@@ -33,6 +33,7 @@ from freecad.cross.kk_robot import *
 from freecad.cross.link_proxy import *
 from freecad.cross.mesh_utils import *
 from freecad.cross.placement_utils import *
+from freecad.cross.pose_proxy import *
 from freecad.cross.planning_scene_proxy import *
 from freecad.cross.planning_scene_utils import *
 from freecad.cross.robot_proxy import *

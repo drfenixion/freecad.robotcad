@@ -142,6 +142,9 @@ class SetJointsDialog(QtGui.QDialog):
         joint_names = [item.text() for item in column_items(table, joint_name_column) if hasattr(item, 'text')]
         joints: list[CrossJoint] = self.robot.Proxy.joint_variables.keys()
         for i, joint in enumerate(joints):
+            if ros_name(joint) not in joint_names:
+                warning = tr(f'Joint {joint.Name} not found in the table')
+                continue
             joint_row = joint_names.index(ros_name(joint))
             unit = table.item(joint_row, unit_column).text()
             value = table.item(joint_row, value_column).text()

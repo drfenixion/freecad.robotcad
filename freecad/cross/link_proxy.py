@@ -587,31 +587,37 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    obj: CrossLink = doc.addObject('App::FeaturePython', name)
-    LinkProxy(obj)
+    cross_link: CrossLink = doc.addObject('App::FeaturePython', name)
+    LinkProxy(cross_link)
+    cross_link.Label2 = cross_link.Label
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
 
-        _ViewProviderLink(obj.ViewObject)
+        _ViewProviderLink(cross_link.ViewObject)
 
         # Make `obj` part of the selected `Cross::Robot`.
         sel = fcgui.Selection.getSelection()
         if sel:
             candidate = sel[0]
             if is_robot(candidate):
-                obj.adjustRelativeLinks(candidate)
-                candidate.addObject(obj)
-                obj.ViewObject.ShowReal = candidate.ViewObject.ShowReal
-                obj.ViewObject.ShowVisual = candidate.ViewObject.ShowVisual
-                obj.ViewObject.ShowCollision = candidate.ViewObject.ShowCollision
+                cross_link.adjustRelativeLinks(candidate)
+                candidate.addObject(cross_link)
+                if candidate.ViewObject:
+                    cross_link.ViewObject.ShowReal = candidate.ViewObject.ShowReal
+                    cross_link.ViewObject.ShowVisual = candidate.ViewObject.ShowVisual
+                    cross_link.ViewObject.ShowCollision = candidate.ViewObject.ShowCollision
             elif is_joint(candidate):
                 robot = candidate.Proxy.get_robot()
                 if robot:
-                    obj.adjustRelativeLinks(robot)
-                    robot.addObject(obj)
-                    candidate.Child = ros_name(obj)
-                    obj.ViewObject.ShowReal = robot.ViewObject.ShowReal
-                    obj.ViewObject.ShowVisual = robot.ViewObject.ShowVisual
-                    obj.ViewObject.ShowCollision = robot.ViewObject.ShowCollision
-    return obj
+                    cross_link.adjustRelativeLinks(robot)
+                    robot.addObject(cross_link)
+                    link_name = ros_name(cross_link)
+                    if link_name in candidate.getEnumerationsOfProperty('Child'):
+                        candidate.Child = ros_name(cross_link)
+                    if robot.ViewObject:
+                        cross_link.ViewObject.ShowReal = robot.ViewObject.ShowReal
+                        cross_link.ViewObject.ShowVisual = robot.ViewObject.ShowVisual
+                        cross_link.ViewObject.ShowCollision = robot.ViewObject.ShowCollision
+    doc.recompute()
+    return cross_link

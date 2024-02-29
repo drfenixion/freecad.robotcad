@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from enum import Enum
+from pathlib import Path
+
 import FreeCAD as fc
 
 from pivy import coin
+
+from .freecad_utils import quantity_as
+from .freecad_utils import warn
+
+
+_Shape = Enum('Shape', ['BOX', 'CONE', 'CUBE', 'CYLINDER', 'SPHERE'])
 
 
 def transform_from_placement(
@@ -35,6 +45,66 @@ def transform_from_placement(
     transform.translation = placement.Base
     transform.rotation = placement.Rotation.Q
     return transform
+
+
+def cylinder_between_points(
+        start_point_mm: Sequence[float],
+        end_point_mm: Sequence[float],
+        radius_mm: float,
+        color: Sequence[float],
+        ):
+    """
+    Create a cylinder between two points with a given color.
+
+    Parameters:
+    - start_point_mm: (x, y, z), the starting point
+    - end_point_mm: (x, y, z), the end point
+    - radius_mm: float, radius of the cylinder
+    - color: (r, g, b) representing the color
+             (RGB values between 0 and 1).
+
+    Returns:
+    - coin.SoSeparator containing the cylinder with the specified color
+
+    """
+    if len(start_point_mm) != 3:
+        raise RuntimeError('start_point_mm must have 3 values')
+    if len(end_point_mm) != 3:
+        raise RuntimeError('end_point_mm must have 3 values')
+    if len(color) != 3:
+        raise RuntimeError('color must have 3 values')
+    if radius_mm < 0:
+        raise RuntimeError('radius_mm must be strictly positive')
+
+    # Create an SoSeparator to encapsulate the cylinder and its properties.
+    separator = coin.SoSeparator()
+
+    # Create an SoMaterial node to set the color.
+    material = coin.SoMaterial()
+    material.diffuseColor = coin.SbColor(color[0], color[1], color[2])
+    separator.addChild(material)
+
+    height = coin.SbVec3f(end_point_mm[0] - start_point_mm[0],
+                          end_point_mm[1] - start_point_mm[1],
+                          end_point_mm[2] - start_point_mm[2]).length()
+
+    cylinder = coin.SoCylinder()
+    cylinder.radius = radius_mm  # FreeCAD uses mm as unit.
+    cylinder.height = height
+
+    # Create an SoTransform node to position and orient the cylinder
+    transform = coin.SoTransform()
+    transform.translation = coin.SbVec3f(start_point_mm[0],
+                                         start_point_mm[1],
+                                         start_point_mm[2])
+    transform.pointAt(coin.SbVec3f(end_point_mm[0],
+                                   end_point_mm[1],
+                                   end_point_mm[2]))
+
+    separator.addChild(transform)
+    separator.addChild(cylinder)
+
+    return separator
 
 
 def arrow_group(
@@ -142,3 +212,240 @@ def face_group(
     group.addChild(vertices)
     group.addChild(indices)
     return group
+
+
+def cylinder_between_points(
+        start_point_mm: Sequence[float],
+        end_point_mm: Sequence[float],
+        radius_mm: float,
+        color: Sequence[float],
+        ) -> coin.SoSeparator:
+    """
+    Create a cylinder between two points.
+
+    Parameters:
+    - start_point_mm: (x, y, z), the starting point
+    - end_point_mm: (x, y, z), the end point
+    - radius_mm: float, radius of the cylinder
+    - color: (r, g, b) representing the color
+             (RGB values between 0 and 1).
+
+    Returns:
+    - coin.SoSeparator containing the cylinder
+
+    """
+    return _cylinder_or_cone_between_points(
+        _Shape.CYLINDER,
+        start_point_mm,
+        end_point_mm,
+        radius_mm,
+        color,
+        )
+
+
+def cone_between_points(
+        start_point_mm: Sequence[float],
+        end_point_mm: Sequence[float],
+        radius_mm: float,
+        color: Sequence[float],
+        ) -> coin.SoSeparator:
+    """
+    Create a cone between two points.
+
+    Parameters:
+    - start_point_mm: (x, y, z), the starting point
+    - end_point_mm: (x, y, z), the end point
+    - radius_mm: float, bottom radius of the cone
+    - color: (r, g, b) representing the color
+             (RGB values between 0 and 1).
+
+    Returns:
+    - coin.SoSeparator containing the cone
+
+    """
+    return _cylinder_or_cone_between_points(
+        _Shape.CONE,
+        start_point_mm,
+        end_point_mm,
+        radius_mm,
+        color,
+        )
+
+
+def tcp_group(
+        tcp_diameter_mm: [float | fc.Units.Quantity] = 50.0,
+        tcp_length_mm: [float | fc.Units.Quantity] = 200.0,
+        tcp_color: Sequence[float] = (0.7, 0.7, 0.7),
+        axis_length_mm: [float | fc.Units.Quantity] = 300.0,
+        axis_diameter_mm: [float | fc.Units.Quantity] = 10.0,
+        ) -> coin.SoSeparator:
+    """Return the SoSeparator reprenting a TCP.
+
+    Return the SoSeparator representing a Tool Center Point, i.e. 3 cylinder
+    representing the frame and a spiky cylinder symbolizing the tool (with the
+    spike of the cone at the origin).
+
+    """
+    if len(tcp_color) != 3:
+        raise RuntimeError('tcp_color must have 3 values')
+    if isinstance(tcp_diameter_mm, fc.Units.Quantity):
+        tcp_diameter_mm = quantity_as(tcp_diameter_mm, 'mm')
+    if isinstance(tcp_length_mm, fc.Units.Quantity):
+        tcp_length_mm = quantity_as(tcp_length_mm, 'mm')
+    if isinstance(axis_length_mm, fc.Units.Quantity):
+        axis_length_mm = quantity_as(axis_length_mm, 'mm')
+    if isinstance(axis_diameter_mm, fc.Units.Quantity):
+        axis_diameter_mm = quantity_as(axis_diameter_mm, 'mm')
+
+    sep = coin.SoSeparator()
+
+    axis_radius = axis_diameter_mm / 2.0
+    axis_start = 0.2 * axis_length_mm
+    axis_end = axis_length_mm - axis_start
+    sep.addChild(cylinder_between_points(start_point_mm=(axis_start, 0.0, 0.0),
+                                         end_point_mm=(axis_end, 0.0, 0.0),
+                                         radius_mm=axis_radius,
+                                         color=(1.0, 0.0, 0.0)))
+    sep.addChild(cylinder_between_points(start_point_mm=(0.0, axis_start, 0.0),
+                                         end_point_mm=(0.0, axis_end, 0.0),
+                                         radius_mm=axis_radius,
+                                         color=(0.0, 1.0, 0.0)))
+    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, axis_start),
+                                         end_point_mm=(0.0, 0.0, axis_end),
+                                         radius_mm=axis_radius,
+                                         color=(0.0, 0.0, 1.0)))
+
+    tcp_radius = tcp_diameter_mm / 2.0
+    tcp_cone_end = -0.25 * tcp_length_mm
+    tcp_cyl_end = -tcp_length_mm - tcp_cone_end
+    sep.addChild(cone_between_points(start_point_mm=(0.0, 0.0, tcp_cone_end),
+                                     end_point_mm=(0.0, 0.0, 0.0),
+                                     radius_mm=tcp_radius,
+                                     color=tcp_color))
+    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, tcp_cone_end),
+                                         end_point_mm=(0.0, 0.0, tcp_cyl_end),
+                                         radius_mm=tcp_radius,
+                                         color=tcp_color))
+    return sep
+
+
+def save_separator_to_file(
+        separator: coin.SoSeparator,
+        filename: [Path | str],
+        file_format: str = 'iv',
+        ) -> None:
+    """Save the content of an SoSeparator to a file in Inventor or VRML format.
+
+    Parameters:
+    - separator: the content to be saved.
+    - filename: the path to the file to save.
+    - file_format: either 'iv' for Inventor (ASCII) or 'wrl' for VRML (binary).
+
+    """
+    path = str(Path(filename).expanduser().absolute())
+
+    # Create an SoOutput to write to a file
+    output = coin.SoOutput()
+
+    # Open the file for writing
+    if not output.openFile(path):
+        warn(f'Error: Cannot open file {filename} for writing.')
+        return
+
+    # Create an SoWriteAction to perform the writing
+    write_action = coin.SoWriteAction(output)
+
+    # Set the file format (Inventor or VRML)
+    if file_format == 'iv':
+        # Use ASCII format for Inventor.
+        write_action.getOutput().setBinary(False)
+    elif file_format == 'wrl':
+        # Use binary format for VRML.
+        write_action.getOutput().setBinary(True)
+    else:
+        warn("Error: Unsupported file format. Use 'iv' for Inventor or 'wrl' for VRML.")
+        return
+
+    # Apply the write action to the separator
+    write_action.apply(separator)
+
+    # Close the file
+    output.closeFile()
+
+
+def _cylinder_or_cone_between_points(
+        shape: _Shape,
+        start_point_mm: Sequence[float],
+        end_point_mm: Sequence[float],
+        radius_mm: float,
+        color: Sequence[float],
+        ) -> coin.SoSeparator:
+    """
+    Create a cylinder or a cone between two points.
+
+    Parameters:
+    - shape: _Shape.CYLINDER or _Shape.CONE.
+    - start_point_mm: (x, y, z), the starting point
+    - end_point_mm: (x, y, z), the end point
+    - radius_mm: float, radius of the cylinder
+    - color: (r, g, b) representing the color
+             (RGB values between 0 and 1).
+
+    Returns:
+    - coin.SoSeparator containing the cylinder
+
+    """
+    if len(start_point_mm) != 3:
+        raise RuntimeError('start_point_mm must have 3 values')
+    if len(end_point_mm) != 3:
+        raise RuntimeError('end_point_mm must have 3 values')
+    if len(color) != 3:
+        raise RuntimeError('color must have 3 values')
+    if radius_mm < 0:
+        raise RuntimeError('radius_mm must be strictly positive')
+    if shape not in (_Shape.CYLINDER, _Shape.CONE):
+        raise RuntimeError('shape must be _Shape.CYLINDER or _Shape.CONE')
+
+    separator = coin.SoSeparator()
+
+    material = coin.SoMaterial()
+    material.diffuseColor = coin.SbColor(color[0], color[1], color[2])
+    separator.addChild(material)
+
+    start = coin.SbVec3f(start_point_mm[0],
+                         start_point_mm[1],
+                         start_point_mm[2])
+    end = coin.SbVec3f(end_point_mm[0],
+                       end_point_mm[1],
+                       end_point_mm[2])
+    shape_axis = end - start
+    height = shape_axis.length()
+
+    if height == 0.0:
+        return separator
+
+    # Both SoCylinder and SoCone have their axis along the y axis.
+    # Rotation from y to shape_axis.
+    y_axis = coin.SbVec3f(0.0, 1.0, 0.0)
+    axis_rot = coin.SbRotation(y_axis, shape_axis)
+
+    # Both SoCylinder and SoCone have their origin at the center of the
+    # shape. We need to translate so that the bottom circle of the shape
+    # is at the starting point.
+    half_shape_axis = coin.SbVec3f(0.0, height / 2.0, 0.0)
+    transform = coin.SoTransform()
+    transform.rotation = axis_rot
+    transform.translation = start + transform.rotation.getValue() * half_shape_axis
+
+    separator.addChild(transform)
+
+    if shape == _Shape.CYLINDER:
+        coin_shape = coin.SoCylinder()
+        coin_shape.radius = radius_mm  # FreeCAD uses mm as Coin unit.
+    else:
+        coin_shape = coin.SoCone()
+        coin_shape.bottomRadius = radius_mm  # FreeCAD uses mm as Coin unit.
+    coin_shape.height = height
+    separator.addChild(coin_shape)
+
+    return separator

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import degrees, radians
-from typing import ForwardRef, Optional
+from typing import ForwardRef, Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -191,6 +191,10 @@ class JointProxy(ProxyBase):
         if state:
             self.Type, = state
 
+    def is_fixed(self) -> bool:
+        """Return whether the joint is of type 'fixed'."""
+        return self.joint.Type == 'fixed'
+
     def get_actuation_placement(self,
                                 joint_value: Optional[float] = None,
                                 ) -> fc.Placement:
@@ -334,7 +338,7 @@ class JointProxy(ProxyBase):
 
 
 class _ViewProviderJoint(ProxyBase):
-    """A view provider for CROSS::Joint objects."""
+    """The view provider for CROSS::Joint objects."""
 
     def __init__(self, vobj: VPDO):
         super().__init__('view_object', [
@@ -361,7 +365,7 @@ class _ViewProviderJoint(ProxyBase):
         # workbench activation in GUI.
         return str(ICON_PATH / 'joint.svg')
 
-    def attach(self, vobj):
+    def attach(self, vobj: VPDO):
         """Setup the scene sub-graph of the view provider."""
         self.view_object = vobj
 
@@ -369,10 +373,7 @@ class _ViewProviderJoint(ProxyBase):
                    obj: CrossJoint,
                    prop: str):
         vobj = obj.ViewObject
-        if not hasattr(vobj, 'Visibility'):
-            return
-        if not vobj.Visibility or not hasattr(vobj, 'ShowAxis'):
-            # root_node.removeAllChildren() # This segfaults when loading the document.
+        if not self.is_execute_ready():
             return
         if prop in ['Placement', 'Type', 'Position']:
             self.draw(vobj, vobj.Visibility and vobj.ShowAxis)
@@ -464,15 +465,16 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    obj: Joint = doc.addObject('App::FeaturePython', name)
-    JointProxy(obj)
+    joint: CrossJoint = doc.addObject('App::FeaturePython', name)
+    JointProxy(joint)
     # Default to type "fixed".
-    obj.Type = 'fixed'
+    joint.Type = 'fixed'
+    joint.Label2 = joint.Label
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
 
-        _ViewProviderJoint(obj.ViewObject)
+        _ViewProviderJoint(joint.ViewObject)
 
         # Make `obj` part of the selected `Cross::Robot`.
         sel = fcgui.Selection.getSelection()
@@ -480,12 +482,17 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
             candidate = sel[0]
             if (is_robot(candidate)
                     or is_workcell(candidate)):
-                obj.adjustRelativeLinks(candidate)
-                candidate.addObject(obj)
+                joint.adjustRelativeLinks(candidate)
+                candidate.addObject(joint)
+                if is_robot(candidate) and candidate.ViewObject:
+                    joint.ViewObject.AxisLength = candidate.ViewObject.JointAxisLength
             elif is_link(candidate):
                 robot = candidate.Proxy.get_robot()
                 if robot:
-                    obj.adjustRelativeLinks(robot)
-                    robot.addObject(obj)
-                    obj.Parent = ros_name(candidate)
-    return obj
+                    joint.adjustRelativeLinks(robot)
+                    robot.addObject(joint)
+                    joint.Parent = ros_name(candidate)
+                    if robot.ViewObject:
+                        joint.ViewObject.AxisLength = robot.ViewObject.JointAxisLength
+    doc.recompute()
+    return joint

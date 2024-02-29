@@ -196,6 +196,8 @@ def cylinder_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
     group.addChild(scaling)
 
     cylinder = coin.SoCylinder()  # Along y, radius 1, height 1 unit.
+    # TODO: cylinder.radius = primitive.dimensions[SolidPrimitive.CYLINDER_RADIUS] * ros_to_coin_cylinder_scale and test
+    # TODO: cylinder.height = primitive.dimensions[SolidPrimitive.CYLINDER_HEIGHT] * ros_to_coin_cylinder_scale and test
     group.addChild(cylinder)
 
     return group

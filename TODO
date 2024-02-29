@@ -1,13 +1,25 @@
 Bugs
 ----
 
-- Fix CROSS complaining about non-existing directory when exporting to URDF into a non-existing directory (the directory is created but CROSS complains though)
+- Fix CROSS complaining about non-existing directory when exporting to URDF into a non-existing directory (the directory is created but CROSS complains though).
 - Fix the placement of some parts in assembly_from_urdf.py (issue with `forearm_visual` when loading `robot_5r.urdf.xacro`).
 - Compute the `Origin` of a joint even if it doesn't have any `Child`.
 - Fix the placement of simplified mesh when selecting the visual- or collision part inside a Cross::Link.
-- Clear necessary fields when `XacroObject.InputFile` is reset
-- Handle empty star-style macro parameters (e.g. `*origin` in `robotiq-3f-gripper_articulated.urdf.xacro`)
+- Clear necessary fields when `XacroObject.InputFile` is reset.
+- Handle empty star-style macro parameters (e.g. `*origin` in `robotiq-3f-gripper_articulated.urdf.xacro`).
 - Fix bug when setting a prefix in XacroObject, then setting it to ''. Some objects are deleted but not all and the Cross::Robot cannot be rebuilt.
+- Fix workbench loading without ROS.
+- Bug with units with `SetJoints`:
+```
+Traceback (most recent call last):
+  File "/home/gael/.local/share/FreeCAD/Mod/freecad.cross/freecad/cross/ui/set_joints_dialog.py", line 153, in _on_table_edited
+    self.robot.Proxy.set_joint_values(self._joint_values)
+  File "/home/gael/.local/share/FreeCAD/Mod/freecad.cross/freecad/cross/robot_proxy.py", line 380, in set_joint_values
+    value = quantity_as(value, target_units[unit_type])
+  File "/home/gael/.local/share/FreeCAD/Mod/freecad.cross/freecad/cross/freecad_utils.py", line 602, in quantity_as
+    return float(q.getValueAs(to_))
+ValueError: Unit mismatch
+```
 
 Missing features
 ----------------
@@ -16,7 +28,7 @@ Missing features
 - Implement toggling the visibility of joints when the visibility of the robot is toggled. (EASY)
 - Use unit (2,1,0,0,0,0,0,0) for moments of inertia. (EASY)
 - Validate Label2 (or Label if Label2 is not defined) against valid URDF names ({Robot,Link,Joint}.onBeforeChange()).
-  The behavior must be configurable: a) Do nothing (export valid names) b) Warn c) Reject. (MEDIUM)
+  The behavior must be configurable: a) Do nothing (but export valid names, as already implemented) b) Warn c) Reject. (MEDIUM)
 - Add a xacro export with `robot_macro.xacro` and `robot.urdf.xacro`. For Workcell, use the current URDF export and replace the current URDF export with pure URDF export. (EASY)
 - Provide a tool to set the inertial parameters automatically. (DIFFICULT)
 - Add two coordinate systems for each Cross::Joint in `assembly_from_urdf` (parent = urdf_joint.origin, child = parent * get_actuation_placement()). (EASY)
@@ -38,6 +50,7 @@ Nice to have
 - Reflect parameters from Robot's joint values in XacroObject. (EASY)
 - Reflect parameters from all XacroObjects' joint values in Workcell. (EASY)
 - Update the robot during editing with `SetJoints`, Assembly4 does update during editing. (EASY, probably)
+- Do not inherit from PythonFeatureGroup but manage the view objects ourselves (HARD).
 
 Lower priority
 --------------

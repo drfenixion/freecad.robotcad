@@ -151,6 +151,7 @@ def get_chains(
     considered.
 
     """
+    # TODO: Make the function faster.
     base_links: list[CrossLink] = []
     tip_links: list[CrossLink] = []
     for link in links:
@@ -169,20 +170,20 @@ def get_chains(
     return chains
 
 
-def get_chain(link: CrossLink) -> DOList:
+def get_chain(link: CrossLink) -> list[CrossBasicElement]:
     """Return the chain from base link to link, excluded.
 
-    The chain start with the base link, then alternates a joint and a link. The
-    last item is the joint that has `link` as child.
+    The chain starts with the base link, then alternates a joint and a link.
+    The last item is the joint that has `link` as child.
 
     """
-    chain: DOList = []
+    chain: list[CrossBasicElement] = []
     ref_joint = link.Proxy.get_ref_joint()
     if not ref_joint:
         # A root link.
         return [link]
     if not ref_joint.Parent:
-        warn(f'Joint `{ros_name(ref_joint)}` has no parent', True)
+        warn(f'Joint `{ros_name(ref_joint)}` has no parent', False)
         # Return only ref_joint to indicate an error.
         return [ref_joint]
     robot = ref_joint.Proxy.get_robot()
@@ -269,7 +270,7 @@ def get_xacro_chains(
     return chains
 
 
-def ros_name(obj: DO):
+def ros_name(obj: DO) -> str:
     """Return in order obj.Label2, obj.Label, obj.Name."""
     if ((not hasattr(obj, 'isDerivedFrom')
          or (not obj.isDerivedFrom('App::DocumentObject')))):

@@ -13,6 +13,7 @@ class _NewJointCommand:
 
     def GetResources(self):
         return {'Pixmap': 'joint.svg',
+                'MenuText': tr('Create a Joint'),
                 'Accel': 'N, J',
                 'ToolTip': tr('Create a Joint.')}
 

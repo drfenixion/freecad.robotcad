@@ -37,6 +37,8 @@ Compatible with ROS2 (for now).
 - Import xacro definitions, i.e. import xacro files that only define some macros and ask the user to choose a macro and its parameters to generate a full-feature URDF,
 - Export the xacro as xacro that includes (`xacro:include`) the original xacro file and uses the macro.
 - Combine several xacros files (i.e. also URDF) into a workcell and export them as a xacro file.
+- Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
+- Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
 ## Installation
 
@@ -49,6 +51,17 @@ You need a recent version of FreeCAD v0.21 with the ability to configure custom 
 - Click on "OK" to close the dialog "Preferences"
 - Back to FreeCAD's main window, menu "Tools / Addon manager"
 - Search and install the workbench via the [Addon Manager](https://wiki.freecad.org/Std_AddonMgr)
+
+## Launching FreeCAD with ROS
+
+The CROSS workbench is supposed to load also without ROS, with limited functionality.
+If this is not the case, please report.
+
+You will probably want to be able to use ROS-related functionalities and this requires launching FreeCAD from the command line:
+
+- Open a terminal
+- Source your ROS workspace
+- Launch FreeCAD with extra Python modules set by ROS, `freecad --module-path ${PYTHONPATH//:/' --module-path '}` (replace `freecad` by your FreeCAD executable). This bash magic will add for example ` --module-path path1 --module-path path2 ` if `$PYTHONPATH` is `path1:path2`.
 
 ## Testing/developing the workbench
 

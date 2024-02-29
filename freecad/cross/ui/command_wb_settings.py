@@ -22,6 +22,7 @@ class _WbSettingsCommand:
 
     def GetResources(self):
         return {'Pixmap': 'wb_settings.svg',
+                'MenuText': tr('Workbench settings'),
                 'Accel': 'W, S',
                 'ToolTip': tr('Workbench settings')}
 

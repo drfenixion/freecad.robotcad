@@ -6,6 +6,7 @@ from .ui import command_box_from_bounding_box
 from .ui import command_kk_edit
 from .ui import command_new_joint
 from .ui import command_new_link
+from .ui import command_new_pose
 from .ui import command_new_robot
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
@@ -50,6 +51,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
+            'NewPose',  # Defined in ./ui/command_new_pose.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.

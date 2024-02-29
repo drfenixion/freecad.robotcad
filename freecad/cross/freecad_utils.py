@@ -533,22 +533,37 @@ class ProxyBase(ABC):
     """A base class for proxies of dynamic (scripted) objects in FreeCAD."""
 
     def __init__(self, object_name: str, properties: list[str]):
+        # Name of the attribute being the FreeCAD object.
         self._object_name: str = object_name
+
+        # List of properties that the FreeCAD object must have to be ready to
+        # execute.
         self._properties: list[str] = properties
 
-    def is_execute_ready(self) -> bool:
+    def is_execute_ready(self, debug=False) -> bool:
         """Return True if the object and all properties are defined.
 
         Return True if `self` has the attribute `self._object_name` and
         `self._object_name` has all attributes given in `self._properties`.
 
+        If `debug` is True, print a warning if the object is missing or the
+        name of the missing property.
+
         """
+        if not hasattr(self, '_object_name'):
+            if debug:
+                warn('Attribute "_object_name" not found in `self`')
+            return False
         try:
             obj = getattr(self, self._object_name)
         except AttributeError:
+            if debug:
+                warn(f'Attribute "{self._object_name}" not found in `self`')
             return False
         for p in self._properties:
             if not hasattr(obj, p):
+                if debug:
+                    warn(f'Attribute "{p}" not found in "self.{self._object_name}"')
                 return False
         return True
 

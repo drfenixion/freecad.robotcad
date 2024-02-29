@@ -7,15 +7,13 @@ from xml.etree import ElementTree as et
 
 import FreeCAD as fc
 
-import FreeCADGui as fcgui
-
 from pivy import coin
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
+from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .planning_scene_utils import coin_from_planning_scene_msg
-from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
 from .wb_utils import ICON_PATH
 
 try:
@@ -27,7 +25,7 @@ except ImportError:
 
 # Stubs and type hints.
 from .planning_scene import PlanningScene as CrossPlanningScene  # A Cross::PlanningScene, i.e. a DocumentObject with Proxy "PlanningScene". # noqa: E501
-VPDO = ForwardRef('FreeCADGui.ViewProviderDocumentObject')  # Don't want to import FreeCADGui here. # noqa: E501
+from .planning_scene import ViewProviderPlanningScene as VP
 
 
 class PlanningSceneProxy(ProxyBase):
@@ -84,21 +82,39 @@ class PlanningSceneProxy(ProxyBase):
 class _ViewProviderPlanningScene(ProxyBase):
     """A view provider for the PlanningScene object """
 
-    def __init__(self, vobj: VPDO):
+    def __init__(self, vobj: VP):
         super().__init__('view_object', [
             'Visibility',
+            'PlaneSides',
             ])
-        vobj.Proxy = self
+
+        if vobj.Proxy is not self:
+            # Implementation note: triggers `self.attach`.
+            vobj.Proxy = self
+        self._init(vobj)
+
+    def _init(self, vobj: VP) -> None:
+        self.view_object = vobj
+        self.scene = vobj.Object
+        self._init_properties(vobj)
+
+    def _init_properties(self, vobj: VP):
+        """Set properties of the view provider."""
+        # Default to 1000.0, i.e. 1 meter.
+        add_property(vobj, 'App::PropertyLength', 'PlaneSides',
+                     'ROS Display Options',
+                     'The length of the sides of the plane.',
+                     1000.0)
 
     def getIcon(self):
         # Implementation note: "return 'planning_scene.svg'" works only after
         # workbench activation in GUI.
         return str(ICON_PATH / 'planning_scene.svg')
 
-    def attach(self, vobj: VPDO):
+    def attach(self, vobj: VP):
         """Setup the scene sub-graph of the view provider, this method is mandatory."""
-        self.view_object = vobj
-        self.scene = vobj.Object
+        # `self.__init__()` is not called on document restore, do it manually.
+        self.__init__(vobj)
 
         self.shaded = coin.SoGroup()
 
@@ -113,7 +129,7 @@ class _ViewProviderPlanningScene(ProxyBase):
     def updateData(self, obj: CrossPlanningScene, prop: str) -> None:
         pass
 
-    def onChanged(self, vobj: VPDO, prop: str) -> None:
+    def onChanged(self, vobj: VP, prop: str) -> None:
         if ((not self.is_execute_ready())
                 or (not hasattr(vobj.Proxy, 'shaded'))
                 or (not hasattr(vobj.Proxy, 'wireframe'))):
@@ -127,13 +143,16 @@ class _ViewProviderPlanningScene(ProxyBase):
         style.style = coin.SoDrawStyle.LINES
         self.wireframe.addChild(style)
 
-        # TODO: plane sides as property.
+        if not self.view_object.Visibility:
+            return
+
+        plane_sides_mm = quantity_as(self.view_object.PlaneSides, 'mm')
         planning_scene_group = coin_from_planning_scene_msg(
-                msg, plane_sides_mm=1000.0)
+                msg, plane_sides_mm=plane_sides_mm)
         self.shaded.addChild(planning_scene_group)
         self.wireframe.addChild(planning_scene_group)
 
-    def getDisplayModes(self, vobj: VPDO) -> list[str]:
+    def getDisplayModes(self, vobj: VP) -> list[str]:
         """Return a list of display modes."""
         modes = []
         modes.append('Shaded')

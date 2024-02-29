@@ -8,7 +8,7 @@ exported as URDF file.
 from __future__ import annotations
 
 from math import radians
-from typing import ForwardRef, List, Optional
+from typing import ForwardRef, List, Optional, Union, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -47,6 +47,7 @@ from .wb_utils import ros_name
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+BasicElement = Union[CrossJoint, CrossLink]
 DO = fc.DocumentObject
 DOList = List[DO]
 VPDO = ForwardRef('FreeCADGui.ViewProviderDocumentObject')  # Don't want to import FreeCADGui here. # noqa: E501
@@ -178,7 +179,7 @@ class RobotProxy(ProxyBase):
         # Only for actuated non-mimicking joints.
         self._joint_variables: dict[CrossJoint, str] = {}
 
-        self.init_properties(obj)
+        self._init_properties(obj)
 
     @property
     def created_objects(self) -> DOList:
@@ -190,7 +191,7 @@ class RobotProxy(ProxyBase):
         """Map of joint names to joint variable names."""
         return self._joint_variables
 
-    def init_properties(self, obj: CrossRobot):
+    def _init_properties(self, obj: CrossRobot):
         add_property(obj, 'App::PropertyString', '_Type', 'Internal',
                      'The type')
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
@@ -478,16 +479,16 @@ class RobotProxy(ProxyBase):
         """Return the root link of the robot."""
         chains = self.get_chains()
         if not chains:
-            return
+            return None
         if not chains[0]:
-            return
+            return None
         return chains[0][0]
 
-    def get_chains(self) -> list[DOList]:
+    def get_chains(self) -> list[list[BasicElement]]:
         """Return the list of chains.
 
         A chain starts at the root link, alternates links and joints, and ends
-        at the last joint of the chain.
+        at the last link of the chain.
 
         If the last element of a chain would be a joint, that chain is not
         considered.
@@ -502,10 +503,111 @@ class RobotProxy(ProxyBase):
         joints = self.get_joints()
         return get_chains(links, joints)
 
+    def get_links_fixed_with(self, link_name: str) -> list[CrossLink]:
+        """Return the list of links fixed with the specified link.
+
+        The order of the links can be considered as arbitrary.
+        If not empty, the returned list contains the specified link itself.
+        An empty list indicated an error (link not found).
+
+        """
+        if not self.is_execute_ready():
+            return []
+        link = self.get_link(link_name)
+        if not link:
+            return []
+        chains = self.get_chains()
+        out_links: set[CrossLink] = set([link])
+        for chain in chains:
+            if link not in chain:
+                # Shortcut.
+                continue
+            subchain: list[CrossLink] = []
+            # Iterate over joints.
+            joints = cast(list[CrossJoint], chain[1::2])
+            for joint in joints:
+                # No need to check the parent- and child link validity because
+                # the joint is part of a chain.
+                parent = cast(CrossLink, self.get_link(joint.Parent))
+                child = cast(CrossLink, self.get_link(joint.Child))
+                if not subchain:
+                    # Add the first link.
+                    subchain.append(parent)
+                if joint.Proxy.is_fixed():
+                    subchain.append(child)
+                    if (joint is chain[-2]):
+                        # Last joint of the chain.
+                        out_links.update(subchain)
+                        # Next subchain.
+                else:
+                    if link in subchain:
+                        out_links.update(subchain)
+                        # Next subchain.
+                        break
+                    # Link not in subchain, wrong subchain, start a new one.
+                    subchain.clear()
+                # Next element in the chain.
+            # Next chain.
+        return list(out_links)
+
+    def get_transform(self, from_link: str, to_link: str) -> Optional[fc.Placement]:
+        """Return the current transform between two links.
+
+        Return the current transform, i.e. with the current joint values,
+        from link `from_link` to link `to_link`.
+
+        """
+        if not self.is_execute_ready():
+            return None
+        from_ = self.get_link(from_link)
+        if not from_:
+            return None
+        to = self.get_link(to_link)
+        if not to:
+            return None
+        if from_ is to:
+            return fc.Placement()
+        chains = self.get_chains()
+        for chain in chains:
+            if from_ not in chain:
+                continue
+            if to not in chain:
+                continue
+            from_or_to_found = False
+            first_transform = fc.Placement()
+            second_transform = fc.Placement()
+            for link, joint in grouper(chain, 2):
+                if ((not ((link is from_) or (link is to)))
+                        and (not from_or_to_found)):
+                    continue
+                if not from_or_to_found:
+                    first_transform = link.Placement
+                if (link is from_) and (not from_or_to_found):
+                    second = to
+                if (link is to) and (not from_or_to_found):
+                    second = from_
+                from_or_to_found = True
+                if link is second:
+                    first_to_second = first_transform.inverse() * second_transform
+                    if second is to:
+                        return first_to_second
+                    else:
+                        return first_to_second.inverse()
+                child = self.get_link(joint.Child)
+                if not child:
+                    return None
+                parent = self.get_link(joint.Parent)
+                if not parent:
+                    return None
+                if (child is second) or (parent is second):
+                    second_transform = (joint.Placement
+                                        * joint.Proxy.get_actuation_placement())
+        return None
+
     def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
         """Export the robot as URDF, writing files."""
         if not self.is_execute_ready():
-            return
+            return None
         if not self.robot.OutputPath:
             # TODO: ask the user for OutputPath.
             warn('Property `OutputPath` cannot be empty', True)
@@ -664,15 +766,15 @@ def make_robot(name, doc: Optional[fc.Document] = None) -> CrossRobot:
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    obj: CrossRobot = doc.addObject('App::DocumentObjectGroupPython', name)
-    # obj = doc.addObject('Part::FeaturePython', name)
-    RobotProxy(obj)
+    robot: CrossRobot = doc.addObject('App::DocumentObjectGroupPython', name)
+    # robot = doc.addObject('Part::FeaturePython', name)
+    RobotProxy(robot)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
-        _ViewProviderRobot(obj.ViewObject)
-        obj.ViewObject.ShowReal = True
-        obj.ViewObject.ShowVisual = False
-        obj.ViewObject.ShowCollision = False
+        _ViewProviderRobot(robot.ViewObject)
+        robot.ViewObject.ShowReal = True
+        robot.ViewObject.ShowVisual = False
+        robot.ViewObject.ShowCollision = False
 
     doc.recompute()
-    return obj
+    return robot

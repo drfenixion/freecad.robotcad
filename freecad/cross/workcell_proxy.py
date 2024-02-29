@@ -325,10 +325,11 @@ def make_workcell(name, doc: Optional[fc.Document] = None) -> CrossWorkcell:
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    obj:CrossWorkcell = doc.addObject('App::DocumentObjectGroupPython', name)
-    WorkcellProxy(obj)
+    workcell: CrossWorkcell = doc.addObject('App::DocumentObjectGroupPython', name)
+    WorkcellProxy(workcell)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
-        _ViewProviderWorkcell(obj.ViewObject)
+        _ViewProviderWorkcell(workcell.ViewObject)
 
-    return obj
+    doc.recompute()
+    return workcell

@@ -10,6 +10,7 @@ class _NewWorkcellCommand:
 
     def GetResources(self):
         return {'Pixmap': 'workcell.svg',
+                'MenuText': tr('Create a Workcell'),
                 'Accel': 'N, W',
                 'ToolTip': tr('Create a Workcell.')}
 

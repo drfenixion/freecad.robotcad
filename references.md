@@ -72,3 +72,7 @@
 - [The V-HACD library](https://github.com/kmammou/v-hacd/) decomposes a 3D surface into a set of "near" convex parts
 - [trimesh interface to V-HACD](https://trimsh.org/trimesh.interfaces.vhacd.html)
 - [Mesh-to-SDF](https://github.com/kmammou/v-hacd/) converter (uses V-HACD).
+
+# Phobos add-on for Blender
+
+- [Phobos](https://github.com/dfki-ric/phobos) allows to make kinematic, inertia, collision, etc for your robot model and export as URDF, SDF, SMURF and other formats.

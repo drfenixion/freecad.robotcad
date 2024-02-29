@@ -481,23 +481,23 @@ def make_xacro_object(name, doc: Optional[fc.Document] = None) -> CrossXacroObje
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    # obj = doc.addObject('App::FeaturePython', name)
-    obj: CrossXacroObject = doc.addObject('Part::FeaturePython', name)
-    XacroObjectProxy(obj)
+    # xacro_obj = doc.addObject('App::FeaturePython', name)
+    xacro_obj: CrossXacroObject = doc.addObject('Part::FeaturePython', name)
+    XacroObjectProxy(xacro_obj)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
 
-        _ViewProviderXacroObject(obj.ViewObject)
+        _ViewProviderXacroObject(xacro_obj.ViewObject)
 
-        # Make `obj` part of the selected `Cross::Workcell`.
+        # Make `xacro_obj` part of the selected `Cross::Workcell`.
         sel = fcgui.Selection.getSelection()
         if sel:
             candidate = sel[0]
             if (is_robot(candidate)
                     or is_workcell(candidate)):
-                obj.adjustRelativeLinks(candidate)
-                candidate.addObject(obj)
+                xacro_obj.adjustRelativeLinks(candidate)
+                candidate.addObject(xacro_obj)
 
     doc.recompute()
-    return obj
+    return xacro_obj

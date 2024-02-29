@@ -34,7 +34,7 @@ class _GetPlanningSceneCommand:
         fcgui.doCommand('if _scene_msg is None:\n'
                         '    _scene = None\n'
                         'else:\n'
-                        "    _scene = freecad.cross.planning_scene_proxy.make_planning_scene('Scene', _scene_msg)")
+                        "    _scene = freecad.cross.planning_scene_proxy.make_planning_scene(_scene_msg.name, _scene_msg)")
         # fcgui.doCommand('FreeCADGui.ActiveDocument.setEdit(_scene.Name)')
         doc.recompute()
         doc.commitTransaction()

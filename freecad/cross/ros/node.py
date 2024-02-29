@@ -8,7 +8,6 @@ try:
     from rclpy.executors import MultiThreadedExecutor
     imports_ok = True
 except ImportError:
-    raise
     Node = ForwardRef('Node')
     MultiThreadedExecutor = ForwardRef('MultiThreadedExecutor')
     imports_ok = False
