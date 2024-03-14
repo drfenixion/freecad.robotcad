@@ -17,6 +17,7 @@ from .ui import command_set_joints
 from .ui import command_set_placement
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
+from .ui import command_cylinder_from_bounding_box
 from .ui import command_update_planning_scene
 from .ui import command_urdf_export
 from .ui import command_wb_settings
@@ -48,6 +49,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
+            'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
             'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
