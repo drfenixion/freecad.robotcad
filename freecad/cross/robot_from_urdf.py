@@ -206,6 +206,18 @@ def _add_ros_joint(
     ros_joint.Child = urdf_joint.child
     ros_joint.Type = urdf_joint.type
     ros_joint.Origin = placement_along_z_from_joint(urdf_joint)
+    if urdf_joint.limit is not None:
+        if ros_joint.Proxy.get_unit_type() == 'Angle':
+            factor = degrees(1.0)  # radians to degrees.
+        elif ros_joint.Proxy.get_unit_type() == 'Length':
+            factor = 1000.0  # meters to millimeters.
+        else:
+            factor = 1.0
+        # All attributes of `limit` are compulsory.
+        ros_joint.LowerLimit = factor * urdf_joint.limit.lower
+        ros_joint.UpperLimit = factor * urdf_joint.limit.upper
+        ros_joint.Effort = factor * urdf_joint.limit.effort
+        ros_joint.Velocity = factor * urdf_joint.limit.velocity
     return ros_joint
 
 

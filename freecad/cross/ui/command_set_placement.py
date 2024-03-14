@@ -20,11 +20,10 @@ LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
 def get_relative_placement(
-        cross_object: [CrossJoint, CrossLink],
         lcs: LCS,
         obj: DO,
         ) -> fc.Placement:
-    """Set the placement of `cross_object` as `lcs` relative to `obj`."""
+    """Return the transform from `lcs` to `obj`."""
     resolve_mode_resolve = 1
     selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
     objects_placements = get_subobjects_and_placements(selection)
@@ -45,7 +44,7 @@ class _SetCROSSPlacementCommand:
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement.svg',
                 'MenuText': tr('Set placement'),
-                'Accel': 'N, L',
+                'Accel': 'S, P',
                 'ToolTip': tr('Set the mounted placement'
                               ' of a link or the origin of a joint.'
                               'Select either\n'
@@ -94,12 +93,12 @@ class _SetCROSSPlacementCommand:
             return
 
         if selection_link:
-            placement = get_relative_placement(cross_link, lcs, obj)
+            placement = get_relative_placement(lcs, obj)
             doc.openTransaction(tr("Set link's mounted placement"))
             cross_link.MountedPlacement = placement
             doc.commitTransaction()
         elif selection_joint:
-            placement = get_relative_placement(cross_joint, lcs_child, lcs_parent)
+            placement = get_relative_placement(lcs_child, lcs_parent)
             doc.openTransaction(tr("Set joint's origin"))
             cross_joint.Origin = placement
             doc.commitTransaction()

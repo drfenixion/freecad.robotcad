@@ -179,6 +179,10 @@ class RobotProxy(ProxyBase):
         # Only for actuated non-mimicking joints.
         self._joint_variables: dict[CrossJoint, str] = {}
 
+        # Save the links and joints to speed-up get_links() and get_joints().
+        self._links: Optional[list[CrossLink]] = None
+        self._joints: Optional[list[CrossJoint]] = None
+
         self._init_properties(obj)
 
     @property
@@ -217,7 +221,11 @@ class RobotProxy(ProxyBase):
         # self.reset_group()
 
     def onChanged(self, obj: CrossRobot, prop: str) -> None:
+        # print(f'{obj.Name}.onChanged({prop})') # DEBUG
         if prop in ['Group']:
+            # Reset _links and _joints to provoke a recompute.
+            self._links = None
+            self._joints = None
             self.execute(obj)
         if prop == 'OutputPath':
             rel_path = remove_ros_workspace(obj.OutputPath)
@@ -230,12 +238,20 @@ class RobotProxy(ProxyBase):
         """Restore attributes because __init__ is not called on restore."""
         self.__init__(obj)
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def _reset_group(self) -> None:
         """Add FreeCAD links in CrossLinks for Real, Visual, and Collision."""
@@ -407,10 +423,16 @@ class RobotProxy(ProxyBase):
         root link.
 
         """
+        joint_cache: dict[CrossJoint, fc.Placement] = {}
         chains = self.get_chains()
         for chain in chains:
             placement = self.robot.Placement  # A copy.
             for link, joint in grouper(chain, 2):
+                if joint in joint_cache:
+                    placement = joint_cache[joint]
+                    # No need to update the link's placement because we support
+                    # only tree structures.
+                    continue
                 # TODO: some links and joints are already placed, re-use.
                 if hasattr(link, 'MountedPlacement'):
                     new_link_placement = placement * link.MountedPlacement
@@ -428,18 +450,28 @@ class RobotProxy(ProxyBase):
                     # For next link.
                     placement = (new_joint_placement
                                  * joint.Proxy.get_actuation_placement())
+                    joint_cache[joint] = placement
 
     def get_links(self) -> list[CrossLink]:
         """Return the list of CROSS links in the order of creation."""
+        # TODO: as property.
+        if (self._links is not None):
+            return list(self._links)  # A copy.
         if not self.is_execute_ready():
             return []
-        return get_links(self.robot.Group)
+        self._links = get_links(self.robot.Group)
+        return list(self._links)  # A copy.
 
     def get_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS joints in the order of creation."""
+        # TODO: as property.
+        if (self._joints is not None):
+            # self._joints is updated in self.onChanged().
+            return list(self._joints)  # A copy.
         if not self.is_execute_ready():
             return []
-        return get_joints(self.robot.Group)
+        self._joints = get_joints(self.robot.Group)
+        return list(self._joints)  # A copy.
 
     def get_actuated_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS actuated joints in the order of creation."""

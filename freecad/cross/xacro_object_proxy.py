@@ -242,12 +242,20 @@ class XacroObjectProxy(ProxyBase):
         self._fix_lost_fc_links()
         self.execute(obj)
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def reset_group(self):
         """Rebuild the CrossRobot object."""

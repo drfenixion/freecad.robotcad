@@ -91,12 +91,20 @@ class WorkcellProxy(ProxyBase):
     def onDocumentRestored(self, obj: CrossWorkcell) -> None:
         self.__init__(obj)
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def get_xacro_objects(self) -> list[CrossXacroObject]:
         if not self.is_execute_ready():

@@ -3,12 +3,15 @@
 <package format="3">
   <name>freecad_cross_rosdep</name>
   <version>1.0.0</version>
-  <description>Package for store freecad.cross workbench dependencies</description>
+  <description>Package to store freecad.cross workbench dependencies</description>
   <maintainer email="no_maintainer@no.maintaner">no</maintainer>
   <license>LGPL-2.1</license>
 
-  <depend>xacro</depend>
+  <depend>geometry_msgs</depend>
+  <depend>moveit_msgs</depend>
+  <depend>shape_msgs</depend>
   <depend>urdfdom_py</depend>
+  <depend>xacro</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

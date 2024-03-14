@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import ForwardRef, List, Optional
+from typing import ForwardRef, List, Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -16,6 +16,7 @@ from .urdf_utils import XmlForExport
 from .urdf_utils import urdf_collision_from_object
 from .urdf_utils import urdf_inertial
 from .urdf_utils import urdf_visual_from_object
+from .utils import attr_equals
 from .utils import warn_unsupported
 from .wb_utils import ICON_PATH
 from .wb_utils import get_chain
@@ -148,8 +149,6 @@ class LinkProxy(ProxyBase):
             ])
         obj.Proxy = self
         self.link = obj
-        self.init_extensions(obj)
-        self.init_properties(obj)
 
         # Lists to keep track of the objects that were added to the link.
         self._fc_links_real: DOList = []
@@ -160,6 +159,15 @@ class LinkProxy(ProxyBase):
         # `Label2`.
         # Updated in `onBeforeChange` and potentially used in `onChanged`.
         self.old_ros_name: str = ''
+
+        # Save the robot to speed-up self.get_robot().
+        self._robot: Optional[CrossRobot] = None
+
+        # Save the parent joint to speed-up self.get_ref_joint().
+        self._ref_joint: Optional[CrossJoint] = None
+
+        self.init_extensions(obj)
+        self.init_properties(obj)
 
     def init_extensions(self, obj: CrossLink) -> None:
         # Need a group to put the generated FreeCAD links in.
@@ -202,7 +210,6 @@ class LinkProxy(ProxyBase):
 
         add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
                      'Placement of elements in the robot frame')
-        obj.setEditorMode('Placement', ['ReadOnly'])
 
         # Used when adding a link which shape in located at the origin but
         # looks correctly placed. For example, when opening a STEP file or a
@@ -211,6 +218,8 @@ class LinkProxy(ProxyBase):
         # joint that is parent of this link.
         add_property(obj, 'App::PropertyPlacement', 'MountedPlacement',
                      'ROS Parameters', 'Shapes placement')
+
+        self._set_property_modes()
 
     def execute(self, obj: CrossLink) -> None:
         pass
@@ -243,21 +252,44 @@ class LinkProxy(ProxyBase):
             if not self.is_execute_ready():
                 return
             for fclink in obj.Group:
+                if self.get_robot():
+                    new_placement = obj.Placement
+                else:
+                    new_placement = obj.Placement * obj.MountedPlacement
                 if (is_freecad_link(fclink)
-                        and (fclink.LinkPlacement != obj.Placement)):
-                    fclink.LinkPlacement = obj.Placement
+                        and (fclink.LinkPlacement != new_placement)):
+                    fclink.LinkPlacement = new_placement
+        if prop == 'MountedPlacement':
+            robot = self.get_robot()
+            if robot:
+                # The placement of FreeCAD links is managed by the robot.
+                return
+            new_placement = obj.Placement * obj.MountedPlacement
+            for fclink in obj.Group:
+                if (is_freecad_link(fclink)
+                        and (fclink.LinkPlacement != new_placement)):
+                    fclink.LinkPlacement = new_placement
+        self._set_property_modes()
 
     def onDocumentRestored(self, obj: CrossLink) -> None:
         self.__init__(obj)
         self._fix_lost_fc_links()
         self._fill_fc_link_lists()
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def cleanup_children(self) -> DOList:
         """Remove and return all objects not supported by CROSS::Link."""
@@ -299,23 +331,37 @@ class LinkProxy(ProxyBase):
 
     def get_robot(self) -> Optional[CrossRobot]:
         """Return the Cross::Robot this link belongs to."""
+        # TODO: as property.
+        if (hasattr(self, '_robot')
+                and self._robot
+                and hasattr(self._robot, 'Group')
+                and (self.link in self._robot.Group)):
+            return self._robot
         if not self.is_execute_ready():
             return None
         for o in self.link.InList:
             if is_robot(o):
-                return o
+                self._robot = cast(CrossRobot, o)
+                return self._robot
         return None
 
     def get_ref_joint(self) -> Optional[CrossJoint]:
         """Return the joint this link is the child of."""
+        # TODO: as property.
         robot = self.get_robot()
         if robot is None:
             return None
+        if (self._ref_joint
+                and attr_equals(self._ref_joint, 'Child', ros_name(self.link))
+                and hasattr(self._ref_joint, 'Proxy')
+                and robot == self._ref_joint.Proxy.get_robot()):
+            return self._ref_joint
         joints = get_joints(robot.Group)
         for joint in joints:
             if joint.Child == ros_name(self.link):
                 # Parallel mechanisms are not supported, there should be only
                 # one joint that has `link` as child.
+                self._ref_joint = joint
                 return joint
         return None
 
@@ -329,7 +375,7 @@ class LinkProxy(ProxyBase):
         if robot is None:
             # Not attached to any robot.
             return True
-        joints = get_joints(robot.Group)
+        joints = robot.Proxy.get_joints()
         for joint in joints:
             if joint.Parent == ros_name(self.link):
                 return False
@@ -510,6 +556,16 @@ class LinkProxy(ProxyBase):
                 self._fc_links_visual.append(o)
             elif o.Label.startswith('collision'):
                 self._fc_links_collision.append(o)
+
+    def _set_property_modes(self) -> None:
+        """Set the modes of the properties."""
+        if not self.is_execute_ready():
+            return
+        if self.get_robot():
+            # Placement is managed by the robot.
+            self.link.setEditorMode('Placement', ['ReadOnly'])
+        else:
+            self.link.setEditorMode('Placement', [])
 
 
 class _ViewProviderLink(ProxyBase):

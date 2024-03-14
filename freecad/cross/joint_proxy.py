@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import degrees, radians
-from typing import ForwardRef, Optional, cast
+from typing import cast, ForwardRef, Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -63,12 +63,15 @@ class JointProxy(ProxyBase):
         self.child_link: Optional[CrossLink] = None
         self.parent_link: Optional[CrossLink] = None
 
-        self.init_properties(obj)
-
         # Used to recover a valid and unique name on change of `Label` or
         # `Label2`.
         # Updated in `onBeforeChange` and potentially used in `onChanged`.
         self.old_ros_name: str = ''
+
+        # Save the robot to speed-up self.get_robot().
+        self._robot: Optional[CrossRobot] = None
+
+        self.init_properties(obj)
 
     def init_properties(self, obj: CrossJoint):
         add_property(obj, 'App::PropertyString', '_Type', 'Internal',
@@ -184,12 +187,20 @@ class JointProxy(ProxyBase):
     def onDocumentRestored(self, obj: CrossJoint):
         self.__init__(obj)
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def is_fixed(self) -> bool:
         """Return whether the joint is of type 'fixed'."""
@@ -215,11 +226,11 @@ class JointProxy(ProxyBase):
             if self.joint.Type == 'prismatic':
                 # User value in mm.
                 off = self.joint.Offset / 1000.0
-            elif self.joint.Type == 'revolute':
+            elif self.joint.Type in ('revolute', 'continuous'):
                 # User value in deg.
                 off = radians(self.joint.Offset)
             else:
-                warn('Mimicking joint must be prismatic or revolute', True)
+                warn('Mimicking joint must be prismatic, revolute or continuous', True)
                 mult = 0.0
                 off = 0.0
             p = self.joint.MimickedJoint.Position
@@ -231,7 +242,7 @@ class JointProxy(ProxyBase):
             if joint_value is None:
                 joint_value = self.joint.Position * 1000.0
             return fc.Placement(fc.Vector(0.0, 0.0, joint_value), fc.Rotation())
-        if self.joint.Type in ['revolute', 'continuous']:
+        if self.joint.Type in ('revolute', 'continuous'):
             if joint_value is None:
                 joint_value = degrees(self.joint.Position)
             return fc.Placement(fc.Vector(),
@@ -241,22 +252,31 @@ class JointProxy(ProxyBase):
 
     def get_robot(self) -> Optional[CrossRobot]:
         """Return the Cross::Robot this joint belongs to."""
+        # TODO: as property.
+        if (hasattr(self, '_robot')
+            and self._robot
+                and hasattr(self._robot, 'Group')
+                and (self.joint in self._robot.Group)):
+            return self._robot
         if not self.is_execute_ready():
-            return
+            return None
         for o in self.joint.InList:
             if is_robot(o):
-                return o
+                self._robot = cast(CrossRobot, o)
+                return self._robot
+        return None
 
     def get_predecessor(self) -> Optional[CrossJoint]:
         """Return the predecessing joint."""
         robot = self.get_robot()
         if robot is None:
-            return
+            return None
         for candidate_joint in robot.Proxy.get_joints():
             child_of_candidate = robot.Proxy.get_link(candidate_joint.Child)
             parent_of_self = robot.Proxy.get_link(self.joint.Parent)
             if child_of_candidate is parent_of_self:
                 return candidate_joint
+        return None
 
     def get_unit_type(self) -> str:
         """Return `Length` or `Angle`."""
@@ -264,7 +284,7 @@ class JointProxy(ProxyBase):
             return ''
         if self.joint.Type == 'prismatic':
             return 'Length'
-        if self.joint.Type in ['revolute', 'continuous']:
+        if self.joint.Type in ('revolute', 'continuous'):
             return 'Angle'
         return ''
 
@@ -284,16 +304,23 @@ class JointProxy(ProxyBase):
         joint_xml.append(urdf_origin_from_placement(joint.Origin))
         if joint.Type != 'fixed':
             joint_xml.append(et.fromstring('<axis xyz="0 0 1" />'))
-            limit_xml = et.fromstring('<limit/>')
-            if joint.Type == 'revolute':
+            if joint.Type in ('revolute', 'continuous'):
                 factor = radians(1.0)
             else:
                 factor = 0.001
-            limit_xml.attrib['lower'] = str(joint.LowerLimit * factor)
-            limit_xml.attrib['upper'] = str(joint.UpperLimit * factor)
-            limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
-            limit_xml.attrib['effort'] = str(joint.Effort)
-            joint_xml.append(limit_xml)
+            if joint.Type != 'continuous':
+                # The URDF specification only says that the `limit` element
+                # is optional for the `continuous` joint type. However, the
+                # `urdfdom` library does not like if the `limit` element is
+                # present but not complete but the `lower` and `upper` values
+                # should not be set for the `continuous` joint type .
+                # Cf. https://github.com/ros/urdfdom/issues/180.
+                limit_xml = et.fromstring('<limit/>')
+                limit_xml.attrib['lower'] = str(joint.LowerLimit * factor)
+                limit_xml.attrib['upper'] = str(joint.UpperLimit * factor)
+                limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
+                limit_xml.attrib['effort'] = str(joint.Effort)
+                joint_xml.append(limit_xml)
         if joint.Mimic:
             mimic_xml = et.fromstring('<mimic/>')
             mimic_joint = ros_name(joint.MimickedJoint)
@@ -322,7 +349,7 @@ class JointProxy(ProxyBase):
         joint.setEditorMode('Multiplier', mimic_editor_mode)
         joint.setEditorMode('Offset', mimic_editor_mode)
 
-        if joint.Type in ['revolute', 'prismatic']:
+        if joint.Type in ('revolute', 'prismatic'):
             continuous_editor_mode = []
         else:
             continuous_editor_mode = ['Hidden']
@@ -427,7 +454,7 @@ class _ViewProviderJoint(ProxyBase):
             ps3 = placement * fc.Vector(+scale / 2.0, -scale / 2.0, 0.0)
             square = face_group([ps0, ps1, ps2, ps3], color=color)
             root_node.addChild(square)
-        if obj.Type in ['revolute', 'continuous']:
+        if obj.Type in ('revolute', 'continuous'):
             placement *= obj.Proxy.get_actuation_placement()
             scale = length * 0.2
             pt0 = placement * fc.Vector(0.0, 0.0, 0.0)

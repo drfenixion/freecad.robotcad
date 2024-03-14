@@ -92,6 +92,11 @@ def is_workcell(obj: DO) -> bool:
     return _has_ros_type(obj, 'Cross::Workcell')
 
 
+def is_planning_scene(obj: DO) -> bool:
+    """Return True if the object is a Cross::PlanningScene."""
+    return _has_ros_type(obj, 'Cross::PlanningScene')
+
+
 def is_simple_joint(obj: DO) -> bool:
     """Return True if prismatic, revolute, or continuous."""
     return (is_joint(obj)
@@ -121,6 +126,11 @@ def is_link_selected() -> bool:
 def is_workcell_selected() -> bool:
     """Return True if the first selected object is a Cross::Workcell."""
     return is_selected_from_lambda(is_workcell)
+
+
+def is_planning_scene_selected() -> bool:
+    """Return True if the first selected object is a Cross::PlanningScene."""
+    return is_selected_from_lambda(is_planning_scene)
 
 
 def get_links(objs: DOList) -> list[CrossLink]:

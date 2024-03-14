@@ -272,12 +272,54 @@ def cone_between_points(
         )
 
 
+def frame_group(
+        length_mm: [float | fc.Units.Quantity] = 200.0,
+        diameter_ratio_to_length: float = 0.05,
+        axis_start_ratio: float = 0.0,
+        ) -> coin.SoSeparator:
+    """
+    Create a frame with 3 cylinders.
+
+    Parameters:
+    - length_mm: length of the frame (in mm)
+    - diameter_ratio_to_length: ratio of the diameter to the length.
+          I.e. the diameter is diameter_ratio_to_length * length_mm.
+    - axis_start_ratio: ratio of the distance of the start of the axis.
+          The cylinder representing the axis will start at
+          axis_start_ratio * length_mm.
+
+    Returns:
+    - coin.SoSeparator containing the representation of a frame.
+
+    """
+    if isinstance(length_mm, fc.Units.Quantity):
+        length_mm = quantity_as(length_mm, 'mm')
+    sep = coin.SoSeparator()
+    if diameter_ratio_to_length < 0:
+        raise RuntimeError('diameter_ratio_to_length must be positive')
+    radius = diameter_ratio_to_length * length_mm / 2.0
+    axis_start = axis_start_ratio * length_mm
+    sep.addChild(cylinder_between_points(start_point_mm=(axis_start, 0.0, 0.0),
+                                         end_point_mm=(length_mm, 0.0, 0.0),
+                                         radius_mm=radius,
+                                         color=(1.0, 0.0, 0.0)))
+    sep.addChild(cylinder_between_points(start_point_mm=(0.0, axis_start, 0.0),
+                                         end_point_mm=(0.0, length_mm, 0.0),
+                                         radius_mm=radius,
+                                         color=(0.0, 1.0, 0.0)))
+    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, axis_start),
+                                         end_point_mm=(0.0, 0.0, length_mm),
+                                         radius_mm=radius,
+                                         color=(0.0, 0.0, 1.0)))
+    return sep
+
+
 def tcp_group(
-        tcp_diameter_mm: [float | fc.Units.Quantity] = 50.0,
         tcp_length_mm: [float | fc.Units.Quantity] = 200.0,
+        tcp_diameter_ratio_to_length: float = 0.25,
         tcp_color: Sequence[float] = (0.7, 0.7, 0.7),
         axis_length_mm: [float | fc.Units.Quantity] = 300.0,
-        axis_diameter_mm: [float | fc.Units.Quantity] = 10.0,
+        axis_diameter_ratio_to_length: float = 0.05,
         ) -> coin.SoSeparator:
     """Return the SoSeparator reprenting a TCP.
 
@@ -288,34 +330,18 @@ def tcp_group(
     """
     if len(tcp_color) != 3:
         raise RuntimeError('tcp_color must have 3 values')
-    if isinstance(tcp_diameter_mm, fc.Units.Quantity):
-        tcp_diameter_mm = quantity_as(tcp_diameter_mm, 'mm')
     if isinstance(tcp_length_mm, fc.Units.Quantity):
         tcp_length_mm = quantity_as(tcp_length_mm, 'mm')
     if isinstance(axis_length_mm, fc.Units.Quantity):
         axis_length_mm = quantity_as(axis_length_mm, 'mm')
-    if isinstance(axis_diameter_mm, fc.Units.Quantity):
-        axis_diameter_mm = quantity_as(axis_diameter_mm, 'mm')
 
     sep = coin.SoSeparator()
 
-    axis_radius = axis_diameter_mm / 2.0
-    axis_start = 0.2 * axis_length_mm
-    axis_end = axis_length_mm - axis_start
-    sep.addChild(cylinder_between_points(start_point_mm=(axis_start, 0.0, 0.0),
-                                         end_point_mm=(axis_end, 0.0, 0.0),
-                                         radius_mm=axis_radius,
-                                         color=(1.0, 0.0, 0.0)))
-    sep.addChild(cylinder_between_points(start_point_mm=(0.0, axis_start, 0.0),
-                                         end_point_mm=(0.0, axis_end, 0.0),
-                                         radius_mm=axis_radius,
-                                         color=(0.0, 1.0, 0.0)))
-    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, axis_start),
-                                         end_point_mm=(0.0, 0.0, axis_end),
-                                         radius_mm=axis_radius,
-                                         color=(0.0, 0.0, 1.0)))
+    sep.addChild(frame_group(length_mm=axis_length_mm,
+                             diameter_ratio_to_length=axis_diameter_ratio_to_length,
+                             axis_start_ratio=0.2))
 
-    tcp_radius = tcp_diameter_mm / 2.0
+    tcp_radius = tcp_diameter_ratio_to_length * tcp_length_mm / 2.0
     tcp_cone_end = -0.25 * tcp_length_mm
     tcp_cyl_end = -tcp_length_mm - tcp_cone_end
     sep.addChild(cone_between_points(start_point_mm=(0.0, 0.0, tcp_cone_end),

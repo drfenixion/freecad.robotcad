@@ -18,18 +18,17 @@ class _GetPlanningSceneCommand:
     def GetResources(self):
         return {'Pixmap': 'planning_scene.svg',
                 'MenuText': tr('Get Planning Scene'),
-                'Accel': 'S, J',
-                'ToolTip': tr('Get the Current Planning Scene')}
+                'Accel': 'G, P',
+                'ToolTip': tr('Get the Current Planning Scene from the /get_planning_scene service.')}
 
     def IsActive(self):
         return True
 
     def Activated(self):
         doc = fc.activeDocument()
-        fcgui.doCommand('')
         fcgui.addModule('freecad.cross.planning_scene_proxy')
         fcgui.addModule('freecad.cross.ros.planning_scene')
-        fcgui.doCommand('_scene_msg = freecad.cross.ros.planning_scene.get_planning_scene(timeout_sec=1.0)')
+        fcgui.doCommand('_scene_msg = freecad.cross.ros.planning_scene.get_planning_scene(timeout_sec=10.0)')
         doc.openTransaction(tr('Get Planning Scene'))
         fcgui.doCommand('if _scene_msg is None:\n'
                         '    _scene = None\n'

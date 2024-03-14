@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-from typing import Any, ForwardRef, Optional
+from typing import Any, Optional
 
 import FreeCAD as fc
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
 from .freecad_utils import warn
-from .freecad_utils import message # DEBUG
 from .wb_utils import ICON_PATH
 from .wb_utils import is_link
 from .wb_utils import is_robot
 from .wb_utils import ros_name
 
 try:
-    from moveit_msgs.msg import PlanningScene
-    imports_ok = True
+    from moveit_msgs.msg import PlanningScene as PlanningSceneMsg
 except ImportError:
-    PlanningScene = Any
-    imports_ok = False
+    PlanningSceneMsg = Any
 
 # Stubs and type hints.
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
@@ -35,7 +32,7 @@ class PoseProxy(ProxyBase):
 
     def __init__(self,
                  obj: CrossPose,
-                 planning_scene_msg: Optional[PlanningScene] = None):
+                 planning_scene_msg: Optional[PlanningSceneMsg] = None):
         """Initialize the proxy.
 
         Not called on document restore.
@@ -45,6 +42,7 @@ class PoseProxy(ProxyBase):
         super().__init__('pose', [
             'AllowNonLeafLink',
             'EndEffector',
+            'Placement',  # Set by `App::GeometryPython`.
             'Robot',
             '_Type',
             ])
@@ -68,9 +66,6 @@ class PoseProxy(ProxyBase):
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyPlacement', 'Pose', 'Base',
-                     'The pose')
-
         add_property(obj, 'App::PropertyLink', 'Robot', 'Robot',
                      'The associated robot')
         add_property(obj, 'App::PropertyEnumeration', 'EndEffector', 'Robot',
@@ -88,6 +83,21 @@ class PoseProxy(ProxyBase):
         warn(f'{obj.Name}.onDocumentRestored()') # DEBUG
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(obj)
+
+    def dumps(self):
+        return self.Type,
+
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
+        if state:
+            self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
 
     def onChanged(self, obj: CrossPose, prop: str) -> None:
         """Handle a property change of the object, after the change.
@@ -198,7 +208,7 @@ class _ViewProviderPose(ProxyBase):
         Required by FreeCAD.
 
         """
-        message(f'{obj.Name}.updateData({prop})') # DEBUG
+        print(f'{obj.Name}.updateData({prop})') # DEBUG
         self.draw()
 
     def onChanged(self, vobj: VP, prop: str) -> None:
@@ -207,7 +217,7 @@ class _ViewProviderPose(ProxyBase):
         Required by FreeCAD.
 
         """
-        message(f'view_object({vobj.Object.Name}).onChanged({prop})') # DEBUG
+        print(f'view_object({vobj.Object.Name}).onChanged({prop})') # DEBUG
         self.draw()
 
     def getDisplayModes(self, vobj: VP) -> list[str]:
@@ -235,7 +245,7 @@ class _ViewProviderPose(ProxyBase):
         return mode
 
     def draw(self) -> None:
-        message(f'view_object({self.view_object.Object.Name}).draw()') # DEBUG
+        print(f'view_object({self.view_object.Object.Name}).draw()') # DEBUG
         from pivy import coin
         from .coin_utils import tcp_group
         from .coin_utils import transform_from_placement
@@ -256,15 +266,16 @@ class _ViewProviderPose(ProxyBase):
 
         if not vobj.Visibility:
             return
-        pose = obj.Pose
         sep = coin.SoSeparator()
-        sep.addChild(transform_from_placement(pose))
+        # When `self.pose` is a `App::GeometryPython` object, the
+        # placement of the view object is managed by the view object itself
+        # and sep.addChild(transform_from_placement(Placement)) should not be used.
         sep.addChild(tcp_group(
-            tcp_diameter_mm=vobj.AxisLength / 6.0,
             tcp_length_mm=0.66 * vobj.AxisLength,
+            tcp_diameter_ratio_to_length=0.17,
             tcp_color=(0.7, 0.7, 0.7),
             axis_length_mm=vobj.AxisLength,
-            axis_diameter_mm=0.03 * vobj.AxisLength,
+            axis_diameter_ratio_to_length=0.03,
             ))
 
         if (self.pose.Proxy.is_execute_ready(debug=True)
@@ -290,7 +301,7 @@ def make_pose(name, doc: Optional[fc.Document] = None) -> CrossPose:
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    obj: CrossPose = doc.addObject('App::FeaturePython', name)
+    obj: CrossPose = doc.addObject('App::GeometryPython', name)
     PoseProxy(obj)
     obj.Label2 = name
 

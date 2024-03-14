@@ -17,7 +17,7 @@ ws_path=$script_dir/../../$ws_dir_name
 
 [ -d $ws_path ] || mkdir -p $ws_path
 
-echo 'PATHs: '
+echo 'Paths: '
 echo '$script_dir: '$script_dir
 echo '$ws_path: '$ws_path
 echo '$cont_path_ws: '$cont_path_ws

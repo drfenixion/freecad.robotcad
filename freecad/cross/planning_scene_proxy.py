@@ -17,10 +17,10 @@ from .planning_scene_utils import coin_from_planning_scene_msg
 from .wb_utils import ICON_PATH
 
 try:
-    from moveit_msgs.msg import PlanningScene
+    from moveit_msgs.msg import PlanningSceneMsg
     imports_ok = True
 except ImportError:
-    PlanningScene = Any
+    PlanningSceneMsg = Any
     imports_ok = False
 
 # Stubs and type hints.
@@ -37,7 +37,7 @@ class PlanningSceneProxy(ProxyBase):
 
     def __init__(self,
                  obj: CrossPlanningScene,
-                 planning_scene_msg: Optional[PlanningScene] = None):
+                 planning_scene_msg: Optional[PlanningSceneMsg] = None):
         super().__init__('scene', [
             '_Type',
             ])
@@ -66,12 +66,27 @@ class PlanningSceneProxy(ProxyBase):
         """Restore attributes because __init__ is not called on restore."""
         self.__init__(obj)
 
-    def __getstate__(self):
+    def dumps(self):
         return self.Type,
 
-    def __setstate__(self, state):
+    def __getstate__(self):
+        # Deprecated.
+        return self.dumps()
+
+    def loads(self, state):
         if state:
             self.Type, = state
+
+    def __setstate__(self, state):
+        # Deprecated.
+        return self.loads(state)
+
+    def update_scene(self, planning_scene_msg: PlanningSceneMsg) -> None:
+        """Update the scene with a new PlanningScene message."""
+        self.planning_scene_msg = planning_scene_msg
+        self.scene.recompute()
+        if self.scene.ViewObject and self.scene.ViewObject.Proxy:
+            self.scene.ViewObject.Proxy.draw()
 
     def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
         """Export the scene as URDF, writing files."""
@@ -106,6 +121,12 @@ class _ViewProviderPlanningScene(ProxyBase):
                      'The length of the sides of the plane.',
                      1000.0)
 
+        # Default to 100.0, i.e. 100 cm.
+        add_property(vobj, 'App::PropertyLength', 'SubframeSize',
+                     'ROS Display Options',
+                     'The length of the subframe axes.',
+                     100.0)
+
     def getIcon(self):
         # Implementation note: "return 'planning_scene.svg'" works only after
         # workbench activation in GUI.
@@ -130,27 +151,7 @@ class _ViewProviderPlanningScene(ProxyBase):
         pass
 
     def onChanged(self, vobj: VP, prop: str) -> None:
-        if ((not self.is_execute_ready())
-                or (not hasattr(vobj.Proxy, 'shaded'))
-                or (not hasattr(vobj.Proxy, 'wireframe'))):
-            return
-        scene: CrossPlanningScene = vobj.Object
-        msg = scene.Proxy.planning_scene_msg
-
-        self.shaded.removeAllChildren()
-        self.wireframe.removeAllChildren()
-        style = coin.SoDrawStyle()
-        style.style = coin.SoDrawStyle.LINES
-        self.wireframe.addChild(style)
-
-        if not self.view_object.Visibility:
-            return
-
-        plane_sides_mm = quantity_as(self.view_object.PlaneSides, 'mm')
-        planning_scene_group = coin_from_planning_scene_msg(
-                msg, plane_sides_mm=plane_sides_mm)
-        self.shaded.addChild(planning_scene_group)
-        self.wireframe.addChild(planning_scene_group)
+        self.draw()
 
     def getDisplayModes(self, vobj: VP) -> list[str]:
         """Return a list of display modes."""
@@ -166,14 +167,47 @@ class _ViewProviderPlanningScene(ProxyBase):
     def setDisplayMode(self, mode: str) -> str:
         return mode
 
+    def loads(self) -> None:
+        return None
+
     def __getstate__(self) -> None:
+        # Deprecated.
         return
 
     def __setstate__(self, state) -> None:
         return
 
+    def draw(self) -> None:
+        if ((not self.is_execute_ready())
+                or (not hasattr(self.view_object.Proxy, 'shaded'))
+                or (not hasattr(self.view_object.Proxy, 'wireframe'))):
+            return
+        scene: CrossPlanningScene = self.view_object.Object
+        msg = scene.Proxy.planning_scene_msg
 
-def make_planning_scene(name, planning_scene_msg: PlanningScene, doc: Optional[fc.Document] = None) -> CrossPlanningScene:
+        self.shaded.removeAllChildren()
+        self.wireframe.removeAllChildren()
+        style = coin.SoDrawStyle()
+        style.style = coin.SoDrawStyle.LINES
+        self.wireframe.addChild(style)
+
+        if not self.view_object.Visibility:
+            return
+
+        planning_scene_group = coin_from_planning_scene_msg(
+                msg,
+                plane_sides_mm=self.view_object.PlaneSides,
+                subframe_length_mm=self.view_object.SubframeSize,
+                )
+        self.shaded.addChild(planning_scene_group)
+        self.wireframe.addChild(planning_scene_group)
+
+
+def make_planning_scene(
+        name: str,
+        planning_scene_msg: PlanningSceneMsg,
+        doc: Optional[fc.Document] = None,
+        ) -> CrossPlanningScene:
     """Add a Cross::PlanningScene to the current document."""
     if doc is None:
         doc = fc.activeDocument()

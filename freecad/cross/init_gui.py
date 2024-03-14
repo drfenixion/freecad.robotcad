@@ -3,6 +3,7 @@ import FreeCADGui as fcgui
 
 from .ui import command_assembly_from_urdf
 from .ui import command_box_from_bounding_box
+from .ui import command_get_planning_scene
 from .ui import command_kk_edit
 from .ui import command_new_joint
 from .ui import command_new_link
@@ -16,9 +17,9 @@ from .ui import command_set_joints
 from .ui import command_set_placement
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
+from .ui import command_update_planning_scene
 from .ui import command_urdf_export
 from .ui import command_wb_settings
-from .ui import command_get_planning_scene
 from .wb_utils import ICON_PATH
 
 
@@ -51,6 +52,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
+            'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
             'NewPose',  # Defined in ./ui/command_new_pose.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.

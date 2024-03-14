@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from typing import ForwardRef, Optional
+import time
 
 try:
-    from moveit_msgs.msg import PlanningScene
+    from moveit_msgs.msg import PlanningScene as PlanningSceneMsg
     from moveit_msgs.srv import GetPlanningScene
     imports_ok = True
 except ImportError:
-    PlanningScene = ForwardRef('PlanningScene')
+    PlanningSceneMsg = ForwardRef('PlanningSceneMsg')
     GetPlanningScene = ForwardRef('GetPlanningScene')
     imports_ok = False
 
@@ -17,12 +18,13 @@ from ..freecad_utils import tr
 from ..freecad_utils import warn
 
 
-def get_planning_scene(timeout_sec=0.0) -> Optional[PlanningScene]:
+def get_planning_scene(timeout_sec=0.0) -> Optional[PlanningSceneMsg]:
     """Get the current planning scene by calling the ROS server.
 
     Parameters:
         - timeout_sec: Timeout to reach the server and then timeout
-                       to get the response.
+                       to get the response. Will wait indefinitely if
+                       set to 0.0 (the default).
 
     """
     if not imports_ok:
@@ -36,12 +38,16 @@ def get_planning_scene(timeout_sec=0.0) -> Optional[PlanningScene]:
     executor = wb_globals.g_ros_executor
 
     # TODO: configure the service name.
-    servce_name = 'get_planning_scene'
-    client = node.create_client(GetPlanningScene, servce_name)
-    while not client.wait_for_service(timeout_sec=timeout_sec):
-        msg = f'service {servce_name} not available, waiting again...'
+    service_name = 'get_planning_scene'
+    client = node.create_client(GetPlanningScene, service_name)
+    start_time = time.time()
+    while not client.wait_for_service(timeout_sec=1.0):
+        msg = f'service /{service_name} not available, waiting again...'
         message(msg)
         node.get_logger().info(msg)
+        if (timeout_sec > 0.0) and (time.time() - start_time) > timeout_sec:
+            warn(tr(f'The server /{service_name} was not reached within {timeout_sec} s'), gui=True)
+            return None
     request = GetPlanningScene.Request()
     future = client.call_async(request)
     executor.spin_until_future_complete(future, timeout_sec=timeout_sec)

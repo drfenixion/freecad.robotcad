@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+import FreeCAD as fc
+
 from geometry_msgs.msg import Pose
 
 from moveit_msgs.msg import PlanningScene
@@ -14,23 +16,65 @@ from shape_msgs.msg import SolidPrimitive
 
 from pivy import coin
 
-from .freecad_utils import warn
+from .coin_utils import frame_group
 
 
 def coin_from_planning_scene_msg(
         scene: PlanningScene,
         plane_sides_mm: float,
+        subframe_length_mm: [float | fc.Units.Quantity] = 100.0,
         ) -> coin.SoSeparator:
+    """Convert a moveit_msgs.msg.PlanningScene to Coin3D.
+
+    Only the world is considered for now, not the robot state.
+
+    Parameters:
+    - scene: moveit_msgs.msg.PlanningScene
+    - plane_sides_mm: length of the sides of the planes, in millimeters.
+
+    Returns:
+    - coin.SoSeparator containing Coin3D nodes representing the PlanningScene.
+
+    """
     separator = coin.SoSeparator()
 
-    world: PlanningSceneWorld = scene.world
-    for co in world.collision_objects:
-        separator.addChild(coin_from_collision_object(co, plane_sides_mm))
+    separator.addChild(coin_from_planning_scene_world(scene.world,
+        plane_sides_mm=plane_sides_mm,
+        subframe_length_mm=subframe_length_mm))
 
     return separator
 
 
-def coin_from_collision_object(co: CollisionObject, plane_sides_mm: float) -> coin.SoSeparator:
+def coin_from_planning_scene_world(
+        world: PlanningSceneWorld,
+        plane_sides_mm: float,
+        subframe_length_mm: [float | fc.Units.Quantity] = 100.0,
+        ) -> coin.SoSeparator:
+    """Convert a moveit_msgs.msg.PlanningSceneWorld to Coin3D.
+
+    Only the collision objects are considered for now, not the octomap.
+
+    Parameters:
+    - scene: moveit_msgs.msg.PlanningSceneWorld
+    - plane_sides_mm: length of the sides of the planes, in millimeters.
+
+    Returns:
+    - coin.SoSeparator containing Coin3D nodes representing the PlanningScene.
+
+    """
+    separator = coin.SoSeparator()
+    for co in world.collision_objects:
+        separator.addChild(coin_from_collision_object(co,
+            plane_sides_mm=plane_sides_mm,
+            subframe_length_mm=subframe_length_mm))
+    return separator
+
+
+def coin_from_collision_object(
+        co: CollisionObject,
+        plane_sides_mm: float,
+        subframe_length_mm: [float | fc.Units.Quantity] = 100.0,
+        ) -> coin.SoSeparator:
     separator = coin.SoSeparator()
     separator.setName(co.id)
     separator.addChild(transform_from_pose(co.pose))
@@ -44,13 +88,27 @@ def coin_from_collision_object(co: CollisionObject, plane_sides_mm: float) -> co
 
     for (plane, pose) in zip(co.planes, co.plane_poses):
         separator.addChild(coin_from_plane(plane, pose, plane_sides_mm))
+
+    for (subframe_name, pose) in zip(co.subframe_names, co.subframe_poses):
+        separator.addChild(coin_from_subframe(subframe_name, pose,
+                                              axis_length_mm=subframe_length_mm))
     return separator
 
 
 def coin_from_primitive(
         primitive: SolidPrimitive,
         pose: Pose,
-        ) -> coin.SoGroup:
+        ) -> coin.SoSeparator:
+    """Convert a shape_msgs.msg.SolidPrimitive to Coin3D.
+
+    Parameters:
+    - primitive: Shape to represent.
+    - pose: geometry_msgs.msg.Pose
+
+    Returns:
+    - SoTransform
+
+    """
     def prism_not_implemented():
         raise NotImplementedError('PRISM not supported')
 
@@ -61,13 +119,21 @@ def coin_from_primitive(
             SolidPrimitive.CONE: cone_from_primitive,
             SolidPrimitive.PRISM: prism_not_implemented,
             }
+    type_map: dict[int, str] = {
+            SolidPrimitive.BOX: 'BOX',
+            SolidPrimitive.SPHERE: 'SPHERE',
+            SolidPrimitive.CYLINDER: 'CYLINDER',
+            SolidPrimitive.CONE: 'CONE',
+            SolidPrimitive.PRISM: 'PRISM',
+            }
     if primitive.type not in fun_map.keys():
         raise ValueError('Unsupported SolidPrimitive type, got {primitive.type}')
-    group = coin.SoGroup()
-    group.addChild(transform_from_pose(pose))
+    sep = coin.SoSeparator()
+    sep.setName(f'{type_map[primitive.type]} at {str_from_pose(pose)}')
+    sep.addChild(transform_from_pose(pose))
     shape = fun_map[primitive.type](primitive)
-    group.addChild(shape)
-    return group
+    sep.addChild(shape)
+    return sep
 
 
 def transform_from_pose(pose: Pose) -> coin.SoTransform:
@@ -99,7 +165,21 @@ def transform_from_pose(pose: Pose) -> coin.SoTransform:
     return so_transform
 
 
-def box_from_primitive(primitive: SolidPrimitive) -> coin.Group:
+def str_from_pose(pose: Pose) -> str:
+    """Return a string representation of a geometry_msgs.msg.Pose.
+
+    Parameters:
+    - pose: geometry_msgs.msg.Pose to represent as a string.
+
+    Returns:
+    - str
+
+    """
+    return (f'({pose.position.x}, {pose.position.y}, {pose.position.z} m;'
+            f'{pose.orientation.x}, {pose.orientation.y}, {pose.orientation.z}, {pose.orientation.w})')
+
+
+def box_from_primitive(primitive: SolidPrimitive) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.SolidPrimitive with type=BOX to coin.
 
     Parameters:
@@ -108,14 +188,14 @@ def box_from_primitive(primitive: SolidPrimitive) -> coin.Group:
 
     Returns:
 
-        - coin.SoGroup
+        - coin.SoSeparator
 
     """
     if primitive.type != SolidPrimitive.BOX:
         raise ValueError('Unsupported SolidPrimitive type, got {primitive.type},'
                          ' expected {SolidPrimitive.BOX} (BOX)')
 
-    group = coin.SoGroup()
+    sep = coin.SoSeparator()
 
     # Scaling node (meters -> millimeters, default SoCube = side 2 units).
     ros_to_coin_cube_scale = 1000.0 / 2.0
@@ -125,15 +205,15 @@ def box_from_primitive(primitive: SolidPrimitive) -> coin.Group:
             primitive.dimensions[SolidPrimitive.BOX_Y] * ros_to_coin_cube_scale,
             primitive.dimensions[SolidPrimitive.BOX_Z] * ros_to_coin_cube_scale,
             ]
-    group.addChild(scaling)
+    sep.addChild(scaling)
 
     cube = coin.SoCube()  # Default side length 2 units.
-    group.addChild(cube)
+    sep.addChild(cube)
 
-    return group
+    return sep
 
 
-def sphere_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
+def sphere_from_primitive(primitive: SolidPrimitive) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.SolidPrimitive with type=SPHERE to coin.
 
     Parameters:
@@ -142,28 +222,28 @@ def sphere_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
 
     Returns:
 
-        - coin.SoGroup
+        - coin.SoSeparator
 
     """
     if primitive.type != SolidPrimitive.SPHERE:
         raise ValueError('Unsupported SolidPrimitive type, got {primitive.type},'
                          ' expected {SolidPrimitive.SPHERE} (SPHERE)')
 
-    group = coin.SoGroup()
+    sep = coin.SoSeparator()
 
     # Scaling node (meters -> millimeters, default SoSphere = radius 1 unit).
     ros_to_coin_sphere_scale = 1000.0
     scaling = coin.SoScale()
     scaling.scaleFactor = [primitive.dimensions[SolidPrimitive.SPHERE_RADIUS] * ros_to_coin_sphere_scale] * 3
-    group.addChild(scaling)
+    sep.addChild(scaling)
 
     sphere = coin.SoSphere()  # Default radius 1 unit.
-    group.addChild(sphere)
+    sep.addChild(sphere)
 
-    return group
+    return sep
 
 
-def cylinder_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
+def cylinder_from_primitive(primitive: SolidPrimitive) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.SolidPrimitive with type=CYLINDER to coin.
 
     Parameters:
@@ -172,18 +252,18 @@ def cylinder_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
 
     Returns:
 
-        - coin.SoGroup
+        - coin.SoSeparator
 
     """
     if primitive.type != SolidPrimitive.CYLINDER:
         raise ValueError('Unsupported SolidPrimitive type, got {primitive.type},'
                          ' expected {SolidPrimitive.CYLINDER} (CYLINDER)')
 
-    group = coin.SoGroup()
+    sep = coin.SoSeparator()
 
     # Rotation from Coin (along y) to ROS (along z).
     rotation = coin.SbRotation(0.7071067811865475, 0.0, 0.0, 0.7071067811865476)
-    group.addChild(rotation)
+    sep.addChild(rotation)
 
     # Scaling node (meters -> millimeters, default SoCylinder = radius 1 unit).
     ros_to_coin_cylinder_scale = 1000.0
@@ -193,17 +273,17 @@ def cylinder_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
             primitive.dimensions[SolidPrimitive.CYLINDER_HEIGHT] * ros_to_coin_cylinder_scale,
             primitive.dimensions[SolidPrimitive.CYLINDER_RADIUS] * ros_to_coin_cylinder_scale,
             ]
-    group.addChild(scaling)
+    sep.addChild(scaling)
 
     cylinder = coin.SoCylinder()  # Along y, radius 1, height 1 unit.
     # TODO: cylinder.radius = primitive.dimensions[SolidPrimitive.CYLINDER_RADIUS] * ros_to_coin_cylinder_scale and test
     # TODO: cylinder.height = primitive.dimensions[SolidPrimitive.CYLINDER_HEIGHT] * ros_to_coin_cylinder_scale and test
-    group.addChild(cylinder)
+    sep.addChild(cylinder)
 
-    return group
+    return sep
 
 
-def cone_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
+def cone_from_primitive(primitive: SolidPrimitive) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.SolidPrimitive with type=CONE to coin.
 
     Parameters:
@@ -212,19 +292,19 @@ def cone_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
 
     Returns:
 
-        - coin.SoGroup
+        - coin.SoSeparator
 
     """
     if primitive.type != SolidPrimitive.CONE:
         raise ValueError('Unsupported SolidPrimitive type, got {primitive.type},'
                          ' expected {SolidPrimitive.CONE} (CONE)')
 
-    group = coin.SoGroup()
+    sep = coin.SoSeparator()
 
     # Rotation from Coin (along y) to ROS (along z).
     rotation = coin.SoRotation()
     rotation.rotation = (0.7071067811865475, 0.0, 0.0, 0.7071067811865476)
-    group.addChild(rotation)
+    sep.addChild(rotation)
 
     # Scaling node (meters -> millimeters,
     # default SoCone = radius 1 unit, height = 2.0).
@@ -236,33 +316,37 @@ def cone_from_primitive(primitive: SolidPrimitive) -> coin.SoGroup:
             primitive.dimensions[SolidPrimitive.CONE_HEIGHT] * ros_to_coin_cone_height_scale,
             primitive.dimensions[SolidPrimitive.CONE_RADIUS] * ros_to_coin_cone_radius_scale,
             ]
-    group.addChild(scaling)
+    sep.addChild(scaling)
 
     cone = coin.SoCone()  # Pointing towards +y, radius 1, height 1 unit.
-    group.addChild(cone)
+    sep.addChild(cone)
 
-    return group
+    return sep
 
 
-def coin_from_mesh(mesh_msg: Mesh, pose: Pose) -> coin.SoSeparator:
+def coin_from_mesh(mesh_msg: Mesh,
+                   pose: Pose,
+                   ) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.Mesh to Coin3D nodes.
 
     Parameters:
-    - mesh_msg: shape_msgs.msg.Mesh
+    - mesh_msg: shape_msgs.msg.Mesh.
+    - pose: Mesh pose.
 
     Returns:
     - coin.SoSeparator containing the Coin3D node representing the mesh
 
     """
     separator = coin.SoSeparator()
+    separator.setName(f'Mesh at {str_from_pose(pose)}')
     separator.addChild(transform_from_pose(pose))
     separator.addChild(coin_mesh_from_shape_mesh(mesh_msg))
     return separator
 
 
-def coin_mesh_from_shape_mesh(mesh_msg: Mesh) -> coin.SoGroup:
+def coin_mesh_from_shape_mesh(mesh_msg: Mesh) -> coin.SoSeparator:
     ros_to_coin_scale = 1000.0  # m (ROS) to mm (coin,FreeCAD).
-    mesh = coin.SoGroup()
+    mesh = coin.SoSeparator()
     if mesh_msg.triangles:
         vertices = coin.SoCoordinate3()
         vertices.point.setNum(len(mesh_msg.vertices))
@@ -278,14 +362,15 @@ def coin_mesh_from_shape_mesh(mesh_msg: Mesh) -> coin.SoGroup:
                 face_set.coordIndex.set1Value(t * 4 + i, int(index))
             face_set.coordIndex.set1Value(t * 4 + 3, -1)  # Close the triangle.
 
-        # Add nodes to the group
         mesh.addChild(vertices)
         mesh.addChild(face_set)
-
     return mesh
 
 
-def coin_from_plane(plane_msg: Plane, pose: Pose, side_mm: float) -> coin.SoSeparator:
+def coin_from_plane(plane_msg: Plane,
+                    pose: Pose,
+                    side_mm: float,
+                    ) -> coin.SoSeparator:
     """Convert a shape_msgs.msg.Plane to Coin3D.
 
     Parameters:
@@ -340,4 +425,27 @@ def coin_from_plane(plane_msg: Plane, pose: Pose, side_mm: float) -> coin.SoSepa
     quad_mesh.verticesPerRow = 2
     separator.addChild(quad_mesh)
 
+    return separator
+
+
+def coin_from_subframe(subframe_name: str,
+                       pose: Pose,
+                       axis_length_mm: [float | fc.Units.Quantity] = 100.0,
+                       ) -> coin.SoSeparator:
+    """Return a SoSeparator represent a frame.
+
+    Parameters:
+    - subfname_name: Subframe name.
+    - pose: Subframe pose relative to the collision
+            object's center.
+    - side_mm: length of the axes of the subframe, in millimeters.
+
+    Returns:
+    - coin.SoSeparator containing Coin3D nodes representing the subframe.
+
+    """
+    separator = coin.SoSeparator()
+    separator.setName(subframe_name)
+    separator.addChild(transform_from_pose(pose))
+    separator.addChild(frame_group(length_mm=axis_length_mm))
     return separator

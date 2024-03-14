@@ -16,7 +16,7 @@ VPPoseProxy = ForwardRef('VPPoseProxy')
 class Pose(DO):
     AllowNonLeafLink: bool
     EndEffector: Union[str, list[str]]  # Both an enum and a string.
-    Pose: fc.Placement
+    Placement: fc.Placement
     Proxy: PoseProxy
     Robot: CrossRobot
     ViewObject: Optional[ViewProviderPose]
