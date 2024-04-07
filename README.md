@@ -3,7 +3,7 @@
 CROSS is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS].
 
 # This fork inludes all of CROSS and new features such as:
-1. Selecting material of link or whole robot
+1. Material selection of link or whole robot
 1. Auto calculation of mass and inertia
 1. Launcher for Gazebo
 1. New some icons and icons reordering
