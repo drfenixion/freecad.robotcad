@@ -9,9 +9,9 @@ CROSS is a FreeCAD workbench to generate robot description packages (xacro or UR
 1. New some icons and icons reordering
 1. Bug fixes
 
-
+Tools of FreeCAD CROSS
 ![Tools of FreeCAD CROSS](https://github.com/drfenixion/freecad.cross/assets/13005708/d3d44e65-a9cc-45cc-937a-be5008b98608)
-
+Generated inertia blocks and centers of mass in Gazebo
 ![Generated inertia blocks and centers of mass in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/a46715a0-0dc6-4f6e-b80e-e4c644589477)
 
 
