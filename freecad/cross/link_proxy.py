@@ -145,6 +145,10 @@ class LinkProxy(ProxyBase):
             'Placement',
             'Real',
             'Visual',
+            'MaterialCardName',
+            'MaterialCardPath',
+            'MaterialDensity',
+            'MaterialNotCalculate',
             '_Type',
             ])
         obj.Proxy = self
@@ -210,7 +214,19 @@ class LinkProxy(ProxyBase):
 
         add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
                      'Placement of elements in the robot frame')
-
+        
+        add_property(obj, 'App::PropertyString', 'MaterialCardName', 'Material',
+                     'Material of element. Used to calculate mass and inertia. Use "Set material" tool to change')
+        obj.setPropertyStatus('MaterialCardName', ['ReadOnly'])
+        add_property(obj, 'App::PropertyPath', 'MaterialCardPath', 'Material',
+                     'Material of element. Used to calculate mass and inertia')
+        obj.setPropertyStatus('MaterialCardPath', ['Hidden', 'ReadOnly'])
+        add_property(obj, 'App::PropertyString', 'MaterialDensity', 'Material',
+                     'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.')
+        obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
+        add_property(obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
+                     'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.')
+        
         # Used when adding a link which shape in located at the origin but
         # looks correctly placed. For example, when opening a STEP file or a
         # mesh with all links at the mounted position.

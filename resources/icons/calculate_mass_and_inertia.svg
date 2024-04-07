@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This work is licensed under a 
+<a rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed">CC0 1.0</a>.
+-->
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="32" cy="36.843" rx="25.827" ry="22.911" transform="matrix(1, 0, 0, 1, 0, -1.7763568394002505e-15)"/>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 9.1px; font-weight: 700; white-space: pre;" x="9.845" y="24.667" transform="matrix(2.318997859954834, 0, 0, 1.9507410526275635, -6.5190887451171875, -3.048119068145752)">KG</text>
+  <path style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" d="M 13.402 21.313 C 13.9 -2.299 52.182 -0.807 51.391 22.054" transform="matrix(1, 0, 0, 1, 0, -1.7763568394002505e-15)"/>
+</svg>

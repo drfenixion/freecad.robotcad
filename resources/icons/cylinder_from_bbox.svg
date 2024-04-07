@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This work is licensed under a 
+<a rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed">CC0 1.0</a>.
+-->
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <g id="layer1" transform="matrix(1.783334970474243, 0, 0, 1.1243350505828857, 1.8018610477447439, -270.1076965332031)" style="">
+    <ellipse style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff5555;fill-opacity:1;stroke:#000000;stroke-width:3.72281;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1" id="path674" cx="16.933332" cy="280.06665" rx="13.791595" ry="14.257236"/>
+    <path style="paint-order: fill markers; stroke-linecap: square; stroke-linejoin: bevel; fill: rgb(255, 85, 85);" d="M 4.777 267.177 L 29.063 267.492 L 28.883 281.101 C 28.001 298.069 4.195 294.406 4.867 281.493"/>
+  </g>
+  <g id="g-1" transform="matrix(1.783334970474243, 0, 0, 1.1243350505828857, 1.8018610477447439, -295.6698303222656)" style="">
+    <ellipse style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff5555;fill-opacity:1;stroke:#000000;stroke-width:3.72281;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1" id="ellipse-1" cx="16.933332" cy="280.06665" rx="13.791595" ry="14.257236"/>
+  </g>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 6px;" x1="7.353" y1="19.685" x2="7.405" y2="44.804" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 6px;" x1="56.595" y1="19.685" x2="56.647" y2="44.804" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+</svg>

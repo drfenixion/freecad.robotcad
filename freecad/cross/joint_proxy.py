@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import degrees, radians
-from typing import cast, ForwardRef, Optional, cast
+from typing import Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -21,9 +21,9 @@ from .wb_utils import ros_name
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
+from .joint import ViewProviderJoint as VP
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
-VPDO = ForwardRef('FreeCADGui.ViewProviderDocumentObject')  # Don't want to import FreeCADGui here. # noqa: E501
 
 
 class JointProxy(ProxyBase):
@@ -367,7 +367,7 @@ class JointProxy(ProxyBase):
 class _ViewProviderJoint(ProxyBase):
     """The view provider for CROSS::Joint objects."""
 
-    def __init__(self, vobj: VPDO):
+    def __init__(self, vobj: VP) -> None:
         super().__init__('view_object', [
             'AxisLength',
             'ShowAxis',
@@ -376,7 +376,7 @@ class _ViewProviderJoint(ProxyBase):
         vobj.Proxy = self
         self.set_properties(vobj)
 
-    def set_properties(self, vobj: VPDO):
+    def set_properties(self, vobj: VP) -> None:
         """Set properties of the view provider."""
         add_property(vobj, 'App::PropertyBool', 'ShowAxis',
                      'ROS Display Options',
@@ -387,43 +387,48 @@ class _ViewProviderJoint(ProxyBase):
                      "Length of the arrow for the joint's axis",
                      500.0)
 
-    def getIcon(self):
+    def getIcon(self) -> str:
         # Implementation note: "return 'joint.svg'" works only after
         # workbench activation in GUI.
         return str(ICON_PATH / 'joint.svg')
 
-    def attach(self, vobj: VPDO):
+    def attach(self, vobj: VP) -> None:
         """Setup the scene sub-graph of the view provider."""
         self.view_object = vobj
 
     def updateData(self,
                    obj: CrossJoint,
-                   prop: str):
-        vobj = obj.ViewObject
+                   prop: str) -> None:
+        # print(f'{obj.Name}.ViewObject.updateData({prop})') # DEBUG
         if not self.is_execute_ready():
             return
         if prop in ['Placement', 'Type', 'Position']:
-            self.draw(vobj, vobj.Visibility and vobj.ShowAxis)
+            self.draw()
         # Implementation note: no need to react on prop == 'Origin' because
         # this triggers a change in 'Placement'.
 
-    def onChanged(self, vobj: VPDO, prop: str):
+    def onChanged(self, vobj: VP, prop: str) -> None:
         if prop in ('ShowAxis', 'AxisLength'):
-            self.draw(vobj, vobj.ShowAxis)
+            self.draw()
 
-    def draw(self, vobj: VPDO, visible: bool):
+    def draw(self) -> None:
         from .coin_utils import arrow_group
         from .coin_utils import face_group
 
+        if not self.is_execute_ready():
+            return
+        vobj = self.view_object
         if not hasattr(vobj, 'RootNode'):
             return
         root_node = vobj.RootNode
         root_node.removeAllChildren()
-        if not visible:
-            return
-        if not hasattr(vobj.Object, 'Placement'):
+        if not (vobj.Visibility and vobj.AxisLength):
             return
         obj = vobj.Object
+        if not obj:
+            return
+        if not hasattr(obj, 'Placement'):
+            return
         placement = obj.Placement  # A copy.
         if placement is None:
             return

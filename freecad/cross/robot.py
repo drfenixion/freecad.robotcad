@@ -21,6 +21,9 @@ class Robot(DO):
     Group: list[BasicElement]
     OutputPath: str
     Placement: fc.Placement
+    MaterialCardName: str
+    MaterialCardPath: str
+    MaterialDensity: str
     _Type: str
 
     def addObject(self, object_to_add: fc.DocumentObject) -> None: ...

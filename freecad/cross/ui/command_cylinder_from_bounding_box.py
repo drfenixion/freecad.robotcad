@@ -10,7 +10,7 @@ from ..placement_utils import get_global_placement
 
 class CylinderFromBoundingBoxCommand:
     def GetResources(self):
-        return {'Pixmap': 'sphere_from_bbox.svg',
+        return {'Pixmap': 'cylinder_from_bbox.svg',
                 'MenuText': tr('Cylinder from bounding box'),
                 'ToolTip': tr('Add a Part::Cylinder corresponding to the'
                               ' bounding box of the selected objects'),

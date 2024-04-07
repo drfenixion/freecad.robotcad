@@ -9,6 +9,7 @@ import sys
 import FreeCAD as fc
 
 from ..utils import get_parent_by_pattern
+from ..utils import add_path_to_environment_variable
 
 
 def warn(text: str, gui: bool = False) -> None:
@@ -93,13 +94,16 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
         ]:
         _add_python_path(path)
 
-    _add_ld_library_path(f'{ros_workspace}/install/lib')
+    add_path_to_environment_variable(f'{ros_workspace}/install/lib', 'LD_LIBRARY_PATH')
     for path in [
         Path(f'{base}/opt/rviz_ogre_vendor/lib'),
         Path(f'{base}/lib/x86_64-linux-gnu'),
         Path(f'{base}/lib'),
         ]:
-        _add_ld_library_path(path)
+        add_path_to_environment_variable(path, 'LD_LIBRARY_PATH')
+
+    add_path_to_environment_variable(f'{ros_workspace}/install', 'AMENT_PREFIX_PATH')
+    add_path_to_environment_variable(f'{base}', 'AMENT_PREFIX_PATH')
     return True
 
 
@@ -324,3 +328,14 @@ def _add_ld_library_path(path: [Path | str]) -> None:
             os.environ['LD_LIBRARY_PATH'] = str(path)
         else:
             os.environ['LD_LIBRARY_PATH'] += ':' + str(path)
+
+
+def _add_ament_prefix_path(path: [Path | str]) -> None:
+    """Add the path to AMENT_PREFIX_PATH if existing."""
+    path = Path(path).expanduser().absolute()
+    existing_paths = os.environ.get('AMENT_PREFIX_PATH', '').split(':')
+    if path.exists() and (str(path) not in existing_paths):
+        if 'AMENT_PREFIX_PATH' not in os.environ:
+            os.environ['AMENT_PREFIX_PATH'] = str(path)
+        else:
+            os.environ['AMENT_PREFIX_PATH'] += ':' + str(path)

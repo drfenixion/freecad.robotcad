@@ -8,7 +8,9 @@ import FreeCAD as fc
 
 # Implementation note: The following import is necessary to avoid a circular
 # dependency.
+JointProxy = '.joint_proxy.JointProxy'
 JointRef = ForwardRef('Joint')
+VPJointProxy = ForwardRef('VPJointProxy')
 
 
 class Joint(fc.DocumentObject):
@@ -23,7 +25,17 @@ class Joint(fc.DocumentObject):
     Parent: str  # Must name a CROSS::Link by its ROS name.
     Placement: fc.Placement
     Position: float
+    Proxy: JointProxy
     Type: str
     UpperLimit: float
     Velocity: float
     _Type: str
+
+
+class ViewProviderJoint:
+    AxisLength: float
+    Object: Joint
+    Proxy: VPJointProxy
+    Visibility: bool
+
+    def addDisplayMode(self, separator, mode: str) -> None: ...

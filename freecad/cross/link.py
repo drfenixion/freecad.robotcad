@@ -13,4 +13,8 @@ class Link(fc.DocumentObject):
     Placement: fc.Placement
     Real: list[fc.DocumentObject]
     Visual: list[fc.DocumentObject]
+    MaterialCardName: str
+    MaterialCardPath: str
+    MaterialDensity: str
+    MaterialNotCalculate: bool
     _Type: str

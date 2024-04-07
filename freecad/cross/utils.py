@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from itertools import zip_longest
+import os
 from pathlib import Path
 import string
 from typing import Any, Iterable, Optional
@@ -20,6 +21,26 @@ DOList = Iterable[DO]
 
 # Otherwise et.tostring uses xlmns:ns0 as xacro namespace.
 et.register_namespace('xacro', 'http://ros.org/wiki/xacro')
+
+
+def add_path_to_environment_variable(path: [Path | str], env_var: str) -> None:
+    """Add the path to the environment variable if existing.
+
+    The environment variable is created if it does not exist.
+
+    """
+    path = Path(path).expanduser().absolute()
+    if not path.exists():
+        return
+    path_str = str(path)
+    if ' ' in path_str:
+        path_str = f'"{path_str}"'
+    if env_var not in os.environ:
+        os.environ[env_var] = path_str
+        return
+    existing_paths = os.environ.get(env_var).split(':')
+    if path_str not in existing_paths:
+        os.environ[env_var] += ':' + path_str
 
 
 def get_valid_filename(text: str) -> str:

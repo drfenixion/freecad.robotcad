@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ForwardRef, List, Optional, Union
+from typing import ForwardRef, Optional, Union
 
 import FreeCAD as fc
 

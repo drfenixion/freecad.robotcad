@@ -109,7 +109,7 @@ def cylinder_between_points(
 
 def arrow_group(
         points: list[fc.Vector],
-        color: tuple[float] = (0.0, 0.0, 1.0),
+        color: tuple[float, float, float] = (0.0, 0.0, 1.0),
         scale: float = 1.0,
         ) -> coin.SoSeparator:
     """Return the SoSeparator of an arrow between two points.
@@ -183,7 +183,7 @@ def arrow_group(
 
 def face_group(
         points: list[fc.Vector],
-        color: tuple[float] = (0.0, 0.0, 1.0),
+        color: tuple[float, float, float] = (0.0, 0.0, 1.0),
         ) -> coin.SoSeparator:
     if len(points) < 3:
         raise RuntimeError('At least 3 points expected')

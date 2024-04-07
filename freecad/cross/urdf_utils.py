@@ -642,7 +642,11 @@ def _urdf_generic_from_object(
             transform=True,
             matrix=fc.Matrix())
         if is_primitive(linked_object):
-            placement_for_dae_export = fc.Placement(link_matrix)
+            # Implementation note: the DAE export of FreeCAD integrates the
+            # placement of the linked object into the mesh, as of 2023-09.
+            # We thus need to remove it from the placement of the object.
+            placement_for_dae_export = (fc.Placement(link_matrix)
+                                        * linked_object.Placement.inverse())
         else:
             # Implementation note: the DAE export of FreeCAD integrates the
             # placement of the linked object into the mesh, as of 2023-09.
