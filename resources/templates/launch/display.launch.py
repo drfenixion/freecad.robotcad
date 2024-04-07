@@ -1,11 +1,12 @@
 from pathlib import Path
 
 import launch
-from launch.substitutions import Command
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 import launch_ros
-from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
@@ -13,16 +14,19 @@ def generate_launch_description():
     default_model_path = pkg_share / 'urdf/{urdf_file}'
     default_rviz_config_path = pkg_share / 'rviz/robot_description.rviz'
 
-    robot_state_publisher_node = launch_ros.actions.Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        parameters=[
-            {{
-                # ParameterValue is required to avoid being interpreted as YAML.
-                'robot_description': ParameterValue(Command(['xacro ', LaunchConfiguration('model')]), value_type=str),
-            }},
-            ]
+    use_sim_time = LaunchConfiguration('use_sim_time')
+
+    robot_state_publisher_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('{package_name}'),
+                    'launch',
+                    'description.launch.py'
+                ])
+        ]),
+        launch_arguments=dict(use_sim_time = use_sim_time).items()
     )
+
     joint_state_publisher_node = launch_ros.actions.Node(
         package='joint_state_publisher',
         executable='joint_state_publisher',
@@ -44,6 +48,11 @@ def generate_launch_description():
     )
 
     return launch.LaunchDescription([
+        launch.actions.DeclareLaunchArgument(
+                                            name='use_sim_time',
+                                            default_value='true',
+                                            description='Flag to enable usage of simulation time'
+                                            ),
         launch.actions.DeclareLaunchArgument(name='gui',
                                              default_value='True',
                                              description='Flag to enable joint_state_publisher_gui'),
