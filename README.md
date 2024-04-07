@@ -8,7 +8,7 @@ CROSS is a FreeCAD workbench to generate robot description packages (xacro or UR
 1. Launcher for Gazebo
 1. New some icons and icons reordering
 1. Bug fixes
-2. Others
+1. Others
 
 Tools of FreeCAD CROSS
 ![Tools of FreeCAD CROSS](https://github.com/drfenixion/freecad.cross/assets/13005708/d3d44e65-a9cc-45cc-937a-be5008b98608)
