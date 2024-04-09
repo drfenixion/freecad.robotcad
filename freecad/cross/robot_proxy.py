@@ -522,14 +522,12 @@ class RobotProxy(ProxyBase):
 
     def get_root_link(self) -> Optional[CrossLink]:
         """Return the root link of the robot."""
-        chains = self.get_chains()
-        if not chains:
-            return None
-        if not chains[0]:
+        chains = self.get_chains(check_kinematics=True)
+        if not chains or not chains[0]:
             return None
         return chains[0][0]
 
-    def get_chains(self) -> list[list[BasicElement]]:
+    def get_chains(self, check_kinematics=False) -> list[list[BasicElement]]:
         """Return the list of chains.
 
         A chain starts at the root link, alternates links and joints, and ends
@@ -546,7 +544,7 @@ class RobotProxy(ProxyBase):
             return []
         links = self.get_links()
         joints = self.get_joints()
-        return get_chains(links, joints)
+        return get_chains(links, joints, check_kinematics)
 
     def get_links_fixed_with(self, link_name: str) -> list[CrossLink]:
         """Return the list of links fixed with the specified link.
@@ -717,12 +715,18 @@ class RobotProxy(ProxyBase):
         file_base = get_valid_filename(ros_name(self.robot))
         urdf_file = f'{file_base}.urdf'
         urdf_path = output_path / f'urdf/{urdf_file}'
+        root_link=self.get_root_link()
+
+        if root_link == None:
+            error('Bad kinematics. Double root link or link not in joint ralationship or empty kinematic chain detected. Fix it and repeat.', True)
+            return
+        
         save_xml(xml, urdf_path)
         export_templates(template_files,
                          package_parent,
                          package_name=package_name,
                          urdf_file=urdf_file,
-                         fixed_frame=self.get_root_link().Name,
+                         fixed_frame=root_link.Name,
                          )
         return xml
 

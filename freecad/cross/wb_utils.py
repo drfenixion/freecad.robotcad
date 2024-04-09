@@ -151,6 +151,7 @@ def get_xacro_objects(objs: DOList) -> list[CrossXacroObject]:
 def get_chains(
         links: list[CrossLink],
         joints: list[CrossJoint],
+        check_kinematics = True
         ) -> list[list[CrossBasicElement]]:
     """Return the list of chains.
 
@@ -164,9 +165,14 @@ def get_chains(
     # TODO: Make the function faster.
     base_links: list[CrossLink] = []
     tip_links: list[CrossLink] = []
+
     for link in links:
         if link.Proxy.may_be_base_link():
-            base_links.append(link)
+            if check_kinematics == False: # avoid silent bug https://github.com/drfenixion/freecad.cross/issues/5
+                if len(base_links) < 1:
+                    base_links.append(link)
+            else:
+                base_links.append(link)
         if link.Proxy.is_tip_link():
             tip_links.append(link)
     if len(base_links) > 1:
