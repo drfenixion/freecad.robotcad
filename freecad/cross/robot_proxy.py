@@ -726,7 +726,7 @@ class RobotProxy(ProxyBase):
                          package_parent,
                          package_name=package_name,
                          urdf_file=urdf_file,
-                         fixed_frame=root_link.Name,
+                         fixed_frame=root_link.Label2,
                          )
         return xml
 
