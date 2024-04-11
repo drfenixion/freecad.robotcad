@@ -165,9 +165,11 @@ def urdf_box_placement_from_object(
         raise RuntimeError("First argument must be a 'Part::Box'")
     if not placement:
         placement = box.Placement
-    to_center = fc.Placement(fc.Vector(box.Length.Value,
-                                       box.Width.Value,
-                                       box.Height.Value) / 2.0,
+
+    #fix collision boxes displacement https://github.com/drfenixion/freecad.cross/issues/12
+    to_center = fc.Placement(fc.Vector(0,
+                                       0,
+                                       box.Height.Value / 2.0),
                              fc.Rotation())
     return placement * to_center
 
