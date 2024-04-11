@@ -64,13 +64,7 @@ def _add_fc_links_lod(
         name = f'{lod}_{link.Label}_'
         lod_link = doc.addObject('App::Link', name)
         lod_link.Label = name
-        if lod == 'collision':
-            try:
-                lod_link.LinkPlacement = link.Collision[0].Placement
-            except (IndexError, KeyError):
-                error('Broken collision for link - ', link.Lable, ' - (', link.Lable2, ')', 'Check collision for this link.')
-        else:
-            lod_link.LinkPlacement = link.Placement
+        lod_link.LinkPlacement = link.Placement
         lod_link.setLink(o)
         lod_link.adjustRelativeLinks(link)
         fc_links.append(lod_link)
