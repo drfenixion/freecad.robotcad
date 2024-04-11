@@ -17,7 +17,8 @@ Launched Rviz and Gazebo from gazebo launcher
 Generated inertia blocks and centers of mass in Gazebo
 ![Generated inertia blocks and centers of mass in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/a46715a0-0dc6-4f6e-b80e-e4c644589477)
 Generated collisions in Gazebo
-![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c37fbda3-0ac0-4189-b65c-449b2a1c9d7e)
+![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c43a8d29-fe17-4268-b0dc-76f943c4b0b5)
+
 
 
 CROSS is a powerful ROS workbench for [FreeCAD](https://www.freecad.org/), a popular open-source 3D parametric modelling software.
