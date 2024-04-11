@@ -12,7 +12,7 @@ CROSS is a FreeCAD workbench to generate robot description packages (xacro or UR
 
 Tools of FreeCAD OVERCROSS
 ![Tools of FreeCAD OVERCROSS](https://github.com/drfenixion/freecad.cross/assets/13005708/d3d44e65-a9cc-45cc-937a-be5008b98608)
-Launched Rviz and Gazebo from gazebo launcher
+Launched Rviz and Gazebo from generated Gazebo launcher
 ![Launched Rviz and Gazebo from gazebo launcher](https://github.com/drfenixion/freecad.cross/assets/13005708/9017aec4-70e5-45fa-82ad-6b4646453767)
 Generated inertia blocks and centers of mass in Gazebo
 ![Generated inertia blocks and centers of mass in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/a46715a0-0dc6-4f6e-b80e-e4c644589477)
