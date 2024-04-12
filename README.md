@@ -81,7 +81,7 @@ You need a recent version of FreeCAD v0.21 with the ability to configure custom 
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"
 - Add an entry to "Custom repository" by clicking on the "+" sign.
-- Repository URL: `https://github.com/galou/freecad.cross.git`, branch: `main`
+- Repository URL: `https://github.com/drfenixion/freecad.overcross.git`, branch: `main`
 - Click on "OK" to close the dialog "Preferences"
 - Back to FreeCAD's main window, menu "Tools / Addon manager"
 - Search and install the workbench via the [Addon Manager](https://wiki.freecad.org/Std_AddonMgr)
