@@ -12,7 +12,7 @@ class CylinderFromBoundingBoxCommand:
     def GetResources(self):
         return {'Pixmap': 'cylinder_from_bbox.svg',
                 'MenuText': tr('Cylinder from bounding box'),
-                'ToolTip': tr('Add a Part::Cylinder corresponding to the'
+                'ToolTip': tr('Add a z-aligned Part::Cylinder englobing the'
                               ' bounding box of the selected objects'),
                 }
 
@@ -46,16 +46,18 @@ class CylinderFromBoundingBoxCommand:
                     continue
                 box_name = obj.Label + '_bbox'
                 placement = fc.Placement()
-            # Cf. https://github.com/pboechat/pyobb for oriented bounding-box.
             is_one_object_compatible = True
             doc = fc.activeDocument()
+            if not hasattr(subobj, 'BoundBox'):
+                is_one_object_incompatible = True
+                continue
             bbox = subobj.BoundBox
             doc.openTransaction(tr('Cylinder from bounding box'))
             cylinder = doc.addObject('Part::Cylinder', box_name)
             cylinder.Label = box_name
             cylinder.Height = bbox.ZLength
-            cylinder.Radius = bbox.DiagonalLength / 2.0
-            cylinder.Placement = placement * cylinder.Placement
+            cylinder.Radius = ((bbox.XLength ** 2 + bbox.YLength ** 2) ** 0.5) / 2.0
+            cylinder.Placement = fc.Placement(bbox.Center, fc.Rotation())
             doc.commitTransaction()
         if not is_one_object_compatible:
             error(tr('No compatible object selected'), gui=True)

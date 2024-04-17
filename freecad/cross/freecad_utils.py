@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from abc import ABC
 from copy import copy
+from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
 
 import FreeCAD as fc
 import MaterialEditor
+
+import MaterialEditor  # FreeCAD.
 
 from .utils import true_then_false
 
@@ -330,9 +333,9 @@ def is_link(obj: DO) -> bool:
     return is_derived_from(obj, 'App::Link')
 
 
-def get_linked_obj(obj: DO, recursive=True) -> DO:
-    """Return linked object or False."""
-    
+def get_linked_obj(obj: DO, recursive=True) -> Optional[DO]:
+    """Return the linked object or the object itself."""
+
     if recursive and is_link(obj):
         return get_linked_obj(obj.LinkedObject, recursive)
     else:
@@ -340,27 +343,31 @@ def get_linked_obj(obj: DO, recursive=True) -> DO:
             return obj.LinkedObject
         else:
             return obj
-        
 
-def get_first_object_with_volume(obj: DO) -> DO | False:
-    """Return first object with positive volume from part, body, link (depest linked body or body in part) or False."""
 
-    linked_obj = get_linked_obj(obj) # deepest linked obj
-    first_object_with_volume = False
+def first_object_with_volume(obj: DO) -> Optional[DO]:
+    """Return the first object with positive volume.
+
+    Return the first object with positive volume from part, body, or link
+    (deepest linked body or body in part).
+    Return None if no child with volume is found.
+
+    """
+    linked_obj = get_linked_obj(obj)  # Deepest linked obj.
 
     if is_part(linked_obj):
         try:
             for part_member in linked_obj.Group:
-                if get_volume(part_member) > 0:
-                    first_object_with_volume = part_member
-                    break
+                if volume_mm3(part_member) > 0.0:
+                    return part_member
         except KeyError:
-            error('Part - ', linked_obj.Label, ' - ', linked_obj.Label, ' - has not solid object')
-    else:
-        if get_volume(linked_obj) > 0:
-            first_object_with_volume = linked_obj
-    
-    return first_object_with_volume
+            # error('Part - ', linked_obj.Label, ' - ', linked_obj.Label, ' - has not solid object')
+            pass
+
+    if volume_mm3(linked_obj) > 0.0:
+        return linked_obj
+
+    return None
 
 
 def is_lcs(obj: DO) -> bool:
@@ -656,89 +663,94 @@ def unit_type(
     return fc.Units.Quantity(v).Unit.Type
 
 
-def get_material(
+@dataclass
+class Material:
+    """A class to store material data."""
+    # Absolute path to the material card (*.FCMat).
+    card_path: str
+    material_name: Optional[str] = None
+    density: Optional[fc.Units.Quantity] = None
+
+
+def material_from_material_editor(
         card_path: str,
-        ) -> dict:
-    """Return material data from Material Editor (FEM -> Model -> Materials -> Material Editor).
+        ) -> Material:
+    """Return the material data from the Material Editor
+
+    Return the material data from the Material Editor
+    (FEM -> Model -> Materials -> Material Editor).
+
     """
-    defaultMaterial = {}
-    defaultMaterial['card_path'] = card_path
-    materialEditor = MaterialEditor.MaterialEditor(card_path=defaultMaterial['card_path'])
+    material = Material(card_path)
+    material.card_path = card_path
+    material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
     try:
-        defaultMaterial['card_name'] = materialEditor.cards[materialEditor.card_path]
-        density = materialEditor.materials[materialEditor.card_path]['Density'].split()
-        defaultMaterial['density'] = int(round(float(density[0])))
-        defaultMaterial['density_dimension'] = density[1]
-    except (KeyError, AttributeError, IndexError):
-        defaultMaterial['card_name'] = False
-        defaultMaterial['density'] = False
-
-    return defaultMaterial
+        material.material_name = material_editor.cards[material_editor.card_path]
+        material.density = fc.Units.Quantity(
+                material_editor.materials[material_editor.card_path]['Density'])
+    except (KeyError, AttributeError):
+        material.material_name = None
+        material.density = None
+    return material
 
 
-def get_matrix_of_inertia(
-        obj: fc.DocumentObject,
-        ) -> fc.Matrix:
-    """Return matrix of inertia of object or False.
-    """
-
-    try:  
-        matrixOfInertia = obj.Shape.MatrixOfInertia
+def matrix_of_inertia(
+        obj: Optional[fc.DocumentObject],
+        ) -> Optional[fc.Matrix]:
+    """Return the matrix of inertia of the given object assuming a density of 1."""
+    try:
+        return obj.Shape.MatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
-        try:
-            matrixOfInertia = obj.Shape.Solids[0].MatrixOfInertia
-        except (AttributeError, IndexError, RuntimeError):
-            matrixOfInertia = False
+        pass
+    try:
+        return obj.Shape.Solids[0].MatrixOfInertia
+    except (AttributeError, IndexError, RuntimeError):
+        pass
+    return None
 
-    return matrixOfInertia
 
-def correct_matrix_of_inertia(elemMatrixOfInertia: fc.Matrix, elemVolumeMM3: float, mass: float) -> fc.Matrix:
+def correct_matrix_of_inertia(
+        matrix_of_inertia: fc.Matrix,
+        volume_mm3: float,
+        mass: float) -> fc.Matrix:
     # convert matrix of inertia considering mass
 
-    elemVolumeReversed = 1 / elemVolumeMM3 # for matrix multiplication instead of division 
+    # Looks freecad uses mass = volume and therefore default density is 1
+    # my formula for correction of matrix_of_inertia is:
+    # matrix_of_inertia / volume (because it equal mass) * real_mass
 
-    # Looks freecad uses mass = volume and therefore default density is 1  
-    # my formula for correction of matrixOfInertia is:
-    # matrixOfInertia = elemMatrixOfInertia / volume (because it equal mass) * real_mass
-
-    # formula works but with wrong scale. I entered this ratio for correct scale. If you can rewrite formula without ratio do plz.                                          
-    ratioForCorrectScale = 1 / 1000000 
-    elemMatrixOfInertiaCorrected = elemMatrixOfInertia * elemVolumeReversed * mass * ratioForCorrectScale
-
-    return elemMatrixOfInertiaCorrected
+    # Formula works but with wrong scale. I entered this ratio for correct scale.
+    # If you can rewrite formula without ratio do plz.
+    ratio_for_correct_scale = 1 / 1e6
+    # Implementation note fc.Matrix doesn't support division by a scalar.
+    return matrix_of_inertia * mass * (1.0 / volume_mm3) * ratio_for_correct_scale
 
 
-def get_volume(
-        obj: fc.DocumentObject,
-        ) -> float:
-    """Return volume of object or False. FreeCAD uses mm3 for volume
-    """
-
-    try:  
-        volume = obj.Shape.Volume
+def volume_mm3(
+        obj: Optional[fc.DocumentObject],
+        ) -> Optional[float]:
+    """Return the volume of the given object in mm³."""
+    try:
+        return obj.Shape.Volume
     except (AttributeError, IndexError, RuntimeError):
-        try:
-            volume = obj.Shape.Solids[0].Volume
-        except (AttributeError, IndexError, RuntimeError):
-            volume = False
-
-    return volume
-
-
-def get_center_of_gravity(
-        obj: fc.DocumentObject,
-        ) -> fc.Vector:
-    """Return center of gravity (aka center of mass) of object or False.
-    """
-
-    try:  
-        centerOfGravity = obj.Shape.CenterOfGravity
+        pass
+    try:
+        return obj.Shape.Solids[0].Volume
     except (AttributeError, IndexError, RuntimeError):
-        try:
-            centerOfGravity = obj.Shape.Solids[0].CenterOfGravity
-        except (AttributeError, IndexError, RuntimeError):
-            centerOfGravity = False
-
-    return centerOfGravity
+        pass
+    return None
 
 
+def center_of_gravity_mm(
+        obj: Optional[fc.DocumentObject],
+        ) -> Optional[fc.Vector]:
+    """Return the center of gravity (aka center of mass) of the object in mm."""
+    try:
+        return obj.Shape.CenterOfGravity
+    except (AttributeError, IndexError, RuntimeError):
+        pass
+    try:
+        return obj.Shape.Solids[0].CenterOfGravity
+    except (AttributeError, IndexError, RuntimeError):
+        pass
+    return None

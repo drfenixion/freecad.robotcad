@@ -6,43 +6,49 @@ from ..gui_utils import tr
 from ..wb_utils import is_robot_selected, is_link_selected
 
 
-class SetMaterialCommand:
+class _SetMaterialCommand:
     def GetResources(self):
         return {'Pixmap': 'set_material.svg',
-                'MenuText': tr('Set material to whole robot or link'),
-                'ToolTip': tr('Select robot or link and press this bottom for selection of material. Material will be used for calculating mass and inertia based on material density'),
+                'MenuText': tr('Set the material to the whole robot or a link'),
+                'ToolTip': tr('Select a robot or a link and use this action to'
+                              ' select a material. The material will be used to'
+                              ' estimate the mass and moments of inertia'),
                 }
-    
+
     def Activated(self):
         doc = fc.activeDocument()
         doc.openTransaction(tr('Calculate mass and inertia'))
         objs = fcgui.Selection.getSelection()
+
+        # TODO: apply to all selected robots and links.
+
         if not objs:
             doc = fc.activeDocument()
         else:
             obj = objs[0]
-        
+
         try:
             card_path = obj.MaterialCardPath
         except (KeyError, AttributeError):
             card_path = ''
-        
-        materialEditor = MaterialEditor.MaterialEditor(card_path=card_path)
-        result = materialEditor.exec_()
 
-        if result != True:
-            # on cancel button an empty dict is returned
+        material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+        result = material_editor.exec_()
+
+        if not result:
+            # on cancel button an empty dict is returned.
             return
-    
+
         try:
-            card_name = materialEditor.cards[materialEditor.card_path]
-            density = materialEditor.materials[materialEditor.card_path]['Density']
-        except (KeyError, AttributeError):
+            card_name = material_editor.cards[material_editor.card_path]
+            density = material_editor.materials[material_editor.card_path]['Density']
+        except AttributeError:
             card_name = ''
             density = ''
-        
+
         obj.MaterialCardName = card_name
-        obj.MaterialCardPath = materialEditor.card_path
+        # TODO: make MaterialCardPath portable.
+        obj.MaterialCardPath = material_editor.card_path
         obj.MaterialDensity = density
 
         doc.recompute()
@@ -52,4 +58,4 @@ class SetMaterialCommand:
         return is_robot_selected() or is_link_selected()
 
 
-fcgui.addCommand('SetMaterial', SetMaterialCommand())
+fcgui.addCommand('SetMaterial', _SetMaterialCommand())

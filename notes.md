@@ -14,6 +14,8 @@ When opening an existing document
 ---------------------------------
 
 - Object exists
+- loads()
 - ViewObject exists
 - `ViewObject.Proxy.attach()`
+- Properties are restored (onChanged())
 - `Object.onDocumentRestored()`

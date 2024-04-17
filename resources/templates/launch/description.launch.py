@@ -26,6 +26,6 @@ def generate_launch_description():
     return launch.LaunchDescription([
         launch.actions.DeclareLaunchArgument(name='model',
                                              default_value=str(default_model_path),
-                                             description='Absolute path to robot urdf file'),
+                                             description="Absolute path to the robot's URDF file"),
         robot_state_publisher_node,
     ])

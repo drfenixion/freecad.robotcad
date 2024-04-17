@@ -94,17 +94,9 @@ class WorkcellProxy(ProxyBase):
     def dumps(self):
         return self.Type,
 
-    def __getstate__(self):
-        # Deprecated.
-        return self.dumps()
-
-    def loads(self, state):
+    def loads(self, state) -> None:
         if state:
             self.Type, = state
-
-    def __setstate__(self, state):
-        # Deprecated.
-        return self.loads(state)
 
     def get_xacro_objects(self) -> list[CrossXacroObject]:
         if not self.is_execute_ready():
@@ -319,11 +311,11 @@ class _ViewProviderWorkcell(ProxyBase):
     def onChanged(self, vobj: VPDO, prop: str):
         return
 
-    def __getstate__(self):
+    def dumps(self):
         return None
 
-    def __setstate__(self, state):
-        return None
+    def loads(self, state) -> None:
+        pass
 
 
 def make_workcell(name, doc: Optional[fc.Document] = None) -> CrossWorkcell:

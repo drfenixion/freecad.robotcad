@@ -214,7 +214,7 @@ class LinkProxy(ProxyBase):
 
         add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
                      'Placement of elements in the robot frame')
-        
+
         add_property(obj, 'App::PropertyString', 'MaterialCardName', 'Material',
                      'Material of element. Used to calculate mass and inertia. Use "Set material" tool to change')
         obj.setPropertyStatus('MaterialCardName', ['ReadOnly'])
@@ -226,7 +226,7 @@ class LinkProxy(ProxyBase):
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
         add_property(obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
                      'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.')
-        
+
         # Used when adding a link which shape in located at the origin but
         # looks correctly placed. For example, when opening a STEP file or a
         # mesh with all links at the mounted position.
@@ -295,17 +295,9 @@ class LinkProxy(ProxyBase):
     def dumps(self):
         return self.Type,
 
-    def __getstate__(self):
-        # Deprecated.
-        return self.dumps()
-
-    def loads(self, state):
+    def loads(self, state) -> None:
         if state:
             self.Type, = state
-
-    def __setstate__(self, state):
-        # Deprecated.
-        return self.loads(state)
 
     def cleanup_children(self) -> DOList:
         """Remove and return all objects not supported by CROSS::Link."""
@@ -645,11 +637,11 @@ class _ViewProviderLink(ProxyBase):
         fcgui.Control.closeDialog()
         return
 
-    def __getstate__(self):
+    def dumps(self):
         return None
 
-    def __setstate__(self, state):
-        return None
+    def loads(self, state) -> None:
+        pass
 
 
 def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:

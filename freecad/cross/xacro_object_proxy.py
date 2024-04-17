@@ -245,17 +245,9 @@ class XacroObjectProxy(ProxyBase):
     def dumps(self):
         return self.Type,
 
-    def __getstate__(self):
-        # Deprecated.
-        return self.dumps()
-
-    def loads(self, state):
+    def loads(self, state) -> None:
         if state:
             self.Type, = state
-
-    def __setstate__(self, state):
-        # Deprecated.
-        return self.loads(state)
 
     def reset_group(self):
         """Rebuild the CrossRobot object."""
@@ -475,11 +467,11 @@ class _ViewProviderXacroObject(ProxyBase):
     def unsetEdit(self, vobj: VPDO, mode):
         return
 
-    def __getstate__(self):
+    def dumps(self):
         return None
 
-    def __setstate__(self, state):
-        return None
+    def loads(self, state) -> None:
+        pass
 
 
 def make_xacro_object(name, doc: Optional[fc.Document] = None) -> CrossXacroObject:

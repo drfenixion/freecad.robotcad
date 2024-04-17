@@ -1,92 +1,119 @@
 import FreeCAD as fc
 import FreeCADGui as fcgui
-
+from ..freecad_utils import center_of_gravity_mm
+from ..freecad_utils import correct_matrix_of_inertia
 from ..freecad_utils import error
-from ..freecad_utils import get_material, get_matrix_of_inertia, get_volume, get_center_of_gravity, get_first_object_with_volume, correct_matrix_of_inertia, get_linked_obj
+from ..freecad_utils import first_object_with_volume
+from ..freecad_utils import get_linked_obj
+from ..freecad_utils import material_from_material_editor
+from ..freecad_utils import matrix_of_inertia
+from ..freecad_utils import quantity_as
+from ..freecad_utils import volume_mm3
+from ..freecad_utils import warn
 from ..gui_utils import tr
-from ..wb_utils import is_robot_selected, is_link
+from ..wb_utils import is_link
+from ..wb_utils import is_robot_selected
 
 
-class CalculateMassAndInertiaCommand:
-    def GetResources(self):
+class _CalculateMassAndInertiaCommand:
+    def GetResources(self) -> dict:
         return {'Pixmap': 'calculate_mass_and_inertia.svg',
                 'MenuText': tr('Calculate mass and inertia'),
-                'ToolTip': tr('Select robot and press this button. It will calculate mass and inertia based on density and fills links data. If link does not have material, default material will be taken from robot element. Link will skipped if property of link - "MaterialNotCalculate" is true. You can visually check inertia placement in Gazebo. Turn on display of inertia in Gazebo and check what generated inertia blocks approximately same size and same position/orientation as their links. Inertia block orientation tilt to towards the mass displacement is ok for unsymmetrical bodies.'),
+                'ToolTip': tr('Select robot and press this button.'
+                              ' It will calculate mass and inertia based on'
+                              ' density and fills links data. If link does not'
+                              ' have material, default material will be taken'
+                              ' from robot element. Link will skipped if'
+                              ' property of link - "MaterialNotCalculate" is'
+                              ' true. You can visually check inertia placement'
+                              ' in Gazebo. Turn on display of inertia in Gazebo'
+                              ' and check what generated inertia blocks'
+                              ' approximately same size and same'
+                              ' position/orientation as their links. Inertia'
+                              ' block orientation tilt to towards the mass'
+                              ' displacement is ok for unsymmetrical bodies.'),
                 }
-    
-    def Activated(self):
+
+    def Activated(self) -> None:
         doc = fc.activeDocument()
-        doc.openTransaction(tr('Calculate mass and inertia'))
         objs = fcgui.Selection.getSelection()
-        
+
+        # Implementation note: the command is active only when a robot is selected.
         robot = objs[0]
-        
-        defaultMaterial = get_material(robot.MaterialCardPath)
 
-        for elem in robot.Group:
-            if is_link(elem):
-                print('Start process inertia and mass of elem - Label: ', elem.Label, ' Label2: ', elem.Label2)
-                if elem.MaterialNotCalculate == False:
-                    
-                    if  len(elem.Real) > 0:
-                        if  len(elem.Collision) > 0:
-                            real = elem.Real[0]
+        default_material = material_from_material_editor(robot.MaterialCardPath)
 
-                            first_body = get_first_object_with_volume(real)
-                            elemCenterOfGravity = get_center_of_gravity(first_body)
-                            elemMatrixOfInertia = get_matrix_of_inertia(first_body)
-                            elemVolumeMM3 = get_volume(first_body)
-                            elemMaterial = get_material(elem.MaterialCardPath)
+        doc.openTransaction(tr('Calculate mass and inertia'))
+        for link in robot.Proxy.get_links():
+            print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
+            
+            if link.MaterialNotCalculate:
+                continue
 
-                            if elemMaterial['card_name'] != False or defaultMaterial['card_name'] != False:
-                                
-                                if elemVolumeMM3 != False:
+            if not link.Real:
+                error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
+                continue
 
-                                    if elemCenterOfGravity != False:
+            real = link.Real[0]
+            elem_with_volume = first_object_with_volume(real)
 
-                                        if elemMatrixOfInertia != False:
-                                            
-                                            if elemMaterial['card_name'] == False:
-                                                material = defaultMaterial
-                                                print('   No material specified for Link. Used default material of robot element')
-                                            else:
-                                                material = elemMaterial
+            if not elem_with_volume:
+                error(f'Link "{link.Label}" does not link to any child with volume.',
+                      gui=True)
+                continue
 
-                                            if material['density'] > 0:
-                                                elemVolumeM3 = elemVolumeMM3 / 1000000000 # convert mm3 to m3
-                                                elem.Mass = elemVolumeM3 * material['density']
-                                                elemMatrixOfInertia = correct_matrix_of_inertia(elemMatrixOfInertia, elemVolumeMM3, elem.Mass)
-                                                
-                                                basic_obj = get_linked_obj(real)
-                                                # correction if basic obj has not zero placement
-                                                elemCenterOfGravity = elemCenterOfGravity - basic_obj.Placement.Base
-                                                elem.CenterOfMass = fc.Placement(elem.MountedPlacement * elemCenterOfGravity, elem.MountedPlacement.Rotation, fc.Vector()) 
-                                                
-                                                elem.Ixx = elemMatrixOfInertia.A11
-                                                elem.Ixy = elemMatrixOfInertia.A12
-                                                elem.Ixz = elemMatrixOfInertia.A13
-                                                elem.Iyy = elemMatrixOfInertia.A22
-                                                elem.Iyz = elemMatrixOfInertia.A23
-                                                elem.Izz = elemMatrixOfInertia.A33
-                                            else:
-                                                error('   Link skipped. Material density less or equal zero.') 
-                                        else:
-                                            error('   Link skipped. Can not get MatrixOfInertia of binded Real element.')                                        
-                                    else:
-                                        error('   Link skipped. Can not get CenterOfGravity of binded Real element.')
-                                else:
-                                    error('   Link skipped. Can not get volume of binded Real element.')
-                            else:
-                                error('   Link skipped. No material specified for Link and no default material specified for robot element.')
-                        else:
-                            error('   Link skipped. No binded Collision element for Link.')
-                    else:
-                        error('   Link skipped. No binded Real element for Link.')
-                else:
-                    print('   Link skipped. Option "MaterialNotCalculate" is True.')
+            center_of_gravity = center_of_gravity_mm(elem_with_volume)
+            elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
+            elem_volume_mm3 = volume_mm3(elem_with_volume)
+            elem_material = material_from_material_editor(link.MaterialCardPath)
 
-                print('Finish process inertia and mass of elem - Label: ', elem.Label, ' Label2: ', elem.Label2)
+            if (elem_material.material_name is None) and (default_material.material_name is None):
+                error(f'Link "{link.Label}" skipped.'
+                      ' No material specified for Link and no default material specified for robot element.', gui=True)
+                continue
 
+            if center_of_gravity is None:
+                error(f'Link "{link.Label}" skipped.'
+                      ' Can not get CenterOfGravity of bound Real element.',
+                      gui=True)
+                continue
+
+            if elem_matrix_of_inertia is None:
+                error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
+                continue
+
+            if elem_material.material_name is None:
+                material = default_material
+                warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
+            else:
+                material = elem_material
+
+            if ((material.density is None)
+                    or (material.density.Value <= 0.0)):
+                error(f'Link "{link.Label}" skipped.'
+                      ' Material density not strictly positive.',
+                      gui=True)
+                continue
+
+            volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
+            link.Mass = quantity_as(volume * material.density, 'kg')
+            # TODO: have matrix_of_inertia return a specified unit without correction
+            elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)
+
+            basic_obj = get_linked_obj(real)
+            # Correction if basic obj has not zero placement.
+            # TODO: get the global placement
+            center_of_gravity = center_of_gravity - basic_obj.Placement.Base
+            link.CenterOfMass = fc.Placement(link.MountedPlacement * center_of_gravity, link.MountedPlacement.Rotation, fc.Vector())
+
+            link.Ixx = elem_matrix_of_inertia.A11
+            link.Ixy = elem_matrix_of_inertia.A12
+            link.Ixz = elem_matrix_of_inertia.A13
+            link.Iyy = elem_matrix_of_inertia.A22
+            link.Iyz = elem_matrix_of_inertia.A23
+            link.Izz = elem_matrix_of_inertia.A33
+
+        print('Finished calculating mass and inertia.')
         doc.recompute()
         doc.commitTransaction()
 
@@ -94,4 +121,4 @@ class CalculateMassAndInertiaCommand:
         return is_robot_selected()
 
 
-fcgui.addCommand('CalculateMassAndInertia', CalculateMassAndInertiaCommand())
+fcgui.addCommand('CalculateMassAndInertia', _CalculateMassAndInertiaCommand())

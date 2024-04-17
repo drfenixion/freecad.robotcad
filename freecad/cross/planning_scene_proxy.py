@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ForwardRef, Optional
+from typing import Any, Optional
 from xml.etree import ElementTree as et
 
 import FreeCAD as fc
@@ -11,8 +11,9 @@ from pivy import coin
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
-from .freecad_utils import quantity_as
 from .freecad_utils import warn
+from  .wb_utils import is_robot
+from .gui_utils import tr
 from .planning_scene_utils import coin_from_planning_scene_msg
 from .wb_utils import ICON_PATH
 
@@ -40,6 +41,7 @@ class PlanningSceneProxy(ProxyBase):
                  planning_scene_msg: Optional[PlanningSceneMsg] = None):
         super().__init__('scene', [
             '_Type',
+            'Robot',
             ])
         obj.Proxy = self
         self.scene = obj
@@ -54,13 +56,19 @@ class PlanningSceneProxy(ProxyBase):
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        # TODO: export as package (+OutputPath) or single file.
+        add_property(obj, 'App::PropertyLink', 'Robot', 'ROS',
+                     tr('The associated robot.'),
+                     )
 
     def execute(self, obj: CrossPlanningScene) -> None:
-        pass
+        self._update_robot_joint_values()
 
     def onChanged(self, obj: CrossPlanningScene, prop: str) -> None:
-        pass
+        if prop == 'Robot':
+            if obj.Robot and (not is_robot(obj.Robot)):
+                if obj.Robot:
+                    warn('The selected object is not a robot, rejecting.', True)
+                obj.Robot = None
 
     def onDocumentRestored(self, obj):
         """Restore attributes because __init__ is not called on restore."""
@@ -69,17 +77,9 @@ class PlanningSceneProxy(ProxyBase):
     def dumps(self):
         return self.Type,
 
-    def __getstate__(self):
-        # Deprecated.
-        return self.dumps()
-
     def loads(self, state):
         if state:
             self.Type, = state
-
-    def __setstate__(self, state):
-        # Deprecated.
-        return self.loads(state)
 
     def update_scene(self, planning_scene_msg: PlanningSceneMsg) -> None:
         """Update the scene with a new PlanningScene message."""
@@ -92,6 +92,21 @@ class PlanningSceneProxy(ProxyBase):
         """Export the scene as URDF, writing files."""
         xml = et.fromstring('<robot/>')
         return xml
+
+    def _update_robot_joint_values(self) -> None:
+        """Update the joint values of the robot."""
+        if not self.is_execute_ready():
+            return
+        if not self.scene.Robot:
+            return
+        robot = self.scene.Robot
+        if not self.planning_scene_msg:
+            return
+        names = self.planning_scene_msg.robot_state.joint_state.name
+        joints = [robot.Proxy.get_joint(n) for n in names]
+        positions = self.planning_scene_msg.robot_state.joint_state.position
+        position_map = {j: float(p) for j, p in zip(joints, positions) if j}
+        robot.Proxy.set_joint_values(position_map)
 
 
 class _ViewProviderPlanningScene(ProxyBase):
@@ -167,15 +182,11 @@ class _ViewProviderPlanningScene(ProxyBase):
     def setDisplayMode(self, mode: str) -> str:
         return mode
 
-    def loads(self) -> None:
+    def dumps(self):
         return None
 
-    def __getstate__(self) -> None:
-        # Deprecated.
-        return
-
-    def __setstate__(self, state) -> None:
-        return
+    def loads(self, state) -> None:
+        pass
 
     def draw(self) -> None:
         if ((not self.is_execute_ready())
@@ -218,7 +229,16 @@ def make_planning_scene(
     PlanningSceneProxy(obj, planning_scene_msg)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
+        import FreeCADGui as fcgui
+
         _ViewProviderPlanningScene(obj.ViewObject)
+
+        # Set the selected object as obj.Robot if applicable.
+        sel = fcgui.Selection.getSelection()
+        if sel:
+            candidate = sel[0]
+            if is_robot(candidate):
+                obj.Robot = candidate
 
     doc.recompute()
     return obj

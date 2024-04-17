@@ -8,6 +8,7 @@ import FreeCAD as fc
 
 # Typing hints
 DO = fc.DocumentObject
+from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 VPPlanningSceneProxy = ForwardRef('VPPlanningSceneProxy')
 
 
@@ -18,6 +19,7 @@ class PlanningScene(DO):
 class ViewProviderPlanningScene:
     Object: PlanningScene
     PlaneSides: float
+    Robot: CrossRobot
     Proxy: VPPlanningSceneProxy
     SubframeSize: float
     Visibility: bool

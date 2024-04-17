@@ -20,11 +20,11 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
                 FindPackageShare('{package_name}'),
-                    'launch',
-                    'description.launch.py'
+                'launch',
+                'description.launch.py'
                 ])
         ]),
-        launch_arguments=dict(use_sim_time = use_sim_time).items()
+        launch_arguments=dict(use_sim_time=use_sim_time).items()
     )
 
     joint_state_publisher_node = launch_ros.actions.Node(

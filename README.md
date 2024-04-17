@@ -58,7 +58,7 @@ The key features of CROSS are:
 
 ## Compatibility
 
-Compatible with FreeCAD v0.19 (or earlier version with the local coordinate system feature) but tested on FreeCAD v0.21.
+Compatible with FreeCAD at least v0.21.2 (use the tag `fc_v0.21.1` for earlier FreeCAD versions).
 Compatible with ROS2 (for now).
 
 ## Features
@@ -76,7 +76,7 @@ Compatible with ROS2 (for now).
 
 ## Installation
 
-You need a recent version of FreeCAD v0.21 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
+You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"

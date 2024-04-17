@@ -35,8 +35,8 @@ class _UrdfImportCommand:
             if not doc:
                 doc = fc.newDocument()
             filename = str(dialog.selectedFiles()[0])
-            doc.openTransaction(tr('Robot from URDF'))
             urdf_robot = UrdfLoader.load_from_file(filename)
+            doc.openTransaction(tr('Robot from URDF'))
             robot_from_urdf(doc, urdf_robot)
             doc.commitTransaction()
             doc.recompute()

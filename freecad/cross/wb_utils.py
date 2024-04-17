@@ -19,6 +19,7 @@ from .freecad_utils import warn
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals
+from .utils import values_from_string
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -470,3 +471,32 @@ def is_name_used(
                     and (ros_name(joint) == obj_name)):
                 return True
     return False
+
+
+def placement_from_pose_string(pose: str) -> fc.Placement:
+    """Return a FreeCAD Placement from a string pose `x, y, z; qw, qx, qy, qz`.
+
+    The pose is a string of 2 semi-colon-separated groups: 3 floats
+    representing the position in meters and 4 floats for the orientation
+    as quaternions qw, qx, qy, qz. The values in a group can be separated
+    by commas or spaces.
+    A string of 7 floats is also accepted.
+
+    """
+    if ';' in pose:
+        position_str, orientation_str = pose.split(';')
+        try:
+            x, y, z = values_from_string(position_str)
+            qw, qx, qy, qz = values_from_string(orientation_str)
+        except ValueError:
+            raise ValueError('Pose must have the format `x, y, z; qw, qx, qy, qz`')
+    else:
+        try:
+            x, y, z, qw, qx, qy, qz = values_from_string(pose)
+        except ValueError:
+            raise ValueError(
+                    'Pose must have the format `x, y, z; qw, qx, qy, qz`'
+                    ' or `x, y, z, qw, qx, qy, qz`')
+    ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
+    return fc.Placement(fc.Vector(x, y, z) * ros_to_freecad_factor,
+                        fc.Rotation(qw, qx, qy, qz))

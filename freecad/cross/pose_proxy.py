@@ -84,20 +84,12 @@ class PoseProxy(ProxyBase):
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(obj)
 
-    def dumps(self):
+    def dumps(self) -> tuple[str]:
         return self.Type,
 
-    def __getstate__(self):
-        # Deprecated.
-        return self.dumps()
-
-    def loads(self, state):
+    def loads(self, state) -> None:
         if state:
             self.Type, = state
-
-    def __setstate__(self, state):
-        # Deprecated.
-        return self.loads(state)
 
     def onChanged(self, obj: CrossPose, prop: str) -> None:
         """Handle a property change of the object, after the change.
@@ -244,6 +236,12 @@ class _ViewProviderPose(ProxyBase):
         """
         return mode
 
+    def dumps(self):
+        return None
+
+    def loads(self, state) -> None:
+        pass
+
     def draw(self) -> None:
         print(f'view_object({self.view_object.Object.Name}).draw()') # DEBUG
         from pivy import coin
@@ -325,6 +323,7 @@ def make_pose(name, doc: Optional[fc.Document] = None) -> CrossPose:
                     if link_name not in obj.getEnumerationsOfProperty('EndEffector'):
                         obj.AllowNonLeafLink = True
                     obj.EndEffector = ros_name(candidate)
+                    obj.Placement = candidate.Placement
     return obj
 
 
