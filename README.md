@@ -9,6 +9,7 @@ CROSS is a FreeCAD workbench to generate robot description packages (xacro or UR
 1. New some icons and icons reordering
 1. Bug fixes
 1. Others
+2. More [docs](https://github.com/drfenixion/freecad.overcross/wiki) 
 
 Tools of FreeCAD OVERCROSS
 
