@@ -29,6 +29,8 @@ class Joint(fc.DocumentObject):
     Type: str
     UpperLimit: float
     Velocity: float
+    JointSpecific: dict
+    JoinRotationDirection: dict
     _Type: str
 
 

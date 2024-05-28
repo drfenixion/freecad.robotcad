@@ -20,6 +20,7 @@ from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals
 from .utils import values_from_string
+from .utils import get_valid_filename
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -393,13 +394,11 @@ def export_templates(
         raise RuntimeError('Parameter "package_name" must be given')
 
     package_parent = Path(package_parent)
-    meshes_dir = ('meshes '
-                  if _has_meshes_directory(package_parent, package_name)
-                  else '')
+
     for f in template_files:
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
-        txt = template.format(meshes_dir=meshes_dir, **keys)
+        txt = template.format(**keys)
         output_path = package_parent / package_name / f
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(txt)
@@ -500,3 +499,15 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
     ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
     return fc.Placement(fc.Vector(x, y, z) * ros_to_freecad_factor,
                         fc.Rotation(qw, qx, qy, qz))
+
+
+def getURDFPath(robot: CrossRobot, output_path: str) -> Path:
+    """Return URDF file path`.
+    """
+        
+    file_base = get_valid_filename(ros_name(robot))
+    urdf_file = f'{file_base}.urdf'
+    urdf_path = output_path / f'urdf/{urdf_file}'
+    urdf_path = Path(urdf_path)
+
+    return urdf_path

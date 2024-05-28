@@ -24,6 +24,7 @@ class Robot(DO):
     MaterialCardName: str
     MaterialCardPath: str
     MaterialDensity: str
+    RobotType: dict
     _Type: str
 
     def addObject(self, object_to_add: fc.DocumentObject) -> None: ...

@@ -54,6 +54,8 @@ class JointProxy(ProxyBase):
                 'Type',
                 'UpperLimit',
                 'Velocity',
+                'JointSpecific',
+                'JoinRotationDirection',
                 '_Type',
                 ])
         obj.Proxy = self
@@ -109,6 +111,15 @@ class JointProxy(ProxyBase):
                      'value = Multiplier * other_joint_value + Offset', 1.0)
         add_property(obj, 'App::PropertyFloat', 'Offset', 'Mimic',
                      'value = Multiplier * other_joint_value + Offset, in mm or deg')
+        
+        add_property(obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
+                     'Propellers rotation direction. Can be used for code generation')
+        obj.JoinRotationDirection=["unset","cw","ccw"]
+        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])        
+        add_property(obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
+                     'Specific of joint working. Can be used for code generation')
+        obj.JointSpecific=["unset","propeller"]
+
 
         add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
                      'Placement of the joint in the robot frame')
@@ -183,6 +194,11 @@ class JointProxy(ProxyBase):
                  and (new_link_name in obj.getEnumerationsOfProperty('Parent')))
                     and (obj.Parent != new_link_name)):
                 obj.Parent = new_link_name
+        if prop == 'JointSpecific':
+            if obj.JointSpecific != 'unset':
+                obj.setPropertyStatus('JoinRotationDirection', '-Hidden')
+            else:
+                obj.setPropertyStatus('JoinRotationDirection', 'Hidden')
 
     def onDocumentRestored(self, obj: CrossJoint):
         self.__init__(obj)

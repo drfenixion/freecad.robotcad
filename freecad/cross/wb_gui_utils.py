@@ -85,10 +85,12 @@ class WbSettingsGetter:
         self._old_vhacd_path = Path(old_vhacd_path)
         self.ros_workspace = self._old_ros_workspace
         self.vhacd_path = _get_vhacd_path(self, self._old_vhacd_path)
+        self.overcross_token = get_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, '')
 
     def get_settings(self,
                      get_ros_workspace: bool = True,
                      get_vhacd_path: bool = True,
+                     get_overcross_token: bool = True,
                      ) -> bool:
         """Get the settings for this workbench.
 
@@ -102,6 +104,8 @@ class WbSettingsGetter:
             self.form.widget_ros_workspace.hide()
         if not get_vhacd_path:
             self.form.widget_vhacd_path.hide()
+        if not get_overcross_token:
+            self.form.widget_overcross_token.hide()
         self.form.adjustSize()
 
         self.form.lineedit_workspace.setText(str(self.ros_workspace))
@@ -111,6 +115,8 @@ class WbSettingsGetter:
         self.form.lineedit_vhacd_path.setText(str(self.vhacd_path))
         self.form.button_browse_vhacd_path.clicked.connect(
                 self.on_button_browse_vhacd_path)
+        
+        self.form.lineedit_overcross_token.setText(str(self.overcross_token))
 
         self.form.button_box.accepted.connect(self.on_ok)
         self.form.button_box.rejected.connect(self.on_cancel)
@@ -169,6 +175,8 @@ class WbSettingsGetter:
             if not vhacd_path.exists():
                 _warn_if_not_vhacd_ok(vhacd_path, True)
             self.vhacd_path = vhacd_path
+
+        self.overcross_token = self.form.lineedit_overcross_token.text()
 
     def on_cancel(self):
         if hasattr(self, '_old_ros_workspace'):

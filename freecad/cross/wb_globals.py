@@ -9,6 +9,7 @@ from .ros.utils import get_ros_distro_from_env
 # Constants.
 PREFS_CATEGORY = 'CROSS'  # Category in the preferences dialog.
 PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
+PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
 
 # Session-wide globals.
 g_ros_distro = get_ros_distro_from_env()

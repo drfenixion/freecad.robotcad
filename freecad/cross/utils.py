@@ -111,6 +111,16 @@ def save_xml(
     file_path.write_text(txt)
 
 
+def save_file(
+        content: str,
+        filename: [Path | str],
+        ) -> None:
+    """Save the content into a file."""
+    file_path = Path(filename)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content)
+
+
 def grouper(iterable, n, fillvalue=None):
     """Collect data into fixed-length chunks or blocks."""
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"

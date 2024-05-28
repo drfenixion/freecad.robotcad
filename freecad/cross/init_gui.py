@@ -22,6 +22,7 @@ from .ui import command_update_planning_scene
 from .ui import command_urdf_export
 from .ui import command_set_material
 from .ui import command_calculate_mass_and_inertia
+from .ui import command_transfer_project_to_external_code_generator
 from .ui import command_wb_settings
 from .wb_utils import ICON_PATH
 
@@ -64,6 +65,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
+            'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.            
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Reload',  # Comment out to disable this developer tool.
             ]
