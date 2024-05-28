@@ -501,7 +501,7 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
                         fc.Rotation(qw, qx, qy, qz))
 
 
-def getURDFPath(robot: CrossRobot, output_path: str) -> Path:
+def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
     """Return URDF file path`.
     """
         

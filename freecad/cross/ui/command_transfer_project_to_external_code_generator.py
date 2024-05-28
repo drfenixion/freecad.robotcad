@@ -2,7 +2,7 @@ from xml.dom.minidom import parseString, Document
 from ..wb_utils import get_rel_and_abs_path
 import FreeCAD as fc
 import FreeCADGui as fcgui
-from ..wb_utils import getURDFPath
+from ..wb_utils import get_urdf_path
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected
 from pathlib import Path
@@ -29,7 +29,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
     def getURDFFilePath(self):
       robot = self.getSelectedRobot()
       p, output_path = get_rel_and_abs_path(robot.OutputPath)
-      urdf_path = getURDFPath(robot, output_path)
+      urdf_path = get_urdf_path(robot, output_path)
 
       return urdf_path, output_path
 

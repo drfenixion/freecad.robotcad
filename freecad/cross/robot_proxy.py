@@ -44,6 +44,7 @@ from .wb_utils import is_robot
 from .wb_utils import remove_ros_workspace
 from .wb_utils import ros_name
 from .wb_utils import _has_meshes_directory
+from .wb_utils import get_urdf_path
 from xml.dom.minidom import parseString
 from pathlib import Path
 
@@ -737,9 +738,8 @@ class RobotProxy(ProxyBase):
                       ", has no 'Proxy' attribute", True)
         # Save the xml into a file.
         output_path.mkdir(parents=True, exist_ok=True)
-        file_base = get_valid_filename(ros_name(self.robot))
-        urdf_file = f'{file_base}.urdf'
-        urdf_path = output_path / f'urdf/{urdf_file}'
+        urdf_path = get_urdf_path(self.robot, output_path)
+        urdf_file = urdf_path.name
         root_link=self.get_root_link()
 
         if root_link == None:
