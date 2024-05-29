@@ -710,7 +710,7 @@ class RobotProxy(ProxyBase):
         elif set(write + overwrite) != set(write_files):
             warn(tr('Partial selection of files not supported yet'), True)
             return
-        package_parent, package_name = split_package_path(output_path)
+        project_path, package_name, description_package_path = split_package_path(output_path)
         # TODO: warn if package name doesn't end with `_description`.
         xml = et.fromstring('<robot/>')
         xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
@@ -723,7 +723,7 @@ class RobotProxy(ProxyBase):
                 error(f"Internal error with '{link.Label}', has no 'Proxy' attribute",
                       True)
                 return
-            xml.append(link.Proxy.export_urdf(package_parent, package_name))
+            xml.append(link.Proxy.export_urdf(project_path, package_name))
 
         for joint in self.get_joints():
             if not joint.Parent:
@@ -739,8 +739,8 @@ class RobotProxy(ProxyBase):
                       ", has no 'Proxy' attribute", True)
                 
         # Save the xml into a file.
-        output_path.mkdir(parents=True, exist_ok=True)
-        urdf_path = get_urdf_path(self.robot, output_path)
+        description_package_path.mkdir(parents=True, exist_ok=True)
+        urdf_path = get_urdf_path(self.robot, description_package_path)
         urdf_file = urdf_path.name
         root_link=self.get_root_link()
 
@@ -749,7 +749,7 @@ class RobotProxy(ProxyBase):
             return
         
         meshes_dir = ('meshes '
-                if _has_meshes_directory(Path(package_parent), package_name)
+                if _has_meshes_directory(Path(project_path), package_name)
                 else '')
             
         # robot meta for external code generator
@@ -758,7 +758,7 @@ class RobotProxy(ProxyBase):
 
         save_xml(xml, urdf_path)
         export_templates(template_files,
-                         package_parent,
+                         project_path,
                          meshes_dir=meshes_dir,
                          package_name=package_name,
                          urdf_file=urdf_file,
