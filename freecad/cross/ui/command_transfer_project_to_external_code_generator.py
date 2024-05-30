@@ -14,6 +14,7 @@ import zipfile
 import requests
 from ..wb_utils import get_workbench_param
 from .. import wb_globals
+from ..ros.utils import split_package_path
 
 
 class _TransferProjectToExternalCodeGeneratorCommand:
@@ -26,21 +27,18 @@ class _TransferProjectToExternalCodeGeneratorCommand:
                 }
 
 
-    def getURDFFilePath(self):
-      robot = self.getSelectedRobot()
-      p, output_path = get_rel_and_abs_path(robot.OutputPath)
-      urdf_path = get_urdf_path(robot, output_path)
-
-      return urdf_path, output_path
-
-
     def Activated(self):
 
-      urdf_path, output_path = self.getURDFFilePath()
+      robot = self.getSelectedRobot()
+      rel_output_path, abs_output_path = get_rel_and_abs_path(robot.OutputPath)
+      project_path, package_name, description_package_path = split_package_path(abs_output_path)
+      urdf_path = get_urdf_path(robot, description_package_path)
+
       path_to_overcross_meta_dir_rel_to_project = 'overcross/'
-      path_to_overcross_meta_dir = str(output_path) + '/' + path_to_overcross_meta_dir_rel_to_project
+      path_to_overcross_meta_dir = str(project_path) + '/' + path_to_overcross_meta_dir_rel_to_project
       path_to_robot_meta = Path(path_to_overcross_meta_dir + 'robot_meta.xml')
       path_to_overcross_meta_tmp_dir = path_to_overcross_meta_dir + 'tmp/'
+      
 
       print('Local code generating started.')
       # ensure files present by regenerate them
@@ -75,7 +73,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       Path(path_to_overcross_meta_dir_in_tmp_dir).mkdir(parents=True, exist_ok=True)
       shutil.copy(path_to_robot_meta, path_to_overcross_meta_dir_in_tmp_dir)
 
-      path_to_overcross_urdf_dir_in_tmp_dir = path_to_overcross_meta_tmp_dir + 'urdf'
+      path_to_overcross_urdf_dir_in_tmp_dir = path_to_overcross_meta_tmp_dir + '/' + package_name + '/' + 'urdf'
       Path(path_to_overcross_urdf_dir_in_tmp_dir).mkdir(parents=True, exist_ok=True)
       shutil.copy(urdf_path, path_to_overcross_urdf_dir_in_tmp_dir)
 
@@ -109,7 +107,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
       # unarchive and place generated files to project
       with zipfile.ZipFile(path_to_generated_project_zip, 'r') as zip_ref:
-        zip_ref.extractall(output_path)
+        zip_ref.extractall(project_path)
 
       # delete zip`s and tmp dir
       Path(path_to_overcross_project_zip_in_meta_dir).unlink()
