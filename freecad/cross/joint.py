@@ -24,6 +24,7 @@ class Joint(fc.DocumentObject):
     Origin: fc.Placement
     Parent: str  # Must name a CROSS::Link by its ROS name.
     Placement: fc.Placement
+    PlacementRelTotalCenterOfMass: fc.Placement 
     Position: float
     Proxy: JointProxy
     Type: str

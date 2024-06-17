@@ -197,6 +197,9 @@ class LinkProxy(ProxyBase):
         obj.Mass = fc.Units.Mass
         add_property(obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
                      'Center of mass of the link, with orientation determining the principal axes of inertia')
+        add_property(obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
+                     'Center of mass of the link, with orientation determining the principal axes of inertia \
+                        in global coordinates.')
         # Implementation note: App.Units.MomentOfInertia is not a valid unit in
         # FC v0.21.
         add_property(obj, 'App::PropertyFloat', 'Ixx', 'Inertial Parameters',

@@ -26,6 +26,7 @@ class Robot(DO):
     MaterialDensity: str
     RobotType: dict
     _Type: str
+    Mass: float
 
     def addObject(self, object_to_add: fc.DocumentObject) -> None: ...
     def removeObject(self, object_to_remove: fc.DocumentObject) -> DOList: ...

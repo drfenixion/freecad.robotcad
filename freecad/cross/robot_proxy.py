@@ -175,6 +175,7 @@ class RobotProxy(ProxyBase):
             'MaterialDensity',
             'RobotType',
             '_Type',
+            'Mass',
             ])
         if obj.Proxy is not self:
             obj.Proxy = self
@@ -223,6 +224,14 @@ class RobotProxy(ProxyBase):
         add_property(obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
                      'Objects created for the robot')
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
+
+        add_property(obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
+                     'Mass of the link')
+        obj.Mass = fc.Units.Mass
+
+        add_property(obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
+                     'Center of mass of the link, with orientation determining the principal axes of inertia \
+                        in global coordinates.')
 
         # Managed in self.reset_group().
         obj.setPropertyStatus('Group', 'ReadOnly')
@@ -792,6 +801,9 @@ class RobotProxy(ProxyBase):
             <name>{get_valid_urdf_name(ros_name(joint))}</name>
             <jointSpecific>{joint.JointSpecific}</jointSpecific>
             <jointRotationDirection>{joint.JoinRotationDirection}</jointRotationDirection>
+            <jointRelTotalCenterOfMass_x>{joint.PlacementRelTotalCenterOfMass.Base.x}</jointRelTotalCenterOfMass_x>
+            <jointRelTotalCenterOfMass_y>{joint.PlacementRelTotalCenterOfMass.Base.y}</jointRelTotalCenterOfMass_y>
+            <jointRelTotalCenterOfMass_z>{joint.PlacementRelTotalCenterOfMass.Base.z}</jointRelTotalCenterOfMass_z>
         </joint>
         """
         

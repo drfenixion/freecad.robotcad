@@ -50,6 +50,7 @@ class JointProxy(ProxyBase):
                 'Origin',
                 'Parent',
                 'Placement',
+                'PlacementRelTotalCenterOfMass',
                 'Position',
                 'Type',
                 'UpperLimit',
@@ -123,6 +124,9 @@ class JointProxy(ProxyBase):
 
         add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
                      'Placement of the joint in the robot frame')
+        obj.setEditorMode('Placement', ['ReadOnly'])
+        add_property(obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
+                     'Placement of the joint in the center of mass frame of robot')
         obj.setEditorMode('Placement', ['ReadOnly'])
 
         self._toggle_editor_mode()
