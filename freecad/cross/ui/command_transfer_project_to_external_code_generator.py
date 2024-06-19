@@ -23,7 +23,10 @@ class _TransferProjectToExternalCodeGeneratorCommand:
     def GetResources(self):
         return {'Pixmap': 'urdf_export.svg',
                 'MenuText': tr('Transfer project to external code generator'),
-                'ToolTip': tr('Select Robot and press this tool. It will generate local ROS files and transfer it to external code generator and save gotten result files.'),
+                'ToolTip': tr('Select Robot and press this tool. It will generate local ROS files'
+                              ' and transfer it to external code generator and save gotten result files.'
+                              ' Used for extended code genaration: startup code, docker code,'
+                              ' specific robot types code, etc.)'),
                 }
 
 
