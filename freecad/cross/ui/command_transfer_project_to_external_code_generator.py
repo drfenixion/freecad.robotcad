@@ -96,12 +96,21 @@ class _TransferProjectToExternalCodeGeneratorCommand:
                           allow_redirects=True)
       
       if r.status_code == 403:
-        error('Wrong OVERCROSS token', True)
+        error('Wrong OVERCROSS token. Get it at website.', True)
         fcgui.runCommand("WbSettings")
+        return
+      
+      if r.status_code == 429:
+        error('You have reached the daily limit of code generations for your tariff.'
+              ' Wait 24 hours for the generating counted to be reseted, or purchase a higher tariff.', True)
         return
   
       if r.status_code == 500:
         error('External code generator server error. Try later.', True)
+        return
+      
+      if r.status_code != 200:
+        error('Server error. Try later.', True)
         return
       
       # write gotten generated archive
