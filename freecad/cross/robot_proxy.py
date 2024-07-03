@@ -252,7 +252,7 @@ class RobotProxy(ProxyBase):
 
         add_property(obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
                      'Can be used for code generation.')
-        obj.RobotType=["unset","multicopter"]
+        obj.RobotType=["nonspecific","multicopter"]
 
         # The `Placement` is not used directly by the robot but it is used to
         # transform the pose of its links.
