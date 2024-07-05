@@ -21,12 +21,14 @@ class _TransferProjectToExternalCodeGeneratorCommand:
     """Command that transfers project to external code generator."""
 
     def GetResources(self):
-        return {'Pixmap': 'urdf_export.svg',
-                'MenuText': tr('Transfer project to external code generator'),
+        return {'Pixmap': 'urdf_export_external_generator.svg',
+                'MenuText': tr('External code generator (URDF, docker, startup script, etc)'),
                 'ToolTip': tr('Select Robot and press this tool. It will generate local ROS files'
-                              ' and transfer it to external code generator and save gotten result files.'
-                              ' Used for extended code genaration: startup code, docker code,'
-                              ' specific robot types code, etc.)'),
+                              ' and transfer it to external code generator and save gotten result files locally.'
+                              ' Used for extended code generating: project structure, infrastructure - startup script code'
+                              ' (one command for build and run docker with all dependencies of project),'
+                              ' docker related code (commands, dockerfile), Git to control dependencies,'
+                              ' specific robot types code (like PX4 multicopters), etc.'),
                 }
 
 
