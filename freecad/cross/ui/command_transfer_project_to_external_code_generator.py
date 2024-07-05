@@ -94,15 +94,19 @@ class _TransferProjectToExternalCodeGeneratorCommand:
                           data={'token': token},                    
                           files={'file': f},
                           allow_redirects=True)
-      
-      if r.status_code == 403:
-        error('Wrong OVERCROSS token. Get it at website.', True)
+
+      if r.status_code == 402:
+        error(r.text, True)
+        # TODO redirect to tariffs page
+        return      
+
+      if r.status_code == 403 or r.status_code == 401:
+        error(r.text, True)
         fcgui.runCommand("WbSettings")
         return
       
       if r.status_code == 429:
-        error('You have reached the daily limit of code generations for your tariff.'
-              ' Wait 24 hours for the generating counted to be reseted, or purchase a higher tariff.', True)
+        error(r.text, True)
         return
   
       if r.status_code == 500:
