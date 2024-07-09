@@ -795,18 +795,18 @@ class RobotProxy(ProxyBase):
         """
 
         for joint in self.get_joints():
-            
+
             jointsXml += f"""
         <joint>
             <name>{get_valid_urdf_name(ros_name(joint))}</name>
             <jointSpecific>{joint.JointSpecific}</jointSpecific>
             <jointRotationDirection>{joint.JoinRotationDirection}</jointRotationDirection>
-            <jointRelTotalCenterOfMass_x>{joint.PlacementRelTotalCenterOfMass.Base.x}</jointRelTotalCenterOfMass_x>
-            <jointRelTotalCenterOfMass_y>{joint.PlacementRelTotalCenterOfMass.Base.y}</jointRelTotalCenterOfMass_y>
-            <jointRelTotalCenterOfMass_z>{joint.PlacementRelTotalCenterOfMass.Base.z}</jointRelTotalCenterOfMass_z>
+            <jointRelTotalCenterOfMass_x>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.x) + ' mm'), 'm')}</jointRelTotalCenterOfMass_x>
+            <jointRelTotalCenterOfMass_y>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.y) + ' mm'), 'm')}</jointRelTotalCenterOfMass_y>
+            <jointRelTotalCenterOfMass_z>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.z) + ' mm'), 'm')}</jointRelTotalCenterOfMass_z>
         </joint>
         """
-        
+
         jointsXml += f"""
     </joints>
         """
