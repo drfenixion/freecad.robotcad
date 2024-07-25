@@ -92,7 +92,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
       # send file to external code generator
       with open(path_to_overcross_project_zip_in_meta_dir, 'rb') as f:
-        r = requests.post('http://127.0.0.1:8080/ru/generator/',      
+        r = requests.post('https://robotcad.ru/ru/generator/',      
                           data={'token': token},                    
                           files={'file': f},
                           allow_redirects=True)
