@@ -14,6 +14,7 @@ import MaterialEditor
 import MaterialEditor  # FreeCAD.
 
 from .utils import true_then_false
+from . import wb_constants
 
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
     from PySide import QtCore  # FreeCAD's PySide!
@@ -123,7 +124,7 @@ def message(text: str, gui: bool = False) -> None:
     fc.Console.PrintMessage(text + '\n')
     if gui and fc.GuiUp:
         diag = QtGui.QMessageBox(QtGui.QMessageBox.Information,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+                                 wb_constants.WORKBENCH_NAME, text)
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -133,7 +134,7 @@ def warn(text: str, gui: bool = False) -> None:
     fc.Console.PrintWarning(text + '\n')
     if gui and fc.GuiUp:
         diag = QtGui.QMessageBox(QtGui.QMessageBox.Warning,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+                                 wb_constants.WORKBENCH_NAME, text)
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -143,7 +144,7 @@ def error(text: str, gui: bool = False) -> None:
     fc.Console.PrintError(text + '\n')
     if gui and fc.GuiUp:
         diag = QtGui.QMessageBox(QtGui.QMessageBox.Critical,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+                                 wb_constants.WORKBENCH_NAME, text)
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This work is licensed under a 
+<a rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed">CC0 1.0</a>.
+-->
+<svg viewBox="80.073 27.617 348.662 334.174" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <filter id="outline-filter-1" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="outline 1 7 #000">
+      <feMorphology in="SourceAlpha" result="dilated" operator="dilate" radius="7"/>
+      <feFlood flood-color="#000" result="flood"/>
+      <feComposite in="flood" in2="dilated" operator="in" result="outline"/>
+      <feMerge>
+        <feMergeNode in="outline"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="morphology-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="morphology 1 dilate 6">
+      <feMorphology operator="dilate" radius="6"/>
+    </filter>
+    <filter id="inner-shadow-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="inner-shadow 1 0 0 18 0.5 rgba(0,0,0,0.7)">
+      <feOffset dx="0" dy="0"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feComposite operator="out" in="SourceGraphic"/>
+      <feComponentTransfer result="choke">
+        <feFuncA type="linear" slope="1"/>
+      </feComponentTransfer>
+      <feFlood flood-color="rgba(0,0,0,0.7)" result="color"/>
+      <feComposite operator="in" in="color" in2="choke" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect x="337.584" y="43.762" width="40.103" height="204.729" style="stroke: rgb(0, 0, 0); paint-order: fill; fill-rule: nonzero; stroke-linejoin: bevel; filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <rect x="224.499" y="220.877" width="170.721" height="53.661" style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="356.332" cy="248.211" rx="45.25" ry="50.982" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <rect x="205.608" y="239.075" width="34.534" height="51.14" style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137); transform-origin: 222.875px 264.645px;" transform="matrix(0.677165210247, -0.735831022263, 0.797496974468, 0.610157012939, -20.042691008385, -68.47636532017)"/>
+  <rect x="207.273" y="237.156" width="34.813" height="50.727" style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137); transform-origin: 224.68px 262.521px;" transform="matrix(-0.738942980766, -0.673768103123, 0.742094993591, -0.676642000675, -18.739941231288, 40.441049161436)"/>
+  <rect x="203.984" y="240.981" width="34.261" height="51.547" style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137); transform-origin: 221.114px 266.755px;" transform="matrix(-0.6090670228, -0.793118000031, 0.846041023731, -0.540152132511, -79.06134569206, -70.587403515464)"/>
+  <rect x="200.788" y="244.817" width="33.722" height="52.368" style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137); transform-origin: 217.648px 271.002px;" transform="matrix(0.438781946898, -0.898594021797, 0.928745090961, 0.377033054829, -74.708687292509, 36.815111576625)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" cx="143.185" cy="196.635" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="120.436" cy="211.789" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" cx="204.095" cy="198.26" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="221.944" cy="212.61" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="174.149" cy="178.23" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" cx="146.855" cy="309.198" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="123.371" cy="297.292" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(76, 18, 137);" cx="203.362" cy="305.952" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="228.122" cy="282.737" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+  <ellipse style="stroke: rgb(0, 0, 0); filter: url('#outline-filter-1') url('#morphology-filter-0') url('#inner-shadow-filter-0'); fill: rgb(137, 18, 108);" cx="177.544" cy="319.953" rx="20.408" ry="19.822" transform="matrix(1, 0, 0, 1, 0, 1.4210854715202004e-14)"/>
+</svg> 

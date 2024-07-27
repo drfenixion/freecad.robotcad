@@ -10,6 +10,7 @@ import FreeCAD as fc
 
 from ..utils import get_parent_by_pattern
 from ..utils import add_path_to_environment_variable
+from .. import wb_constants
 
 
 def warn(text: str, gui: bool = False) -> None:
@@ -23,7 +24,7 @@ def warn(text: str, gui: bool = False) -> None:
     fc.Console.PrintWarning(text + '\n')
     if gui and hasattr(fc, 'GuiUp') and fc.GuiUp:
         diag = QtGui.QMessageBox(QtGui.QMessageBox.Warning,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+                                 wb_constants.WORKBENCH_NAME, text)
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 

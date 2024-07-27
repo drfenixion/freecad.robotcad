@@ -25,14 +25,15 @@ from .ui import command_calculate_mass_and_inertia
 from .ui import command_transfer_project_to_external_code_generator
 from .ui import command_wb_settings
 from .wb_utils import ICON_PATH
+from . import wb_constants
 
 
 class CrossWorkbench(fcgui.Workbench):
     """Class which gets initiated at startup of the GUI."""
 
-    MenuText = 'CROSS - ROS workbench'
+    MenuText = wb_constants.WORKBENCH_NAME
     ToolTip = 'ROS-related workbench'
-    Icon = str(ICON_PATH / 'cross.svg')
+    Icon = str(ICON_PATH / 'robotcad_overcross_joint.svg')
 
     def GetClassName(self):
         return 'Gui::PythonWorkbench'
