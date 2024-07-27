@@ -1,20 +1,33 @@
-# Copy your FreeCAD-0.21.2-Linux-x86_64.AppImage to freecad_appimage_dir
+# (optional) If you dont have docker installed
 
-``cp FreeCAD-0.21.2-Linux-x86_64.AppImage freecad_appimage_dir``
+## Install Docker with Compose and Buildx plugins
+https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
 
-# Run container
-
-``sh run.sh``
-
-# Run freecad in container like:
-
+### Add your user to docker group
 ```
-source /opt/ros/$ROS_DISTRO/setup.bash
-sudo apt-get update && rosdep update && rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO}
-colcon build
-source ./install/setup.bash
-./../FreeCAD/FreeCAD-0.21.2-Linux-x86_64.AppImage --appimage-extract-and-run
+sudo usermod -aG docker $USER
 ```
 
-# For your convenience you can install Portainer. It is a docker GUI.
+### Reboot system
+```
+reboot
+```
 
+# Run FreeCAD with RobotCAD - OVERCROSS
+
+``bash run.bash``
+
+It will build image and run FreeCAD in container then open FreeCAD window at host. Also it bind host FreeCAD mods to container.
+Folder bindings (cont <-> host):
+<repo>/docker/freecad/freecad_projects_save_place/ - folder for your FC projects 
+<repo>/docker/freecad/freecad_appimage_dir - folder where you can place FreeCAD appImage if you want not to use default stable FreeCAD
+<repo>/docker/ros2_ws/src - ROS2 workspace src inside container
+<repo>/docker/ros2_ws/build_data - ROS2 workspace build folders (build, install, log, etc) inside container
+~/.local/share/FreeCAD/Mod - mods of FreeCAD
+
+
+# Troubleshooting
+
+## ERROS when run FreeCAD:
+"Program received signal SIGSEGV, Segmentation fault."
+Mean not enough rights with some folder that FreeCAD using. FreeCAD can be run with sudo or find folder and chown it to current user
