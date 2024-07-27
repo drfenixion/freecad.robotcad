@@ -35,7 +35,7 @@ if [ "$use_default_stable_freecad" = "false" ]
 then
     command=$custom_command
 fi
-echo "custom_command: $custom_command"
+echo "command: $command"
 
 # make dirs at host for builds, logs, other from container
 [ -d $build_data_path ] && rm -rf $build_data_path # remove dir
@@ -68,7 +68,7 @@ docker ps -aq --filter "name=$ros_container_name" | xargs -r docker rm > /dev/nu
 # [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installing-with-apt)
 # If dont need this set Prime integrated video (f.e. sudo prime-select intel). It usually is default.
 nvidia_options=''
-if [ $(prime-select query) == 'nvidia' ]; then 
+if [ "$(prime-select query 2> /dev/null)" == 'nvidia' ]; then 
     nvidia_options='--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all'
 fi
 
