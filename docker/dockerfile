@@ -91,4 +91,4 @@ RUN echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
 ### Build ROS packages
 
 
-CMD ["bash", "-c", ". ./install/setup.bash && bash"] 
+CMD ["bash", "-c", ". ./install/setup.bash && freecad"] 
