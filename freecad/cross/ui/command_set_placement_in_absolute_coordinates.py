@@ -19,7 +19,7 @@ CrossJoint = Joint
 LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
-def get_transform(
+def get_placements(
         orienteer1: DO,
         orienteer2: DO,
         ) -> fc.Placement:
@@ -104,7 +104,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             return
 
         if selection_link:
-            placement1, placement2 = get_transform(orienteer1, orienteer2)
+            placement1, placement2 = get_placements(orienteer1, orienteer2)
             doc.openTransaction(tr("Set link's mounted placement"))
 
             old_mounted_placement = cross_link.MountedPlacement
@@ -117,13 +117,13 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             cross_link.MountedPlacement = cross_link_basic_placement.inverse() * placement2
             doc.recompute()
 
-            placement1_new, placement2_new = get_transform(orienteer1, orienteer2)
+            placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
             placements_new_diff = placement1_new.inverse() * placement2_new
             cross_link.MountedPlacement = cross_link.MountedPlacement * placements_new_diff
 
             doc.commitTransaction()
         elif selection_joint:
-            placement1, placement2 = get_transform(orienteer1, orienteer2)
+            placement1, placement2 = get_placements(orienteer1, orienteer2)
             doc.openTransaction(tr("Set joint's origin"))
 
             old_origin = cross_joint.Origin
@@ -136,7 +136,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             cross_joint.Origin = cross_joint_basic_placement.inverse() * placement2
             doc.recompute()
 
-            placement1_new, placement2_new = get_transform(orienteer1, orienteer2)
+            placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
             placements_new_diff = placement1_new.inverse() * placement2_new
             cross_joint.Origin = cross_joint.Origin * placements_new_diff
 
