@@ -30,4 +30,4 @@ Folder bindings (cont <-> host):
 
 ## ERROS when run FreeCAD:
 "Program received signal SIGSEGV, Segmentation fault."
-Mean not enough rights with some folder that FreeCAD using. FreeCAD can be run with sudo or find folder and chown it to current user
+Mean not enough rights with some folder that FreeCAD using. FreeCAD can be run with sudo or find folder (usualy ~/.local/share/FreeCAD) and "chown" it to current user
