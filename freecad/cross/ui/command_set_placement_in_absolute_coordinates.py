@@ -57,7 +57,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
                               'This will move origin/mounted placement to position\n'
                               'that equal current position + difference between orienteers.\n'
                               'That give you opotunity to move or bind element not only by it origin (zero coordinates) \n'
-                              'but also by orienteer at any position.'
+                              'but also by orienteer at any position.\n'
                               'F.e. if you select: joint, LCS somethere at this joint link and any LCS where you want\n'
                               'it will move first LCS to second LCS position and origin of joint respectively to this move\n'
                               ' (like first LCS and origin in binded system).  \n'
@@ -108,8 +108,8 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             doc.openTransaction(tr("Set link's mounted placement"))
 
             old_mounted_placement = cross_link.MountedPlacement
-            cross_link.MountedPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero origin
-            doc.recompute() # trigger compute element placement based on zero origin
+            cross_link.MountedPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero MountedPlacement
+            doc.recompute() # trigger compute element placement based on zero MountedPlacement
             cross_link_basic_placement = cross_link.Placement
             cross_link.MountedPlacement = old_mounted_placement
             doc.recompute()
@@ -123,22 +123,39 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
 
             doc.commitTransaction()
         elif selection_joint:
-            placement1, placement2 = get_placements(orienteer1, orienteer2)
             doc.openTransaction(tr("Set joint's origin"))
 
-            old_origin = cross_joint.Origin
-            cross_joint.Origin = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero origin
-            doc.recompute() # trigger compute element placement based on zero origin
-            cross_joint_basic_placement = cross_joint.Placement
-            cross_joint.Origin = old_origin
-            doc.recompute()
+            orienteer1_most_parent_link = orienteer1.Parents[-1][0]
+            orienteer1_parent_robot_link_or_joint = orienteer1_most_parent_link.InList[0]
+            orienteer2_most_parent_link = orienteer2.Parents[-1][0]
+            orienteer2_parent_robot_link_or_joint = orienteer2_most_parent_link.InList[0]
 
-            cross_joint.Origin = cross_joint_basic_placement.inverse() * placement2
-            doc.recompute()
+            placement1, placement2 = get_placements(orienteer1, orienteer2)
+            
+            if orienteer1_parent_robot_link_or_joint.Name == orienteer2_parent_robot_link_or_joint.Name:
+                # orienteers in same frame 
 
-            placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
-            placements_new_diff = placement1_new.inverse() * placement2_new
-            cross_joint.Origin = cross_joint.Origin * placements_new_diff
+                # apply difference between orienteers
+                cross_joint.Origin = placement1.inverse() * placement2
+            else:
+                # orienteers in different frames
+                
+                # prepare data
+                old_origin = cross_joint.Origin
+                cross_joint.Origin = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero origin
+                doc.recompute() # trigger compute element placement based on zero origin
+                cross_joint_basic_placement = cross_joint.Placement
+                cross_joint.Origin = old_origin
+                doc.recompute()
+
+                # do transfer origin to orienteer2 frame
+                cross_joint.Origin = cross_joint_basic_placement.inverse() * placement2
+                doc.recompute()
+
+                # apply difference between orienteers
+                placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
+                placements_new_diff = placement1_new.inverse() * placement2_new
+                cross_joint.Origin = cross_joint.Origin * placements_new_diff
 
             doc.commitTransaction()
         doc.recompute()
