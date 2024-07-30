@@ -34,6 +34,36 @@ def get_placements(
     return orienteer1_placement, orienteer2_placement
 
 
+def move_local_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO, orienteer2: DO):
+    """Move element (joint or link) local placement (Origin or Mounted placement).
+
+    Move first orienteer to placement of second and second orienteer
+    and element to positions relative their bind system (element and orienteers) before.
+    This move does not change spatial relation between each other.
+    """
+
+    placement1, placement2 = get_placements(orienteer1, orienteer2)
+    
+    # prepare data
+    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
+    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
+    doc.recompute() # trigger compute element placement based on zero Origin
+    element_basic_placement = getattr(link_or_joint, 'Placement')
+    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
+    doc.recompute()
+
+    ## prepare data
+    element_local_placement = getattr(link_or_joint, origin_or_mounted_placement_name)
+    origin_placement1_diff = (element_basic_placement * element_local_placement).inverse() * placement1
+    origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
+
+    # do Origin move
+    # first orienteer come to second orienteer place and Origin respectively moved
+    # in local frame every tool click will result Origin move because both orienteers moved and received new position
+    new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
+    setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
+
+
 class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
     """Command to set the placement of a Link or a Joint.
 
@@ -104,74 +134,12 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             return
 
         if selection_link:
-            placement1, placement2 = get_placements(orienteer1, orienteer2)
             doc.openTransaction(tr("Set link's mounted placement"))
-
-            old_mounted_placement = cross_link.MountedPlacement
-            cross_link.MountedPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero MountedPlacement
-            doc.recompute() # trigger compute element placement based on zero MountedPlacement
-            cross_link_basic_placement = cross_link.Placement
-            cross_link.MountedPlacement = old_mounted_placement
-            doc.recompute()
-
-            cross_link.MountedPlacement = cross_link_basic_placement.inverse() * placement2
-            doc.recompute()
-
-            placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
-            placements_new_diff = placement1_new.inverse() * placement2_new
-            cross_link.MountedPlacement = cross_link.MountedPlacement * placements_new_diff
-
+            move_local_placement(doc, cross_link, 'MountedPlacement', orienteer1, orienteer2)
             doc.commitTransaction()
         elif selection_joint:
             doc.openTransaction(tr("Set joint's origin"))
-
-            try:
-                orienteer1_most_parent_link = orienteer1.Parents[-1][0]
-                orienteer1_parent_robot_link_or_joint = orienteer1_most_parent_link.InList[0]
-                orienteer2_most_parent_link = orienteer2.Parents[-1][0]
-                orienteer2_parent_robot_link_or_joint = orienteer2_most_parent_link.InList[0]
-                can_get_parents=True
-            except:
-                # cant get parent looks different frames
-                can_get_parents=False
-
-            placement1, placement2 = get_placements(orienteer1, orienteer2)
-            
-
-            # prepare data
-            old_origin = cross_joint.Origin
-            cross_joint.Origin = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)) # set zero origin
-            doc.recompute() # trigger compute element placement based on zero origin
-            cross_joint_basic_placement = cross_joint.Placement
-            cross_joint.Origin = old_origin
-            doc.recompute()
-
-            # do transfer origin to orienteer2 frame
-
-            
-            if can_get_parents and orienteer1_parent_robot_link_or_joint.Name == orienteer2_parent_robot_link_or_joint.Name:
-                # orienteers in same frame 
-                
-                ## prepare data
-                origin_placement1_diff = (cross_joint_basic_placement * cross_joint.Origin).inverse() * placement1
-                origin_placement2_diff = (cross_joint_basic_placement * cross_joint.Origin).inverse() * placement2
-
-                # do origin move
-                # first orienteer come to second orienteer place and origin respectively moved
-                # in local frame every tool click will result Origin move because both orienteers moved and received new position
-                cross_joint.Origin = cross_joint.Origin * origin_placement2_diff * origin_placement1_diff.inverse()
-            else:
-                # orienteers in different frames
-                
-                # more origin to second orienteer placement
-                cross_joint.Origin = cross_joint_basic_placement.inverse() * placement2
-                doc.recompute()
-
-                # apply difference between orienteers
-                placement1_new, placement2_new = get_placements(orienteer1, orienteer2)
-                placements_new_diff = placement1_new.inverse() * placement2_new
-                cross_joint.Origin = cross_joint.Origin * placements_new_diff
-
+            move_local_placement(doc, cross_joint, 'Origin', orienteer1, orienteer2)
             doc.commitTransaction()
         doc.recompute()
 
