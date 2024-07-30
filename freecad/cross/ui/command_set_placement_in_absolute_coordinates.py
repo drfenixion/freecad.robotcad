@@ -75,25 +75,17 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
                 'MenuText': tr('Set placement - in absolute coordinates'),
-                'Accel': 'S, P',
+                'Accel': 'P, A',
                 'ToolTip': tr('Set the mounted placement of a link or the origin of a joint.\n'
-                              'Select either\n'
-                              '  a) a CROSS::Link, a LCS, and any orienteer (LCS or other)\n'
-                              '  b) a CROSS::Joint, the child LCS, and the'
-                              ' parent LCS on the same link.\n'
-                              '  c) a CROSS::Joint, the LCS on the parent link,'
-                              ' and the LCS on the child link.\n'
+                              'Select either:\n'
+                              '  a) a CROSS::Link, a local frame LCS (first orienteer), any (second orienteer) \n'
+                              '  b) a CROSS::Joint, a local frame LCS (first orienteer), a LCS (second orienteer).\n'
                               '\n'
-                              'This will move origin/mounted placement to position\n'
-                              'that equal current position + difference between orienteers.\n'
-                              'That give you opotunity to move or bind element not only by it origin (zero coordinates) \n'
-                              'but also by orienteer at any position.\n'
-                              'F.e. if you select: joint, LCS somethere at this joint link and any LCS where you want\n'
-                              'it will move first LCS to second LCS position and origin of joint respectively to this move\n'
-                              ' (like first LCS and origin in binded system).  \n'
+                              'This will move first orienteer to position of second orienteer\n'
+                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
                               '\n'
-                              'Uses absolute coordinates and works in any case.\n'
-                              'Use it instead of old Set placement tool (that works only in local frame).\n',
+                              'It uses absolute coordinates and works correct in any case.\n'
+                              'Use this tool instead of old Set placement tool (that works correct only in local frame and have bug with rotated LCS).\n',
                               )}
 
     def IsActive(self):
@@ -125,11 +117,8 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
 
         if not selection_ok:
             message('Select either\n'
-                    '  a) a CROSS::Link, a LCS, and any orienteer (LCS or other)\n'
-                    '  b) a CROSS::Joint, the child LCS, and the'
-                    ' parent LCS on the same link.\n'
-                    '  c) a CROSS::Joint, the LCS on the parent link,'
-                    ' and the LCS on the child link.\n',
+                    '  a) a CROSS::Link, a local frame LCS (first orienteer), any (second orienteer) \n'
+                    '  b) a CROSS::Joint, a local frame LCS (first orienteer), a LCS (second orienteer).\n',
                     gui=True)
             return
 
