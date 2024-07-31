@@ -22,13 +22,23 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
     def GetResources(self):
         return {'Pixmap': 'urdf_export_external_generator.svg',
-                'MenuText': tr('External code generator (URDF, docker, startup script, etc)'),
-                'ToolTip': tr('Select Robot and press this tool. It will generate local ROS files'
-                              ' and transfer it to external code generator and save gotten result files locally.'
-                              ' Used for extended code generating: project structure, infrastructure - startup script code'
-                              ' (one command for build and run docker with all dependencies of project),'
-                              ' docker related code (commands, dockerfile), Git to control dependencies,'
-                              ' specific robot types code (like PX4 multicopters), etc.'),
+                'MenuText': tr('External extended code generator (URDF, docker, startup script, etc)'),
+                'ToolTip': tr('Select Robot and press this tool.\n'
+                              'It will generate local ROS files '
+                              'and transfer it to external code generator service and save gotten result files locally.\n'
+                              '\n'
+                              'Used for extended code generating:\n'
+                              '  project structure (folders, git), \n'
+                              '  specific robot types code (like PX4 multicopters), etc.\n'
+                              '  infrastructure: \n'
+                              '    startup script code (one command to build and run docker with all dependencies of project), \n'
+                              '    docker related code (commands, dockerfile).\n'
+                              '  all basic code:\n'
+                              '     URDF,\n'
+                              '     ROS 2 files,\n'
+                              '     etc.\n'
+                              '\n'
+                              'Provided by robotcad.ru'),
                 }
 
 
