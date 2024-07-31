@@ -16,6 +16,7 @@ from .ui import command_robot_from_urdf
 from .ui import command_set_joints
 from .ui import command_set_placement
 from .ui import command_set_placement_in_absolute_coordinates
+from .ui import command_set_placement_by_orienteer
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
 from .ui import command_cylinder_from_bounding_box
@@ -53,6 +54,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
+            'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
