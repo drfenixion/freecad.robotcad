@@ -64,7 +64,7 @@ class _SetCROSSPlacementByOrienteerCommand:
 
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement_by_orienteer.svg',
-                'MenuText': tr('Set placement by orienteer'),
+                'MenuText': tr('Set placement - by orienteer'),
                 'Accel': 'P, O',
                 'ToolTip': tr('Set the mounted placement of a link or the origin of a joint.\n'
                               'Select either:\n'

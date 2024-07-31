@@ -74,8 +74,8 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
 
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
-                'MenuText': tr('Set placement - in absolute coordinates'),
-                'Accel': 'P, A',
+                'MenuText': tr('Set placement - as system'),
+                'Accel': 'P, S',
                 'ToolTip': tr('Set the mounted placement of a link or the origin of a joint.\n'
                               'Select either:\n'
                               '  a) a CROSS::Link, a local frame LCS (first orienteer), any (second orienteer) \n'
@@ -84,8 +84,9 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
                               'This will move first orienteer to position of second orienteer\n'
                               'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
                               '\n'
-                              'It uses absolute coordinates and works correct in any case.\n'
-                              'Use this tool instead of old Set placement tool (that works correct only in local frame and have bug with rotated LCS).\n',
+                              'It uses absolute placement and works correct in any case.\n'
+                              'Use this tool instead of old Set placement tool \n'
+                              '(old Set placement works correct only in local frame and have bug with rotated LCS).\n',
                               )}
 
     def IsActive(self):
