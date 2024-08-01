@@ -2,6 +2,6 @@ FreeCAD-*
 freecad/freecad_projects_save_dir/*
 !freecad/freecad_projects_save_dir/.gitkeep 
 
-ros2_ws/build_data/
+ros2_ws/build_*
 ros2_ws/src/*
 !ros2_ws/src/freecad_cross_rosdep
