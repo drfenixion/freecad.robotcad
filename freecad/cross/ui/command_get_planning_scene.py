@@ -26,6 +26,8 @@ class _GetPlanningSceneCommand:
 
     def Activated(self):
         doc = fc.activeDocument()
+        if not doc:
+            doc = fc.newDocument()
         fcgui.addModule('freecad.cross.planning_scene_proxy')
         fcgui.addModule('freecad.cross.ros.planning_scene')
         fcgui.doCommand('_scene_msg = freecad.cross.ros.planning_scene.get_planning_scene(timeout_sec=10.0)')

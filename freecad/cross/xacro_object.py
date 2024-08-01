@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import ForwardRef, List
+from typing import List
 
 import FreeCAD as fc
-
-# Implementation note: The following import is necessary to avoid a circular
-# dependency.
-LinkRef = ForwardRef('Link')
-RobotRef = ForwardRef('Robot')
 
 # Typing hints
 DO = fc.DocumentObject

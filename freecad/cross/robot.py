@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import ForwardRef, List, Union
+from typing import NewType, List, Union
 
 import FreeCAD as fc
 
-# Implementation note: The following import is necessary to avoid a circular
+# Implementation note: These cannot be imported because of circular
 # dependency.
-JointRef = ForwardRef('Joint')
-LinkRef = ForwardRef('Link')
+Joint = NewType('Joint', fc.DocumentObject)
+Link = NewType('Link', fc.DocumentObject)
 
 # Typing hints
-BasicElement = Union[LinkRef, JointRef]
+BasicElement = Union[Link, Joint]
 DO = fc.DocumentObject
 DOList = List[DO]
 

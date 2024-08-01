@@ -187,7 +187,7 @@ def true_then_false(list: Iterable[bool]) -> bool:
 
 
 def values_from_string(values_str: str,
-                       delimiters: Iterable[str] = (' ', ',', ';'),
+                       delimiters: Iterable[str] = (' ', ',', ';', '\t'),
                        ) -> list[float]:
     """Return a list of floats from a string."""
     # Try a single value.
@@ -195,11 +195,12 @@ def values_from_string(values_str: str,
         return [float(values_str)]
     except ValueError:
         pass
-    # Try a list of values separated by spaces, commas or semicolons.
+    # Try a list of values separated by the given delimiters.
     for delimiter in delimiters:
         if delimiter in values_str:
             try:
-                return [float(value) for value in values_str.split(delimiter)]
+                return [float(value) for value in values_str.split(delimiter)
+                        if value != '']
             except ValueError:
                 pass
     return []

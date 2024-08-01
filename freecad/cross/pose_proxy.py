@@ -246,7 +246,6 @@ class _ViewProviderPose(ProxyBase):
         print(f'view_object({self.view_object.Object.Name}).draw()') # DEBUG
         from pivy import coin
         from .coin_utils import tcp_group
-        from .coin_utils import transform_from_placement
 
         if ((not self.is_execute_ready(debug=True))
                 or (not hasattr(self, 'shaded'))
@@ -267,7 +266,8 @@ class _ViewProviderPose(ProxyBase):
         sep = coin.SoSeparator()
         # When `self.pose` is a `App::GeometryPython` object, the
         # placement of the view object is managed by the view object itself
-        # and sep.addChild(transform_from_placement(Placement)) should not be used.
+        # and sep.addChild(transform_from_placement(Placement)) should not be
+        # used.
         sep.addChild(tcp_group(
             tcp_length_mm=0.66 * vobj.AxisLength,
             tcp_diameter_ratio_to_length=0.17,

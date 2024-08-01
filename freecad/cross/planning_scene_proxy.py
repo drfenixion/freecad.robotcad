@@ -205,6 +205,9 @@ class _ViewProviderPlanningScene(ProxyBase):
         if not self.view_object.Visibility:
             return
 
+        if not msg:
+            return
+
         planning_scene_group = coin_from_planning_scene_msg(
                 msg,
                 plane_sides_mm=self.view_object.PlaneSides,

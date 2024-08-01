@@ -7,6 +7,7 @@ import FreeCADGui as fcgui
 from PySide import QtGui  # FreeCAD's PySide!
 from PySide import QtCore  # FreeCAD's PySide!
 
+from ..freecad_utils import quantity_as
 from ..gui_utils import tr
 from ..utils import values_from_string
 from ..wb_utils import UI_PATH
@@ -117,20 +118,14 @@ class SetJointsDialog(QtGui.QDialog):
             unit = table.item(joint_row, unit_column).text()
             quantity = fc.Units.Quantity(f'{value} {unit}')
             if joint.Type == 'prismatic':
-                # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-                # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-                value = float(quantity.getValueAs('m'))
+                value = quantity_as(quantity, 'm')
             else:
                 # joint.Type in ['revolute', 'continuous']
-                # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-                # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-                value = float(quantity.getValueAs('rad'))
+                value = quantity_as(quantity, 'rad')
             # We set the joint value directly, without going through the
             # robot in order to avoid recomputing the robot at each joint value
             # change.
-            # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-            # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-            item = QtGui.QTableWidgetItem(f'{float(quantity.getValueAs(unit))}')
+            item = QtGui.QTableWidgetItem(f'{quantity_as(quantity, unit)}')
             table.setItem(i, value_column, item)
 
     def _on_table_edited(self) -> None:
