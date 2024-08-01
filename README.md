@@ -1,15 +1,42 @@
-# CROSS - CAD and ROS, Open-Source Synergy
+# RobotCAD also known as FreeCAD OVERCROSS
 
-CROSS is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS].
+RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS].
 
-# This fork named - OVERCROSS - inludes all of CROSS and new features such as:
+# Key features:
+1. Autoinstall and run by startup script
+1. Modeling parts (in FreeCAD),
+1. Creating robot structure (joints, links, elements of link (collisions, visuals, reals), etc),
+1. Сonvenient new tools to set placement of joints and links
 1. Material selection of link or whole robot
 1. Auto calculation of mass and inertia
-1. Launcher for Gazebo
-1. New some icons and icons reordering
-1. Bug fixes
+1. all features from CROSS
+1. Basic code generator:
+  1. ROS2 package with Launchers for Gazebo, RViz
+  1. URDF
+  1. Meshes
+1. Tool for use external extended code generating service
+  1. External code generator:
+    1. all of basic generator
+    1. Project structure
+    1. Startup script for build and run docker container with all dependencies of project
+    1. Init Git with submodules for dependencies management
+    1. Docker related code
+    1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
+    1. Nvidia video cards container support
+    1. README instruction how to use
 1. Others
 
+
+# Fast install and run
+If you have docker (buildx, compose plugins) installed just do
+```
+git clone https://github.com/drfenixion/freecad.overcross.git
+cd freecad.overcross/docker
+bash run.bash
+```
+If docker is not installed look at docker/README.md. There is also additional information on how to use the startup script.
+
+# Overview
 Tools of FreeCAD OVERCROSS
 
 ![Tools of FreeCAD OVERCROSS](https://github.com/drfenixion/freecad.cross/assets/13005708/d3d44e65-a9cc-45cc-937a-be5008b98608)
@@ -58,8 +85,8 @@ The key features of CROSS are:
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2 (use the tag `fc_v0.21.1` for earlier FreeCAD versions).
-Compatible with ROS2 (for now).
+Compatible with FreeCAD at least v0.21.2.
+Compatible with ROS2.
 
 ## Features
 
