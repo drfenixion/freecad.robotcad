@@ -479,7 +479,6 @@ class RobotProxy(ProxyBase):
                     # No need to update the link's placement because we support
                     # only tree structures.
                     continue
-                # TODO: some links and joints are already placed, re-use.
                 if hasattr(link, 'MountedPlacement'):
                     new_link_placement = placement * link.MountedPlacement
                 else:

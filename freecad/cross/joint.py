@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-from typing import ForwardRef
+from typing import NewType
 
 import FreeCAD as fc
 
-# Implementation note: The following import is necessary to avoid a circular
+# Implementation note: These cannot be imported because of circular
 # dependency.
-JointProxy = '.joint_proxy.JointProxy'
-JointRef = ForwardRef('Joint')
-VPJointProxy = ForwardRef('VPJointProxy')
+JointProxy = NewType('JointProxy', object)
+VPJointProxy = NewType('VPJointProxy', object)
 
 
 class Joint(fc.DocumentObject):
     Child: str  # Must name a CROSS::Link by its ROS name.
     Effort: float
     LowerLimit: float
-    Mimic: JointRef
-    MimickedJoint: JointRef
+    Mimic: bool
+    MimickedJoint: Joint
     Multiplier: float
     Offset: float
     Origin: fc.Placement
