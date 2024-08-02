@@ -82,11 +82,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
                               '  b) a CROSS::Joint, a local frame LCS (first orienteer), a LCS (second orienteer).\n'
                               '\n'
                               'This will move first orienteer to position of second orienteer\n'
-                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
-                              '\n'
-                              'It uses absolute placement and works correct in any case.\n'
-                              'Use this tool instead of old Set placement tool \n'
-                              '(old Set placement works correct only in local frame and have bug with rotated LCS).\n',
+                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n',
                               )}
 
     def IsActive(self):

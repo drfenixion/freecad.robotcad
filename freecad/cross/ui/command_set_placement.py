@@ -53,6 +53,11 @@ class _SetCROSSPlacementCommand:
                               ' parent LCS on the same link.\n'
                               '  c) a CROSS::Joint, the LCS on the parent link,'
                               ' and the LCS on the child link.',
+                              '\n'
+                              'This tool works correct only in local frame and have bug with rotated LCS.\n'
+                              'Also it does not takes into account current origin.\n'
+                              'Use "Set Placement - as system" tool instead of this tool.\n'
+                              'This tool planned to be removed.\n',
                               )}
 
     def IsActive(self):
