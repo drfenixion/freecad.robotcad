@@ -36,7 +36,7 @@ bash run.bash
 ```
 If docker is not installed look at docker/README.md. There is also additional information on how to use the startup script.
 
-You also can install RobotCAD manually (long way) by <a name="installation">Installation section</a>
+You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
 # Overview
 Tools of RobotCAD (FreeCAD OVERCROSS)
@@ -103,7 +103,7 @@ Compatible with ROS2.
 - Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
 - Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
-## [Installation](#installation)
+## Installation 
 
 You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
