@@ -52,7 +52,7 @@ class _SetCROSSPlacementCommand:
                               '  b) a CROSS::Joint, the child LCS, and the'
                               ' parent LCS on the same link.\n'
                               '  c) a CROSS::Joint, the LCS on the parent link,'
-                              ' and the LCS on the child link.'
+                              ' and the LCS on the child link.\n'
                               '\n'
                               'This tool works correct only in local frame and have bug with rotated LCS.\n'
                               'Also it does not takes into account current origin.\n'
