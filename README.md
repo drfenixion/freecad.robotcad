@@ -7,8 +7,11 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 1. Modeling parts (in FreeCAD),
 1. Creating robot structure (joints, links, elements of link (collisions, visuals, reals), etc),
 1. Сonvenient new tools to set placement of joints and links
-1. Material selection of link or whole robot
-1. Auto calculation of mass and inertia
+1. Material setting (from library or custom) to link or whole robot
+1. Auto calculation:
+  1. mass and inertia
+  1. center of mass (in global and local coordinates)
+  1. positions of joints relative to the robot's center of mass
 1. all features from CROSS
 1. Basic code generator:
   1. ROS2 package with Launchers for Gazebo, RViz
