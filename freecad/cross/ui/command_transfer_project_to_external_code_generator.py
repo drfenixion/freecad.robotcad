@@ -24,7 +24,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
         return {'Pixmap': 'urdf_export_external_generator.svg',
                 'MenuText': tr('External extended code generator (URDF, docker, startup script, etc)'),
                 'ToolTip': tr('Select Robot and press this tool.\n'
-                              'It will generate local ROS files '
+                              'It will do needed mass/inertia calculation then generate local ROS files\n'
                               'and transfer it to external code generator service and save gotten result files locally.\n'
                               '\n'
                               'Used for extended code generating:\n'
