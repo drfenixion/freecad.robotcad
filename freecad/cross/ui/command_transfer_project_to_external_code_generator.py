@@ -54,13 +54,16 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       path_to_robot_meta = Path(path_to_overcross_meta_dir + 'robot_meta.xml')
       path_to_overcross_meta_tmp_dir = path_to_overcross_meta_dir + 'tmp/'
       
+      print('Calculating mass and inertia started.')
+      fcgui.runCommand("CalculateMassAndInertia")
+      print('Calculating mass and inertia finished.')
 
       print('Local code generating started.')
       # ensure files present by regenerate them
       fcgui.runCommand("UrdfExport")
       print('Local code generating finished.')
-      print('External code generating started.')
 
+      print('External code generating started.')
       # check urdf
       if not urdf_path.exists():
         error(f"File: {urdf_path} does not exists.", True)
