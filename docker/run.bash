@@ -1,5 +1,34 @@
 #!/bin/bash
 
+# Usage info
+show_help() {
+cat << EOF
+Usage: ${0##*/} [-dh] 
+Run RobotCAD in container and open it window at host.
+
+    -h          display this help and exit
+    -d          debug
+EOF
+}
+
+# process params of script
+while getopts dh opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        d)  
+            debug=true
+            echo 'DEBUG is active.'
+            ;;
+        *)
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
 # Vars
 custom_fc_appimage=FreeCAD-0.21.2-Linux-x86_64.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
@@ -20,7 +49,8 @@ freecad_ros2_package_with_deps=freecad_cross_rosdep
 # Prepare paths
 cont_user_path=/home/$USER
 cont_path_ws=$cont_user_path/$parent_dir_of_ws_dir_name/$ws_dir_name
-script_dir="$(cd "$(dirname "$1")"; pwd -P)"
+basedir=`dirname $0`
+script_dir=`cd $basedir; pwd; cd - > /dev/null 2>&1;`
 root_of_freecad_cross=$script_dir/../
 ws_path=$root_of_freecad_cross/docker/ros2_ws/
 build_data_path=$ws_path/build_data
@@ -92,6 +122,15 @@ else
     fi
 
 
+    debug_port=''
+    debug_env=''
+    localhost_address=''
+    if [ "$debug" = true ] ; then
+        debug_port='-p 5678:5678'
+        debug_env='DEBUG=1'
+        localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
+    fi
+
     xhost +local:
     mount_options=',type=volume,volume-driver=local,volume-opt=type=none,volume-opt=o=bind'
     docker run -t -d --name=$ros_container_name \
@@ -115,7 +154,9 @@ else
         --network=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
-        $image bash -c ". ./install/setup.bash && $command"
+        $debug_port \
+        $localhost_address \
+        $image bash -c ". ./install/setup.bash && $debug_env $command"
     xhost -
 
 

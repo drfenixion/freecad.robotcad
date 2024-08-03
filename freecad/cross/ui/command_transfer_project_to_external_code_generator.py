@@ -103,12 +103,22 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       
       token = get_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, '')
 
-      # send file to external code generator
-      with open(path_to_overcross_project_zip_in_meta_dir, 'rb') as f:
-        r = requests.post('https://robotcad.ru/ru/generator/',      
-                          data={'token': token},                    
-                          files={'file': f},
-                          allow_redirects=True)
+      if os.environ.get('DEBUG'):
+        # send file to external code generator
+        print('DEBUG is active. Connect to localhost generator.')
+        with open(path_to_overcross_project_zip_in_meta_dir, 'rb') as f:
+          r = requests.post('https://localhost/ru/generator/',      
+                            data={'token': token},                    
+                            files={'file': f},
+                            allow_redirects=True,
+                            verify=False)
+      else:
+        # send file to external code generator
+        with open(path_to_overcross_project_zip_in_meta_dir, 'rb') as f:
+          r = requests.post('https://robotcad.ru/ru/generator/',      
+                            data={'token': token},                    
+                            files={'file': f},
+                            allow_redirects=True)
 
       if r.status_code == 402:
         error(r.text, True)

@@ -13,6 +13,9 @@ ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
 ENV USER=$USER
 ENV PASSWD=$PASSWD
 
+# fix - error: externally-managed-environment
+ENV PIP_BREAK_SYSTEM_PACKAGES 1
+
 
 #bash needed for ros distro setup.bash builtin (command in script)
 SHELL ["/bin/bash", "-c"]
@@ -24,7 +27,9 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common \
         mesa-utils \
-        nano && \
+        nano \
+        pip && \
+    pip install debugpy && \
     apt-get autoclean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/*
