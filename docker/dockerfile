@@ -23,7 +23,8 @@ RUN echo 'Install system packages'
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common \
-        mesa-utils && \
+        mesa-utils \
+        nano && \
     apt-get autoclean && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/*
