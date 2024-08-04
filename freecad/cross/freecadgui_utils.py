@@ -14,7 +14,7 @@ SO = 'FreeCADGui.SelectionObject'  # Could not get the class from Python.
 
 def get_subobjects_and_placements(
         selection: list[SO],
-        ) -> list[tuple[DO, fc.Placement]]:
+) -> list[tuple[DO, fc.Placement]]:
     """Return the list of selected subobjects and their placement."""
     outlist: list[tuple[DO, fc.Placement]] = []
     for selection_object in selection:

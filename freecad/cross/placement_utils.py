@@ -12,7 +12,7 @@ import FreeCAD as fc
 def get_global_placement_and_scale(
         object: fc.DocumentObject,
         subobject_fullpath: str,
-        ) -> tuple[fc.Placement, fc.Vector]:
+) -> tuple[fc.Placement, fc.Vector]:
     """Return the global placement and the total scale, respecting links.
     Returns the placement and scale the objects content is related to,
     which means the properties LinkTransform and Scale is respected if
@@ -35,8 +35,10 @@ def get_global_placement_and_scale(
             "additive primitve" in PartDesign.
     """
     return_type_link_matrix = 6  # Cf. DocumentObjectPyImp.cpp::getSubObject (l.417).
-    matrix = object.getSubObject(subobject_fullpath, return_type_link_matrix,
-                                 transform=True)
+    matrix = object.getSubObject(
+        subobject_fullpath, return_type_link_matrix,
+        transform=True,
+    )
     if matrix is None:
         return
     scale_type = matrix.hasScale(1e-5)
@@ -48,8 +50,10 @@ def get_global_placement_and_scale(
     fc.Console.PrintWarning('Uniform scaling may give wrong results, use with care\n')
     # Find scale.
     # Works only if uniform?
-    s_gen = (copysign(hypot(*matrix.col(i)), matrix.col(i)[i])
-             for i in range(3))
+    s_gen = (
+        copysign(hypot(*matrix.col(i)), matrix.col(i)[i])
+        for i in range(3)
+    )
     scale_vec = fc.Vector(*s_gen)
     # Workaround for scale affecting rotation
     # see https://forum.freecad.org/viewtopic.php?t=75448
@@ -64,7 +68,7 @@ def get_global_placement_and_scale(
 def get_global_placement(
         object: fc.DocumentObject,
         subobject_fullpath: str,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the global placement respecting links.
     Returns the placement the objects content is related to, which means
     the properties LinkTransform is respected if path points to a link.

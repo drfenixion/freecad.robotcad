@@ -9,10 +9,12 @@ class _NewRobotCommand:
     """The command definition to create a new Robot object."""
 
     def GetResources(self):
-        return {'Pixmap': 'robot.svg',
-                'MenuText': tr('New Robot'),
-                'Accel': 'N, R',
-                'ToolTip': tr('Create a Robot container.')}
+        return {
+            'Pixmap': 'robot.svg',
+            'MenuText': tr('New Robot'),
+            'Accel': 'N, R',
+            'ToolTip': tr('Create a Robot container.'),
+        }
 
     def IsActive(self):
         return fc.activeDocument() is not None

@@ -63,7 +63,7 @@ def _add_joint_variable(
         robot: CrossRobot,
         joint: CrossJoint,
         category: str,
-        ) -> str:
+) -> str:
     """Add a property for the actuator value to `robot` and return its name.
 
     Add a property starting with "joint.Label" to represent the actuation
@@ -72,8 +72,10 @@ def _add_joint_variable(
 
     """
     if not is_joint(joint):
-        warn(f'Wrong object type. {joint.Name} ({joint.Label})'
-             ' is not a Cross::Joint')
+        warn(
+            f'Wrong object type. {joint.Name} ({joint.Label})'
+            ' is not a Cross::Joint',
+        )
         return ''
     if joint.Mimic:
         # No actuator for mimic joints.
@@ -97,9 +99,11 @@ def _add_joint_variable(
         prop_type = 'App::PropertyFloatConstraint'
     else:
         prop_type = 'App::PropertyFloat'
-    _, used_var_name = add_property(robot,
-                                    prop_type, var_name,
-                                    category, help_txt)
+    _, used_var_name = add_property(
+        robot,
+        prop_type, var_name,
+        category, help_txt,
+    )
     if joint.Type in ['prismatic', 'revolute']:
         # Set the default value to the current value to set min/max.
         value = robot.getPropertyByName(used_var_name)
@@ -126,7 +130,7 @@ def _dispatch_to_joint_view_objects(
         robot: CrossRobot,
         prop: str,
         joint_prop: str,
-        ) -> None:
+) -> None:
     """Dispatch a property to the view objects of the joints of `robot`."""
     if not is_robot(robot):
         return
@@ -134,23 +138,23 @@ def _dispatch_to_joint_view_objects(
         return
     prop_value = getattr(robot.ViewObject, prop)
     for joint in get_joints(robot.Group):
-        if hasattr(joint.ViewObject, joint_prop):
-            setattr(joint.ViewObject, joint_prop, prop_value)
+        if hasattr(joint.ViewObject, 'Proxy') and (joint.ViewObject.Proxy is not None):
+            joint.ViewObject.Proxy.update_prop(joint_prop, prop_value)
 
 
 def _dispatch_to_link_view_objects(
         robot: CrossRobot,
         prop: str,
         link_prop: str,
-        ) -> None:
+) -> None:
     if not is_robot(robot):
         return
     if (not hasattr(robot, 'Proxy')) or (not robot.Proxy.is_execute_ready()):
         return
     prop_value = getattr(robot.ViewObject, prop)
     for link in get_links(robot.Group):
-        if hasattr(link.ViewObject, link_prop):
-            setattr(link.ViewObject, link_prop, prop_value)
+        if hasattr(link.ViewObject, 'Proxy') and (link.ViewObject.Proxy is not None):
+            link.ViewObject.Proxy.update_prop(link_prop, prop_value)
 
 
 class RobotProxy(ProxyBase):
@@ -177,6 +181,7 @@ class RobotProxy(ProxyBase):
             '_Type',
             'Mass',
             ])
+
         if obj.Proxy is not self:
             obj.Proxy = self
         self.robot = obj
@@ -216,13 +221,17 @@ class RobotProxy(ProxyBase):
         return self._joint_variables
 
     def _init_properties(self, obj: CrossRobot):
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+            obj, 'App::PropertyString', '_Type', 'Internal',
+            'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
-                     'Objects created for the robot')
+        add_property(
+            obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
+            'Objects created for the robot',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
 
         add_property(obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
@@ -236,18 +245,26 @@ class RobotProxy(ProxyBase):
         # Managed in self.reset_group().
         obj.setPropertyStatus('Group', 'ReadOnly')
 
-        add_property(obj, 'App::PropertyPath', 'OutputPath', 'Export',
-                     'The path to the ROS package to export files to,'
-                     ' relative to $ROS_WORKSPACE/src')
+        add_property(
+            obj, 'App::PropertyPath', 'OutputPath', 'Export',
+            'The path to the ROS package to export files to,'
+            ' relative to $ROS_WORKSPACE/src',
+        )
 
-        add_property(obj, 'App::PropertyString', 'MaterialCardName', 'Material',
-                     'Default material of robot. Used to calculate mass and inertia if link has not its own material. Use "Set material" tool to change')
+        add_property(
+            obj, 'App::PropertyString', 'MaterialCardName', 'Material',
+            'Default material of robot. Used to calculate mass and inertia if link has not its own material. Use "Set material" tool to change',
+        )
         obj.setPropertyStatus('MaterialCardName', ['ReadOnly'])
-        add_property(obj, 'App::PropertyPath', 'MaterialCardPath', 'Material',
-                     'Default material of robot. Used to calculate mass and inertia')
+        add_property(
+            obj, 'App::PropertyPath', 'MaterialCardPath', 'Material',
+            'Default material of robot. Used to calculate mass and inertia',
+        )
         obj.setPropertyStatus('MaterialCardPath', ['Hidden', 'ReadOnly'])
-        add_property(obj, 'App::PropertyString', 'MaterialDensity', 'Material',
-                     'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.')
+        add_property(
+            obj, 'App::PropertyString', 'MaterialDensity', 'Material',
+            'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.',
+        )
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
 
         add_property(obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
@@ -256,8 +273,10 @@ class RobotProxy(ProxyBase):
 
         # The `Placement` is not used directly by the robot but it is used to
         # transform the pose of its links.
-        add_property(obj, 'App::PropertyPlacement', 'Placement',
-                     'Base', 'Placement')
+        add_property(
+            obj, 'App::PropertyPlacement', 'Placement',
+            'Base', 'Placement',
+        )
 
     def execute(self, obj: CrossRobot) -> None:
         self._cleanup_group()
@@ -285,8 +304,10 @@ class RobotProxy(ProxyBase):
         self.__init__(obj)
         self._created_objects = obj.CreatedObjects
         # Rebuilt self._joint_variables from the map {ros_name: joint_variable_name}.
-        self._joint_variables = {self.get_joint(name): var
-                                 for name, var in self._joint_variables_ros_map.items()}
+        self._joint_variables = {
+            self.get_joint(name): var
+            for name, var in self._joint_variables_ros_map.items()
+        }
 
     def dumps(self):
         self.robot.CreatedObjects = self._created_objects
@@ -341,10 +362,12 @@ class RobotProxy(ProxyBase):
                 continue
             for o in link.Group:
                 show_objects.append(o)
-        robot_objects = (self.get_links()
-                         + self.get_joints()
-                         + self.created_objects
-                         + show_objects)
+        robot_objects = (
+            self.get_links()
+            + self.get_joints()
+            + self.created_objects
+            + show_objects
+        )
         return (obj in robot_objects) and len(set(obj.InList) - set(robot_objects)) == 0
 
     def delete_created_objects(self) -> None:
@@ -367,8 +390,10 @@ class RobotProxy(ProxyBase):
             except RuntimeError:
                 # Already deleted.
                 continue
-            if (self._is_exclusive_to_robot(obj)
-                    and all([self._is_exclusive_to_robot(o) for o in obj.OutList])):
+            if (
+                self._is_exclusive_to_robot(obj)
+                and all([self._is_exclusive_to_robot(o) for o in obj.OutList])
+            ):
                 # Object without "external" parent in the dependency graph.
                 # "External" means not in self.created_objects.
                 self.robot.Document.removeObject(name)
@@ -381,8 +406,10 @@ class RobotProxy(ProxyBase):
             for link in self.get_links():
                 link_name = ros_name(link)
                 if ((joint.Parent == link_name)
-                    or (hasattr(link, 'Proxy')
-                        and link.Proxy.is_execute_ready())):
+                    or (
+                        hasattr(link, 'Proxy')
+                        and link.Proxy.is_execute_ready()
+                    )):
                     links.append(link_name)
             return links
 
@@ -391,11 +418,13 @@ class RobotProxy(ProxyBase):
             for link in self.get_links():
                 link_name = ros_name(link)
                 if ((joint.Child == link_name)
-                    or (hasattr(link, 'Proxy')
+                    or (
+                        hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
                         and link.Proxy.may_be_base_link()
                         and (not link.Proxy.is_in_chain_to_joint(joint))
-                        and (joint.Parent != link_name))):
+                        and (joint.Parent != link_name)
+                    )):
                     links.append(link_name)
             return links
 
@@ -416,8 +445,10 @@ class RobotProxy(ProxyBase):
                 # Doesn't change the value if in the new enum.
                 joint.Child = child_links
 
-    def set_joint_values(self,
-                         joint_values: dict[CrossJoint, [float | fc.Units.Quantity]]) -> None:
+    def set_joint_values(
+            self,
+            joint_values: dict[CrossJoint, [float | fc.Units.Quantity]],
+    ) -> None:
         """Set the joint values from values in meters and radians.
 
         Set the joint values of the robot from values in meters and radians or
@@ -428,19 +459,18 @@ class RobotProxy(ProxyBase):
         source_units = {
                 'Length': 'm',
                 'Angle': 'rad',
-                }
+        }
         target_units = {
                 'Length': 'mm',
                 'Angle': 'deg',
-                }
+        }
         for joint, value in joint_values.items():
             var_name = joint_variables[joint]
             unit_type = joint.Proxy.get_unit_type()
             if isinstance(value, float):
                 value = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
             value = quantity_as(value, target_units[unit_type])
-            if getattr(self.robot, var_name) != value:
-                setattr(self.robot, var_name, value)
+            self.update_prop(var_name, value)
 
     def add_joint_variables(self) -> None:
         """Add a property for each actuated joint."""
@@ -448,13 +478,18 @@ class RobotProxy(ProxyBase):
             return
         self._joint_variables.clear()
         # Get all old variables.
-        old_vars: set[str] = set(get_properties_of_category(
+        old_vars: set[str] = set(
+            get_properties_of_category(
             self.robot,
-            self._category_of_joint_values))
+            self._category_of_joint_values,
+            ),
+        )
         # Add a variable for each actuated (supported) joint.
         for joint in self.get_joints():
-            var = _add_joint_variable(self.robot, joint,
-                                      self._category_of_joint_values)
+            var = _add_joint_variable(
+                self.robot, joint,
+                self._category_of_joint_values,
+            )
             if var:
                 self._joint_variables[joint] = var
         # Remove obsoleted variables.
@@ -493,8 +528,10 @@ class RobotProxy(ProxyBase):
                         # Avoid recursive recompute.
                         joint.Placement = new_joint_placement
                     # For next link.
-                    placement = (new_joint_placement
-                                 * joint.Proxy.get_actuation_placement())
+                    placement = (
+                        new_joint_placement
+                        * joint.Proxy.get_actuation_placement()
+                    )
                     joint_cache[joint] = placement
 
     def get_links(self) -> list[CrossLink]:
@@ -675,8 +712,10 @@ class RobotProxy(ProxyBase):
                 if not parent:
                     return None
                 if (child is second) or (parent is second):
-                    second_transform = (joint.Placement
-                                        * joint.Proxy.get_actuation_placement())
+                    second_transform = (
+                        joint.Placement
+                        * joint.Proxy.get_actuation_placement()
+                    )
         return None
 
     def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
@@ -699,7 +738,7 @@ class RobotProxy(ProxyBase):
             'launch/display.launch.py',
             'launch/gazebo.launch.py',
             'rviz/robot_description.rviz',
-            ]
+        ]
 
         write_files = template_files + [
                 'meshes/',
@@ -709,7 +748,8 @@ class RobotProxy(ProxyBase):
 
         if interactive and fc.GuiUp:
             diag = FileOverwriteConfirmationDialog(
-                    output_path, write_files)
+                    output_path, write_files,
+            )
             ignore, write, overwrite = diag.exec_()
             diag.close()
         if set(ignore) == set(write_files):
@@ -728,8 +768,10 @@ class RobotProxy(ProxyBase):
         
         for link in self.get_links():
             if not hasattr(link, 'Proxy'):
-                error(f"Internal error with '{link.Label}', has no 'Proxy' attribute",
-                      True)
+                error(
+                    f"Internal error with '{link.Label}', has no 'Proxy' attribute",
+                    True,
+                )
                 return
             xml.append(link.Proxy.export_urdf(project_path, package_name))
 
@@ -772,6 +814,7 @@ class RobotProxy(ProxyBase):
                          urdf_file=urdf_file,
                          fixed_frame=ros_name(self.get_root_link()),
                          )
+
         return xml
     
 
@@ -822,14 +865,17 @@ class _ViewProviderRobot(ProxyBase):
     """A view provider for the Robot container object """
 
     def __init__(self, vobj: VPDO):
-        super().__init__('view_object', [
-            'JointAxisLength',
-            'ShowCollision',
-            'ShowJointAxes',
-            'ShowReal',
-            'ShowVisual',
-            'Visibility',
-            ])
+        super().__init__(
+            'view_object',
+            [
+                'JointAxisLength',
+                'ShowCollision',
+                'ShowJointAxes',
+                'ShowReal',
+                'ShowVisual',
+                'Visibility',
+            ],
+        )
         vobj.Proxy = self
 
     def getIcon(self):
@@ -844,22 +890,32 @@ class _ViewProviderRobot(ProxyBase):
         # vobj.addExtension('Gui::ViewProviderGeoFeatureGroupExtensionPython')
 
         # Level of detail.
-        add_property(vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
-                     'Whether to show the real parts')
-        add_property(vobj, 'App::PropertyBool', 'ShowVisual', 'ROS Display Options',
-                     'Whether to show the parts for URDF visual')
-        add_property(vobj, 'App::PropertyBool', 'ShowCollision', 'ROS Display Options',
-                     'Whether to show the parts for URDF collision')
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
+            'Whether to show the real parts',
+        )
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowVisual', 'ROS Display Options',
+            'Whether to show the parts for URDF visual',
+        )
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowCollision', 'ROS Display Options',
+            'Whether to show the parts for URDF collision',
+        )
 
         # Joint display options.
-        add_property(vobj, 'App::PropertyBool', 'ShowJointAxes',
-                     'ROS Display Options',
-                     'Toggle the display of the Z-axis for all child joints',
-                     True)
-        add_property(vobj, 'App::PropertyLength', 'JointAxisLength',
-                     'ROS Display Options',
-                     "Length of the arrow for the joints axes",
-                     500.0)
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowJointAxes',
+            'ROS Display Options',
+            'Toggle the display of the Z-axis for all child joints',
+            True,
+        )
+        add_property(
+            vobj, 'App::PropertyLength', 'JointAxisLength',
+            'ROS Display Options',
+            "Length of the arrow for the joints axes",
+            500.0,
+        )
 
     def updateData(self, obj: CrossRobot, prop: str):
         return

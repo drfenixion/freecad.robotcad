@@ -44,7 +44,7 @@ def _add_fc_links_lod(
         link: CrossLink,
         objects: DOList,
         lod: str,
-        ) -> list[AppLink]:
+) -> list[AppLink]:
     """Create links to real, visual or collision elements.
 
     Return the list of created FreeCAD link objects.
@@ -99,7 +99,7 @@ def _get_xmls_and_export_meshes(
         placement,
         package_parent: [Path | str] = Path(),
         package_name: str = '',
-        ) -> list[et.Element]:
+) -> list[et.Element]:
     """
     Save the meshes as dae files.
 
@@ -118,12 +118,14 @@ def _get_xmls_and_export_meshes(
         obj,
         package_name=str(package_name),
         placement=placement,
-        )
+    )
     xmls: list[et.Element] = []
     for export_datum in export_data:
         if not is_primitive(export_datum.object):
-            mesh_path = (package_parent / package_name
-                         / 'meshes' / export_datum.mesh_filename)
+            mesh_path = (
+                package_parent / package_name
+                / 'meshes' / export_datum.mesh_filename
+            )
             save_mesh_dae(export_datum.object, mesh_path)
         xmls.append(export_datum.xml)
     return xmls
@@ -137,20 +139,23 @@ class LinkProxy(ProxyBase):
     Type = 'Cross::Link'
 
     def __init__(self, obj: CrossLink):
-        super().__init__('link', [
-            'Collision',
-            'Group',
-            'Mass',
-            'MountedPlacement',
-            'Placement',
-            'Real',
-            'Visual',
-            'MaterialCardName',
-            'MaterialCardPath',
-            'MaterialDensity',
-            'MaterialNotCalculate',
-            '_Type',
-            ])
+        super().__init__(
+            'link',
+            [
+                'Collision',
+                'Group',
+                'Mass',
+                'MountedPlacement',
+                'Placement',
+                'Real',
+                'Visual',
+                'MaterialCardName',
+                'MaterialCardPath',
+                'MaterialDensity',
+                'MaterialNotCalculate',
+                '_Type',
+            ],
+        )
         obj.Proxy = self
         self.link = obj
 
@@ -178,22 +183,32 @@ class LinkProxy(ProxyBase):
         obj.addExtension('App::GroupExtensionPython')
 
     def init_properties(self, obj: CrossLink):
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+            obj, 'App::PropertyString', '_Type', 'Internal',
+            'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyLinkList', 'Real', 'Elements',
-                     'The real part objects of this link, optional')
-        add_property(obj, 'App::PropertyLinkList', 'Visual', 'Elements',
-                     'The part objects this link that constitutes the URDF'
-                     ' visual elements, optional')
-        add_property(obj, 'App::PropertyLinkList', 'Collision', 'Elements',
-                     'The part objects this link that constitutes the URDF'
-                     ' collision elements, optional')
+        add_property(
+            obj, 'App::PropertyLinkList', 'Real', 'Elements',
+            'The real part objects of this link, optional',
+        )
+        add_property(
+            obj, 'App::PropertyLinkList', 'Visual', 'Elements',
+            'The part objects this link that constitutes the URDF'
+            ' visual elements, optional',
+        )
+        add_property(
+            obj, 'App::PropertyLinkList', 'Collision', 'Elements',
+            'The part objects this link that constitutes the URDF'
+            ' collision elements, optional',
+        )
 
-        add_property(obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
-                     'Mass of the link')
+        add_property(
+            obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
+            'Mass of the link',
+        )
         obj.Mass = fc.Units.Mass
         add_property(obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
                      'Center of mass of the link, with orientation determining the principal axes of inertia')
@@ -202,41 +217,65 @@ class LinkProxy(ProxyBase):
                         in global coordinates.')
         # Implementation note: App.Units.MomentOfInertia is not a valid unit in
         # FC v0.21.
-        add_property(obj, 'App::PropertyFloat', 'Ixx', 'Inertial Parameters',
-                     'Moment of inertia around the x axis, in kg m^2')
-        add_property(obj, 'App::PropertyFloat', 'Ixy', 'Inertial Parameters',
-                     'Moment of inertia around the y axis when rotating around the x axis, in kg m^2')
-        add_property(obj, 'App::PropertyFloat', 'Ixz', 'Inertial Parameters',
-                     'Moment of inertia around the z axis when rotating around the x axis, in kg m^2')
-        add_property(obj, 'App::PropertyFloat', 'Iyy', 'Inertial Parameters',
-                     'Moment of inertia around the y axis, in kg m^2')
-        add_property(obj, 'App::PropertyFloat', 'Iyz', 'Inertial Parameters',
-                     'Moment of inertia around the z axis when rotating around the y axis, in kg m^2')
-        add_property(obj, 'App::PropertyFloat', 'Izz', 'Inertial Parameters',
-                     'Moment of inertia around the z axis, in kg m^2')
+        add_property(
+            obj, 'App::PropertyFloat', 'Ixx', 'Inertial Parameters',
+            'Moment of inertia around the x axis, in kg m^2',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Ixy', 'Inertial Parameters',
+            'Moment of inertia around the y axis when rotating around the x axis, in kg m^2',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Ixz', 'Inertial Parameters',
+            'Moment of inertia around the z axis when rotating around the x axis, in kg m^2',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Iyy', 'Inertial Parameters',
+            'Moment of inertia around the y axis, in kg m^2',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Iyz', 'Inertial Parameters',
+            'Moment of inertia around the z axis when rotating around the y axis, in kg m^2',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Izz', 'Inertial Parameters',
+            'Moment of inertia around the z axis, in kg m^2',
+        )
 
-        add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
-                     'Placement of elements in the robot frame')
+        add_property(
+            obj, 'App::PropertyPlacement', 'Placement', 'Internal',
+            'Placement of elements in the robot frame',
+        )
 
-        add_property(obj, 'App::PropertyString', 'MaterialCardName', 'Material',
-                     'Material of element. Used to calculate mass and inertia. Use "Set material" tool to change')
+        add_property(
+            obj, 'App::PropertyString', 'MaterialCardName', 'Material',
+            'Material of element. Used to calculate mass and inertia. Use "Set material" tool to change',
+        )
         obj.setPropertyStatus('MaterialCardName', ['ReadOnly'])
-        add_property(obj, 'App::PropertyPath', 'MaterialCardPath', 'Material',
-                     'Material of element. Used to calculate mass and inertia')
+        add_property(
+            obj, 'App::PropertyPath', 'MaterialCardPath', 'Material',
+            'Material of element. Used to calculate mass and inertia',
+        )
         obj.setPropertyStatus('MaterialCardPath', ['Hidden', 'ReadOnly'])
-        add_property(obj, 'App::PropertyString', 'MaterialDensity', 'Material',
-                     'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.')
+        add_property(
+            obj, 'App::PropertyString', 'MaterialDensity', 'Material',
+            'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.',
+        )
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
-        add_property(obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
-                     'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.')
+        add_property(
+            obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
+            'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.',
+        )
 
         # Used when adding a link which shape in located at the origin but
         # looks correctly placed. For example, when opening a STEP file or a
         # mesh with all links at the mounted position.
         # This placement is the transform from origin to the location of the
         # joint that is parent of this link.
-        add_property(obj, 'App::PropertyPlacement', 'MountedPlacement',
-                     'ROS Parameters', 'Shapes placement')
+        add_property(
+            obj, 'App::PropertyPlacement', 'MountedPlacement',
+            'ROS Parameters', 'Shapes placement',
+        )
 
         self._set_property_modes()
 
@@ -263,9 +302,11 @@ class LinkProxy(ProxyBase):
             robot = self.get_robot()
             if robot and hasattr(robot, 'Proxy'):
                 robot.Proxy.set_joint_enum()
-            if (robot
-                    and is_name_used(obj, robot)
-                    and getattr(obj, prop) != self.old_ros_name):
+            if (
+                robot
+                and is_name_used(obj, robot)
+                and getattr(obj, prop) != self.old_ros_name
+            ):
                 setattr(obj, prop, self.old_ros_name)
         if prop == 'Placement':
             if not self.is_execute_ready():
@@ -275,8 +316,10 @@ class LinkProxy(ProxyBase):
                     new_placement = obj.Placement
                 else:
                     new_placement = obj.Placement * obj.MountedPlacement
-                if (is_freecad_link(fclink)
-                        and (fclink.LinkPlacement != new_placement)):
+                if (
+                    is_freecad_link(fclink)
+                    and (fclink.LinkPlacement != new_placement)
+                ):
                     fclink.LinkPlacement = new_placement
         if prop == 'MountedPlacement':
             robot = self.get_robot()
@@ -285,8 +328,10 @@ class LinkProxy(ProxyBase):
                 return
             new_placement = obj.Placement * obj.MountedPlacement
             for fclink in obj.Group:
-                if (is_freecad_link(fclink)
-                        and (fclink.LinkPlacement != new_placement)):
+                if (
+                    is_freecad_link(fclink)
+                    and (fclink.LinkPlacement != new_placement)
+                ):
                     fclink.LinkPlacement = new_placement
         self._set_property_modes()
 
@@ -343,10 +388,12 @@ class LinkProxy(ProxyBase):
     def get_robot(self) -> Optional[CrossRobot]:
         """Return the Cross::Robot this link belongs to."""
         # TODO: as property.
-        if (hasattr(self, '_robot')
-                and self._robot
-                and hasattr(self._robot, 'Group')
-                and (self.link in self._robot.Group)):
+        if (
+            hasattr(self, '_robot')
+            and self._robot
+            and hasattr(self._robot, 'Group')
+            and (self.link in self._robot.Group)
+        ):
             return self._robot
         if not self.is_execute_ready():
             return None
@@ -362,10 +409,12 @@ class LinkProxy(ProxyBase):
         robot = self.get_robot()
         if robot is None:
             return None
-        if (self._ref_joint
-                and attr_equals(self._ref_joint, 'Child', ros_name(self.link))
-                and hasattr(self._ref_joint, 'Proxy')
-                and robot == self._ref_joint.Proxy.get_robot()):
+        if (
+            self._ref_joint
+            and attr_equals(self._ref_joint, 'Child', ros_name(self.link))
+            and hasattr(self._ref_joint, 'Proxy')
+            and robot == self._ref_joint.Proxy.get_robot()
+        ):
             return self._ref_joint
         joints = get_joints(robot.Group)
         for joint in joints:
@@ -464,15 +513,19 @@ class LinkProxy(ProxyBase):
             self._fc_links_real = _add_fc_links_lod(link, link.Real, 'real')
         if update_visual and vlink.ShowVisual:
             self._fc_links_visual = _add_fc_links_lod(
-                    link, link.Visual, 'visual')
+                    link, link.Visual, 'visual',
+            )
         if update_collision and vlink.ShowCollision:
             self._fc_links_collision = _add_fc_links_lod(
-                    link, link.Collision, 'collision')
+                    link, link.Collision, 'collision',
+            )
 
         # Reset the group.
-        new_group = (self._fc_links_real
-                     + self._fc_links_visual
-                     + self._fc_links_collision)
+        new_group = (
+            self._fc_links_real
+            + self._fc_links_visual
+            + self._fc_links_collision
+        )
         if new_group != link.Group:
             link.Group = new_group
 
@@ -481,10 +534,11 @@ class LinkProxy(ProxyBase):
         for o in old_fc_links:
             doc.removeObject(o.Name)
 
-    def export_urdf(self,
-                    package_parent: Path,
-                    package_name: [Path | str],
-                    ) -> et.ElementTree:
+    def export_urdf(
+        self,
+        package_parent: Path,
+        package_name: [Path | str],
+    ) -> et.ElementTree:
         """Return the xml for this link.
 
         Parameters
@@ -497,14 +551,16 @@ class LinkProxy(ProxyBase):
         """
 
         link_xml = et.fromstring(
-            f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />')
+            f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />',
+        )
         for obj in self.link.Visual:
             for xml in _get_xmls_and_export_meshes(
                     obj,
                     urdf_visual_from_object,
                     self.link.MountedPlacement,
                     package_parent,
-                    package_name):
+                    package_name,
+            ):
                 link_xml.append(xml)
         for obj in self.link.Collision:
             for xml in _get_xmls_and_export_meshes(
@@ -512,9 +568,11 @@ class LinkProxy(ProxyBase):
                     urdf_collision_from_object,
                     self.link.MountedPlacement,
                     package_parent,
-                    package_name):
+                    package_name,
+            ):
                 link_xml.append(xml)
-        link_xml.append(urdf_inertial(
+        link_xml.append(
+            urdf_inertial(
             mass=self.link.Mass.Value,
             center_of_mass=self.link.CenterOfMass,
             ixx=self.link.Ixx,
@@ -523,7 +581,8 @@ class LinkProxy(ProxyBase):
             iyy=self.link.Iyy,
             iyz=self.link.Iyz,
             izz=self.link.Izz,
-            ))
+            ),
+        )
         return link_xml
 
     def _fix_lost_fc_links(self) -> None:
@@ -583,9 +642,12 @@ class _ViewProviderLink(ProxyBase):
     """A view provider for the Cross::Link object """
 
     def __init__(self, vobj: VPDO):
-        super().__init__('view_object', [
-            'Visibility',
-            ])
+        super().__init__(
+            'view_object',
+            [
+                'Visibility',
+            ],
+        )
         vobj.Proxy = self
 
     def getIcon(self):
@@ -603,12 +665,18 @@ class _ViewProviderLink(ProxyBase):
 
     def init_properties(self, vobj: VPDO):
         # Level of detail.
-        add_property(vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
-                     'Whether to show the real parts')
-        add_property(vobj, 'App::PropertyBool', 'ShowVisual', 'ROS Display Options',
-                     'Whether to show the parts for URDF visual')
-        add_property(vobj, 'App::PropertyBool', 'ShowCollision', 'ROS Display Options',
-                     'Whether to show the parts for URDF collision')
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
+            'Whether to show the real parts',
+        )
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowVisual', 'ROS Display Options',
+            'Whether to show the parts for URDF visual',
+        )
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowCollision', 'ROS Display Options',
+            'Whether to show the parts for URDF collision',
+        )
 
         self._old_show_real = vobj.ShowReal
         self._old_show_visual = vobj.ShowVisual

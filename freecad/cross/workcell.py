@@ -19,4 +19,3 @@ class Workcell(fc.DocumentObject):
     OutputPath: str
     RootLink: str
     _Type: str
-

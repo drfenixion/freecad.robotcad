@@ -9,10 +9,12 @@ class _NewXacroObjectCommand:
     """The command definition to create a new xacro object."""
 
     def GetResources(self):
-        return {'Pixmap': 'xacro.svg',
-                'MenuText': tr('New xacro object'),
-                'Accel': 'N, X',
-                'ToolTip': tr('Create a robot from a xacro macro.')}
+        return {
+            'Pixmap': 'xacro.svg',
+            'MenuText': tr('New xacro object'),
+            'Accel': 'N, X',
+            'ToolTip': tr('Create a robot from a xacro macro.'),
+        }
 
     def IsActive(self):
         return (fc.activeDocument() is not None)

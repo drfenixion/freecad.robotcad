@@ -28,7 +28,7 @@ DOList = Iterable[DO]
 
 def read_mesh_dae(
         filename: [Path | str],
-        ) -> Mesh.Mesh:
+) -> Mesh.Mesh:
     current_doc = fc.activeDocument()
     path = Path(filename)
     # `read_dae` does not export its object, so we need to let it create an
@@ -47,9 +47,10 @@ def read_mesh_dae(
     return merged_raw_mesh
 
 
-def save_mesh_dae(obj: DO,
-                  filename: [Path | str],
-                  ) -> None:
+def save_mesh_dae(
+    obj: DO,
+    filename: [Path | str],
+) -> None:
     """Save the mesh of a FreeCAD object into a Collada file."""
     current_doc = fc.activeDocument()
     # `export_dae` doesn't support links. Deep copy the shape in a new
@@ -64,7 +65,7 @@ def save_mesh_dae(obj: DO,
 
 def read_mesh(
         filename: [Path | str],
-        ) -> Mesh.Mesh:
+) -> Mesh.Mesh:
     """Read a mesh from a file.
 
     All files format supported by the Mesh module are supported.
@@ -88,9 +89,10 @@ def read_mesh(
     return merged_raw_mesh
 
 
-def save_mesh(obj: DO,
-              filename: [Path | str],
-              ) -> None:
+def save_mesh(
+    obj: DO,
+    filename: [Path | str],
+) -> None:
     """Save the mesh of a FreeCAD object into a file.
 
     The type of the exported file is determined by the Mesh module.
@@ -113,15 +115,18 @@ def scale_mesh_object(obj: DO, scale_factor: [float | Iterable[float]]) -> None:
     """
     if not is_mesh(obj):
         raise RuntimeError(
-            'First argument must be `Mesh::Feature` FreeCAD object')
+            'First argument must be `Mesh::Feature` FreeCAD object',
+        )
     if isinstance(scale_factor, float):
         scaling_vector = fc.Vector(scale_factor, scale_factor, scale_factor)
     else:
         try:
             scaling_vector = fc.Vector(scale_factor)
         except (IndexError, ValueError):
-            raise RuntimeError('Scaling factor must be a float or a list'
-                               f' of 3 floats, got {scale_factor}')
+            raise RuntimeError(
+                'Scaling factor must be a float or a list'
+                f' of 3 floats, got {scale_factor}',
+            )
     scale_mat = fc.Matrix()
     scale_mat.scale(scaling_vector)
     mesh = obj.Mesh.copy()
@@ -131,7 +136,7 @@ def scale_mesh_object(obj: DO, scale_factor: [float | Iterable[float]]) -> None:
 
 def get_simplified_mesh(
         obj: DO,
-        ) -> Mesh.Mesh:
+) -> Mesh.Mesh:
     """Create a simplified mesh from a FreeCAD object.
 
     Create an approximate-convex-decomposition mesh with V-HACD.
@@ -162,9 +167,11 @@ def get_simplified_mesh(
 
     # Test if V-HACD is available.
     try:
-        subprocess.run([vhacd_path],
-                       capture_output=True,
-                       check=True)
+        subprocess.run(
+            [vhacd_path],
+            capture_output=True,
+            check=True,
+        )
     except (FileNotFoundError, subprocess.CalledProcessError):
         warn('V-HACD executable not found', True)
         raise RuntimeError('V-HACD executable not found')
@@ -177,13 +184,16 @@ def get_simplified_mesh(
     # The name of the output file cannot be specified with V-HACD as of
     # 2022-11-22 (commit 454913f), it is 'decomp.obj', along other files.
     try:
-        subprocess.run([vhacd_path,
-                        tmp_input_obj.name,
-                        '-g', 'false',  # No logging.
-                        ],
-                       capture_output=True,
-                       check=True,
-                       cwd=tmp_dir.name)
+        subprocess.run(
+            [
+                vhacd_path,
+                tmp_input_obj.name,
+                '-g', 'false',  # No logging.
+            ],
+            capture_output=True,
+            check=True,
+            cwd=tmp_dir.name,
+        )
     except subprocess.CalledProcessError:
         warn('V-HACD failed', True)
         raise RuntimeError('V-HACD failed `cd {tmp_dir} && {vhacd_path} {tmp_input_obj.name}`')

@@ -20,10 +20,11 @@ class _SimplifyMeshCommand:
     """Command to make a simplifed mesh from the selected objects."""
 
     def GetResources(self):
-        return {'Pixmap': 'simplify_mesh.svg',
-                'MenuText': tr('Simplify mesh'),
-                'ToolTip': tr('Generate an approximate convex decomposition mesh from the selected object with V-HACD from https://github.com/kmammou/v-hacd/'),
-                }
+        return {
+            'Pixmap': 'simplify_mesh.svg',
+            'MenuText': tr('Simplify mesh'),
+            'ToolTip': tr('Generate an approximate convex decomposition mesh from the selected object with V-HACD from https://github.com/kmammou/v-hacd/'),
+        }
 
     def Activated(self):
         selection = fcgui.Selection.getSelectionEx('', 0)

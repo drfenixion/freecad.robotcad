@@ -20,7 +20,7 @@ class KKModel(DHKKModel):
             'gamma',
             'epsilon',
             'prismatic',
-            )
+    )
     column_headers = (
             'θ (rad)',
             'r (m)',
@@ -29,7 +29,7 @@ class KKModel(DHKKModel):
             'ɣ (rad)',
             'ε (m)',
             'Prismatic?',
-            )
+    )
 
     column_tooltips = (
             'Θi: angle between X(i-1) and Xi about Zi, in radians.',
@@ -39,10 +39,11 @@ class KKModel(DHKKModel):
             "γi: angle between Xi and X'i about Zi, in radians.",
             "εi: distance between Oi and O'i, in meters.",
             'True if the joint is prismatic, False if revolute.',
-            )
+    )
 
-    def __init__(self,
-                 kk_robot: KKRobot,
-                 parent=None,
-                 ) -> None:
+    def __init__(
+        self,
+        kk_robot: KKRobot,
+        parent=None,
+    ) -> None:
         super().__init__(kk_robot, parent)

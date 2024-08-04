@@ -41,4 +41,3 @@ def load_urdf(filename: str, doc: fc.Document) -> None:
     doc.commitTransaction()
     doc.recompute()
     fcgui.SendMsgToActiveView('ViewFit')
-

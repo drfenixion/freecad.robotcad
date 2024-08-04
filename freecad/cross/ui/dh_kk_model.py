@@ -20,10 +20,11 @@ class DHKKModel(QtCore.QAbstractTableModel):
     column_headers = tuple()
     column_tooltips = tuple()
 
-    def __init__(self,
-                 kk_robot: KKRobot,
-                 parent=None,
-                 ) -> None:
+    def __init__(
+        self,
+        kk_robot: KKRobot,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.kk_robot = kk_robot
 
@@ -73,41 +74,47 @@ class DHKKModel(QtCore.QAbstractTableModel):
                 return False
             return self._set_cell_value(index, value)
 
-    def _get_edited_joint(self,
-                          index,
-                          ) -> KKJoint:
+    def _get_edited_joint(
+        self,
+        index,
+    ) -> KKJoint:
         """Return `self.kk_robot.joints[i]`."""
         return self.kk_robot.joints[index.row()]
 
-    def _get_joint_value(self,
-                        kk_joint: KKJoint,
-                        index,
-                        ) -> str:
+    def _get_joint_value(
+        self,
+        kk_joint: KKJoint,
+        index,
+    ) -> str:
         """Return the appropriate field."""
         attr_str = self.columns[index.column()]
         value = getattr(kk_joint, attr_str)
         return value
 
-    def _get_joint_data(self,
-                        kk_joint: KKJoint,
-                        index,
-                        ) -> str:
+    def _get_joint_data(
+        self,
+        kk_joint: KKJoint,
+        index,
+    ) -> str:
         """Return the appropriate field as string."""
         return str(self._get_joint_value(kk_joint, index))
 
-    def _set_joint_data(self,
-                        kk_joint: KKJoint,
-                        index,
-                        value,
-                        ) -> bool:
+    def _set_joint_data(
+        self,
+        kk_joint: KKJoint,
+        index,
+        value,
+    ) -> bool:
         """Set the appropriate field."""
         kk_joint = self._get_edited_joint(index)
         attr_str = self.columns[index.column()]
         if attr_str == 'prismatic':
             try:
-                setattr(kk_joint,
-                        attr_str,
-                        value.casefold() == 'true')
+                setattr(
+                    kk_joint,
+                    attr_str,
+                    value.casefold() == 'true',
+                )
             except IndexError:
                 # DHModel has less columns than KKModel.
                 pass
@@ -115,9 +122,11 @@ class DHKKModel(QtCore.QAbstractTableModel):
                 return False
         else:
             try:
-                setattr(kk_joint,
-                        attr_str,
-                        float(value))
+                setattr(
+                    kk_joint,
+                    attr_str,
+                    float(value),
+                )
             except IndexError:
                 # DHModel has less columns than KKModel.
                 pass
@@ -125,17 +134,19 @@ class DHKKModel(QtCore.QAbstractTableModel):
                 return False
         return True
 
-    def _get_cell_value(self,
-                        index,
-                        ) -> str:
+    def _get_cell_value(
+        self,
+        index,
+    ) -> str:
         """Return the cell content."""
         kk_joint = self._get_edited_joint(index)
         return self._get_joint_data(kk_joint, index)
 
-    def _set_cell_value(self,
-                        index,
-                        value,
-                        ) -> bool:
+    def _set_cell_value(
+        self,
+        index,
+        value,
+    ) -> bool:
         kk_joint = self._get_edited_joint(index)
         return self._set_joint_data(kk_joint, index, value)
 

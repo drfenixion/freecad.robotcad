@@ -53,7 +53,7 @@ LcsPair = Tuple[LCS, LCS]
 def assembly_from_urdf(
         doc: fc.Document,
         robot: UrdfRobot,
-        ) -> DO:
+) -> DO:
     """Creates two "App::Part" objects that mimic Assembly4 assemblies.
 
     Creates an "App::Part" object that mimics an Assembly4 assembly for the
@@ -62,8 +62,10 @@ def assembly_from_urdf(
     per FreeCAD document.
 
     """
-    assembly, parts_group, var_container = _make_assembly_container(doc,
-                                                                    robot.name)
+    assembly, parts_group, var_container = _make_assembly_container(
+        doc,
+        robot.name,
+    )
     # dict[urdf_link.name, 'App::Link']
     link_map: dict[str, AppLink] = {}
     # dict[urdf_link.name, 'PartDesign::CoordinateSystem']
@@ -82,14 +84,17 @@ def assembly_from_urdf(
         root_link = link_map[robot.get_root()]
         lcs_link = lcs_map[robot.get_root()]
         # TODO: this is not accepted by Assembly4.
-        update_placement_expression(root_link,
-            f'LCS_Origin.Placement * AttachmentOffset * {lcs_link.Name}.Placement ^ -1')
+        update_placement_expression(
+            root_link,
+            f'LCS_Origin.Placement * AttachmentOffset * {lcs_link.Name}.Placement ^ -1',
+        )
     _add_visual(robot, link_map)
     _add_joint_variables(var_container, robot, joint_map)
 
     # Make the assembly for collision.
     collision_assembly = _make_collision_assembly_from_visual(
-            doc, robot, link_map, joint_map, var_container)
+            doc, robot, link_map, joint_map, var_container,
+    )
 
     # Make the collision- and visual assemblies coincident.
     _collision_at_visual(assembly, collision_assembly)
@@ -99,7 +104,7 @@ def _make_assembly_container(
         doc: fc.Document,
         name: str = 'robot',
         emulate_assembly4: bool = True,
-        ) -> tuple[AppPart, DO, DO]:
+) -> tuple[AppPart, DO, DO]:
     """Create an App::Part.
 
     Return (assembly object, parts group, variable container).
@@ -124,8 +129,10 @@ def _make_assembly_container(
     # An Assembly4 Part is a Part with .Type = 'Assembly' and
     # .Label = 'Assembly'.
     candidate_assembly = doc.getObject('Assembly')
-    if ((candidate_assembly is None)
-            and emulate_assembly4):
+    if (
+        (candidate_assembly is None)
+        and emulate_assembly4
+    ):
         assembly = doc.addObject('App::Part', 'Assembly')
         # set the type as a "proof" that it's an Assembly
         assembly.Type = 'Assembly'
@@ -140,7 +147,7 @@ def _make_assembly_container(
 
     # Add an LCS at the root of the Model, and attach it to the 'Origin'.
     lcs = assembly.newObject('PartDesign::CoordinateSystem', 'LCS_Origin')
-    lcs.Support = [(assembly.Origin.OriginFeatures[0], '')]  # The X axis.
+    lcs.AttachmentSupport = [(assembly.Origin.OriginFeatures[0], '')]  # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     # Create an object Variables to hold variables to be used in this document.
@@ -160,7 +167,7 @@ def _make_collision_assembly_from_visual(
         visual_link_map: dict[str, DO],
         visual_joint_map: dict[str, LcsPair],
         variable_container: DO,
-        ) -> DO:
+) -> DO:
     assembly, _ = _make_part(doc, 'Collision Assembly')
     assembly.Label = 'Collision Assembly'
     parts_group = make_group(doc, 'Collision Parts', visible=False)
@@ -181,7 +188,7 @@ def _make_collision_assembly_from_visual(
 def _make_part(
         doc: fc.Document,
         name: str = 'Part',
-        ) -> tuple[DO, DO]:
+) -> tuple[DO, DO]:
     """Create an App::Part.
 
     Emulates an Assembly4 Part by adding a local coordinate system.
@@ -198,7 +205,7 @@ def _make_part(
     part = doc.addObject('App::Part', name)
     # Add an LCS at the root of the Part, and attach it to the 'Origin'.
     lcs = part.newObject('PartDesign::CoordinateSystem', 'LCS_0')
-    lcs.Support = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
+    lcs.AttachmentSupport = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     return part, lcs
@@ -208,7 +215,7 @@ def _add_link(
         assembly: DO,
         parts_group: DO,
         name: str,
-        ) -> Tuple[DO, DO]:
+) -> Tuple[DO, DO]:
     """Add an App::Part to the group and a link to it to the assembly.
 
     Return the "App::Link" and its first LCS.
@@ -216,11 +223,13 @@ def _add_link(
     """
     if not is_part(assembly):
         raise RuntimeError(
-                'First argument must be an "App::Part" FreeCAD object')
+                'First argument must be an "App::Part" FreeCAD object',
+        )
     if not is_group(parts_group):
         raise RuntimeError(
                 'First argument must be an "App::DocumentObjectGroup"'
-                ' FreeCAD object')
+                ' FreeCAD object',
+        )
     # We use an underscore to let the label free for the link in `assembly`.
     part, lcs = _make_part(assembly.Document, name + '_')
     parts_group.addObject(part)
@@ -239,7 +248,7 @@ def _add_link(
 def _lcs_name(
         joint_name: str,
         part_is_parent: bool,
-        ) -> str:
+) -> str:
     """Return the candidate name for a coordinate system."""
     if part_is_parent:
         suffix = 'parent'
@@ -252,7 +261,7 @@ def _add_lcs(
         part_or_link: DO,
         joint_name: str,
         part_is_parent: bool,
-        ) -> DO:
+) -> DO:
     """Add a coordinate system to a part.
 
     A link to a part can be provided and the coordinate system will be added to
@@ -266,7 +275,8 @@ def _add_lcs(
     if (not (is_part(part_or_link) or is_link)):
         raise RuntimeError(
                 'First argument must be an `App::Part`'
-                ' or `App::Link` FreeCAD object')
+                ' or `App::Link` FreeCAD object',
+        )
     if is_link:
         part = part_or_link.LinkedObject
         if not is_part(part):
@@ -274,9 +284,11 @@ def _add_lcs(
     else:
         part = part_or_link
 
-    lcs = part.newObject('PartDesign::CoordinateSystem',
-                         _lcs_name(joint_name, part_is_parent))
-    lcs.Support = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
+    lcs = part.newObject(
+        'PartDesign::CoordinateSystem',
+        _lcs_name(joint_name, part_is_parent),
+    )
+    lcs.AttachmentSupport = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     return lcs
@@ -285,7 +297,7 @@ def _add_lcs(
 def _add_joint_lcs(
         link_map: dict[str, DO],
         joint: UrdfJoint,
-        ) -> LcsPair:
+) -> LcsPair:
     """Add a LCS to the parent and child parts.
 
     Parameters
@@ -309,7 +321,7 @@ def _add_joint_lcs(
 def _place_parent_lcs(
         lcs: DO,
         joint: UrdfJoint,
-        ) -> None:
+) -> None:
     """Place a coordinate system to correspond to the joint position.
 
     In an assembly generated from URDF, a joint is represented by 2 local
@@ -321,8 +333,10 @@ def _place_parent_lcs(
 
     """
     if not is_lcs(lcs):
-        raise RuntimeError('First argument must be a'
-                           ' `PartDesign::CoordinateSystem`')
+        raise RuntimeError(
+            'First argument must be a'
+            ' `PartDesign::CoordinateSystem`',
+        )
     if not hasattr(joint, 'origin'):
         lcs.AttachmentOffset = fc.Placement()
         return
@@ -332,7 +346,7 @@ def _place_parent_lcs(
 def _get_parent_link(
         joint: UrdfJoint,
         link_map: dict[str, DO],
-        ) -> DO:
+) -> DO:
     """Return the FreeCAD link associated with the parent link of the joint."""
     for link_name, link_object in link_map.items():
         if link_name == joint.parent:
@@ -342,7 +356,7 @@ def _get_parent_link(
 def _get_child_link(
         joint: UrdfJoint,
         link_map: dict[str, DO],
-        ) -> DO:
+) -> DO:
     """Return the FreeCAD link associated with the child link of the joint."""
     for link_name, link_object in link_map.items():
         if link_name == joint.child:
@@ -353,7 +367,7 @@ def _make_structure(
         lcs_pair: LcsPair,
         joint: UrdfJoint,
         link_map: dict[str, DO],
-        ) -> None:
+) -> None:
     """Create the parent-child inheritence.
 
     The parent-child inheritence is done exclusively by the expression engines
@@ -375,19 +389,26 @@ def _make_structure(
             isinstance(lcs_pair, tuple)
             and len(lcs_pair) == 2
             and is_lcs(lcs_pair[0])
-            and is_lcs(lcs_pair[1])):
-        raise RuntimeError('First argument must be a list of 2'
-                           ' PartDesign::CoordinateSystem')
+            and is_lcs(lcs_pair[1])
+    ):
+        raise RuntimeError(
+            'First argument must be a list of 2'
+            ' PartDesign::CoordinateSystem',
+        )
     parent_lcs = lcs_pair[0]
     child_lcs = lcs_pair[1]
     parent_link = _get_parent_link(joint, link_map)
     if not parent_link:
-        raise RuntimeError('The parent LCS is not associated to any'
-                           ' App::Part')
+        raise RuntimeError(
+            'The parent LCS is not associated to any'
+            ' App::Part',
+        )
     child_link = _get_child_link(joint, link_map)
     if not child_link:
-        raise RuntimeError('The child LCS is not associated to any'
-                           ' App::Part')
+        raise RuntimeError(
+            'The child LCS is not associated to any'
+            ' App::Part',
+        )
     child_link.AttachedBy = f'#{child_lcs.Name}'
     child_link.AttachedTo = f'{parent_link.Name}#{parent_lcs.Name}'
 
@@ -399,12 +420,14 @@ def _add_joint_variables(
         variable_container: DO,
         robot: UrdfRobot,
         joint_map: dict[str, LcsPair],
-        ) -> dict[str, str]:
+) -> dict[str, str]:
     var_map: dict[str, str] = {}
     for joint_name, joint_obj in joint_map.items():
         _, child_lcs = joint_map[joint_name]
-        var_name = _add_joint_variable(variable_container, robot, joint_name,
-                                       joint_obj, child_lcs)
+        var_name = _add_joint_variable(
+            variable_container, robot, joint_name,
+            joint_obj, child_lcs,
+        )
         var_map[joint_name] = var_name
     return var_map
 
@@ -415,7 +438,7 @@ def _add_joint_variable(
         joint_name: str,
         joint: DO,
         child_lcs: DO,
-        ) -> str:
+) -> str:
     """Add a property and return its name."""
     urdf_joint = robot.joint_map[joint_name]
     if urdf_joint.joint_type == 'prismatic':
@@ -426,15 +449,21 @@ def _add_joint_variable(
         return ''
     var_name = get_valid_property_name(f'{joint_name}{f"_{unit}" if unit else ""}')
     help_txt = f'{joint_name}{f" in {unit}" if unit else ""}'
-    _, used_var_name = add_property(variable_container,
-                                    'App::PropertyFloat', var_name,
-                                    'Variables', help_txt)
+    _, used_var_name = add_property(
+        variable_container,
+        'App::PropertyFloat', var_name,
+        'Variables', help_txt,
+    )
     if urdf_joint.joint_type == 'prismatic':
-        _make_prismatic_lcs(urdf_joint.axis, variable_container.Name,
-                            used_var_name, child_lcs)
+        _make_prismatic_lcs(
+            urdf_joint.axis, variable_container.Name,
+            used_var_name, child_lcs,
+        )
     elif urdf_joint.joint_type in ['revolute', 'continuous']:
-        _make_revolute_lcs(urdf_joint.axis, variable_container.Name,
-                           used_var_name, child_lcs)
+        _make_revolute_lcs(
+            urdf_joint.axis, variable_container.Name,
+            used_var_name, child_lcs,
+        )
     return used_var_name
 
 
@@ -453,7 +482,7 @@ def _make_prismatic_lcs(
         var_container_name: str,
         var_name: str,
         child_lcs: DO,
-        ) -> None:
+) -> None:
     """Set the expression of a coordinate system.
 
     Set the expression engine of a child local coordinate system to correspond
@@ -492,7 +521,7 @@ def _make_revolute_lcs(
         var_container_name: str,
         var_name: str,
         child_lcs: DO,
-        ) -> None:
+) -> None:
     """Set the expression of a coordinate system.
 
     Set the expression engine of a child local coordinate system to correspond
@@ -522,7 +551,7 @@ def _make_revolute_lcs(
 def _add_visual(
         robot: UrdfRobot,
         link_map: dict[str, DO],
-        ) -> None:
+) -> None:
     """Add the visual geometries to an assembly.
 
     Parameters
@@ -535,14 +564,16 @@ def _add_visual(
 
     """
     for link_name, link_obj in link_map.items():
-        _add_visual_geometries(link_obj, link_name,
-                               robot.link_map[link_name].visuals)
+        _add_visual_geometries(
+            link_obj, link_name,
+            robot.link_map[link_name].visuals,
+        )
 
 
 def _add_collision(
         robot: UrdfRobot,
         link_map: dict[str, DO],
-        ) -> None:
+) -> None:
     """Add the collision geometries to an assembly.
 
     Parameters
@@ -555,15 +586,17 @@ def _add_collision(
 
     """
     for link_name, link_obj in link_map.items():
-        _add_collision_geometries(link_obj, link_name,
-                                  robot.link_map[link_name].collisions)
+        _add_collision_geometries(
+            link_obj, link_name,
+            robot.link_map[link_name].collisions,
+        )
 
 
 def _add_visual_geometries(
         link: DO,
         link_name: str,
         geometries: VisualList,
-        ) -> tuple[list[DO], list[DO]]:
+) -> tuple[list[DO], list[DO]]:
     """Add the primitive shapes and meshes to a FreeCAD link.
 
     Parameters
@@ -585,7 +618,7 @@ def _add_collision_geometries(
         link: DO,
         link_name: str,
         geometries: CollisionList,
-        ) -> tuple[list[DO], list[DO]]:
+) -> tuple[list[DO], list[DO]]:
     """Add the primitive shapes and meshes to a link.
 
     Parameters
@@ -598,8 +631,10 @@ def _add_collision_geometries(
 
     """
     collision_group = make_group(link.Document, 'Collisions', visible=False)
-    group = make_group(collision_group, f'{link_name} Collisions',
-                       visible=False)
+    group = make_group(
+        collision_group, f'{link_name} Collisions',
+        visible=False,
+    )
     name_linked_geom = f'{link_name}_collision'
     return _add_geometries(group, geometries, link, name_linked_geom)
 
@@ -609,7 +644,7 @@ def _add_geometries(
         geometries: [VisualList | CollisionList],
         link: DO = None,
         name_linked_geom: str = '',
-        ) -> tuple[list[DO], list[DO]]:
+) -> tuple[list[DO], list[DO]]:
     """Add the geometries from URDF into `group` and an App::Link to it into `link`.
 
     `geometries` is either `visuals` or `collisions` and the geometry itself is
@@ -643,13 +678,17 @@ def _add_geometries(
         geom_objs.append(geom_obj)
         geom_obj.Visibility = False
         if hasattr(geometry, 'origin'):
-            geom_obj.Placement = (placement_from_origin(geometry.origin)
-                                  * geom_obj.Placement)
+            geom_obj.Placement = (
+                placement_from_origin(geometry.origin)
+                * geom_obj.Placement
+            )
         if link is not None:
             # Make a FC link into `link`.
             original_part = link.LinkedObject
-            link_to_geom = original_part.newObject('App::Link',
-                                                   name_linked_geom)
+            link_to_geom = original_part.newObject(
+                'App::Link',
+                name_linked_geom,
+            )
             link_to_geom.setLink(geom_obj)
             link_to_geom.Placement = geom_obj.Placement
             fc_links.append(link_to_geom)
@@ -659,13 +698,15 @@ def _add_geometries(
 def _collision_at_visual(
         visual_assembly: DO,
         collision_assembly: DO,
-        ) -> None:
+) -> None:
     """Make the collision and visual assembly coincident.
 
     Write expressions for the placement of `collision_assembly` so that it has
     the same pose than `visual_assembly`.
 
     """
-    collision_assembly.setExpression('.Placement',
-                                     f'{visual_assembly.Name}.Placement')
+    collision_assembly.setExpression(
+        '.Placement',
+        f'{visual_assembly.Name}.Placement',
+    )
     collision_assembly.setEditorMode('Placement', ['ReadOnly'])

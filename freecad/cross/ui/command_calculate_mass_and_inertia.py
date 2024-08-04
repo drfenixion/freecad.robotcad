@@ -68,14 +68,18 @@ class _CalculateMassAndInertiaCommand:
             elem_material = material_from_material_editor(link.MaterialCardPath)
 
             if (elem_material.material_name is None) and (default_material.material_name is None):
-                error(f'Link "{link.Label}" skipped.'
-                      ' No material specified for Link and no default material specified for robot element.', gui=True)
+                error(
+                    f'Link "{link.Label}" skipped.'
+                    ' No material specified for Link and no default material specified for robot element.', gui=True,
+                )
                 continue
 
             if center_of_gravity is None:
-                error(f'Link "{link.Label}" skipped.'
-                      ' Can not get CenterOfGravity of bound Real element.',
-                      gui=True)
+                error(
+                    f'Link "{link.Label}" skipped.'
+                    ' Can not get CenterOfGravity of bound Real element.',
+                    gui=True,
+                )
                 continue
 
             if elem_matrix_of_inertia is None:

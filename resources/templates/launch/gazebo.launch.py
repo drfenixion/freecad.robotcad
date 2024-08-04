@@ -42,10 +42,10 @@ def generate_launch_description():
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
+            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'),
         ),
         launch_arguments=dict(gz_args='-r empty.sdf --verbose').items(),
-        )
+    )
 
     # Spawn
     spawn = Node(
@@ -56,8 +56,8 @@ def generate_launch_description():
                 '-x', '1.2',
                 '-z', '2.3',
                 '-Y', '3.4',
-                '-topic', '/robot_description'
-                ],
+                '-topic', '/robot_description',
+            ],
             output='screen',
     )
 
@@ -74,23 +74,23 @@ def generate_launch_description():
                 PathJoinSubstitution([
                     FindPackageShare(resources_package),
                     'launch',
-                    'description.launch.py'
-                    ])
+                    'description.launch.py',
                 ]),
+            ]),
             condition=UnlessCondition(use_rviz),  # rviz launch includes rsp.
             launch_arguments=dict(use_sim_time=use_sim_time).items(),
-            )
+    )
 
     rviz = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
                 FindPackageShare(resources_package),
                 'launch',
-                'display.launch.py'
-            ])
+                'display.launch.py',
+            ]),
         ]),
         condition=IfCondition(use_rviz),
-        )
+    )
 
     return LaunchDescription([
         use_sim_time_launch_arg,

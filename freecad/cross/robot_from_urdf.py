@@ -53,7 +53,7 @@ CollisionList = List[UrdfCollision]
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
-        ) -> CrossRobot:
+) -> CrossRobot:
     """Creates a CROSS::Robot from URDF."""
 
     robot, parts_group = _make_robot(doc, urdf_robot.name)
@@ -61,7 +61,8 @@ def robot_from_urdf(
     # collision_map: dict[str, AppPart] = {}
     for urdf_link in urdf_robot.links:
         ros_link, visual_part, collision_part = _add_ros_link(
-            urdf_link, robot, parts_group)
+            urdf_link, robot, parts_group,
+        )
         # visual_map[urdf_link.name] = visual_part
         # collision_map[urdf_link.name] = collision_part
         geoms, fc_links = _add_visual(urdf_link, parts_group, ros_link, visual_part)
@@ -94,7 +95,7 @@ def robot_from_urdf(
 def _make_robot(
         doc: fc.Document,
         name: str = 'robot',
-        ) -> tuple[CrossRobot, DOG]:
+) -> tuple[CrossRobot, DOG]:
     """Create a CROSS::Robot
 
     Return (robot object, parts group).
@@ -116,7 +117,7 @@ def _add_ros_link(
         urdf_link: UrdfLink,
         robot: CrossRobot,
         parts_group: DOG,
-        ) -> Tuple[CrossLink, AppPart, AppPart]:
+) -> Tuple[CrossLink, AppPart, AppPart]:
     """Add two App::Part to the group and links to them to the robot.
 
     - Add an "App::Part" for the visual of each link.
@@ -145,8 +146,10 @@ def _add_ros_link(
     ros_link.adjustRelativeLinks(robot)
     _set_link_inertial(ros_link, urdf_link)
     robot.addObject(ros_link)
-    link_to_visual_part = add_object(parts_group, 'App::Link',
-                                     f'visual_{name}')
+    link_to_visual_part = add_object(
+        parts_group, 'App::Link',
+        f'visual_{name}',
+    )
     robot.Proxy.created_objects.append(link_to_visual_part)
     # TODO: make a function utils.make_link.
     link_to_visual_part.setLink(visual_part)
@@ -155,8 +158,10 @@ def _add_ros_link(
     # ros_link.Visual is a new object on each evoking.
     ros_link.Visual = [link_to_visual_part]
 
-    link_to_collision_part = add_object(parts_group, 'App::Link',
-                                        f'collision_{name}')
+    link_to_collision_part = add_object(
+        parts_group, 'App::Link',
+        f'collision_{name}',
+    )
     robot.Proxy.created_objects.append(link_to_collision_part)
     link_to_collision_part.setLink(collision_part)
     link_to_collision_part.Visibility = False
@@ -167,7 +172,7 @@ def _add_ros_link(
 def _set_link_inertial(
         ros_link: CrossLink,
         urdf_link: UrdfLink,
-        ) -> None:
+) -> None:
     """Set the inertial properties of a Cross::Link.
 
     Parameters
@@ -196,7 +201,7 @@ def _set_link_inertial(
 def _add_ros_joint(
         urdf_joint: UrdfJoint,
         robot: CrossRobot,
-        ) -> CrossJoint:
+) -> CrossJoint:
     doc = robot.Document
     ros_joint = make_joint(urdf_joint.name, doc)
     ros_joint.Label2 = urdf_joint.name
@@ -224,22 +229,26 @@ def _add_ros_joint(
 def _define_mimic_joints(
         urdf_robot: UrdfRobot,
         joint_map: dict[str, CrossJoint],
-        ) -> None:
+) -> None:
     """Add the correct properties for mimic joints."""
     for name, ros_joint in joint_map.items():
         urdf_joint = urdf_robot.joint_map[name]
         if urdf_joint.mimic is None:
             continue
         if urdf_joint.type not in ['prismatic', 'revolute', 'continuous']:
-            warn(f'Mimicking joint "{urdf_joint.name}" has type '
-                 f'{urdf_joint.type} but only prismatic, revolute,'
-                 ' and continuous types are supported, ignoring "mimic"', True)
+            warn(
+                f'Mimicking joint "{urdf_joint.name}" has type '
+                f'{urdf_joint.type} but only prismatic, revolute,'
+                ' and continuous types are supported, ignoring "mimic"', True,
+            )
             continue
         ros_joint.Mimic = True
         mimicked_urdf_joint = urdf_robot.joint_map.get(urdf_joint.mimic.joint)
         if not mimicked_urdf_joint:
-            warn(f'Joint "{urdf_joint.name}" mimicks the unknown'
-                 f' joint "{mimicked_urdf_joint}", ignoring', True)
+            warn(
+                f'Joint "{urdf_joint.name}" mimicks the unknown'
+                f' joint "{mimicked_urdf_joint}", ignoring', True,
+            )
             continue
         mimicked_ros_joint = joint_map.get(mimicked_urdf_joint.name)
         # `mimicked_ros_joint` should not be None.
@@ -263,7 +272,7 @@ def _compensate_joint_placement(
         robot: CrossRobot,
         urdf_robot: UrdfRobot,
         joint_map: dict[str, CrossJoint],
-        ) -> None:
+) -> None:
     """Make all joints about/around the z axis."""
     chains = robot.Proxy.get_chains()
     already_compensated_joints: set[CrossJoint] = set()
@@ -287,7 +296,7 @@ def _set_child_placement(
         robot: CrossRobot,
         urdf_joint: UrdfJoint,
         ros_joint: CrossJoint,
-        ) -> None:
+) -> None:
     """Set Child.MountedPlacement to compensate for joints not along z."""
     if not ros_joint.Child:
         return
@@ -301,7 +310,7 @@ def _add_visual(
         parts_group: DOG,
         ros_link: CrossLink,
         visual_part: AppPart,
-        ) -> tuple[DOList, DOList]:
+) -> tuple[DOList, DOList]:
     """Add the visual geometries to an assembly.
 
     Return the list of objects representing the geometries and the list of
@@ -314,11 +323,13 @@ def _add_visual(
 
     """
     name_linked_geom = f'{urdf_link.name}_visual'
-    return _add_geometries(parts_group,
-                           ros_link,
-                           visual_part,
-                           urdf_link.visuals,
-                           name_linked_geom)
+    return _add_geometries(
+        parts_group,
+        ros_link,
+        visual_part,
+        urdf_link.visuals,
+        name_linked_geom,
+    )
 
 
 def _add_collision(
@@ -326,7 +337,7 @@ def _add_collision(
         parts_group: DOG,
         ros_link: CrossLink,
         collision_part: AppPart,
-        ) -> tuple[DOList, DOList]:
+) -> tuple[DOList, DOList]:
     """Add the visual geometries to an assembly.
 
     Return the list of objects representing the geometries and the list of
@@ -339,8 +350,10 @@ def _add_collision(
 
     """
     name_linked_geom = f'{urdf_link.name}_collision'
-    return _add_geometries(parts_group, ros_link,
-                           collision_part, urdf_link.collisions, name_linked_geom)
+    return _add_geometries(
+        parts_group, ros_link,
+        collision_part, urdf_link.collisions, name_linked_geom,
+    )
 
 
 def _add_geometries(
@@ -349,7 +362,7 @@ def _add_geometries(
         part: AppPart,
         geometries: [VisualList | CollisionList],
         name_linked_geom: str,
-        ) -> tuple[DOList, DOList]:
+) -> tuple[DOList, DOList]:
     """Add the geometries from URDF into `group` and an App::Link to it into `link`.
 
     `geometries` is either `visuals` or `collisions` and the geometry itself is
@@ -390,8 +403,10 @@ def _add_geometries(
         link_to_geom = add_object(part, 'App::Link', name_linked_geom)
         link_to_geom.setLink(geom_obj)
         if hasattr(geometry, 'origin'):
-            placement = (placement_from_origin(geometry.origin)
-                                  * geom_obj.Placement)
+            placement = (
+                placement_from_origin(geometry.origin)
+                * geom_obj.Placement
+            )
         else:
             placement = geom_obj.Placement
         link_to_geom.Placement = placement

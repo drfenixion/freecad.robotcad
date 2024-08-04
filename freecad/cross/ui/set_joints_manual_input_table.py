@@ -107,7 +107,7 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
         target_units = {
                 'Length': 'm',
                 'Angle': 'rad',
-                }
+        }
         self._to_new_unit(change_values, target_units)
 
     def to_mm_deg(self, change_values: bool) -> None:
@@ -115,11 +115,13 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
         target_units = {
                 'Length': 'mm',
                 'Angle': 'deg',
-                }
+        }
         self._to_new_unit(change_values, target_units)
 
-    def _to_new_unit(self, change_values: bool,
-                     target_units: dict[str, str]) -> None:
+    def _to_new_unit(
+        self, change_values: bool,
+        target_units: dict[str, str],
+    ) -> None:
         """Convert the values in the table to meters and radians.
 
         The keys of `target_units` must be in the set {'Length', 'Angle'}.
@@ -189,13 +191,13 @@ def dnd(values, old_index, drop_index):
                 + values[old_index + 1:drop_index + 1]
                 + values[old_index: old_index + 1]
                 + values[drop_index + 1:]
-                )
+        )
     return (
             values[:drop_index]
             + values[old_index: old_index + 1]
             + values[drop_index: old_index]
             + values[old_index + 1:]
-            )
+    )
 
 
 def _get_joint_unit(joint: CrossJoint) -> str:
@@ -209,9 +211,10 @@ def _get_joint_unit(joint: CrossJoint) -> str:
         raise NotImplementedError()
 
 
-def _get_joint_value(joint: CrossJoint,
-                     unit: str,
-                     ) -> float:
+def _get_joint_value(
+    joint: CrossJoint,
+    unit: str,
+) -> float:
     """Get the joint value in the specified unit."""
     if joint.Type == 'prismatic':
         return quantity_as(fc.Units.Quantity( f'{joint.Position} m'), unit)

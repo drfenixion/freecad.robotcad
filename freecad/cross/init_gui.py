@@ -73,7 +73,7 @@ class CrossWorkbench(fcgui.Workbench):
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.            
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Reload',  # Comment out to disable this developer tool.
-            ]
+        ]
         self.appendToolbar('CROSS', commands)
         self.appendMenu('CROSS', commands)
 

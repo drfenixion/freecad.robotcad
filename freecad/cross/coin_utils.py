@@ -17,7 +17,7 @@ _Shape = Enum('Shape', ['BOX', 'CONE', 'CUBE', 'CYLINDER', 'SPHERE'])
 
 def transform_from_placement(
         placement: [fc.Placement | fc.Vector | fc.Rotation],
-        ) -> coin.SoTransform:
+) -> coin.SoTransform:
     """Return the SoTransform equivalent to the placement.
 
     # Should show a cone entering a cylinder.
@@ -33,9 +33,13 @@ def transform_from_placement(
     >>> sg.addChild(sep)
     >>> App.ActiveDocument.recompute()
     """
-    if (not (isinstance(placement, fc.Placement)
-             or isinstance(placement, fc.Vector)
-             or isinstance(placement, fc.Rotation))):
+    if (
+        not (
+            isinstance(placement, fc.Placement)
+            or isinstance(placement, fc.Vector)
+            or isinstance(placement, fc.Rotation)
+        )
+    ):
         raise RuntimeError('Argument must be a FreeCAD.{Placement,Vector,Rotation}')
     if isinstance(placement, fc.Vector):
         placement = fc.Placement(placement, fc.Rotation())
@@ -52,7 +56,7 @@ def cylinder_between_points(
         end_point_mm: Sequence[float],
         radius_mm: float,
         color: Sequence[float],
-        ):
+):
     """
     Create a cylinder between two points with a given color.
 
@@ -84,9 +88,11 @@ def cylinder_between_points(
     material.diffuseColor = coin.SbColor(color[0], color[1], color[2])
     separator.addChild(material)
 
-    height = coin.SbVec3f(end_point_mm[0] - start_point_mm[0],
-                          end_point_mm[1] - start_point_mm[1],
-                          end_point_mm[2] - start_point_mm[2]).length()
+    height = coin.SbVec3f(
+        end_point_mm[0] - start_point_mm[0],
+        end_point_mm[1] - start_point_mm[1],
+        end_point_mm[2] - start_point_mm[2],
+    ).length()
 
     cylinder = coin.SoCylinder()
     cylinder.radius = radius_mm  # FreeCAD uses mm as unit.
@@ -94,12 +100,18 @@ def cylinder_between_points(
 
     # Create an SoTransform node to position and orient the cylinder
     transform = coin.SoTransform()
-    transform.translation = coin.SbVec3f(start_point_mm[0],
-                                         start_point_mm[1],
-                                         start_point_mm[2])
-    transform.pointAt(coin.SbVec3f(end_point_mm[0],
-                                   end_point_mm[1],
-                                   end_point_mm[2]))
+    transform.translation = coin.SbVec3f(
+        start_point_mm[0],
+        start_point_mm[1],
+        start_point_mm[2],
+    )
+    transform.pointAt(
+        coin.SbVec3f(
+            end_point_mm[0],
+            end_point_mm[1],
+            end_point_mm[2],
+        ),
+    )
 
     separator.addChild(transform)
     separator.addChild(cylinder)
@@ -111,7 +123,7 @@ def arrow_group(
         points: list[fc.Vector],
         color: tuple[float, float, float] = (0.0, 0.0, 1.0),
         scale: float = 1.0,
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """Return the SoSeparator of an arrow between two points.
 
     """
@@ -184,7 +196,7 @@ def arrow_group(
 def face_group(
         points: list[fc.Vector],
         color: tuple[float, float, float] = (0.0, 0.0, 1.0),
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     if len(points) < 3:
         raise RuntimeError('At least 3 points expected')
     if len(color) != 3:
@@ -219,7 +231,7 @@ def cylinder_between_points(
         end_point_mm: Sequence[float],
         radius_mm: float,
         color: Sequence[float],
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """
     Create a cylinder between two points.
 
@@ -240,7 +252,7 @@ def cylinder_between_points(
         end_point_mm,
         radius_mm,
         color,
-        )
+    )
 
 
 def cone_between_points(
@@ -248,7 +260,7 @@ def cone_between_points(
         end_point_mm: Sequence[float],
         radius_mm: float,
         color: Sequence[float],
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """
     Create a cone between two points.
 
@@ -269,14 +281,14 @@ def cone_between_points(
         end_point_mm,
         radius_mm,
         color,
-        )
+    )
 
 
 def frame_group(
         length_mm: [float | fc.Units.Quantity] = 200.0,
         diameter_ratio_to_length: float = 0.05,
         axis_start_ratio: float = 0.0,
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """
     Create a frame with 3 cylinders.
 
@@ -299,18 +311,30 @@ def frame_group(
         raise RuntimeError('diameter_ratio_to_length must be positive')
     radius = diameter_ratio_to_length * length_mm / 2.0
     axis_start = axis_start_ratio * length_mm
-    sep.addChild(cylinder_between_points(start_point_mm=(axis_start, 0.0, 0.0),
-                                         end_point_mm=(length_mm, 0.0, 0.0),
-                                         radius_mm=radius,
-                                         color=(1.0, 0.0, 0.0)))
-    sep.addChild(cylinder_between_points(start_point_mm=(0.0, axis_start, 0.0),
-                                         end_point_mm=(0.0, length_mm, 0.0),
-                                         radius_mm=radius,
-                                         color=(0.0, 1.0, 0.0)))
-    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, axis_start),
-                                         end_point_mm=(0.0, 0.0, length_mm),
-                                         radius_mm=radius,
-                                         color=(0.0, 0.0, 1.0)))
+    sep.addChild(
+        cylinder_between_points(
+            start_point_mm=(axis_start, 0.0, 0.0),
+            end_point_mm=(length_mm, 0.0, 0.0),
+            radius_mm=radius,
+            color=(1.0, 0.0, 0.0),
+        ),
+    )
+    sep.addChild(
+        cylinder_between_points(
+            start_point_mm=(0.0, axis_start, 0.0),
+            end_point_mm=(0.0, length_mm, 0.0),
+            radius_mm=radius,
+            color=(0.0, 1.0, 0.0),
+        ),
+    )
+    sep.addChild(
+        cylinder_between_points(
+            start_point_mm=(0.0, 0.0, axis_start),
+            end_point_mm=(0.0, 0.0, length_mm),
+            radius_mm=radius,
+            color=(0.0, 0.0, 1.0),
+        ),
+    )
     return sep
 
 
@@ -320,7 +344,7 @@ def tcp_group(
         tcp_color: Sequence[float] = (0.7, 0.7, 0.7),
         axis_length_mm: [float | fc.Units.Quantity] = 300.0,
         axis_diameter_ratio_to_length: float = 0.05,
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """Return the SoSeparator reprenting a TCP.
 
     Return the SoSeparator representing a Tool Center Point, i.e. 3 cylinder
@@ -337,21 +361,33 @@ def tcp_group(
 
     sep = coin.SoSeparator()
 
-    sep.addChild(frame_group(length_mm=axis_length_mm,
-                             diameter_ratio_to_length=axis_diameter_ratio_to_length,
-                             axis_start_ratio=0.2))
+    sep.addChild(
+        frame_group(
+            length_mm=axis_length_mm,
+            diameter_ratio_to_length=axis_diameter_ratio_to_length,
+            axis_start_ratio=0.2,
+        ),
+    )
 
     tcp_radius = tcp_diameter_ratio_to_length * tcp_length_mm / 2.0
     tcp_cone_end = -0.25 * tcp_length_mm
     tcp_cyl_end = -tcp_length_mm - tcp_cone_end
-    sep.addChild(cone_between_points(start_point_mm=(0.0, 0.0, tcp_cone_end),
-                                     end_point_mm=(0.0, 0.0, 0.0),
-                                     radius_mm=tcp_radius,
-                                     color=tcp_color))
-    sep.addChild(cylinder_between_points(start_point_mm=(0.0, 0.0, tcp_cone_end),
-                                         end_point_mm=(0.0, 0.0, tcp_cyl_end),
-                                         radius_mm=tcp_radius,
-                                         color=tcp_color))
+    sep.addChild(
+        cone_between_points(
+            start_point_mm=(0.0, 0.0, tcp_cone_end),
+            end_point_mm=(0.0, 0.0, 0.0),
+            radius_mm=tcp_radius,
+            color=tcp_color,
+        ),
+    )
+    sep.addChild(
+        cylinder_between_points(
+            start_point_mm=(0.0, 0.0, tcp_cone_end),
+            end_point_mm=(0.0, 0.0, tcp_cyl_end),
+            radius_mm=tcp_radius,
+            color=tcp_color,
+        ),
+    )
     return sep
 
 
@@ -359,7 +395,7 @@ def save_separator_to_file(
         separator: coin.SoSeparator,
         filename: [Path | str],
         file_format: str = 'iv',
-        ) -> None:
+) -> None:
     """Save the content of an SoSeparator to a file in Inventor or VRML format.
 
     Parameters:
@@ -405,7 +441,7 @@ def _cylinder_or_cone_between_points(
         end_point_mm: Sequence[float],
         radius_mm: float,
         color: Sequence[float],
-        ) -> coin.SoSeparator:
+) -> coin.SoSeparator:
     """
     Create a cylinder or a cone between two points.
 
@@ -438,12 +474,16 @@ def _cylinder_or_cone_between_points(
     material.diffuseColor = coin.SbColor(color[0], color[1], color[2])
     separator.addChild(material)
 
-    start = coin.SbVec3f(start_point_mm[0],
-                         start_point_mm[1],
-                         start_point_mm[2])
-    end = coin.SbVec3f(end_point_mm[0],
-                       end_point_mm[1],
-                       end_point_mm[2])
+    start = coin.SbVec3f(
+        start_point_mm[0],
+        start_point_mm[1],
+        start_point_mm[2],
+    )
+    end = coin.SbVec3f(
+        end_point_mm[0],
+        end_point_mm[1],
+        end_point_mm[2],
+    )
     shape_axis = end - start
     height = shape_axis.length()
 

@@ -92,13 +92,15 @@ class XacroObjectProxy(ProxyBase):
     Type = 'Cross::XacroObject'
 
     def __init__(self, obj: CrossXacroObject):
-        super().__init__('xacro_object', [
+        super().__init__(
+            'xacro_object', [
             'Group',
             'InputFile',
             'MainMacro',
             'Placement',
             '_Type',
-            ])
+            ],
+        )
         obj.Proxy = self
         self.xacro_object = obj
 
@@ -132,22 +134,30 @@ class XacroObjectProxy(ProxyBase):
         obj.setPropertyStatus('Group', ['ReadOnly', 'Hidden'])
 
     def init_properties(self, obj: CrossXacroObject):
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+            obj, 'App::PropertyString', '_Type', 'Internal',
+            'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyFile', 'InputFile', 'Input',
-                     'The source xacro or URDF file, in'
-                     ' `package://pkg/rel_path` format')
-        add_property(obj, 'App::PropertyEnumeration', 'MainMacro', 'Input',
-                     'The macro to use')
+        add_property(
+            obj, 'App::PropertyFile', 'InputFile', 'Input',
+            'The source xacro or URDF file, in'
+            ' `package://pkg/rel_path` format',
+        )
+        add_property(
+            obj, 'App::PropertyEnumeration', 'MainMacro', 'Input',
+            'The macro to use',
+        )
 
         # The computed placement (or the placement defined by the user if no
         # attachment mode is defined). This is only
         # when using `Part::AttachExtensionPython`.
-        add_property(obj, 'App::PropertyPlacement', 'Placement',
-                     'Base', 'Placement')
+        add_property(
+            obj, 'App::PropertyPlacement', 'Placement',
+            'Base', 'Placement',
+        )
 
         self._toggle_editor_mode()
 
@@ -309,11 +319,13 @@ class XacroObjectProxy(ProxyBase):
         """Show/hide properties."""
         # Hide until an input file is given and macros are defined.
         xo: CrossXacroObject = self.xacro_object
-        if (hasattr(xo, 'InputFile')
-                and xo.InputFile
-                and hasattr(self, 'xacro')
-                and self.xacro
-                and self.xacro.get_macro_names()):
+        if (
+            hasattr(xo, 'InputFile')
+            and xo.InputFile
+            and hasattr(self, 'xacro')
+            and self.xacro
+            and self.xacro.get_macro_names()
+        ):
             # Show property `MainMacro`.
             xo.setEditorMode('MainMacro', [])
         else:
@@ -340,13 +352,17 @@ class XacroObjectProxy(ProxyBase):
                 help = f'Macro parameter "{name}"'
             if name in macro.defaultmap:
                 # Default given.
-                add_property(xo, 'App::PropertyString', prop_name, 'Input',
-                             help,
-                             macro.defaultmap[name][1])
+                add_property(
+                    xo, 'App::PropertyString', prop_name, 'Input',
+                    help,
+                    macro.defaultmap[name][1],
+                )
             else:
                 # No default.
-                add_property(xo, 'App::PropertyString', prop_name, 'Input',
-                             help)
+                add_property(
+                    xo, 'App::PropertyString', prop_name, 'Input',
+                    help,
+                )
 
         # Clear old parameters.
         for prop_name in old_param_properties.values():
@@ -368,11 +384,12 @@ class XacroObjectProxy(ProxyBase):
         robot.Placement = self.xacro_object.Placement
         return robot
 
-    def _generate_urdf(self,
-                       robot_name: str,
-                       macro: Optional[str] = '',
-                       params: Optional[dict[str, str]] = None,
-                       ) -> UrdfRobot:
+    def _generate_urdf(
+        self,
+        robot_name: str,
+        macro: Optional[str] = '',
+        params: Optional[dict[str, str]] = None,
+    ) -> UrdfRobot:
         params = {} if params is None else params
         urdf_txt = self.xacro.to_urdf_string(robot_name, macro, params)
         urdf_robot = UrdfLoader.load_from_string(urdf_txt)
@@ -391,10 +408,12 @@ class XacroObjectProxy(ProxyBase):
                 try:
                     value = parseString(str_value).documentElement
                 except ExpatError as e:
-                    value = Document().createComment('PARSING_ERROR'
-                                                     f' in xacro parameter"{xacro_param_name}"'
-                                                     f' of macro "{xo.MainMacro}":'
-                                                     f' "{e}"')
+                    value = Document().createComment(
+                        'PARSING_ERROR'
+                        f' in xacro parameter"{xacro_param_name}"'
+                        f' of macro "{xo.MainMacro}":'
+                        f' "{e}"',
+                    )
             else:
                 value = str_value
             params[xacro_param_name] = value
@@ -437,9 +456,11 @@ class _ViewProviderXacroObject(ProxyBase):
     """A view provider for the CROSS XacroObject object."""
 
     def __init__(self, vobj: VPDO):
-        super().__init__('view_object', [
+        super().__init__(
+            'view_object', [
             'Visibility',
-            ])
+            ],
+        )
         vobj.Proxy = self
 
     def getIcon(self):
@@ -494,8 +515,10 @@ def make_xacro_object(name, doc: Optional[fc.Document] = None) -> CrossXacroObje
         sel = fcgui.Selection.getSelection()
         if sel:
             candidate = sel[0]
-            if (is_robot(candidate)
-                    or is_workcell(candidate)):
+            if (
+                is_robot(candidate)
+                or is_workcell(candidate)
+            ):
                 xacro_obj.adjustRelativeLinks(candidate)
                 candidate.addObject(xacro_obj)
 

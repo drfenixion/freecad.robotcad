@@ -30,10 +30,11 @@ class _KKEditCommand:
     """Command to edit the selected robot in KK representation."""
 
     def GetResources(self):
-        return {'Pixmap': 'kk_edit.svg',
-                'MenuText': tr('Edit DH or KK parameters'),
-                'ToolTip': tr('Edit the Denavit-Hartenberg or Khalil-Kleinfinger parameters of the selected robot'),
-                }
+        return {
+            'Pixmap': 'kk_edit.svg',
+            'MenuText': tr('Edit DH or KK parameters'),
+            'ToolTip': tr('Edit the Denavit-Hartenberg or Khalil-Kleinfinger parameters of the selected robot'),
+        }
 
     def Activated(self):
         objs = fcgui.Selection.getSelection()

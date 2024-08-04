@@ -21,10 +21,12 @@ class _WbSettingsCommand:
     """The command definition to set up the workbench."""
 
     def GetResources(self):
-        return {'Pixmap': 'wb_settings.svg',
-                'MenuText': tr('Workbench settings'),
-                'Accel': 'W, S',
-                'ToolTip': tr('Workbench settings')}
+        return {
+            'Pixmap': 'wb_settings.svg',
+            'MenuText': tr('Workbench settings'),
+            'Accel': 'W, S',
+            'ToolTip': tr('Workbench settings'),
+        }
 
     def IsActive(self):
         return True
