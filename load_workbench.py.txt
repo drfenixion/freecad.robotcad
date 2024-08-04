@@ -51,4 +51,3 @@ from freecad.cross.wb_utils import *
 from freecad.cross.workcell_proxy import *
 from freecad.cross.xacro_loader import *
 from freecad.cross.xacro_object_proxy import *
-

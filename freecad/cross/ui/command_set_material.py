@@ -8,12 +8,15 @@ from ..wb_utils import is_robot_selected, is_link_selected
 
 class _SetMaterialCommand:
     def GetResources(self):
-        return {'Pixmap': 'set_material.svg',
-                'MenuText': tr('Set the material to the whole robot or a link'),
-                'ToolTip': tr('Select a robot or a link and use this action to'
-                              ' select a material. The material will be used to'
-                              ' estimate the mass and moments of inertia'),
-                }
+        return {
+            'Pixmap': 'set_material.svg',
+            'MenuText': tr('Set the material to the whole robot or a link'),
+            'ToolTip': tr(
+                'Select a robot or a link and use this action to'
+                ' select a material. The material will be used to'
+                ' estimate the mass and moments of inertia',
+            ),
+        }
 
     def Activated(self):
         doc = fc.activeDocument()

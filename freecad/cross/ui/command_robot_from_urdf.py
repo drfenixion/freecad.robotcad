@@ -19,15 +19,18 @@ except ImportError as e:
 
 class _UrdfImportCommand:
     def GetResources(self):
-        return {'Pixmap': 'robot_from_urdf.svg',
-                'MenuText': tr('Import a URDF or xacro file'),
-                'ToolTip': tr('Import a URDF or xacro file'),
-                }
+        return {
+            'Pixmap': 'robot_from_urdf.svg',
+            'MenuText': tr('Import a URDF or xacro file'),
+            'ToolTip': tr('Import a URDF or xacro file'),
+        }
 
     def Activated(self):
         doc = fc.activeDocument()
-        dialog = QtGui.QFileDialog(fcgui.getMainWindow(),
-                                   'Select URDF/xacro file to import part from')
+        dialog = QtGui.QFileDialog(
+            fcgui.getMainWindow(),
+            'Select URDF/xacro file to import part from',
+        )
         # set option "DontUseNativeDialog"=True, as native Filedialog shows
         # misbehavior on Unbuntu 18.04. It works case sensitively, what is not wanted...
         dialog.setNameFilter('Supported Formats *.urdf *.xacro;;All files (*.*)')

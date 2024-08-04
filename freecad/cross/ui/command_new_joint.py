@@ -12,15 +12,19 @@ class _NewJointCommand:
     """The command definition to create a new Joint object."""
 
     def GetResources(self):
-        return {'Pixmap': 'joint.svg',
-                'MenuText': tr('Create a Joint'),
-                'Accel': 'N, J',
-                'ToolTip': tr('Create a Joint.')}
+        return {
+            'Pixmap': 'joint.svg',
+            'MenuText': tr('Create a Joint'),
+            'Accel': 'N, J',
+            'ToolTip': tr('Create a Joint.'),
+        }
 
     def IsActive(self):
-        return (is_robot_selected()
-                or is_link_selected()
-                or is_workcell_selected())
+        return (
+            is_robot_selected()
+            or is_link_selected()
+            or is_workcell_selected()
+        )
 
     def Activated(self):
         doc = fc.activeDocument()

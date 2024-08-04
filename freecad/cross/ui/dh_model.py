@@ -20,14 +20,14 @@ class DHModel(DHKKModel):
             'd',
             'alpha',
             'prismatic',
-            )
+    )
     column_headers = (
             'θ (rad)',
             'r (m)',
             'd (m)',
             'α (rad)',
             'Prismatic?',
-            )
+    )
 
     column_tooltips = (
             'Θi: angle between X(i-1) and Xi about Z(i-1), in radians.',
@@ -35,12 +35,13 @@ class DHModel(DHKKModel):
             'di: distance between O(i-1) and Zi, in meters.',
             'ɑi: angle between Z(i-1) and Zi about X(i-1), in radians.',
             'True if the joint is prismatic, False if revolute.',
-            )
+    )
 
-    def __init__(self,
-                 kk_robot: KKRobot,
-                 parent=None,
-                 ) -> None:
+    def __init__(
+        self,
+        kk_robot: KKRobot,
+        parent=None,
+    ) -> None:
         super().__init__(kk_robot, parent)
 
     def data(self, index, role):

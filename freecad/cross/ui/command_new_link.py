@@ -9,10 +9,12 @@ class _NewLinkCommand:
     """The command definition to create a new Link object."""
 
     def GetResources(self):
-        return {'Pixmap': 'link.svg',
-                'MenuText': tr('New Link'),
-                'Accel': 'N, L',
-                'ToolTip': tr('Create a Link container.')}
+        return {
+            'Pixmap': 'link.svg',
+            'MenuText': tr('New Link'),
+            'Accel': 'N, L',
+            'ToolTip': tr('Create a Link container.'),
+        }
 
     def IsActive(self):
         return fc.activeDocument() is not None

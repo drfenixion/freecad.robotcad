@@ -13,10 +13,12 @@ class _SetJointsCommand:
     """The command definition to create a set the joint values of a robot."""
 
     def GetResources(self):
-        return {'Pixmap': 'set_joints.svg',
-                'MenuText': tr('Set Joints'),
-                'Accel': 'S, J',
-                'ToolTip': tr('Set the joint values of a robot.')}
+        return {
+            'Pixmap': 'set_joints.svg',
+            'MenuText': tr('Set Joints'),
+            'Accel': 'S, J',
+            'ToolTip': tr('Set the joint values of a robot.'),
+        }
 
     def IsActive(self):
         return is_robot_selected()

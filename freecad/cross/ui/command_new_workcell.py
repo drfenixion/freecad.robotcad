@@ -9,10 +9,12 @@ class _NewWorkcellCommand:
     """The command definition to create a new Workcell object."""
 
     def GetResources(self):
-        return {'Pixmap': 'workcell.svg',
-                'MenuText': tr('Create a Workcell'),
-                'Accel': 'N, W',
-                'ToolTip': tr('Create a Workcell.')}
+        return {
+            'Pixmap': 'workcell.svg',
+            'MenuText': tr('Create a Workcell'),
+            'Accel': 'N, W',
+            'ToolTip': tr('Create a Workcell.'),
+        }
 
     def IsActive(self):
         return fc.activeDocument() is not None

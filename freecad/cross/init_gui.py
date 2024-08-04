@@ -66,7 +66,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Reload',  # Comment out to disable this developer tool.
-            ]
+        ]
         self.appendToolbar('CROSS', commands)
         self.appendMenu('CROSS', commands)
 

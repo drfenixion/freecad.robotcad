@@ -62,16 +62,19 @@ class _UrdfExportCommand:
     """Command to export the selected objects to URDF."""
 
     def GetResources(self):
-        return {'Pixmap': 'urdf_export.svg',
-                'MenuText': tr('Export to URDF'),
-                'ToolTip': tr('Export selected elements to URDF'),
-                }
+        return {
+            'Pixmap': 'urdf_export.svg',
+            'MenuText': tr('Export to URDF'),
+            'ToolTip': tr('Export selected elements to URDF'),
+        }
 
     def Activated(self):
         def set_package_name() -> None:
             nonlocal txt
-            txt = original_txt.replace('$package_name$',
-                                       package_name_lineedit.text())
+            txt = original_txt.replace(
+                '$package_name$',
+                package_name_lineedit.text(),
+            )
             txt_view.setPlainText(txt)
 
         selection = fcgui.Selection.getSelectionEx('', 0)
@@ -96,24 +99,37 @@ class _UrdfExportCommand:
             exported_objects.append(obj)
             xmls: list[Optional[et.ElementTree]] = []
             if is_box(linked_obj):
-                xmls.append(urdf_collision_from_box(
-                    linked_obj, obj.Label, placement,
-                    ignore_obj_placement=True))
+                xmls.append(
+                    urdf_collision_from_box(
+                        linked_obj, obj.Label, placement,
+                        ignore_obj_placement=True,
+                    ),
+                )
             elif is_sphere(linked_obj):
-                xmls.append(urdf_collision_from_sphere(
-                    linked_obj, obj.Label, placement,
-                    ignore_obj_placement=True))
+                xmls.append(
+                    urdf_collision_from_sphere(
+                        linked_obj, obj.Label, placement,
+                        ignore_obj_placement=True,
+                    ),
+                )
             elif is_cylinder(linked_obj):
-                xmls.append(urdf_collision_from_cylinder(
-                    linked_obj, obj.Label, placement,
-                    ignore_obj_placement=True))
-            elif (is_robot(obj)
-                  or is_workcell(obj)):
+                xmls.append(
+                    urdf_collision_from_cylinder(
+                        linked_obj, obj.Label, placement,
+                        ignore_obj_placement=True,
+                    ),
+                )
+            elif (
+                is_robot(obj)
+                or is_workcell(obj)
+            ):
                 if hasattr(obj, 'Proxy'):
                     xmls.append(obj.Proxy.export_urdf(interactive=True))
                     show_xml = False
-            elif (is_xacro_object(obj)
-                  or is_joint(obj)):
+            elif (
+                is_xacro_object(obj)
+                or is_joint(obj)
+            ):
                 if hasattr(obj, 'Proxy'):
                     xmls.append(obj.Proxy.export_urdf())
             elif is_link(obj):
@@ -123,9 +139,13 @@ class _UrdfExportCommand:
                     xmls.append(obj.Proxy.export_urdf(package_path, 'package_name'))
                     if list(package_path.iterdir()):
                         # Non empty directory.
-                        xmls.append(et.Comment(f'Exported mesh files in "{package_path}"'
-                                               ' will be deleted when'
-                                               ' closing FreeCAD!'))
+                        xmls.append(
+                            et.Comment(
+                                f'Exported mesh files in "{package_path}"'
+                                ' will be deleted when'
+                                ' closing FreeCAD!',
+                            ),
+                        )
                         _temp_dirs.append(temp_dir)
             elif hasattr(obj, 'Placement'):
                 has_mesh = True
@@ -134,10 +154,14 @@ class _UrdfExportCommand:
                         obj,
                         package_name=package_name,
                         placement=placement,
-                        )
+                )
                 for xml_for_export in xml_for_exports:
-                    xmls.append(et.Comment('Export the mesh manually to '
-                                           f'{xml_for_export.mesh_filename}'))
+                    xmls.append(
+                        et.Comment(
+                            'Export the mesh manually to '
+                            f'{xml_for_export.mesh_filename}',
+                        ),
+                    )
                     xmls.append(xml_for_export.xml)
             if xmls:
                 txt += f'  <!-- {obj.Label} -->\n'
@@ -147,12 +171,16 @@ class _UrdfExportCommand:
                         txt += '\n'
         if txt and show_xml:
             if 'dummy>' in txt:
-                fc.Console.PrintError('Object labels cannot contain '
-                                      '"<dummy>" or "</dummy>"')
+                fc.Console.PrintError(
+                    'Object labels cannot contain '
+                    '"<dummy>" or "</dummy>"',
+                )
             txt = f'<dummy>{txt}</dummy>'  # xml cannot have multiple root tags
-            txt = (minidom.parseString(txt)
-                   .toprettyxml(indent='  ', encoding='utf-8')
-                   .decode('utf-8'))
+            txt = (
+                minidom.parseString(txt)
+                .toprettyxml(indent='  ', encoding='utf-8')
+                .decode('utf-8')
+            )
             # Maybe see
             # http://www.ronrothman.com/public/leftbraned/xml-dom-minidom-toprettyxml-and-silly-whitespace/#best-solution
             # if whitespace problems.

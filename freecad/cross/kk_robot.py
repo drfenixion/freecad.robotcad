@@ -95,9 +95,10 @@ class KKJoint:
         """
         return (self.gamma == 0.0) and (self.epsilon == 0.0)
 
-    def set_dh_from_placement(self,
-                              placement: fc.Placement,
-                              ) -> None:
+    def set_dh_from_placement(
+        self,
+        placement: fc.Placement,
+    ) -> None:
         """Set the joint parameters from a placement.
 
         Set the joint parameters from the joint's Origin (in the
@@ -114,12 +115,14 @@ class KKJoint:
             [matrix.A11, matrix.A12, matrix.A13, matrix.A14],
             [matrix.A21, matrix.A22, matrix.A23, matrix.A24],
             [matrix.A31, matrix.A32, matrix.A33, matrix.A34],
-            [matrix.A41, matrix.A42, matrix.A43, matrix.A44]])
+            [matrix.A41, matrix.A42, matrix.A43, matrix.A44],
+        ])
 
-    def set_dh_from_matrix(self,
-                           matrix: ndarray,
-                           axis: Optional[ndarray] = None,
-                           ) -> None:
+    def set_dh_from_matrix(
+        self,
+        matrix: ndarray,
+        axis: Optional[ndarray] = None,
+    ) -> None:
         """Set the joint parameters from a transformation matrix.
         Set the joint parameters from a transformation matrix between two
         joints.
@@ -204,7 +207,8 @@ class KKJoint:
         dh_params: list[float] = [0.0] * 4
         dh_params[1] = gh.lines_intersect(
                 np.zeros(3), zaxis,
-                origin, axis)[1][0]  # r.
+                origin, axis,
+        )[1][0]  # r.
 
         # Round small values to 0.0.
         axis[axis < 1.0e-5] = 0.0
@@ -218,8 +222,10 @@ class KKJoint:
         dh_params[2] = 0.0
 
         vn = cn / np.linalg.norm(cn)
-        dh_params[3] = math.atan2(np.dot(np.cross(zaxis, axis), vn),
-                                  np.dot(zaxis, axis))  # ɑ.
+        dh_params[3] = math.atan2(
+            np.dot(np.cross(zaxis, axis), vn),
+            np.dot(zaxis, axis),
+        )  # ɑ.
 
         return dh_params
 
@@ -256,8 +262,10 @@ class KKJoint:
         cn = point_b - point_a
         vn = cn / np.linalg.norm(cn)
         zaxis = np.array([0.0, 0.0, 1.0])
-        dh_params[3] = math.atan2(np.dot(np.cross(zaxis, direction), vn),
-                                  np.dot(zaxis, direction))  # ɑ.
+        dh_params[3] = math.atan2(
+            np.dot(np.cross(zaxis, direction), vn),
+            np.dot(zaxis, direction),
+        )  # ɑ.
 
         return dh_params
 
@@ -281,11 +289,14 @@ class KKJoint:
         sθ = math.sin(self.theta)
         cα = math.cos(self.alpha)
         sα = math.sin(self.alpha)
-        placement = fc.Placement(fc.Matrix(
-            cθ,      -sθ,     0.0, self.d,
-            cα * sθ, cα * cθ, -sα, -self.r * sα,
-            sα * sθ, sα * cθ, cα,  self.r * cα,
-            0.0, 0.0, 0.0, 1.0))
+        placement = fc.Placement(
+            fc.Matrix(
+                cθ,      -sθ,     0.0,       self.d,
+                cα * sθ, cα * cθ, -sα, -self.r * sα,
+                sα * sθ, sα * cθ,  cα,  self.r * cα,
+                0.0,     0.0,     0.0,          1.0,
+            ),
+        )
         placement.Base *= 1000.0  # Convert to mm.
         return placement
 
@@ -331,9 +342,10 @@ class KKRobot:
         """
         return all(j.is_dh_compatible for j in self.joints)
 
-    def set_from_robot(self,
-                       robot: CrossRobot,
-                       ) -> bool:
+    def set_from_robot(
+        self,
+        robot: CrossRobot,
+    ) -> bool:
         """Set all parameters from a CROSS::Robot."""
         self.joints.clear()
 
@@ -354,39 +366,50 @@ class KKRobot:
             self.joints.append(kk_joint)
         return True
 
-    def transfer_to_robot(self,
-                          robot: CrossRobot,
-                          ) -> bool:
+    def transfer_to_robot(
+        self,
+        robot: CrossRobot,
+    ) -> bool:
         """Set all parameters to a CROSS::Robot.
 
         Does NOT open any transaction.
 
         """
         if not self.is_dh_compatible:
-            warn(f'Robot {robot.Label} is not compatible with the'
-                 ' DH convention, not implemented yet', True)
+            warn(
+                f'Robot {robot.Label} is not compatible with the'
+                ' DH convention, not implemented yet', True,
+            )
             return False
         cross_joints = robot.Proxy.get_joints()
         cross_links = robot.Proxy.get_links()
 
         if (not cross_joints) or (len(cross_joints) > len(self.joints)):
-            warn(f'Robot {robot.Label} has a larger number of joints than'
-                 ' in the DH parameter table, not implemented yet',
-                 True)
+            warn(
+                f'Robot {robot.Label} has a larger number of joints than'
+                ' in the DH parameter table, not implemented yet',
+                True,
+            )
             return False
 
-        if (cross_joints and cross_links
-                and (len(cross_joints) != (len(cross_links) - 1))):
-            warn(f'Robot {robot.Label} has {len(cross_joints)} joints and'
-                 f' {len(cross_links)} links, should have'
-                 f' {len(cross_joints) + 1} links, not implemented yet',
-                 True)
+        if (
+            cross_joints and cross_links
+            and (len(cross_joints) != (len(cross_links) - 1))
+        ):
+            warn(
+                f'Robot {robot.Label} has {len(cross_joints)} joints and'
+                f' {len(cross_links)} links, should have'
+                f' {len(cross_joints) + 1} links, not implemented yet',
+                True,
+            )
             return False
 
         if ((not cross_joints) and (len(cross_links) == 1)):
-            warn(f'Robot {robot.Label} has 1 link and no'
-                 ' joint, not implemented yet',
-                 True)
+            warn(
+                f'Robot {robot.Label} has 1 link and no'
+                ' joint, not implemented yet',
+                True,
+            )
             return False
 
         self._add_missing_to_robot(robot)
@@ -415,8 +438,10 @@ class KKRobot:
             if cross_joint.Type != type_:
                 # Implementation note: avoid recursion.
                 cross_joint.Type = type_
-            if not is_same_placement(cross_joint.Origin, kk_joint.to_placement(),
-                                     1e-5, 1e-6):
+            if not is_same_placement(
+                cross_joint.Origin, kk_joint.to_placement(),
+                1e-5, 1e-6,
+            ):
                 # Implementation note: avoid recursion.
                 cross_joint.Origin = kk_joint.to_placement()
             if cross_joint.Mimic:
@@ -424,9 +449,10 @@ class KKRobot:
                 cross_joint.Mimic = False
         return True
 
-    def _add_missing_to_robot(self,
-                              robot: CrossRobot,
-                              ) -> None:
+    def _add_missing_to_robot(
+        self,
+        robot: CrossRobot,
+    ) -> None:
         """Add the missing joints and links to the robot.
 
         Only DH parameters supported for now.

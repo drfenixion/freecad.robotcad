@@ -36,13 +36,18 @@ class PlanningSceneProxy(ProxyBase):
     # workbench, to identify the object type.
     Type = 'Cross::PlanningScene'
 
-    def __init__(self,
-                 obj: CrossPlanningScene,
-                 planning_scene_msg: Optional[PlanningSceneMsg] = None):
-        super().__init__('scene', [
-            '_Type',
-            'Robot',
-            ])
+    def __init__(
+        self,
+        obj: CrossPlanningScene,
+        planning_scene_msg: Optional[PlanningSceneMsg] = None,
+    ):
+        super().__init__(
+            'scene',
+            [
+                '_Type',
+                'Robot',
+            ],
+        )
         obj.Proxy = self
         self.scene = obj
 
@@ -51,14 +56,17 @@ class PlanningSceneProxy(ProxyBase):
         self.init_properties(obj)
 
     def init_properties(self, obj: CrossPlanningScene):
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+                obj, 'App::PropertyString', '_Type', 'Internal',
+                'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyLink', 'Robot', 'ROS',
-                     tr('The associated robot.'),
-                     )
+        add_property(
+                obj, 'App::PropertyLink', 'Robot', 'ROS',
+                tr('The associated robot.'),
+        )
 
     def execute(self, obj: CrossPlanningScene) -> None:
         self._update_robot_joint_values()
@@ -78,6 +86,7 @@ class PlanningSceneProxy(ProxyBase):
         return self.Type,
 
     def loads(self, state):
+        self.planning_scene_msg = None  # TODO
         if state:
             self.Type, = state
 
@@ -113,10 +122,13 @@ class _ViewProviderPlanningScene(ProxyBase):
     """A view provider for the PlanningScene object """
 
     def __init__(self, vobj: VP):
-        super().__init__('view_object', [
-            'Visibility',
-            'PlaneSides',
-            ])
+        super().__init__(
+            'view_object',
+            [
+                'Visibility',
+                'PlaneSides',
+            ],
+        )
 
         if vobj.Proxy is not self:
             # Implementation note: triggers `self.attach`.
@@ -131,16 +143,20 @@ class _ViewProviderPlanningScene(ProxyBase):
     def _init_properties(self, vobj: VP):
         """Set properties of the view provider."""
         # Default to 1000.0, i.e. 1 meter.
-        add_property(vobj, 'App::PropertyLength', 'PlaneSides',
-                     'ROS Display Options',
-                     'The length of the sides of the plane.',
-                     1000.0)
+        add_property(
+            vobj, 'App::PropertyLength', 'PlaneSides',
+            'ROS Display Options',
+            'The length of the sides of the plane.',
+            1000.0,
+        )
 
         # Default to 100.0, i.e. 100 cm.
-        add_property(vobj, 'App::PropertyLength', 'SubframeSize',
-                     'ROS Display Options',
-                     'The length of the subframe axes.',
-                     100.0)
+        add_property(
+            vobj, 'App::PropertyLength', 'SubframeSize',
+            'ROS Display Options',
+            'The length of the subframe axes.',
+            100.0,
+        )
 
     def getIcon(self):
         # Implementation note: "return 'planning_scene.svg'" works only after
@@ -194,6 +210,8 @@ class _ViewProviderPlanningScene(ProxyBase):
                 or (not hasattr(self.view_object.Proxy, 'wireframe'))):
             return
         scene: CrossPlanningScene = self.view_object.Object
+        if not hasattr(scene.Proxy, 'planning_scene_msg'):
+            return
         msg = scene.Proxy.planning_scene_msg
 
         self.shaded.removeAllChildren()
@@ -212,7 +230,7 @@ class _ViewProviderPlanningScene(ProxyBase):
                 msg,
                 plane_sides_mm=self.view_object.PlaneSides,
                 subframe_length_mm=self.view_object.SubframeSize,
-                )
+        )
         self.shaded.addChild(planning_scene_group)
         self.wireframe.addChild(planning_scene_group)
 
@@ -221,7 +239,7 @@ def make_planning_scene(
         name: str,
         planning_scene_msg: PlanningSceneMsg,
         doc: Optional[fc.Document] = None,
-        ) -> CrossPlanningScene:
+) -> CrossPlanningScene:
     """Add a Cross::PlanningScene to the current document."""
     if doc is None:
         doc = fc.activeDocument()

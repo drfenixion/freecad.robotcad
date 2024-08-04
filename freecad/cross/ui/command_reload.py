@@ -9,10 +9,12 @@ class _ReloadCommand:
     """The command definition to create a new Robot object."""
 
     def GetResources(self):
-        return {'Pixmap': 'bulb',
-                'MenuText': 'Reload the ROS workbench',
-                'Accel': 'W, R',
-                'ToolTip': 'Reload the ROS workbench'}
+        return {
+            'Pixmap': 'bulb',
+            'MenuText': 'Reload the ROS workbench',
+            'Accel': 'W, R',
+            'ToolTip': 'Reload the ROS workbench',
+        }
 
     def IsActive(self):
         return True

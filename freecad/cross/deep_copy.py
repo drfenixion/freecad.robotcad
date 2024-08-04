@@ -25,7 +25,7 @@ def deep_copy_object(
         obj: DO,
         doc: Optional[fc.Document] = None,
         placement: fc.Placement = fc.Placement(),
-        ) -> DOList:
+) -> DOList:
     """Copy the shapes and meshes of a FreeCAD object.
 
     Parameters
@@ -40,9 +40,11 @@ def deep_copy_object(
         return deep_copy_part(obj, doc, placement)
     elif is_mesh(obj):
         return deep_copy_mesh(obj, doc, placement)
-    elif (is_box(obj)
-          or is_cylinder(obj)
-          or is_sphere(obj)):
+    elif (
+        is_box(obj)
+        or is_cylinder(obj)
+        or is_sphere(obj)
+    ):
         doc = obj.Document if doc is None else doc
         copy_of_obj = doc.copyObject(obj)
         copy_of_obj.Placement = placement * copy_of_obj.Placement
@@ -60,7 +62,7 @@ def deep_copy_part(
         part: AppPart,
         doc: Optional[fc.Document] = None,
         placement: fc.Placement = fc.Placement(),
-        ) -> DOList:
+) -> DOList:
     """Copy the shape of a "App::Part" object.
 
     Parameters
@@ -75,8 +77,10 @@ def deep_copy_part(
     if (not hasattr(part, 'TypeId')) or part.TypeId != 'App::Part':
         # Part is not a part, return.
         try:
-            fc.Console.PrintWarning(f'"{part.Label}" ({part.Name})'
-                                    ' is not a part, ignoring\n')
+            fc.Console.PrintWarning(
+                f'"{part.Label}" ({part.Name})'
+                ' is not a part, ignoring\n',
+            )
         except AttributeError:
             fc.Console.PrintWarning('Object is not a part, ignoring\n')
         return []
@@ -104,7 +108,7 @@ def deep_copy_part(
 def get_placed_mesh_copies(
         part: AppPart,
         doc: Optional[fc.Document] = None,
-        ) -> list[MeshFeature]:
+) -> list[MeshFeature]:
     mesh_copies: list[MeshFeature] = []
     doc = doc if doc else part.Document
     for mesh, placement in get_meshes_and_placements(part):
@@ -113,8 +117,8 @@ def get_placed_mesh_copies(
 
 
 def get_meshes_and_placements(
-        part: AppPart
-        ) -> list[tuple[MeshFeature, fc.Placement]]:
+        part: AppPart,
+) -> list[tuple[MeshFeature, fc.Placement]]:
     """Return all meshes in a part and their path.
 
     Return a list of (mesh_object, path), where path (also called subname) can be
@@ -135,8 +139,10 @@ def get_meshes_and_placements(
         if is_mesh(sobj):
             outlist.append((sobj, part.getSubObject(subname, return_type_placement)))
         elif hasattr(sobj, 'LinkedObject') and is_mesh(sobj.LinkedObject):
-            outlist.append((sobj.LinkedObject,
-                            part.getSubObject(subname, return_type_placement)))
+            outlist.append((
+                sobj.LinkedObject,
+                part.getSubObject(subname, return_type_placement),
+            ))
     return outlist
 
 
@@ -144,7 +150,7 @@ def deep_copy_mesh(
         mesh: MeshFeature,
         doc: Optional[fc.Document] = None,
         placement: fc.Placement = fc.Placement(),
-        ) -> DOList:
+) -> DOList:
     """Copy a "Mesh::Feature" object.
 
     Parameters
@@ -170,7 +176,7 @@ def deep_copy_shape(
         obj: DO,
         doc: Optional[fc.Document] = None,
         placement: fc.Placement = fc.Placement(),
-        ) -> DOList:
+) -> DOList:
     """Copy `obj.Shape`."""
     if not hasattr(obj, 'Shape'):
         return []

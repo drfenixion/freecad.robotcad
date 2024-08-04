@@ -20,12 +20,14 @@ def generate_launch_description():
                 # ParameterValue is required to avoid being interpreted as YAML.
                 'robot_description': ParameterValue(Command(['xacro ', LaunchConfiguration('model')]), value_type=str),
             }},
-            ]
+        ],
     )
 
     return launch.LaunchDescription([
-        launch.actions.DeclareLaunchArgument(name='model',
-                                             default_value=str(default_model_path),
-                                             description="Absolute path to the robot's URDF file"),
+        launch.actions.DeclareLaunchArgument(
+            name='model',
+            default_value=str(default_model_path),
+            description="Absolute path to the robot's URDF file",
+        ),
         robot_state_publisher_node,
     ])

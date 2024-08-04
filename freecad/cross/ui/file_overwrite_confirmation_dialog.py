@@ -15,11 +15,12 @@ from ..gui_utils import tr
 class CheckBoxAndTextItem(QtGui.QListWidgetItem):
     """A wrapper around QListWidgetItem for a more convenient constructor."""
 
-    def __init__(self,
-                 text: str,
-                 checked: bool = False,
-                 parent: Optional[QtGui.QListWidget] = None
-                 ) -> None:
+    def __init__(
+        self,
+        text: str,
+        checked: bool = False,
+        parent: Optional[QtGui.QListWidget] = None,
+    ) -> None:
         super().__init__(text, parent)
         self.setCheckState(QtCore.Qt.Checked if checked else QtCore.Qt.Unchecked)
 
@@ -37,9 +38,11 @@ class CheckBoxAndTextItem(QtGui.QListWidgetItem):
 class FileOverwriteConfirmationDialog:
     """A dialog that asks the user to confirm overwriting files."""
 
-    def __init__(self,
-                 path: [Path | str],
-                 filenames: list[str]):
+    def __init__(
+        self,
+        path: [Path | str],
+        filenames: list[str],
+    ):
         """Constructor with a path and relative file names."""
         self.path = Path(path)
         self.filenames = filenames
@@ -50,7 +53,8 @@ class FileOverwriteConfirmationDialog:
         self.files_to_overwrite: set[str] = set()  # Existing, checked.
 
         self.form = fcgui.PySideUic.loadUi(
-                str(UI_PATH / 'file_overwrite_confirmation_dialog.ui'), self)
+                str(UI_PATH / 'file_overwrite_confirmation_dialog.ui'), self,
+        )
 
         self.form.line_edit_save_path.setText(str(self.path))
 
@@ -76,7 +80,8 @@ class FileOverwriteConfirmationDialog:
             abs_path = self.path / f
             checkable_file_item = CheckBoxAndTextItem(
                     f, not abs_path.exists(),
-                    self.form.list_widget_files)
+                    self.form.list_widget_files,
+            )
             if abs_path.exists():
                 self.files_to_ignore.add(f)
                 checkable_file_item.setToolTipWithoutSignal(tr('This file will be ignored.'))
@@ -94,7 +99,7 @@ class FileOverwriteConfirmationDialog:
                 list(self.files_to_ignore),
                 list(self.files_to_write),
                 list(self.files_to_overwrite),
-               )
+        )
 
     def close(self) -> None:
         self.form.close()
@@ -107,7 +112,8 @@ class FileOverwriteConfirmationDialog:
     def _on_browse_clicked(self) -> None:
         """Opens a file dialog to select a directory."""
         path = QtGui.QFileDialog.getExistingDirectory(
-                None, tr('Select a directory'), str(self.path))
+                None, tr('Select a directory'), str(self.path),
+        )
         if path:
             self.path = Path(path)
             self.form.line_edit_save_path.setText(str(self.path))
@@ -120,8 +126,10 @@ class FileOverwriteConfirmationDialog:
         for item in self.checkable_file_items:
             # Implementation note: state is actually an int because
             # self.form.select_all_check_box has 3 states, not allowed.
-            item.setCheckState(QtCore.Qt.Checked if state == QtCore.Qt.Checked
-                               else QtCore.Qt.Unchecked)
+            item.setCheckState(
+                QtCore.Qt.Checked if state == QtCore.Qt.Checked
+                else QtCore.Qt.Unchecked,
+            )
 
     def _set_select_all_state(self) -> None:
         """Sets the state of `self.form.select_all_check_box`."""
@@ -145,8 +153,10 @@ class FileOverwriteConfirmationDialog:
             self.form.select_all_check_box.setTristate(False)
         self.form.select_all_check_box.blockSignals(False)
 
-    def _on_list_item_changed(self,
-                              item: CheckBoxAndTextItem) -> None:
+    def _on_list_item_changed(
+        self,
+        item: CheckBoxAndTextItem,
+    ) -> None:
         """Checks or unchecks the item."""
         filename = item.text()
         if item.is_checked():
