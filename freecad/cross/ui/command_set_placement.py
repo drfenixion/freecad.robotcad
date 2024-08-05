@@ -43,7 +43,7 @@ class _SetCROSSPlacementCommand:
 
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement.svg',
-                'MenuText': tr('Set placement - deprecated'),
+                'MenuText': tr('Set placement (deprecated)'),
                 'Accel': 'S, P',
                 'ToolTip': tr('Set the mounted placement'
                               ' of a link or the origin of a joint.'
@@ -54,9 +54,8 @@ class _SetCROSSPlacementCommand:
                               '  c) a CROSS::Joint, the LCS on the parent link,'
                               ' and the LCS on the child link.\n'
                               '\n'
-                              'This tool works correct only in local frame and have bug with rotated LCS.\n'
-                              'Also it does not takes into account current origin.\n'
-                              'Use "Set Placement - as system" tool instead of this tool.\n'
+                              'The behavior of this tool is too complicated in some cases.\n'
+                              'Use "Set Placement - as system" and "Set Placement - by orienteer" instead of this tool.\n'
                               'This tool planned to be removed.\n',
                               )}
 
