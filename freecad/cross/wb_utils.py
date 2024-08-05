@@ -412,7 +412,9 @@ def export_templates(
 
     package_parent = Path(package_parent)
     
-    if not meshes_dir:
+    try:
+        meshes_dir
+    except NameError:
         meshes_dir = (
             'meshes '
             if _has_meshes_directory(package_parent, package_name)
