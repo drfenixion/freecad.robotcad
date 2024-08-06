@@ -14,8 +14,9 @@ reboot
 ```
 
 # Run FreeCAD with RobotCAD - OVERCROSS
-
-``bash run.bash``
+```
+bash run.bash
+```
 
 It will build image and run FreeCAD in container then open FreeCAD window at host. Also it bind host FreeCAD mods to container.
 
