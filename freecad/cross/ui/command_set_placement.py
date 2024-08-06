@@ -22,7 +22,7 @@ LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 def get_relative_placement(
         lcs: LCS,
         obj: DO,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the transform from `lcs` to `obj`."""
     resolve_mode_resolve = 1
     selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
@@ -43,7 +43,7 @@ class _SetCROSSPlacementCommand:
 
     def GetResources(self):
         return {'Pixmap': 'set_cross_placement.svg',
-                'MenuText': tr('Set placement'),
+                'MenuText': tr('Set placement (deprecated)'),
                 'Accel': 'S, P',
                 'ToolTip': tr('Set the mounted placement'
                               ' of a link or the origin of a joint.'
@@ -52,7 +52,11 @@ class _SetCROSSPlacementCommand:
                               '  b) a CROSS::Joint, the child LCS, and the'
                               ' parent LCS on the same link.\n'
                               '  c) a CROSS::Joint, the LCS on the parent link,'
-                              ' and the LCS on the child link.',
+                              ' and the LCS on the child link.\n'
+                              '\n'
+                              'The behavior of this tool is too complicated in some cases.\n'
+                              'Use "Set Placement - as system" and "Set Placement - by orienteer" instead of this tool.\n'
+                              'This tool planned to be removed.\n',
                               )}
 
     def IsActive(self):
@@ -66,7 +70,8 @@ class _SetCROSSPlacementCommand:
         try:
             cross_link, lcs, obj = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Cross::Link', 'PartDesign::CoordinateSystem', 'Any'])
+                ['Cross::Link', 'PartDesign::CoordinateSystem', 'Any'],
+            )
             selection_ok = True
             selection_link = True
         except RuntimeError:
@@ -76,20 +81,23 @@ class _SetCROSSPlacementCommand:
             try:
                 cross_joint, lcs_child, lcs_parent = validate_types(
                     fcgui.Selection.getSelection(),
-                    ['Cross::Joint', 'PartDesign::CoordinateSystem', 'PartDesign::CoordinateSystem'])
+                    ['Cross::Joint', 'PartDesign::CoordinateSystem', 'PartDesign::CoordinateSystem'],
+                )
                 selection_ok = True
                 selection_joint = True
             except RuntimeError:
                 pass
 
         if not selection_ok:
-            message('Select either\n'
-                    '  a) a CROSS::Link, a LCS, and something or\n'
-                    '  b) a CROSS::Joint, the child LCS, and the'
-                    ' parent LCS on the same link.\n'
-                    '  c) a CROSS::Joint, the LCS on the parent link,'
-                    ' and the LCS on the child link.',
-                    gui=True)
+            message(
+                'Select either\n'
+                '  a) a CROSS::Link, a LCS, and something or\n'
+                '  b) a CROSS::Joint, the child LCS, and the'
+                ' parent LCS on the same link.\n'
+                '  c) a CROSS::Joint, the LCS on the parent link,'
+                ' and the LCS on the child link.',
+                gui=True,
+            )
             return
 
         if selection_link:

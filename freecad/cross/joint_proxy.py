@@ -39,7 +39,9 @@ class JointProxy(ProxyBase):
     type_enum = ['fixed', 'prismatic', 'revolute', 'continuous', 'planar', 'floating']
 
     def __init__(self, obj: CrossJoint):
-        super().__init__('joint', [
+        super().__init__(
+            'joint',
+            [
                 'Child',
                 'Effort',
                 'LowerLimit',
@@ -50,12 +52,16 @@ class JointProxy(ProxyBase):
                 'Origin',
                 'Parent',
                 'Placement',
+                'PlacementRelTotalCenterOfMass',
                 'Position',
                 'Type',
                 'UpperLimit',
                 'Velocity',
+                'JointSpecific',
+                'JoinRotationDirection',
                 '_Type',
-                ])
+            ],
+        )
         obj.Proxy = self
         self.joint = obj
 
@@ -74,30 +80,50 @@ class JointProxy(ProxyBase):
         self.init_properties(obj)
 
     def init_properties(self, obj: CrossJoint):
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+            obj, 'App::PropertyString', '_Type', 'Internal',
+            'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyEnumeration', 'Type', 'Elements',
-                     'The kinematical type of the joint')
+        add_property(
+            obj, 'App::PropertyEnumeration', 'Type', 'Elements',
+            'The kinematical type of the joint',
+        )
         obj.Type = JointProxy.type_enum
-        add_property(obj, 'App::PropertyEnumeration', 'Parent', 'Elements',
-                     'Parent link (from CROSS)')
-        add_property(obj, 'App::PropertyEnumeration', 'Child', 'Elements',
-                     'Child link (from CROSS)')
-        add_property(obj, 'App::PropertyPlacement', 'Origin', 'Elements',
-                     'Joint origin relative to the parent link')
-        add_property(obj, 'App::PropertyFloat', 'LowerLimit', 'Limits',
-                     'Lower position limit (mm or deg)')
-        add_property(obj, 'App::PropertyFloat', 'UpperLimit', 'Limits',
-                     'Upper position limit (mm or deg)')
-        add_property(obj, 'App::PropertyFloat', 'Effort', 'Limits',
-                     'Maximal effort (N or Nm)')
-        add_property(obj, 'App::PropertyFloat', 'Velocity', 'Limits',
-                     'Maximal velocity (mm/s or deg/s)')
-        add_property(obj, 'App::PropertyFloat', 'Position', 'Value',
-                     'Joint position (m or rad)')
+        add_property(
+            obj, 'App::PropertyEnumeration', 'Parent', 'Elements',
+            'Parent link (from CROSS)',
+        )
+        add_property(
+            obj, 'App::PropertyEnumeration', 'Child', 'Elements',
+            'Child link (from CROSS)',
+        )
+        add_property(
+            obj, 'App::PropertyPlacement', 'Origin', 'Elements',
+            'Joint origin relative to the parent link',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'LowerLimit', 'Limits',
+            'Lower position limit (mm or deg)',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'UpperLimit', 'Limits',
+            'Upper position limit (mm or deg)',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Effort', 'Limits',
+            'Maximal effort (N or Nm)',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Velocity', 'Limits',
+            'Maximal velocity (mm/s or deg/s)',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Position', 'Value',
+            'Joint position (m or rad)',
+        )
         obj.setEditorMode('Position', ['ReadOnly'])
 
         # Mimic joint.
@@ -109,9 +135,22 @@ class JointProxy(ProxyBase):
                      'value = Multiplier * other_joint_value + Offset', 1.0)
         add_property(obj, 'App::PropertyFloat', 'Offset', 'Mimic',
                      'value = Multiplier * other_joint_value + Offset, in mm or deg')
+        
+        add_property(obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
+                     'Propellers rotation direction. Can be used for code generation')
+        obj.JoinRotationDirection=["unset","cw","ccw"]
+        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])        
+        add_property(obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
+                     'Specific of joint working. Can be used for code generation')
+        obj.JointSpecific=["unset","propeller"]
 
-        add_property(obj, 'App::PropertyPlacement', 'Placement', 'Internal',
-                     'Placement of the joint in the robot frame')
+        add_property(
+            obj, 'App::PropertyPlacement', 'Placement', 'Internal',
+            'Placement of the joint in the robot frame',
+        )
+        obj.setEditorMode('Placement', ['ReadOnly'])
+        add_property(obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
+                     'Placement of the joint in the center of mass frame of robot')
         obj.setEditorMode('Placement', ['ReadOnly'])
 
         self._toggle_editor_mode()
@@ -134,18 +173,22 @@ class JointProxy(ProxyBase):
         if prop == 'MimickedJoint':
             if ((obj.MimickedJoint is not None)
                     and (obj.Type != obj.MimickedJoint.Type)):
-                warn('Mimicked joint must have the same type'
-                     f' but "{obj.Label}"\'s type is {obj.Type} and'
-                     f' "{obj.MimickedJoint}"\'s is {obj.MimickedJoint.Type}',
-                     True)
+                warn(
+                    'Mimicked joint must have the same type'
+                    f' but "{obj.Label}"\'s type is {obj.Type} and'
+                    f' "{obj.MimickedJoint}"\'s is {obj.MimickedJoint.Type}',
+                    True,
+                )
                 obj.MimickedJoint = None
         if prop in ('Label', 'Label2'):
             robot = self.get_robot()
             if robot and hasattr(robot, 'Proxy'):
                 robot.Proxy.add_joint_variables()
-            if (robot
-                    and is_name_used(obj, robot)
-                    and getattr(obj, prop) != self.old_ros_name):
+            if (
+                robot
+                and is_name_used(obj, robot)
+                and getattr(obj, prop) != self.old_ros_name
+            ):
                 setattr(obj, prop, self.old_ros_name)
         if prop == 'Type':
             self._toggle_editor_mode()
@@ -162,8 +205,10 @@ class JointProxy(ProxyBase):
                     return
                 self.child_link = robot.Proxy.get_link(obj.Child)
             new_link_name = ros_name(self.child_link) if self.child_link else obj.Child
-            if ((self.child_link
-                 and (new_link_name in obj.getEnumerationsOfProperty('Child')))
+            if ((
+                self.child_link
+                and (new_link_name in obj.getEnumerationsOfProperty('Child'))
+            )
                     and (obj.Child != new_link_name)):
                 obj.Child = new_link_name
         if prop == 'Parent':
@@ -179,10 +224,17 @@ class JointProxy(ProxyBase):
                     return
                 self.parent_link = robot.Proxy.get_link(obj.Parent)
             new_link_name = ros_name(self.parent_link) if self.parent_link else obj.Parent
-            if ((self.parent_link
-                 and (new_link_name in obj.getEnumerationsOfProperty('Parent')))
+            if ((
+                self.parent_link
+                and (new_link_name in obj.getEnumerationsOfProperty('Parent'))
+            )
                     and (obj.Parent != new_link_name)):
                 obj.Parent = new_link_name
+        if prop == 'JointSpecific':
+            if obj.JointSpecific != 'unset':
+                obj.setPropertyStatus('JoinRotationDirection', '-Hidden')
+            else:
+                obj.setPropertyStatus('JoinRotationDirection', 'Hidden')
 
     def onDocumentRestored(self, obj: CrossJoint):
         self.__init__(obj)
@@ -198,9 +250,10 @@ class JointProxy(ProxyBase):
         """Return whether the joint is of type 'fixed'."""
         return self.joint.Type == 'fixed'
 
-    def get_actuation_placement(self,
-                                joint_value: Optional[float] = None,
-                                ) -> fc.Placement:
+    def get_actuation_placement(
+        self,
+        joint_value: Optional[float] = None,
+    ) -> fc.Placement:
         """Return the transform due to actuation.
 
         Parameters
@@ -237,18 +290,24 @@ class JointProxy(ProxyBase):
         if self.joint.Type in ('revolute', 'continuous'):
             if joint_value is None:
                 joint_value = degrees(self.joint.Position)
-            return fc.Placement(fc.Vector(),
-                                fc.Rotation(fc.Vector(0.0, 0.0, 1.0),
-                                            joint_value))
+            return fc.Placement(
+                fc.Vector(),
+                fc.Rotation(
+                    fc.Vector(0.0, 0.0, 1.0),
+                    joint_value,
+                ),
+            )
         return fc.Placement()
 
     def get_robot(self) -> Optional[CrossRobot]:
         """Return the Cross::Robot this joint belongs to."""
         # TODO: as property.
-        if (hasattr(self, '_robot')
+        if (
+            hasattr(self, '_robot')
             and self._robot
                 and hasattr(self._robot, 'Group')
-                and (self.joint in self._robot.Group)):
+                and (self.joint in self._robot.Group)
+        ):
             return self._robot
         if not self.is_execute_ready():
             return None
@@ -360,11 +419,14 @@ class _ViewProviderJoint(ProxyBase):
     """The view provider for CROSS::Joint objects."""
 
     def __init__(self, vobj: VP) -> None:
-        super().__init__('view_object', [
-            'AxisLength',
-            'ShowAxis',
-            'Visibility',
-            ])
+        super().__init__(
+            'view_object',
+            [
+                'AxisLength',
+                'ShowAxis',
+                'Visibility',
+            ],
+        )
         if vobj.Proxy is not self:
             # Implementation note: triggers `self.attach`.
             vobj.Proxy = self
@@ -377,14 +439,18 @@ class _ViewProviderJoint(ProxyBase):
 
     def _init_properties(self, vobj: VP) -> None:
         """Set properties of the view provider."""
-        add_property(vobj, 'App::PropertyBool', 'ShowAxis',
-                     'ROS Display Options',
-                     "Toggle the display of the joint's Z-axis",
-                     True)
-        add_property(vobj, 'App::PropertyLength', 'AxisLength',
-                     'ROS Display Options',
-                     "Length of the arrow for the joint's axis",
-                     500.0)
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowAxis',
+            'ROS Display Options',
+            "Toggle the display of the joint's Z-axis",
+            True,
+        )
+        add_property(
+            vobj, 'App::PropertyLength', 'AxisLength',
+            'ROS Display Options',
+            "Length of the arrow for the joint's axis",
+            500.0,
+        )
 
     def getIcon(self) -> str:
         # Implementation note: "return 'joint.svg'" works only after
@@ -396,9 +462,11 @@ class _ViewProviderJoint(ProxyBase):
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(vobj)
 
-    def updateData(self,
-                   obj: CrossJoint,
-                   prop: str) -> None:
+    def updateData(
+        self,
+        obj: CrossJoint,
+        prop: str,
+    ) -> None:
         # print(f'{obj.Name}.ViewObject.updateData({prop})') # DEBUG
         if not self.is_execute_ready():
             return
@@ -513,8 +581,10 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
         sel = fcgui.Selection.getSelection()
         if sel:
             candidate = sel[0]
-            if (is_robot(candidate)
-                    or is_workcell(candidate)):
+            if (
+                is_robot(candidate)
+                or is_workcell(candidate)
+            ):
                 joint.adjustRelativeLinks(candidate)
                 candidate.addObject(joint)
                 if is_robot(candidate) and candidate.ViewObject:

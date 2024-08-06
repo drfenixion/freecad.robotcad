@@ -10,6 +10,7 @@ import FreeCAD as fc
 
 from ..utils import get_parent_by_pattern
 from ..utils import add_path_to_environment_variable
+from .. import wb_constants
 
 
 def warn(text: str, gui: bool = False) -> None:
@@ -22,8 +23,10 @@ def warn(text: str, gui: bool = False) -> None:
     # without GUI.
     fc.Console.PrintWarning(text + '\n')
     if gui and hasattr(fc, 'GuiUp') and fc.GuiUp:
-        diag = QtGui.QMessageBox(QtGui.QMessageBox.Warning,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+        diag = QtGui.QMessageBox(
+            QtGui.QMessageBox.Warning,
+            wb_constants.WORKBENCH_NAME, text,
+        )
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -57,16 +60,20 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     if not ros_distro:
         ros_distro = get_ros_distro_from_env()
     if not ros_distro:
-        warn('The environment variable `ROS_DISTRO` is not set and no ROS'
-             ' installation was found in /opt/ros'
-             ', some functionalities will be missing')
+        warn(
+            'The environment variable `ROS_DISTRO` is not set and no ROS'
+            ' installation was found in /opt/ros'
+            ', some functionalities will be missing',
+        )
         return False
     else:
         if not has_ros_distro():
             p = get_ros_workspace_from_env()
-            warn('The environment variable `ROS_DISTRO` is not set but a ROS'
-                 f' installation was found in {p}'
-                 ', attempting to use it')
+            warn(
+                'The environment variable `ROS_DISTRO` is not set but a ROS'
+                f' installation was found in {p}'
+                ', attempting to use it',
+            )
 
     # Add the paths in PYTHONPATH to sys.path.
     # Unfortunately, on some systems and with some versions of FreeCAD, the
@@ -91,7 +98,7 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
         Path(f'{base}/lib/{python_ver}/site-packages'),
         # Humble and later.
         Path(f'{base}/local/lib/{python_ver}/dist-packages'),
-        ]:
+    ]:
         _add_python_path(path)
 
     add_path_to_environment_variable(f'{ros_workspace}/install/lib', 'LD_LIBRARY_PATH')
@@ -99,7 +106,7 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
         Path(f'{base}/opt/rviz_ogre_vendor/lib'),
         Path(f'{base}/lib/x86_64-linux-gnu'),
         Path(f'{base}/lib'),
-        ]:
+    ]:
         add_path_to_environment_variable(path, 'LD_LIBRARY_PATH')
 
     add_path_to_environment_variable(f'{ros_workspace}/install', 'AMENT_PREFIX_PATH')
@@ -196,7 +203,7 @@ def get_package_and_file(file_path: [Path | str]) -> tuple[str, str]:
 
 def pkg_and_file_from_ros_path(
         path: str,
-        ) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str]]:
     """Return the tuple (package_name, relative_file_path).
 
     Return (None, None) if the guessed package does not exist.
@@ -216,9 +223,11 @@ def pkg_and_file_from_ros_path(
     if not path or not isinstance(path, str):
         return None, None
     if not path.startswith('package://'):
-        warn(f'Invalid ROS path `{path}`, only the'
-             ' `package://<package_name>/<relative_file_path>`'
-             ' format is supported', False)
+        warn(
+            f'Invalid ROS path `{path}`, only the'
+            ' `package://<package_name>/<relative_file_path>`'
+            ' format is supported', False,
+        )
         return None, None
     try:
         pkg, _, rel_path = path[len('package://'):].partition('/')
@@ -236,7 +245,7 @@ def pkg_and_file_from_ros_path(
 def abs_path_from_ros_path(
         path: str,
         relative_to: Optional[Path | str] = None,
-        ) -> Optional[Path]:
+) -> Optional[Path]:
     """Return the absolute path to a file given in ROS format.
 
     Return the absolute path to a file given in ROS format.
@@ -260,8 +269,12 @@ def abs_path_from_ros_path(
 
     if not path:
         return None
-    if (not (path.startswith('package://')
-             or path.startswith('file://'))):
+    if (
+        not (
+            path.startswith('package://')
+            or path.startswith('file://')
+        )
+    ):
         return None
     if path.startswith('package://'):
         pkg, rel_path = pkg_and_file_from_ros_path(path)
@@ -278,7 +291,7 @@ def abs_path_from_ros_path(
 
 def ros_path_from_abs_path(
         path: [Path | str],
-        ) -> Optional[str]:
+) -> Optional[str]:
     """Return the ROS path to the given file.
 
     The ROS path has the following format
@@ -292,24 +305,45 @@ def ros_path_from_abs_path(
     return f'package://{pkg}/{rel_path}'
 
 
-def split_package_path(package_path: [Path | str]) -> tuple[Path, str]:
-    """Return the package parent and the package name.
+def split_package_path(output_path: [Path | str]) -> tuple[Path, str, Path]:
+    """Return the project path, package name, package path.
 
     For example, if `package_path` is `/home/user/ros_ws/src/my_pkg`,
-    return (Path('/home/user/ros_ws/src'), 'my_pkg').
+    return (Path('/home/user/ros_ws/src/my_pkg'), 'my_pkg', Path('/home/user/ros_ws/src/my_pkg/my_pkg')).
 
     Parameters
     ----------
-    - package_path: path to the directory containing `package.xml`.
+    - output_path: path to the directory where will be created project and package inside the project.
 
     """
-    package_path = Path(package_path)
-    if not package_path.is_dir():
-        warn('"package_path" must be a directory', True)
-    package_path = package_path.resolve()
-    parent = package_path.parent
-    package_name = package_path.name
-    return parent, package_name
+    output_path = Path(output_path)
+    if not output_path.is_dir():
+        warn('"output_path" must be a directory', True)
+    output_path = output_path.resolve()
+    parent = output_path.parent
+    package_name = output_path.name
+
+    # Make project folder with same name as package. Example: some_package/some_package.
+    # Project folder can be used for store other packages of this project generated by external code generator
+    # or by OVERCROSS 
+    # 
+
+    # parent is a root of project (can be git root and root of packages)
+    project_path = parent / package_name # Example: parent/some_package. 
+
+    # path to description package in project folder with same name
+    description_package_path = project_path / package_name # Example: parent/some_package/some_package.
+
+    # Example structure of project:
+    # parent/some_package/some_package - description package (generated by OVERCROSS)
+    # Can be generated by OVERCROSS or external code generator
+    # parent/some_package/other_package - example of any other package
+    # parent/some_package/.git - git root place
+    # parent/some_package/modules/ - git submodules folder place
+    # parent/some_package/modules/ros_gz - ros package compiled from source and controlled by git submodule
+    # parent/some_package/docker/ - git folder place
+
+    return project_path, package_name, description_package_path
 
 
 def _add_python_path(path: [Path | str]) -> None:

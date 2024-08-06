@@ -15,6 +15,8 @@ from .ui import command_reload # Developer tool.
 from .ui import command_robot_from_urdf
 from .ui import command_set_joints
 from .ui import command_set_placement
+from .ui import command_set_placement_in_absolute_coordinates
+from .ui import command_set_placement_by_orienteer
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
 from .ui import command_cylinder_from_bounding_box
@@ -22,16 +24,18 @@ from .ui import command_update_planning_scene
 from .ui import command_urdf_export
 from .ui import command_set_material
 from .ui import command_calculate_mass_and_inertia
+from .ui import command_transfer_project_to_external_code_generator
 from .ui import command_wb_settings
 from .wb_utils import ICON_PATH
+from . import wb_constants
 
 
 class CrossWorkbench(fcgui.Workbench):
     """Class which gets initiated at startup of the GUI."""
 
-    MenuText = 'CROSS - ROS workbench'
+    MenuText = wb_constants.WORKBENCH_NAME
     ToolTip = 'ROS-related workbench'
-    Icon = str(ICON_PATH / 'cross.svg')
+    Icon = str(ICON_PATH / 'robotcad_overcross_joint.svg')
 
     def GetClassName(self):
         return 'Gui::PythonWorkbench'
@@ -49,6 +53,8 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
+            'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
+            'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
@@ -64,9 +70,10 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
+            'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.            
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Reload',  # Comment out to disable this developer tool.
-            ]
+        ]
         self.appendToolbar('CROSS', commands)
         self.appendMenu('CROSS', commands)
 

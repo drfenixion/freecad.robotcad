@@ -17,13 +17,13 @@ if is_ros_found():
     fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
 
 # Initialize debug with debugpy.
-if os.environ.get('FREECADCROSS_DEBUG'):
+if os.environ.get('DEBUG'):
     # how to use:
-    # FREECADCROSS_DEBUG=1 command_to_run_freecad
+    # DEBUG=1 command_to_run_freecad
     # Don't forget to install debugpy.
     # Cf. https://github.com/FreeCAD/FreeCAD-macros/wiki/Debugging-macros-in-Visual-Studio-Code.
     import debugpy
     debugpy.configure(python="python3")
-    debugpy.listen(5678)
+    debugpy.listen(("0.0.0.0", 5678))
     debugpy.trace_this_thread(True)
     debugpy.debug_this_thread()

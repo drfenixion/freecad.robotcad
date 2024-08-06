@@ -20,6 +20,7 @@ from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals
 from .utils import values_from_string
+from .utils import get_valid_filename
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -52,19 +53,25 @@ class XacroObjectAttachment:
     attachement_ros_object: Optional[CrossXacroObject | CrossRobot] = None
 
 
-def get_workbench_param(param_name: str,
-                        default: Any) -> Any:
+def get_workbench_param(
+    param_name: str,
+    default: Any,
+) -> Any:
     """Return the value of a workbench parameter."""
     param_grp = fc.ParamGet(
-            f'User parameter:BaseApp/Preferences/Mod/{wb_globals.PREFS_CATEGORY}')
+            f'User parameter:BaseApp/Preferences/Mod/{wb_globals.PREFS_CATEGORY}',
+    )
     return get_param(param_grp, param_name, default)
 
 
-def set_workbench_param(param_name: str,
-                        value: Any) -> None:
+def set_workbench_param(
+    param_name: str,
+    value: Any,
+) -> None:
     """Set the value of a workbench parameter."""
     param_grp = fc.ParamGet(
-            f'User parameter:BaseApp/Preferences/Mod/{wb_globals.PREFS_CATEGORY}')
+            f'User parameter:BaseApp/Preferences/Mod/{wb_globals.PREFS_CATEGORY}',
+    )
     set_param(param_grp, param_name, value)
 
 
@@ -100,8 +107,10 @@ def is_planning_scene(obj: DO) -> bool:
 
 def is_simple_joint(obj: DO) -> bool:
     """Return True if prismatic, revolute, or continuous."""
-    return (is_joint(obj)
-            and (obj.Type in ['prismatic', 'revolute', 'continuous']))
+    return (
+        is_joint(obj)
+        and (obj.Type in ['prismatic', 'revolute', 'continuous'])
+    )
 
 
 def is_primitive(obj: DO) -> bool:
@@ -223,7 +232,7 @@ def is_subchain(subchain: DOList, chain: DOList) -> bool:
 def get_xacro_object_attachments(
         xacro_objects: list[CrossXacroObject],
         joints: list[CrossJoint],
-        ) -> list[XacroObjectAttachment]:
+) -> list[XacroObjectAttachment]:
     """Return attachment details of xacro objects."""
     attachments: list[XacroObjectAttachment] = []
     for xacro_object in xacro_objects:
@@ -248,7 +257,7 @@ def get_xacro_object_attachments(
 def get_xacro_chains(
         xacro_objects: list[CrossXacroObject],
         joints: list[CrossJoint],
-        ) -> list[list[XacroObjectAttachment]]:
+) -> list[list[XacroObjectAttachment]]:
     """Return the list of chains.
 
     A chain starts at a xacro object that is not attached to any other xacro
@@ -256,23 +265,27 @@ def get_xacro_chains(
     the xacro object to which no other xacro object is attached.
 
     """
-    def is_parent(xacro_object: CrossXacroObject,
-                  attachments: list[XacroObjectAttachment],
-                  ) -> bool:
+    def is_parent(
+        xacro_object: CrossXacroObject,
+        attachments: list[XacroObjectAttachment],
+    ) -> bool:
         for attachment in attachments:
             if attachment.attachement_ros_object is xacro_object:
                 return True
         return False
 
-    def get_chain(xacro_object: CrossXacroObject,
-                  attachments: list[XacroObjectAttachment],
-                  ) -> list[XacroObjectAttachment]:
+    def get_chain(
+        xacro_object: CrossXacroObject,
+        attachments: list[XacroObjectAttachment],
+    ) -> list[XacroObjectAttachment]:
         for attachment in attachments:
             if attachment.xacro_object is xacro_object:
                 break
         if attachment.attachement_ros_object:
-            return (get_chain(attachment.attachement_ros_object, attachments)
-                    + [attachment])
+            return (
+                get_chain(attachment.attachement_ros_object, attachments)
+                + [attachment]
+            )
         else:
             return [attachment]
 
@@ -289,8 +302,10 @@ def get_xacro_chains(
 
 def ros_name(obj: DO) -> str:
     """Return in order obj.Label2, obj.Label, obj.Name."""
-    if ((not hasattr(obj, 'isDerivedFrom')
-         or (not obj.isDerivedFrom('App::DocumentObject')))):
+    if ((
+        not hasattr(obj, 'isDerivedFrom')
+        or (not obj.isDerivedFrom('App::DocumentObject'))
+    )):
         return 'not_a_FreeCAD_object'
     if obj.Label2:
         return obj.Label2
@@ -332,8 +347,9 @@ def get_rel_and_abs_path(path: str) -> tuple[str, Path]:
         ws = get_ros_workspace()
         wb_globals.g_ros_workspace = ws
     p = without_ros_workspace(path)
-    full_path = (wb_globals.g_ros_workspace.expanduser()
-                 / 'src' / p)
+    full_path = (
+        wb_globals.g_ros_workspace.expanduser() / 'src' / p
+    )
     return p, full_path
 
 
@@ -353,13 +369,15 @@ def remove_ros_workspace(path) -> str:
         if not ws.samefile(Path()):
             # A workspace was found.
             wb_globals.g_ros_workspace = ws
-            message('ROS workspace was set to'
-                    f' {wb_globals.g_ros_workspace},'
-                    ' change if not correct.'
-                    ' Note that packages in this workspace will NOT be'
-                    ' found, though, but only by launching FreeCAD from a'
-                    ' sourced workspace',
-                    True)
+            message(
+                'ROS workspace was set to'
+                f' {wb_globals.g_ros_workspace},'
+                ' change if not correct.'
+                ' Note that packages in this workspace will NOT be'
+                ' found, though, but only by launching FreeCAD from a'
+                ' sourced workspace',
+                True,
+            )
             rel_path = without_ros_workspace(path)
     return rel_path
 
@@ -368,7 +386,7 @@ def export_templates(
         template_files: list[str],
         package_parent: [Path | str],
         **keys: SupportsStr,
-        ) -> None:
+) -> None:
     """Export generated files.
 
     Parameters
@@ -393,13 +411,20 @@ def export_templates(
         raise RuntimeError('Parameter "package_name" must be given')
 
     package_parent = Path(package_parent)
-    meshes_dir = ('meshes '
-                  if _has_meshes_directory(package_parent, package_name)
-                  else '')
+    
+    try:
+        meshes_dir
+    except NameError:
+        meshes_dir = (
+            'meshes '
+            if _has_meshes_directory(package_parent, package_name)
+            else ''
+        )
+
     for f in template_files:
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
-        txt = template.format(meshes_dir=meshes_dir, **keys)
+        txt = template.format(**keys)
         output_path = package_parent / package_name / f
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(txt)
@@ -415,7 +440,7 @@ def _has_ros_type(obj: DO, type_: str) -> bool:
 def _has_meshes_directory(
         package_parent: [Path | str],
         package_name: str,
-        ) -> bool:
+) -> bool:
     """Return True if the directory "meshes" exists in the package."""
     meshes_directory = Path(package_parent) / package_name / 'meshes'
     return meshes_directory.exists()
@@ -423,7 +448,7 @@ def _has_meshes_directory(
 
 def is_selected_from_lambda(
         is_type_fun: Callable[DO, bool],
-        ) -> bool:
+) -> bool:
     """Return True if the first selected object meets the given criteria.
 
     Return `is_type_fun("first_selected_object")`.
@@ -443,10 +468,12 @@ def is_selected_from_lambda(
 def is_name_used(
         obj: CrossObject,
         container_obj: [CrossRobot | CrossWorkcell],
-        ) -> bool:
+) -> bool:
     if not is_robot(container_obj) or is_workcell(container_obj):
-        raise RuntimeError('Second argument must be a'
-                           ' CrossRobot or a CrossWorkbench')
+        raise RuntimeError(
+            'Second argument must be a'
+            ' CrossRobot or a CrossWorkbench',
+        )
     obj_name = ros_name(obj)
     if ((obj is not container_obj)
             and (ros_name(container_obj) == obj_name)):
@@ -496,7 +523,20 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
         except ValueError:
             raise ValueError(
                     'Pose must have the format `x, y, z; qw, qx, qy, qz`'
-                    ' or `x, y, z, qw, qx, qy, qz`')
+                    ' or `x, y, z, qw, qx, qy, qz`',
+            )
     ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
     return fc.Placement(fc.Vector(x, y, z) * ros_to_freecad_factor,
                         fc.Rotation(qw, qx, qy, qz))
+
+
+def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
+    """Return URDF file path`.
+    """
+        
+    file_base = get_valid_filename(ros_name(robot))
+    urdf_file = f'{file_base}.urdf'
+    urdf_path = output_path / f'urdf/{urdf_file}'
+    urdf_path = Path(urdf_path)
+
+    return urdf_path

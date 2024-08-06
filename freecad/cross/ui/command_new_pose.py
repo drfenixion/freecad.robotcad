@@ -9,9 +9,11 @@ class _NewPoseCommand:
     """The command definition to create a new CROSS::Pose object."""
 
     def GetResources(self):
-        return {'Pixmap': 'pose.svg',
-                'Accel': 'N, P',
-                'ToolTip': tr('Create a Pose.')}
+        return {
+            'Pixmap': 'pose.svg',
+            'Accel': 'N, P',
+            'ToolTip': tr('Create a Pose.'),
+        }
 
     def IsActive(self):
         return True

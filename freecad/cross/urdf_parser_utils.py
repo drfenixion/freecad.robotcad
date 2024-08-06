@@ -37,7 +37,7 @@ Shape = [Box, Cylinder, Mesh, Sphere]
 def obj_from_geometry(
         geometry: Shape,
         doc_or_group: [Doc | DO],
-        ) -> tuple[Optional[DO], Optional[Path]]:
+) -> tuple[Optional[DO], Optional[Path]]:
     """Return a FreeCAD object for the URDF shape with the path for meshes."""
     if isinstance(geometry, Box):
         return obj_from_box(geometry, doc_or_group)
@@ -52,7 +52,7 @@ def obj_from_geometry(
 
 def placement_from_origin(
         origin: Pose,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the FreeCAD placement corresponding to URDF origin."""
     placement = fc.Placement()
     if origin is None:
@@ -67,7 +67,7 @@ def placement_from_origin(
 
 def placement_from_link(
         link: UrdfLink,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the FreeCAD placement corresponding to the URDF link."""
     if not hasattr(link, 'origin'):
         return fc.Placement()
@@ -76,7 +76,7 @@ def placement_from_link(
 
 def placement_from_joint(
         joint: UrdfJoint,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the FreeCAD placement corresponding to the URDF joint."""
     if not hasattr(joint, 'origin'):
         return fc.Placement()
@@ -85,7 +85,7 @@ def placement_from_joint(
 
 def axis_to_z(
         joint: UrdfJoint,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the rotation to bring `joint.axis` to z."""
     if hasattr(joint, 'axis') and (joint.axis is not None):
         axis = fc.Vector(joint.axis)
@@ -102,7 +102,7 @@ def axis_to_z(
 
 def placement_along_z_from_joint(
         joint: UrdfJoint,
-        ) -> fc.Placement:
+) -> fc.Placement:
     """Return the joint placement so that its axis is along z."""
     placement = placement_from_joint(joint)
     placement.Rotation *= axis_to_z(joint)
@@ -112,7 +112,7 @@ def placement_along_z_from_joint(
 def obj_from_box(
         geometry: Box,
         doc_or_group: [Doc | DO],
-        ) -> tuple[Optional[DO], None]:
+) -> tuple[Optional[DO], None]:
     """Return a `Part::Box` object and None.
 
     Return a `Part::Box` object for the URDF shape.
@@ -130,7 +130,7 @@ def obj_from_box(
 def obj_from_cylinder(
         geometry: Cylinder,
         doc_or_group: [Doc | DO],
-        ) -> tuple[Optional[DO], None]:
+) -> tuple[Optional[DO], None]:
     """Return a `Part::Cylinder` object and None.
 
     Return a `Part::Cylinder` object for the URDF shape.
@@ -147,7 +147,7 @@ def obj_from_cylinder(
 def obj_from_mesh(
         geometry: Mesh,
         doc_or_group: [Doc | DO],
-        ) -> tuple[Optional[DO], Optional[Path]]:
+) -> tuple[Optional[DO], Optional[Path]]:
     """Return a `Mesh::Feature` object and the path to its file.
 
     Return a `Mesh::Feature` object for the URDF shape and the path to its
@@ -193,8 +193,10 @@ def obj_from_mesh(
     if mesh_path.suffix.lower() in ['.stl', '.obj']:
         scale_mesh_object(mesh_obj, 1000.0)  # m to mm.
     if ((geometry.scale is not None)
-            and (not (geometry.scale == 1.0)
-                 or geometry.scale == [1.0, 1.0, 1.0])):
+            and (
+                not (geometry.scale == 1.0)
+                or geometry.scale == [1.0, 1.0, 1.0]
+            )):
         scale_mesh_object(mesh_obj, geometry.scale)
     return mesh_obj, mesh_path
 
@@ -202,7 +204,7 @@ def obj_from_mesh(
 def obj_from_sphere(
         geometry: Sphere,
         doc_or_group: [Doc | DO],
-        ) -> tuple[Optional[DO], None]:
+) -> tuple[Optional[DO], None]:
     obj = add_object(doc_or_group, 'Part::Sphere', 'sphere')
     obj.Radius = geometry.radius * 1000.0  # m to mm.
     return obj, None

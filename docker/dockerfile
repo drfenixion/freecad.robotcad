@@ -1,0 +1,100 @@
+# syntax=docker/dockerfile:1.4
+ARG ROS_DISTRO_ARG=iron
+ARG ROS_DISTRO_ASSEMBLY_ARG=desktop
+FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
+
+# Must redeclare so that value is available after FROM statement.
+ARG ROS_DISTRO_ARG
+
+ARG USER=1000
+ARG PASSWD=ubuntu
+ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
+
+ENV USER=$USER
+ENV PASSWD=$PASSWD
+
+# fix - error: externally-managed-environment
+ENV PIP_BREAK_SYSTEM_PACKAGES 1
+
+
+#bash needed for ros distro setup.bash builtin (command in script)
+SHELL ["/bin/bash", "-c"]
+
+
+### Install system packages
+RUN echo 'Install system packages'
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        software-properties-common \
+        mesa-utils \
+        nano \
+        pip && \
+    pip install debugpy && \
+    apt-get autoclean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+### End Install system packages
+
+
+### Install FreeCAD
+RUN echo 'Install FreeCAD'
+RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        freecad && \
+    apt-get autoclean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+### End Install FreeCAD
+
+
+### Create user
+RUN echo "* enable custom user: $USER"
+RUN useradd --create-home --shell /bin/bash --user-group --groups adm,sudo $USER
+RUN echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+ENV HOME=/home/$USER
+RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
+RUN export UBUNTU_USER_ID=$(id -u $USER) \
+    && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
+    && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
+    && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile 
+### End create user
+
+
+USER $USER
+
+
+### Copy project to image
+RUN mkdir -p $CONT_PATH_WS/src
+WORKDIR $CONT_PATH_WS/src
+COPY --link --chown=$USER:$USER ros2_ws/src .
+### END copy project to image
+
+
+### Make path for FreeCAD mods
+RUN mkdir -p $HOME/.local/share/FreeCAD/Mod
+### END Make path for FreeCAD mods
+
+
+WORKDIR $CONT_PATH_WS
+
+
+### Install ROS deps
+RUN echo 'Install ROS dependencies...'
+RUN sudo -H apt-get update && rosdep update && \
+    rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
+    sudo apt-get autoclean -y && \
+    sudo apt-get autoremove -y && \
+    sudo rm -rf /var/lib/apt/lists/*
+### End Install ROS deps
+
+
+### Build ROS packages
+RUN echo 'Build ROS packages...'
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
+RUN echo ". /opt/ros/${ROS_DISTRO}/setup.bash" >> ${HOME}/.profile
+RUN echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
+### Build ROS packages
+
+
+CMD ["bash", "-c", ". ./install/setup.bash && freecad"] 

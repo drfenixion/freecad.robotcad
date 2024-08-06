@@ -7,6 +7,7 @@ import FreeCADGui as fcgui
 from PySide import QtGui  # FreeCAD's PySide!
 from PySide import QtCore  # FreeCAD's PySide!
 
+from ..freecad_utils import quantity_as
 from ..gui_utils import tr
 from ..utils import values_from_string
 from ..wb_utils import UI_PATH
@@ -44,7 +45,8 @@ class SetJointsDialog(QtGui.QDialog):
         self._joint_values: dict[CrossJoint, fc.Units.Quantity] = {}
 
         self.table_manual_input.reorder_values = (
-                self.form.check_box_reorder_values.checkState() == QtCore.Qt.Checked)
+                self.form.check_box_reorder_values.checkState() == QtCore.Qt.Checked
+        )
 
         # Deactivate the `tab_input_topic` tab until supported.
         # TODO: implement the `tab_input_topic` tab.
@@ -70,9 +72,11 @@ class SetJointsDialog(QtGui.QDialog):
         self.form.button_box.rejected.connect(self._on_cancel)
         self.table_manual_input.itemChanged.connect(self._on_table_edited)
         self.form.line_edit_joint_values.textChanged.connect(
-                self._on_line_edited) # DEBUG
+                self._on_line_edited,
+        )
         self.form.line_edit_joint_values.editingFinished.connect(
-                self._on_line_edited)
+                self._on_line_edited,
+        )
 
         # TODO: Use only two dynamic buttons depending on the table content.
         # `pushbutton_unit_x_to_x` and `pushbutton_unit_x_to_y` are connected
@@ -82,7 +86,8 @@ class SetJointsDialog(QtGui.QDialog):
             """Set the reorder values flag."""
             self.table_manual_input.reorder_values = (state == QtCore.Qt.Checked)
         self.form.check_box_reorder_values.stateChanged.connect(
-                _on_check_box_reorder_values_state_changed)
+                _on_check_box_reorder_values_state_changed,
+        )
 
     def exec_(self) -> dict[CrossJoint, float]:
         self.form.exec_()
@@ -117,20 +122,14 @@ class SetJointsDialog(QtGui.QDialog):
             unit = table.item(joint_row, unit_column).text()
             quantity = fc.Units.Quantity(f'{value} {unit}')
             if joint.Type == 'prismatic':
-                # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-                # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-                value = float(quantity.getValueAs('m'))
+                value = quantity_as(quantity, 'm')
             else:
                 # joint.Type in ['revolute', 'continuous']
-                # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-                # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-                value = float(quantity.getValueAs('rad'))
+                value = quantity_as(quantity, 'rad')
             # We set the joint value directly, without going through the
             # robot in order to avoid recomputing the robot at each joint value
             # change.
-            # As of 2023-08-31 (0.21.1.33694) `float` must be used as workaround
-            # Cf. https://forum.freecad.org/viewtopic.php?t=82905.
-            item = QtGui.QTableWidgetItem(f'{float(quantity.getValueAs(unit))}')
+            item = QtGui.QTableWidgetItem(f'{quantity_as(quantity, unit)}')
             table.setItem(i, value_column, item)
 
     def _on_table_edited(self) -> None:
@@ -168,23 +167,28 @@ class SetJointsDialog(QtGui.QDialog):
             # self.form.push_button_unit_x_to_x.clicked.disconnect()
             # self.form.push_button_unit_x_to_y.clicked.disconnect()
             self.form.push_button_unit_x_to_x.clicked.connect(
-                    lambda: self.table_manual_input.to_m_rad(False))
+                    lambda: self.table_manual_input.to_m_rad(False),
+            )
             self.form.push_button_unit_x_to_y.clicked.connect(
-                    lambda: self.table_manual_input.to_m_rad(True))
+                    lambda: self.table_manual_input.to_m_rad(True),
+            )
         elif unit in ['m', 'rad']:
             self.form.push_button_unit_x_to_x.setText(tr(f'1 rad → 1°'))
             self.form.push_button_unit_x_to_y.setText(tr(f'π rad → 180°'))
             # self.form.push_button_unit_x_to_x.clicked.disconnect()
             # self.form.push_button_unit_x_to_y.clicked.disconnect()
             self.form.push_button_unit_x_to_x.clicked.connect(
-                    lambda: self.table_manual_input.to_mm_deg(False))
+                    lambda: self.table_manual_input.to_mm_deg(False),
+            )
             self.form.push_button_unit_x_to_y.clicked.connect(
-                    lambda: self.table_manual_input.to_mm_deg(True))
+                    lambda: self.table_manual_input.to_mm_deg(True),
+            )
 
 
-def column_items(table: QtGui.QTableWidget,
-                 column: int,
-                 ) -> list[QtGui.QTableWidgetItem]:
+def column_items(
+    table: QtGui.QTableWidget,
+    column: int,
+) -> list[QtGui.QTableWidgetItem]:
     """Return the items in a column of a table."""
     row_count = table.rowCount()
     return [table.item(row, column) for row in range(row_count)]

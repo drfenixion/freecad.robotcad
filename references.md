@@ -42,14 +42,18 @@
 # Parsing xacro files
 
 - [xacro](https://github.com/ros/xacro)
+- [xacro2urdf](https://github.com/doctorsrn/xacro2urdf), doesn't depend on ROS
 
 # Parsing URDF files
 
 - https://github.com/galou/kdl_parser
-- [PyBullet]https://docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#heading=h.sbnykoneq1me
+- [PyBullet](https://docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#heading=h.sbnykoneq1me)
 - `check_urdf` command-line tool from package `ros-galactic-urdfdom`
 - `check_urdf` node from package `ros-galactic-urdfdom`
 - [kinpy](https://github.com/neka-nat/kinpy), read URDF, forward kinematics
+- [yourdf_py](https://github.com/clemense/yourdfpy)
+- [urdf_py](https://github.com/mmatl/urdfpy)
+- [MPlib](https://motion-planning-lib.readthedocs.io/latest/)
 
 # Displaying URDF files
 

@@ -10,11 +10,14 @@ from ..placement_utils import get_global_placement
 
 class CylinderFromBoundingBoxCommand:
     def GetResources(self):
-        return {'Pixmap': 'cylinder_from_bbox.svg',
-                'MenuText': tr('Cylinder from bounding box'),
-                'ToolTip': tr('Add a z-aligned Part::Cylinder englobing the'
-                              ' bounding box of the selected objects'),
-                }
+        return {
+            'Pixmap': 'cylinder_from_bbox.svg',
+            'MenuText': tr('Cylinder from bounding box'),
+            'ToolTip': tr(
+                'Add a z-aligned Part::Cylinder englobing the'
+                ' bounding box of the selected objects',
+            ),
+        }
 
     def Activated(self):
         is_one_object_compatible = False

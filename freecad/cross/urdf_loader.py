@@ -21,7 +21,8 @@ class UrdfLoader:
         filename = Path(filename)
         if filename.suffix == '.xacro':
             robot = Robot.from_xml_string(
-                    process_file(filename.expanduser()).toxml())
+                    process_file(filename.expanduser()).toxml(),
+            )
         else:
             robot = Robot.from_xml_file(filename)
         return robot
@@ -32,7 +33,9 @@ class UrdfLoader:
         return Robot.from_xml_string(description)
 
     @classmethod
-    def load_from_parameter_server(cls,
-                                   key: str = 'robot_description') -> Robot:
+    def load_from_parameter_server(
+        cls,
+        key: str = 'robot_description',
+    ) -> Robot:
         """Load from ROS parameter server."""
         return Robot.from_parameter_server(key)

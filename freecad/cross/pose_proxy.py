@@ -30,22 +30,27 @@ class PoseProxy(ProxyBase):
     # workbench, to identify the object type.
     Type = 'Cross::Pose'
 
-    def __init__(self,
-                 obj: CrossPose,
-                 planning_scene_msg: Optional[PlanningSceneMsg] = None):
+    def __init__(
+        self,
+        obj: CrossPose,
+        planning_scene_msg: Optional[PlanningSceneMsg] = None,
+    ):
         """Initialize the proxy.
 
         Not called on document restore.
 
         """
         warn(f'{obj.Name}.__init__()') # DEBUG
-        super().__init__('pose', [
-            'AllowNonLeafLink',
-            'EndEffector',
-            'Placement',  # Set by `App::GeometryPython`.
-            'Robot',
-            '_Type',
-            ])
+        super().__init__(
+            'pose',
+            [
+                'AllowNonLeafLink',
+                'EndEffector',
+                'Placement',  # Set by `App::GeometryPython`.
+                'Robot',
+                '_Type',
+            ],
+        )
         if obj.Proxy is not self:
             obj.Proxy = self
         self._init(obj)
@@ -61,18 +66,26 @@ class PoseProxy(ProxyBase):
             obj.ViewObject.Proxy.draw()
 
     def _init_properties(self, obj: CrossPose) -> None:
-        add_property(obj, 'App::PropertyString', '_Type', 'Internal',
-                     'The type')
+        add_property(
+            obj, 'App::PropertyString', '_Type', 'Internal',
+            'The type',
+        )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
-        add_property(obj, 'App::PropertyLink', 'Robot', 'Robot',
-                     'The associated robot')
-        add_property(obj, 'App::PropertyEnumeration', 'EndEffector', 'Robot',
-                     'End-effector link (from CROSS) to bring to the pose')
-        add_property(obj, 'App::PropertyBool', 'AllowNonLeafLink', 'Robot',
-                     'Whether to use allow non-leaf links in `EndEffector`',
-                     False)
+        add_property(
+            obj, 'App::PropertyLink', 'Robot', 'Robot',
+            'The associated robot',
+        )
+        add_property(
+            obj, 'App::PropertyEnumeration', 'EndEffector', 'Robot',
+            'End-effector link (from CROSS) to bring to the pose',
+        )
+        add_property(
+            obj, 'App::PropertyBool', 'AllowNonLeafLink', 'Robot',
+            'Whether to use allow non-leaf links in `EndEffector`',
+            False,
+        )
 
     def onDocumentRestored(self, obj: CrossPose) -> None:
         """Handle the object after a document restore.
@@ -134,10 +147,13 @@ class _ViewProviderPose(ProxyBase):
 
         """
         warn(f'view_object({vobj.Object.Name}).__init__()') # DEBUG
-        super().__init__('view_object', [
-            'AxisLength',
-            'ShowEndEffector',
-            ])
+        super().__init__(
+            'view_object',
+            [
+                'AxisLength',
+                'ShowEndEffector',
+            ],
+        )
 
         if vobj.Proxy is not self:
             # Implementation note: triggers `self.attach`.
@@ -150,14 +166,18 @@ class _ViewProviderPose(ProxyBase):
         self._init_properties(vobj)
 
     def _init_properties(self, vobj: VP) -> None:
-        add_property(vobj, 'App::PropertyBool', 'ShowEndEffector', 'ROS Display Options',
-                     'Whether to show the end-effector link or a symbolic'
-                     'representation of the pose',
-                     True)
-        add_property(vobj, 'App::PropertyLength', 'AxisLength',
-                     'ROS Display Options',
-                     "Length of the rods for the joint's axis",
-                     500.0)  # mm.
+        add_property(
+            vobj, 'App::PropertyBool', 'ShowEndEffector', 'ROS Display Options',
+            'Whether to show the end-effector link or a symbolic'
+            'representation of the pose',
+            True,
+        )
+        add_property(
+            vobj, 'App::PropertyLength', 'AxisLength',
+            'ROS Display Options',
+            "Length of the rods for the joint's axis",
+            500.0,
+        )  # mm.
 
     def getIcon(self) -> str:
         """Return the icon for the view provider.
@@ -192,9 +212,11 @@ class _ViewProviderPose(ProxyBase):
         vobj.addDisplayMode(self.shaded, 'Shaded')
         vobj.addDisplayMode(self.wireframe, 'Wireframe')
 
-    def updateData(self,
-                   obj: CrossPose,
-                   prop: str) -> None:
+    def updateData(
+        self,
+        obj: CrossPose,
+        prop: str,
+    ) -> None:
         """Handle a property change of the object, after the change.
 
         Required by FreeCAD.
@@ -246,7 +268,6 @@ class _ViewProviderPose(ProxyBase):
         print(f'view_object({self.view_object.Object.Name}).draw()') # DEBUG
         from pivy import coin
         from .coin_utils import tcp_group
-        from .coin_utils import transform_from_placement
 
         if ((not self.is_execute_ready(debug=True))
                 or (not hasattr(self, 'shaded'))
@@ -267,18 +288,23 @@ class _ViewProviderPose(ProxyBase):
         sep = coin.SoSeparator()
         # When `self.pose` is a `App::GeometryPython` object, the
         # placement of the view object is managed by the view object itself
-        # and sep.addChild(transform_from_placement(Placement)) should not be used.
-        sep.addChild(tcp_group(
+        # and sep.addChild(transform_from_placement(Placement)) should not be
+        # used.
+        sep.addChild(
+            tcp_group(
             tcp_length_mm=0.66 * vobj.AxisLength,
             tcp_diameter_ratio_to_length=0.17,
             tcp_color=(0.7, 0.7, 0.7),
             axis_length_mm=vobj.AxisLength,
             axis_diameter_ratio_to_length=0.03,
-            ))
+            ),
+        )
 
-        if (self.pose.Proxy.is_execute_ready(debug=True)
-                and vobj.ShowEndEffector
-                and obj.Robot):
+        if (
+            self.pose.Proxy.is_execute_ready(debug=True)
+            and vobj.ShowEndEffector
+            and obj.Robot
+        ):
             robot_proxy = obj.Robot.Proxy
             link = robot_proxy.get_link(obj.EndEffector)
             if link is not None:
@@ -373,8 +399,10 @@ def _get_link_separator(link: CrossLink) -> 'coin.SoSeparator':
         return sep
     for fixed_with_link in robot.Proxy.get_links_fixed_with(ros_name(link)):
         ln_sep = coin.SoSeparator()
-        fixed_transform = robot.Proxy.get_transform(ros_name(link),
-                                                    ros_name(fixed_with_link))
+        fixed_transform = robot.Proxy.get_transform(
+            ros_name(link),
+            ros_name(fixed_with_link),
+        )
         ln_sep.addChild(transform_from_placement(fixed_transform))
         ln_sep.addChild(_get_group_separator(fixed_with_link))
         sep.addChild(ln_sep)

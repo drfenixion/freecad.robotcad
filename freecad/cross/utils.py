@@ -49,10 +49,11 @@ def get_valid_filename(text: str) -> str:
     return ''.join(c if c in valids else '_' for c in text)
 
 
-def warn_unsupported(objects: [DO | DOList],
-                     by: str = '',
-                     gui: bool = False,
-                     ) -> None:
+def warn_unsupported(
+    objects: [DO | DOList],
+    by: str = '',
+    gui: bool = False,
+) -> None:
     """Warn the user of an unsupported object type."""
     # Import here otherwise not fc.GuiUp.
     from .freecad_utils import warn
@@ -66,9 +67,11 @@ def warn_unsupported(objects: [DO | DOList],
         except AttributeError:
             label = str(o)
         try:
-            warn(f'Object "{label}" of type {o.TypeId}'
-                 f' not supported{by_txt}\n',
-                 gui=gui)
+            warn(
+                f'Object "{label}" of type {o.TypeId}'
+                f' not supported{by_txt}\n',
+                gui=gui,
+            )
         except AttributeError:
             warn(f'Object "{label}" not supported{by_txt}\n', gui=gui)
 
@@ -99,7 +102,7 @@ def hasallattr(obj: Any, attrs: list[str]):
 def save_xml(
         xml: et.Element,
         filename: [Path | str],
-        ) -> None:
+) -> None:
     """Save the xml element into a file."""
     file_path = Path(filename)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +112,16 @@ def save_xml(
     # printing.
     txt = minidom.parseString(et.tostring(xml)).toprettyxml(indent='  ')
     file_path.write_text(txt)
+
+
+def save_file(
+        content: str,
+        filename: [Path | str],
+        ) -> None:
+    """Save the content into a file."""
+    file_path = Path(filename)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(content)
 
 
 def grouper(iterable, n, fillvalue=None):
@@ -123,7 +136,7 @@ def get_parent_by_pattern(
         file_path: [Path | str],
         pattern: str,
         type: Optional[str] = None,
-        ) -> tuple[Path, str]:
+) -> tuple[Path, str]:
     """Return the parent directory of the given file containing pattern.
 
     Return the directory that is parent (possibly indirect) of `filepath` and
@@ -152,8 +165,10 @@ def get_parent_by_pattern(
         candidate_path_to_pattern = file_path / pattern
         if is_correct_type(candidate_path_to_pattern):
             return file_path, relative_file_path
-        relative_file_path = (f'{file_path.name}/{relative_file_path}'
-                              if relative_file_path else file_path.name)
+        relative_file_path = (
+            f'{file_path.name}/{relative_file_path}'
+            if relative_file_path else file_path.name
+        )
         file_path = file_path.parent
         if file_path.samefile(Path(file_path.root)):
             # We are at the root.
@@ -186,20 +201,24 @@ def true_then_false(list: Iterable[bool]) -> bool:
     return True
 
 
-def values_from_string(values_str: str,
-                       delimiters: Iterable[str] = (' ', ',', ';'),
-                       ) -> list[float]:
+def values_from_string(
+    values_str: str,
+    delimiters: Iterable[str] = (' ', ',', ';', '\t'),
+) -> list[float]:
     """Return a list of floats from a string."""
     # Try a single value.
     try:
         return [float(values_str)]
     except ValueError:
         pass
-    # Try a list of values separated by spaces, commas or semicolons.
+    # Try a list of values separated by the given delimiters.
     for delimiter in delimiters:
         if delimiter in values_str:
             try:
-                return [float(value) for value in values_str.split(delimiter)]
+                return [
+                    float(value) for value in values_str.split(delimiter)
+                    if value != ''
+                ]
             except ValueError:
                 pass
     return []

@@ -67,6 +67,25 @@
     </widget>
    </item>
    <item>
+    <widget class="QWidget" name="widget_overcross_token" native="true">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="toolTip">
+         <string>You can get this token from OVERCROSS site. It will used by external code generator.</string>
+        </property>
+        <property name="text">
+         <string>OVERCROSS token</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineedit_overcross_token"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="button_box">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>

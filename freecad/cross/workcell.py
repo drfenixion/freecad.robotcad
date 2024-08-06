@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from typing import ForwardRef, Union
+from typing import NewType, Union
 
 import FreeCAD as fc
 
 # Implementation note: The following import is necessary to avoid a circular
 # dependency.
-JointRef = ForwardRef('Joint')
-XacroObjectRef = ForwardRef('XacroObject')
+Joint = NewType('Joint', fc.DocumentObject)
+XacroObject = NewType('XacroObject', fc.DocumentObject)
 
-JointOrXacroObject = Union[JointRef, XacroObjectRef]
+JointOrXacroObject = Union[Joint, XacroObject]
 
 
 class Workcell(fc.DocumentObject):
@@ -19,4 +19,3 @@ class Workcell(fc.DocumentObject):
     OutputPath: str
     RootLink: str
     _Type: str
-

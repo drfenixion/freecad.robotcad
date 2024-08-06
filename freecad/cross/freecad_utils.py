@@ -14,6 +14,7 @@ import MaterialEditor
 import MaterialEditor  # FreeCAD.
 
 from .utils import true_then_false
+from . import wb_constants
 
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
     from PySide import QtCore  # FreeCAD's PySide!
@@ -34,10 +35,12 @@ def with_fc_gui() -> bool:
     return hasattr(fc, 'GuiUp') and fc.GuiUp
 
 
-def get_param(group: 'ParamGrp',
-              param: str,
-              default=None,
-              _type=None) -> Any:
+def get_param(
+    group: 'ParamGrp',
+    param: str,
+    default=None,
+    _type=None,
+) -> Any:
     """Return a parameter with type checking and default."""
     type_map = {
         'Integer': int,
@@ -67,25 +70,29 @@ def get_param(group: 'ParamGrp',
         if name != param:
             continue
         if (_type is not None) and (type_map[_type] is not type_map[typ_]):
-            raise RuntimeError('Parameter found with wrong type: {}'.format(
-                typ_))
+            raise RuntimeError(
+                'Parameter found with wrong type: {}'.format(
+                typ_,
+                ),
+            )
         return val
     if default is None:
         raise RuntimeError('Parameter {} not found'.format(param))
     return default
 
 
-def set_param(group: 'ParamGrp',
-              param: str,
-              value: Any,
-              ) -> None:
+def set_param(
+    group: 'ParamGrp',
+    param: str,
+    value: Any,
+) -> None:
     """Return a parameter with type checking and default."""
     fun_map = {
             int: 'SetInt',
             float: 'SetFloat',
             bool: 'SetBool',
             str: 'SetString',
-            }
+    }
 
     if type(value) not in fun_map:
         raise ValueError('Unkown type')
@@ -111,7 +118,8 @@ def get_valid_property_name(text: str) -> str:
 
 def label_or(
         obj: DO,
-        alternative: str = 'no label') -> str:
+        alternative: str = 'no label',
+) -> str:
     """Return the `Label` or the alternative."""
     if not hasattr(obj, 'Label'):
         return 'not_a_FreeCAD_object'
@@ -122,8 +130,10 @@ def message(text: str, gui: bool = False) -> None:
     """Inform the user."""
     fc.Console.PrintMessage(text + '\n')
     if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(QtGui.QMessageBox.Information,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+        diag = QtGui.QMessageBox(
+            QtGui.QMessageBox.Information,
+            wb_constants.WORKBENCH_NAME, text,
+        )
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -132,8 +142,10 @@ def warn(text: str, gui: bool = False) -> None:
     """Warn the user."""
     fc.Console.PrintWarning(text + '\n')
     if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(QtGui.QMessageBox.Warning,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+        diag = QtGui.QMessageBox(
+            QtGui.QMessageBox.Warning,
+            wb_constants.WORKBENCH_NAME, text,
+        )
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -142,8 +154,10 @@ def error(text: str, gui: bool = False) -> None:
     """Log an error to the user."""
     fc.Console.PrintError(text + '\n')
     if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(QtGui.QMessageBox.Critical,
-                                 'CROSS - FreeCAD ROS Workbench', text)
+        diag = QtGui.QMessageBox(
+            QtGui.QMessageBox.Critical,
+            wb_constants.WORKBENCH_NAME, text,
+        )
         diag.setWindowModality(QtCore.Qt.ApplicationModal)
         diag.exec_()
 
@@ -179,7 +193,7 @@ def strip_subelement(sub_fullpath: str) -> str:
 def get_subobject_by_name(
         object_: DO,
         subobject_name: str,
-        ) -> Optional[DO]:
+) -> Optional[DO]:
     """Return the appropriate object from object_.OutListRecursive."""
     for o in object_.OutListRecursive:
         if o.Name == subobject_name:
@@ -189,7 +203,7 @@ def get_subobject_by_name(
 def get_subobjects_by_full_name(
         root_object: DO,
         subobject_fullpath: str,
-        ) -> DOList:
+) -> DOList:
     """Return the list of objects after root_object to the named object.
 
     The last part of ``subobject_fullpath`` is then a specific vertex, edge or
@@ -231,7 +245,7 @@ def add_property(
         category: str,
         help_: str,
         default: Any = None,
-        ) -> tuple[DO, str]:
+) -> tuple[DO, str]:
     """Add a dynamic property to the object.
 
     Return the `App::FeaturePython` object containing the property and the
@@ -251,7 +265,7 @@ def add_property(
 def get_properties_of_category(
         obj: DO,
         category: str,
-        ) -> list[str]:
+) -> list[str]:
     """Return the list of properties belonging to the category."""
     properties: list[str] = []
     try:
@@ -277,10 +291,14 @@ def has_type(obj: DO, typeid: str) -> bool:
     is the given type.
 
     """
-    return (is_derived_from(obj, typeid)
-            or (hasattr(obj, 'Proxy')
-                and hasattr(obj.Proxy, 'Type')
-                and obj.Proxy.Type == typeid))
+    return (
+        is_derived_from(obj, typeid)
+        or (
+            hasattr(obj, 'Proxy')
+            and hasattr(obj.Proxy, 'Type')
+            and obj.Proxy.Type == typeid
+        )
+    )
 
 
 def is_body(obj: DO) -> bool:
@@ -377,25 +395,30 @@ def is_lcs(obj: DO) -> bool:
 
 def has_placement(obj: DO) -> bool:
     """Return True if obj has a Placement."""
-    return (hasattr(obj, 'Placement')
-            and isinstance(obj.Placement, fc.Placement))
+    return (
+        hasattr(obj, 'Placement')
+        and isinstance(obj.Placement, fc.Placement)
+    )
 
 
 def is_same_placement(
         p1: fc.Placement,
         p2: fc.Placement,
         trans_tol: float = 1e-6,
-        rot_tol: float = 1e-7) -> bool:
+        rot_tol: float = 1e-7,
+) -> bool:
     """Return True if both placements represent the same transform."""
-    return (p2.Base.isEqual(p1.Base, trans_tol)
-            and p2.Rotation.isSame(p1.Rotation, rot_tol))
+    return (
+        p2.Base.isEqual(p1.Base, trans_tol)
+        and p2.Rotation.isSame(p1.Rotation, rot_tol)
+    )
 
 
 def make_group(
         doc_or_group: [fc.Document | DO],
         name: str,
         visible: bool = True,
-        ) -> DO:
+) -> DO:
     """Create or retrieve a group."""
     if is_group(doc_or_group):
         doc = doc_or_group.Document
@@ -418,7 +441,7 @@ def add_object(
         container: [fc.Document | DO],
         type_: str,
         name: str,
-        ) -> DO:
+) -> DO:
     """Create a new object into the container.
 
     The object's label will be set `name` but, according to your settings in
@@ -457,7 +480,7 @@ def get_leafs_and_subnames(obj: DO) -> list[tuple[DO, str]]:
     def get_subobjects_recursive(
             obj: DO,
             subname: str,
-            ) -> list[tuple[DO, str]]:
+    ) -> list[tuple[DO, str]]:
         if (not hasattr(obj, 'getSubObjects')) or (not obj.getSubObjects()):
             # A leaf node.
             return [(obj, subname)]
@@ -476,7 +499,7 @@ def validate_types(
         objects: DOList,
         types: list[str],
         respect_order: [bool | list[bool]] = False,
-        ) -> DOList:
+) -> DOList:
     """Sort objects by required types.
 
     Return a list of objects sorted by the order in `types`.
@@ -493,11 +516,15 @@ def validate_types(
     if isinstance(respect_order, bool):
         respect_order = [respect_order] * len(types)
     if len(respect_order) != len(types):
-        raise RuntimeError('`respect_order` must be a boolean or a'
-                           ' list of booleans with the same length as `types`')
+        raise RuntimeError(
+            '`respect_order` must be a boolean or a'
+            ' list of booleans with the same length as `types`',
+        )
     if not true_then_false(respect_order):
-        raise RuntimeError('`respect_order` must be a list of booleans with no'
-                           ' False after a True')
+        raise RuntimeError(
+            '`respect_order` must be a list of booleans with no'
+            ' False after a True',
+        )
 
     copy_of_objects = copy(objects)
     copy_of_types = copy(types)
@@ -528,15 +555,21 @@ def validate_types(
                 continue
         if not object_found:
             raise RuntimeError(f'No object of type "{type_}"')
-        if (exact_position
-                and (i_in_types != i_in_objects)
-                and (not any_type)):
+        if (
+            exact_position
+            and (i_in_types != i_in_objects)
+            and (not any_type)
+        ):
             if hasattr(o, 'TypeId'):
-                raise RuntimeError(f'Object at position {i_in_objects + 1} is not'
-                                   f' of type "{type_}" but of type "{o.TypeId}"')
+                raise RuntimeError(
+                    f'Object at position {i_in_objects + 1} is not'
+                    f' of type "{type_}" but of type "{o.TypeId}"',
+                )
             else:
-                raise RuntimeError(f'Object at position {i_in_objects + 1} is not'
-                                   f' of type "{type_}"')
+                raise RuntimeError(
+                    f'Object at position {i_in_objects + 1} is not'
+                    f' of type "{type_}"',
+                )
     outlist: DOList = []
     for i in range(len(types)):
         if i in indexes_of_any:
@@ -608,12 +641,34 @@ class ProxyBase(ABC):
                 return False
         return True
 
+    def update_prop(self, prop: str, value: Any, tolerance=1e-6, debug=False) -> None:
+        """Update a property of the object if needed."""
+        if not hasattr(self, '_object_name'):
+            if debug:
+                warn('Attribute "_object_name" not found in `self`')
+            return
+        try:
+            obj = getattr(self, self._object_name)
+        except AttributeError:
+            if debug:
+                warn(f'Attribute "{self._object_name}" not found in `self`')
+            return
+        if not hasattr(obj, prop):
+            if debug:
+                warn(f'Attribute "{prop}" not found in "self.{self._object_name}"')
+            return
+        old_value = getattr(obj, prop)
+        if old_value != value:
+            if debug:
+                message(f'{obj.Name}.{prop} = {value:.15f} was {old_value:.15f} ({obj.Label})')
+            setattr(obj, prop, value)
+
 
 def convert_units(
         value: float,
         from_: str,
         to_: str,
-        ) -> float:
+) -> float:
     """Convert a value from one unit to another.
 
     >>> convert_units(1, 'm', 'mm')
@@ -629,7 +684,7 @@ def convert_units(
 def quantity_as(
         q: fc.Units.Quantity,
         to_: str,
-        ) -> float:
+) -> float:
     """Convert a quantity to another unit.
 
     >>> convert_quantity(fc.Units.Quantity('1 m'), 'mm')
@@ -645,7 +700,7 @@ def quantity_as(
 
 def unit_type(
         v: [str | fc.Units.Quantity],
-        ) -> str:
+) -> str:
     """Return the unit type of a value.
 
     return fc.Units.Quantity(v).Unit.Type, e.g. Length, Angle, etc.
@@ -674,7 +729,7 @@ class Material:
 
 def material_from_material_editor(
         card_path: str,
-        ) -> Material:
+) -> Material:
     """Return the material data from the Material Editor
 
     Return the material data from the Material Editor
@@ -687,7 +742,8 @@ def material_from_material_editor(
     try:
         material.material_name = material_editor.cards[material_editor.card_path]
         material.density = fc.Units.Quantity(
-                material_editor.materials[material_editor.card_path]['Density'])
+                material_editor.materials[material_editor.card_path]['Density'],
+        )
     except (KeyError, AttributeError):
         material.material_name = None
         material.density = None
@@ -696,7 +752,7 @@ def material_from_material_editor(
 
 def matrix_of_inertia(
         obj: Optional[fc.DocumentObject],
-        ) -> Optional[fc.Matrix]:
+) -> Optional[fc.Matrix]:
     """Return the matrix of inertia of the given object assuming a density of 1."""
     try:
         return obj.Shape.MatrixOfInertia
@@ -712,7 +768,8 @@ def matrix_of_inertia(
 def correct_matrix_of_inertia(
         matrix_of_inertia: fc.Matrix,
         volume_mm3: float,
-        mass: float) -> fc.Matrix:
+        mass: float,
+) -> fc.Matrix:
     # convert matrix of inertia considering mass
 
     # Looks freecad uses mass = volume and therefore default density is 1
@@ -728,7 +785,7 @@ def correct_matrix_of_inertia(
 
 def volume_mm3(
         obj: Optional[fc.DocumentObject],
-        ) -> Optional[float]:
+) -> Optional[float]:
     """Return the volume of the given object in mm³."""
     try:
         return obj.Shape.Volume
@@ -743,7 +800,7 @@ def volume_mm3(
 
 def center_of_gravity_mm(
         obj: Optional[fc.DocumentObject],
-        ) -> Optional[fc.Vector]:
+) -> Optional[fc.Vector]:
     """Return the center of gravity (aka center of mass) of the object in mm."""
     try:
         return obj.Shape.CenterOfGravity

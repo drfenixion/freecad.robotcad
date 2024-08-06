@@ -18,14 +18,15 @@ from ..wb_utils import is_robot_selected
 class _CalculateMassAndInertiaCommand:
     def GetResources(self) -> dict:
         return {'Pixmap': 'calculate_mass_and_inertia.svg',
-                'MenuText': tr('Calculate mass and inertia'),
+                'MenuText': tr('Calculate: mass, inertia, center of mass, placement of joints relative to total CoM'),
                 'ToolTip': tr('Select robot and press this button.'
-                              ' It will calculate mass and inertia based on'
-                              ' density and fills links data. If link does not'
+                              ' It will calculate mass, inertia, center of mass, placement of joints relative to total CoM'
+                              ' based on density (from material) and fills links data. If link does not'
                               ' have material, default material will be taken'
                               ' from robot element. Link will skipped if'
                               ' property of link - "MaterialNotCalculate" is'
-                              ' true. You can visually check inertia placement'
+                              ' true (in that case you sould manually fill link inertia and mass).'
+                              ' You can visually check inertia placement'
                               ' in Gazebo. Turn on display of inertia in Gazebo'
                               ' and check what generated inertia blocks'
                               ' approximately same size and same'
@@ -58,8 +59,7 @@ class _CalculateMassAndInertiaCommand:
             elem_with_volume = first_object_with_volume(real)
 
             if not elem_with_volume:
-                error(f'Link "{link.Label}" does not link to any child with volume.',
-                      gui=True)
+                error(f'Link "{link.Label}" does not link to any child with volume.', gui=True)
                 continue
 
             center_of_gravity = center_of_gravity_mm(elem_with_volume)
@@ -68,14 +68,18 @@ class _CalculateMassAndInertiaCommand:
             elem_material = material_from_material_editor(link.MaterialCardPath)
 
             if (elem_material.material_name is None) and (default_material.material_name is None):
-                error(f'Link "{link.Label}" skipped.'
-                      ' No material specified for Link and no default material specified for robot element.', gui=True)
+                error(
+                    f'Link "{link.Label}" skipped.'
+                    ' No material specified for Link and no default material specified for robot element.', gui=True,
+                )
                 continue
 
             if center_of_gravity is None:
-                error(f'Link "{link.Label}" skipped.'
-                      ' Can not get CenterOfGravity of bound Real element.',
-                      gui=True)
+                error(
+                    f'Link "{link.Label}" skipped.'
+                    ' Can not get CenterOfGravity of bound Real element.',
+                    gui=True,
+                )
                 continue
 
             if elem_matrix_of_inertia is None:
@@ -90,13 +94,12 @@ class _CalculateMassAndInertiaCommand:
 
             if ((material.density is None)
                     or (material.density.Value <= 0.0)):
-                error(f'Link "{link.Label}" skipped.'
-                      ' Material density not strictly positive.',
-                      gui=True)
+                error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
                 continue
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
             link.Mass = quantity_as(volume * material.density, 'kg')
+            
             # TODO: have matrix_of_inertia return a specified unit without correction
             elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)
 
@@ -112,6 +115,39 @@ class _CalculateMassAndInertiaCommand:
             link.Iyy = elem_matrix_of_inertia.A22
             link.Iyz = elem_matrix_of_inertia.A23
             link.Izz = elem_matrix_of_inertia.A33
+
+            linkParentLCSPlacement = link.Placement * link.MountedPlacement.inverse() # global coords of link parent LCS
+            link.CenterOfMassGlobalCoords = linkParentLCSPlacement * link.CenterOfMass # global coords of link CenterOfMass
+
+        # calculate total mass of robot
+        massTotal = 0
+        allMassesFilled = True
+        for link in robot.Proxy.get_links():
+            if float(link.Mass) > 0:
+                massTotal += float(link.Mass)
+            else:
+                allMassesFilled = False
+
+        if allMassesFilled:
+            robot.Mass = massTotal
+        else:
+            robot.Mass = 0
+
+        # calculate robot.CenterOfMassGlobalCoords, joint.PlacementRelTotalCenterOfMass
+        if robot.Mass > 0:
+            CoMTotal = fc.Vector()
+            for link in robot.Proxy.get_links():
+                CoMTotal += 1 / robot.Mass.Value * link.Mass.Value * link.CenterOfMassGlobalCoords.Base
+
+            robot.CenterOfMassGlobalCoords = fc.Placement(
+                CoMTotal, 
+                fc.Rotation(),
+                fc.Vector()
+                )   
+            
+            for joint in robot.Proxy.get_joints():
+                joint.PlacementRelTotalCenterOfMass = robot.CenterOfMassGlobalCoords.inverse() * joint.Placement
+
 
         print('Finished calculating mass and inertia.')
         doc.recompute()

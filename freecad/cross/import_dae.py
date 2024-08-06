@@ -79,9 +79,11 @@ def triangulate(shape):
     elif mesher == 1:
         return MeshPart.meshFromShape(Shape=shape,MaxLength=tessellation).Topology
     else:
-        return MeshPart.meshFromShape(Shape=shape,GrowthRate=grading,SegPerEdge=segsperedge,
-               SegPerRadius=segsperradius,SecondOrder=secondorder,Optimize=optimize,
-               AllowQuad=allowquads).Topology
+        return MeshPart.meshFromShape(
+            Shape=shape,GrowthRate=grading,SegPerEdge=segsperedge,
+            SegPerRadius=segsperradius,SecondOrder=secondorder,Optimize=optimize,
+            AllowQuad=allowquads,
+        ).Topology
 
 
 def open(filename):
@@ -136,7 +138,7 @@ def read(filename):
         return
 
     global col
-    col = collada.Collada(filename, ignore=[collada.DaeUnsupportedError])
+    col = collada.Collada(filename, ignore=[collada.common.DaeUnsupportedError])
     # Read the unitmeter info from dae file and compute unit to convert to mm
     unitmeter = col.assetInfo.unitmeter or 1
     unit = unitmeter / 0.001
@@ -223,8 +225,10 @@ def export(exportList,filename,tessellation=1,colors=None):
     defaultmat = None
     objind = 0
     scenenodes = []
-    objectslist = Draft.get_group_contents(exportList, walls=True,
-                                           addgroups=True)
+    objectslist = Draft.get_group_contents(
+        exportList, walls=True,
+        addgroups=True,
+    )
     objectslist = Arch.pruneIncluded(objectslist)
     for obj in objectslist:
         findex = numpy.array([])

@@ -1,17 +1,46 @@
-# CROSS - CAD and ROS, Open-Source Synergy
+# RobotCAD also known as FreeCAD OVERCROSS
 
-CROSS is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS].
+RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2].
 
-# This fork named - OVERCROSS - inludes all of CROSS and new features such as:
-1. Material selection of link or whole robot
-1. Auto calculation of mass and inertia
-1. Launcher for Gazebo
-1. New some icons and icons reordering
-1. Bug fixes
-1. Others
-2. More [docs](https://github.com/drfenixion/freecad.overcross/wiki) 
+# Key features short list:
+1. Autoinstall and run by startup script
+1. Modeling parts (in FreeCAD),
+1. Creating robot structure (joints, links, elements of link (collisions, visuals, reals), etc),
+1. Сonvenient new tools to set placement of joints and links (intuitive way)
+1. Material setting (from library or custom) to link or whole robot
+1. Auto calculation (based on material):
+  1. mass and inertia
+  1. center of mass (in global and local coordinates)
+  1. positions of joints relative to the robot's center of mass
+1. Basic code generator:
+  1. ROS2 package with launchers for Gazebo, RViz
+  1. URDF
+  1. Meshes
+1. Tool for use external extended code generating service
+  1. External code generator (you dont need to install ROS2 or Gazebo, this is itself-packaged environment one command to run):
+    1. all of basic generator
+    1. Project structure
+    1. Startup script for build and run docker container with all dependencies of project
+    1. Init Git with submodules for dependencies management
+    1. Docker related code (dockerfiles, etc)
+    1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
+    1. Nvidia video cards container support
+    1. README instruction how to use
+1. all features from CROSS workbench
 
-Tools of FreeCAD OVERCROSS
+# Fast install and run
+If you have docker (buildx, compose plugins) installed just do
+```
+git clone https://github.com/drfenixion/freecad.overcross.git
+cd freecad.overcross/docker
+bash run.bash
+```
+If docker is not installed look at docker/README.md. There is also additional information on how to use the startup script.
+
+You also can install RobotCAD manually (long way) by [Installation](#Installation) section
+
+# Overview
+Tools of RobotCAD (FreeCAD OVERCROSS)
 
 ![Tools of FreeCAD OVERCROSS](https://github.com/drfenixion/freecad.cross/assets/13005708/d3d44e65-a9cc-45cc-937a-be5008b98608)
 
@@ -35,32 +64,32 @@ Generated collisions in Gazebo
 
 ![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c43a8d29-fe17-4268-b0dc-76f943c4b0b5)
 
+## Description
 
-
-CROSS is a powerful ROS workbench for [FreeCAD](https://www.freecad.org/), a popular open-source 3D parametric modelling software.
+RobotCAD is a powerful ROS workbench for [FreeCAD](https://www.freecad.org/), a popular open-source 3D parametric modelling software.
 As the field of robotics continues to evolve rapidly, the need for comprehensive and efficient tools for robot development and simulation has become increasingly essential.
-CROSS emerges as a versatile solution, empowering engineers, researchers, and hobbyists to leverage the capabilities of both ROS and FreeCAD in a cohesive environment.
-At the time of writing (June 2023), CROSS is the only available open-source solution to generate robot description files for ROS with a graphical user interface with direct visual feedback.
+RobotCAD emerges as a versatile solution, empowering engineers, researchers, and hobbyists to leverage the capabilities of both ROS and FreeCAD in a cohesive environment.
+At the time of writing (June 2023), RobotCAD is the only available open-source solution to generate robot description files for ROS with a graphical user interface with direct visual feedback.
 
-With CROSS, users gain the ability to combine the flexibility of FreeCAD's 3D modeling capabilities with the extensive functionality of ROS, allowing for seamless collaboration between mechanical design and robotics development.
-    By bridging the gap between these two powerful platforms, CROSS streamlines the process of designing, and visualizing robotic systems, ultimately accelerating the development cycle.
+With RobotCAD, users gain the ability to combine the flexibility of FreeCAD's 3D modeling capabilities with the extensive functionality of ROS, allowing for seamless collaboration between mechanical design and robotics development.
+    By bridging the gap between these two powerful platforms, RobotCAD streamlines the process of designing, and visualizing robotic systems, ultimately accelerating the development cycle.
 
-The key features of CROSS are:
+The key features of RobotCAD are:
 
-* ROS Integration: CROSS offers native integration with ROS, an open-source framework widely adopted in the robotics community.
+* ROS Integration: RobotCAD offers native integration with ROS, an open-source framework widely adopted in the robotics community.
         This integration enables users to leverage the vast ecosystem of ROS packages, libraries, and tools while working within the familiar FreeCAD environment.
 * 3D Modelling and Simulation: FreeCAD's 3D modelling capabilities empower users to design intricate mechanical components and complete robot systems.
-        With CROSS, these designs can be seamlessly integrated with ROS simulations, allowing for realistic and accurate testing of robot behaviors and interactions.
-* Visualization and Analysis: CROSS provides advanced visualization and analysis tools provided by FreeCAD itself, enabling users to inspect, analyze, and validate their robot designs.
-* Collaborative Development: CROSS supports collaborative development by facilitating the sharing of robot models through the use of complex macro written in the Python language where a full robot can be generated by code.
+        With RobotCAD, these designs can be seamlessly integrated with ROS simulations, allowing for realistic and accurate testing of robot behaviors and interactions.
+* Visualization and Analysis: RobotCAD provides advanced visualization and analysis tools provided by FreeCAD itself, enabling users to inspect, analyze, and validate their robot designs.
+* Collaborative Development: RobotCAD supports collaborative development by facilitating the sharing of robot models through the use of complex macro written in the Python language where a full robot can be generated by code.
         This encourages teamwork, knowledge sharing, and accelerates the pace of innovation within the robotics community.
-* Extensibility: As an open-source project, CROSS encourages contributions from the community, allowing users to extend its functionality and adapt it to their specific needs.
-        By leveraging the collective expertise of the ROS and FreeCAD communities, CROSS continues to evolve and provide cutting-edge features for robot development.
+* Extensibility: As an open-source project, RobotCAD encourages contributions from the community, allowing users to extend its functionality and adapt it to their specific needs.
+        By leveraging the collective expertise of the ROS and FreeCAD communities, RobotCAD continues to evolve and provide cutting-edge features for robot development.
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2 (use the tag `fc_v0.21.1` for earlier FreeCAD versions).
-Compatible with ROS2 (for now).
+Compatible with FreeCAD at least v0.21.2.
+Compatible with ROS2.
 
 ## Features
 
@@ -75,7 +104,7 @@ Compatible with ROS2 (for now).
 - Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
 - Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
-## Installation
+## Installation 
 
 You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
@@ -89,11 +118,16 @@ You need a recent version of FreeCAD v0.21.2 with the ability to configure custo
 
 ## Launching FreeCAD with ROS
 
-The CROSS workbench is supposed to load also without ROS, with limited functionality.
+The RobotCAD workbench is supposed to load also without ROS, with limited functionality.
 If this is not the case, please report.
 
 You will probably want to be able to use ROS-related functionalities and this requires launching FreeCAD from the command line:
 
+- Install all RobotCAD dependencies by install RobotCAD dependency meta package
+- `cd docker/row2_ws/ && rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO}`
+- `. /install/setup.bash`
+
+(Optional) You can also set extra Python modules
 - Open a terminal
 - Source your ROS workspace
 - Launch FreeCAD with extra Python modules set by ROS, `freecad --module-path ${PYTHONPATH//:/' --module-path '}` (replace `freecad` by your FreeCAD executable). This bash magic will add for example ` --module-path path1 --module-path path2 ` if `$PYTHONPATH` is `path1:path2`.
@@ -102,12 +136,12 @@ You will probably want to be able to use ROS-related functionalities and this re
 
 If you want to work on this workbench you have the following options:
 
-- Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/galou/freecad.cross.git` on Linux
-- Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.cross`)
-- Clone this repository and create a symbolic link to the directory `freecad.cross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
+- Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.overcross.git` on Linux
+- Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.overcross`)
+- Clone this repository and create a symbolic link to the directory `freecad.overcross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
 - `pip install -e .` adds the root-directory to `easy_install.path`.
 
 
 --------------------------------------------------------------------------------
 
-[ROS]: https://www.ros.org/
+[ROS2]: https://www.ros.org/

@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
 
-  <name>CROSS</name>
-  <description>CAD and ROS, Open-Source Synergy. Workbench to create or visualize robot description files (URDF and xacro) from FreeCAD.</description>
-  <version>0.4.0</version>
-  <date>2024-04-16</date>
-  <maintainer email="galou_breizh@yahoo.fr">Gaël Écorchard</maintainer>
+  <name>RobotCAD</name>
+  <description>RobotCAD (FreeCAD OVERCROSS) is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System.</description>
+  <version>2.0.0</version>
+  <date>2024-08-06</date>
+  <maintainer email="it.project.devel@gmail.com">Vasily S</maintainer>
   <license file="LICENSE">LGPL-2.1-or-later</license>
-  <url type="repository" branch="main">https://github.com/galou/freecad.cross.git</url>
-  <url type="readme">https://github.com/galou/freecad.cross/blob/main/README.md</url>
-  <icon>resources/icons/cross.svg</icon>
+  <url type="repository" branch="main">https://github.com/drfenixion/freecad.overcross</url>
+  <url type="readme">https://github.com/drfenixion/freecad.overcross/blob/main/README.md</url>
+  <icon>resources/icons/robotcad_overcross_joint.svg</icon>
 
   <freecadmin>0.21.2</freecadmin>
 
