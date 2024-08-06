@@ -6,28 +6,27 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 1. Autoinstall and run by startup script
 1. Modeling parts (in FreeCAD),
 1. Creating robot structure (joints, links, elements of link (collisions, visuals, reals), etc),
-1. Сonvenient new tools to set placement of joints and links
+1. Сonvenient new tools to set placement of joints and links (intuitive way)
 1. Material setting (from library or custom) to link or whole robot
-1. Auto calculation:
+1. Auto calculation (based on material):
   1. mass and inertia
   1. center of mass (in global and local coordinates)
   1. positions of joints relative to the robot's center of mass
-1. all features from CROSS
 1. Basic code generator:
-  1. ROS2 package with Launchers for Gazebo, RViz
+  1. ROS2 package with launchers for Gazebo, RViz
   1. URDF
   1. Meshes
 1. Tool for use external extended code generating service
-  1. External code generator:
+  1. External code generator (you dont need to install ROS2 or Gazebo, this is itself-packaged environment one command to run):
     1. all of basic generator
     1. Project structure
     1. Startup script for build and run docker container with all dependencies of project
     1. Init Git with submodules for dependencies management
-    1. Docker related code
+    1. Docker related code (dockerfiles, etc)
     1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
     1. Nvidia video cards container support
     1. README instruction how to use
-1. Others
+1. all features from CROSS workbench
 
 
 # Fast install and run
@@ -66,7 +65,7 @@ Generated collisions in Gazebo
 
 ![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c43a8d29-fe17-4268-b0dc-76f943c4b0b5)
 
-
+## Description
 
 RobotCAD is a powerful ROS workbench for [FreeCAD](https://www.freecad.org/), a popular open-source 3D parametric modelling software.
 As the field of robotics continues to evolve rapidly, the need for comprehensive and efficient tools for robot development and simulation has become increasingly essential.
