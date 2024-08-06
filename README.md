@@ -9,23 +9,23 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
 1. Material setting (from library or custom) to link or whole robot
 1. Auto calculation (based on material):
-  1. mass and inertia
-  1. center of mass (in global and local coordinates)
-  1. positions of joints relative to the robot's center of mass
+    1. mass and inertia
+    1. center of mass (in global and local coordinates)
+    1. positions of joints relative to the robot's center of mass
 1. Basic code generator:
-  1. ROS2 package with launchers for Gazebo, RViz
-  1. URDF
-  1. Meshes
+    1. ROS2 package with launchers for Gazebo, RViz
+    1. URDF
+    1. Meshes
 1. Tool for use external extended code generating service
-  1. External code generator (you dont need to install ROS2 or Gazebo, this is itself-packaged environment one command to run):
-    1. all of basic generator
-    1. Project structure
-    1. Startup script for build and run docker container with all dependencies of project
-    1. Init Git with submodules for dependencies management
-    1. Docker related code (dockerfiles, etc)
-    1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
-    1. Nvidia video cards container support
-    1. README instruction how to use
+    1. External code generator (you dont need to install ROS2 or Gazebo, this is itself-packaged environment one command to run):
+        1. all of basic generator
+        1. Project structure
+        1. Startup script for build and run docker container with all dependencies of project
+        1. Init Git with submodules for dependencies management
+        1. Docker related code (dockerfiles, etc)
+        1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
+        1. Nvidia video cards container support
+        1. README instruction how to use
 1. all features from CROSS workbench
 
 # Fast install and run
