@@ -122,7 +122,8 @@ If this is not the case, please report.
 You will probably want to be able to use ROS-related functionalities and this requires launching FreeCAD from the command line:
 
 - Install all RobotCAD dependencies by install RobotCAD dependency meta package
-- `cd docker/ros2_ws/ && rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO}`
+- `sudo apt-get update`
+- `cd docker/ros2_ws/ && rosdep update && rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO}`
 - `. /install/setup.bash`
 
 (Optional) You can also set extra Python modules
