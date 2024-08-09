@@ -811,3 +811,14 @@ def center_of_gravity_mm(
     except (AttributeError, IndexError, RuntimeError):
         pass
     return None
+
+
+def lcs_attachmentsupport_name():
+    """Return LCS AttachmentSupport method name dependent of FreeCAD version."""
+    fc_version_info = fc.Version()
+    fc_version_info[1]
+    fc_version_info[2]
+    if(int(fc_version_info[1]) < 22 and int(fc_version_info[0]) == 0):
+        return 'Support'
+    else:
+        return 'AttachmentSupport'

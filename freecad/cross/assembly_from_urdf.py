@@ -36,6 +36,7 @@ from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import make_group
 from .freecad_utils import get_valid_property_name
+from .freecad_utils import lcs_attachmentsupport_name
 
 # Typing hints.
 DO = fc.DocumentObject
@@ -147,7 +148,7 @@ def _make_assembly_container(
 
     # Add an LCS at the root of the Model, and attach it to the 'Origin'.
     lcs = assembly.newObject('PartDesign::CoordinateSystem', 'LCS_Origin')
-    lcs.AttachmentSupport = [(assembly.Origin.OriginFeatures[0], '')]  # The X axis.
+    setattr(lcs, lcs_attachmentsupport_name(), [(assembly.Origin.OriginFeatures[0], '')])   # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     # Create an object Variables to hold variables to be used in this document.
@@ -205,7 +206,7 @@ def _make_part(
     part = doc.addObject('App::Part', name)
     # Add an LCS at the root of the Part, and attach it to the 'Origin'.
     lcs = part.newObject('PartDesign::CoordinateSystem', 'LCS_0')
-    lcs.AttachmentSupport = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
+    setattr(lcs, lcs_attachmentsupport_name(), [(part.Origin.OriginFeatures[0], '')]) # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     return part, lcs
@@ -288,7 +289,7 @@ def _add_lcs(
         'PartDesign::CoordinateSystem',
         _lcs_name(joint_name, part_is_parent),
     )
-    lcs.AttachmentSupport = [(part.Origin.OriginFeatures[0], '')]  # The X axis.
+    setattr(lcs, lcs_attachmentsupport_name(), [(part.Origin.OriginFeatures[0], '')]) # The X axis.
     lcs.MapMode = 'ObjectXY'
     lcs.MapReversed = False
     return lcs
