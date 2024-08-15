@@ -6,12 +6,16 @@ import os
 from pathlib import Path
 
 import FreeCADGui as fcgui
+import FreeCAD as fc
 
 from PySide import QtGui  # FreeCAD's PySide!
 
 from .freecad_utils import warn
+from .freecadgui_utils import createBoundBox
+from .gui_utils import tr
 from .wb_utils import UI_PATH
 from .wb_utils import get_workbench_param
+from .wb_utils import is_link, is_joint, is_robot
 from . import wb_globals
 
 
@@ -67,6 +71,70 @@ def guess_vhacd_path() -> Path:
             if path.exists():
                 return path
     return Path()
+
+
+def createBoundObjects(createBoundFunc = createBoundBox):
+    """Crete bounding object(s) based on creation function parameter.
+    
+    If you selected a link, an object based on Real element will be created.
+
+    """
+    selEx = fcgui.Selection.getSelectionEx()
+    objs  = [selobj.Object for selobj in selEx]
+    doc = fc.activeDocument()
+    
+    if len(objs) >= 1:
+        doc.openTransaction(tr(createBoundFunc.__name__ + 'from bounding box'))
+
+        for obj in objs:
+            if is_joint(obj) or is_robot(obj):
+                continue
+
+            robotLink = False
+            if is_link(obj):
+                if obj.Real:
+                    robotLink = obj
+                    # get deepest linked object
+                    obj = obj.Real[0].getLinkedObject(True)
+                else:
+                    fc.Console.PrintWarning("Can`t create collision for link: " + obj.Label + ". Add Real element to link firstly !"+"\n")
+                    continue
+
+            obj_placement_old = obj.Placement
+            obj.Placement = fc.Placement()
+            # create bound object with zero placement
+            bound = createBoundFunc(obj)
+            obj.Placement = obj_placement_old
+
+            boundObj = fc.ActiveDocument.getObject(bound.Name)
+
+            # if link was selected do collision bind
+            if robotLink:
+                if not robotLink.Collision and bound:
+                    robotLinkObj = fc.ActiveDocument.getObject(robotLink.Name)
+
+                    # Makes wrapper with robot link placement because has made bound object in zero placement before
+                    # This wrapper need to move primitive in correct placement
+                    boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj_placement__" + robotLink.Label + '__' + bound.Label)
+                    boundObjWrapper.Group = [boundObj]
+                    boundObjWrapper.Placement = robotLinkObj.Placement
+
+
+                    robotLinkObj.Collision = boundObjWrapper
+                    # refresh collision link
+                    fcgui.ActiveDocument.getObject(robotLink.Name).ShowCollision = False
+                    fcgui.ActiveDocument.getObject(robotLink.Name).ShowCollision = True
+                    # hide collision source object (will see it on link)
+                    fcgui.ActiveDocument.getObject(boundObjWrapper.Name).hide()
+            else:
+                # Makes wrapper with object placement because has made bound object in zero placement before
+                # This wrapper need to move primitive in correct placement
+                boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj_placement__" + bound.Label)
+                boundObjWrapper.Group = [boundObj]
+                boundObjWrapper.Placement = obj_placement_old
+        doc.commitTransaction()
+    else:
+        fc.Console.PrintMessage("Select an object !"+"\n")
 
 
 class WbSettingsGetter:
