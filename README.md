@@ -44,6 +44,21 @@ You also can install RobotCAD manually (long way) by [Installation](#Installatio
 
 # Overview
 Tools of RobotCAD (FreeCAD OVERCROSS)
+![RobotCAD](https://github.com/user-attachments/assets/7c6a3a0b-35dd-4843-9656-5d7178d3d5e9)
+### Generated code:
+RViz
+![RViz](https://github.com/user-attachments/assets/4e3f28ca-e798-44a5-9f5f-422c4de770e5)
+Gazebo - Basic view
+![basic](https://github.com/user-attachments/assets/52aa2789-8cd1-442c-ad64-ae48f297cca7)
+Gazebo - Joints view
+![joints](https://github.com/user-attachments/assets/8808ea8d-4784-4344-aa85-eaf12ab5917a)
+Gazebo - Collisions view
+![collision](https://github.com/user-attachments/assets/b7cae031-40cc-41c3-8233-4d56ca29d2c1)
+Gazebo - Inertia view
+
+
+# One more robot
+Tools of RobotCAD (FreeCAD OVERCROSS)
 ![Tools of RobotCAD](https://github.com/user-attachments/assets/cde5a1b4-7c75-406c-9a8e-c0815eccfce4)
 
 Choosing of material of robot or link
