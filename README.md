@@ -45,7 +45,7 @@ You also can install RobotCAD manually (long way) by [Installation](#Installatio
 # Overview
 Tools of RobotCAD (FreeCAD OVERCROSS)
 ![RobotCAD](https://github.com/user-attachments/assets/7c6a3a0b-35dd-4843-9656-5d7178d3d5e9)
-### Generated code:
+### Launched RViz and Gazebo using generated code:
 
 RViz
 ![RViz](https://github.com/user-attachments/assets/4e3f28ca-e798-44a5-9f5f-422c4de770e5)
