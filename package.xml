@@ -3,7 +3,7 @@
 
   <name>RobotCAD</name>
   <description>RobotCAD (FreeCAD OVERCROSS) is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System.</description>
-  <version>2.0.0</version>
+  <version>2.1.0</version>
   <date>2024-08-06</date>
   <maintainer email="it.project.devel@gmail.com">Vasily S</maintainer>
   <license file="LICENSE">LGPL-2.1-or-later</license>
