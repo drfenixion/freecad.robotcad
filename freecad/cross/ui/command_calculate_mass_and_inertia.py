@@ -103,10 +103,6 @@ class _CalculateMassAndInertiaCommand:
             # TODO: have matrix_of_inertia return a specified unit without correction
             elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)
 
-            basic_obj = get_linked_obj(real)
-            # Correction if basic obj has not zero placement.
-            # TODO: get the global placement
-            center_of_gravity = center_of_gravity - basic_obj.Placement.Base
             link.CenterOfMass = fc.Placement(link.MountedPlacement * center_of_gravity, link.MountedPlacement.Rotation, fc.Vector())
 
             link.Ixx = elem_matrix_of_inertia.A11
