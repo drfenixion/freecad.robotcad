@@ -373,19 +373,26 @@ def first_object_with_volume(obj: DO) -> Optional[DO]:
     """
     linked_obj = get_linked_obj(obj)  # Deepest linked obj.
 
-    if is_part(linked_obj):
+    return first_object_with_volume_in_deepest_part(linked_obj)
+
+
+def first_object_with_volume_in_deepest_part(obj):
+    if is_part(obj):
         try:
-            for part_member in linked_obj.Group:
-                if volume_mm3(part_member) > 0.0:
+            for part_member in obj.Group:
+                if is_part(part_member):
+                    return first_object_with_volume_in_deepest_part(part_member)
+                elif volume_mm3(part_member) > 0.0:
                     return part_member
         except KeyError:
             # error('Part - ', linked_obj.Label, ' - ', linked_obj.Label, ' - has not solid object')
             pass
 
-    if volume_mm3(linked_obj) > 0.0:
-        return linked_obj
-
+    if volume_mm3(obj) > 0.0:
+        return obj
+    
     return None
+
 
 
 def is_lcs(obj: DO) -> bool:
@@ -788,14 +795,22 @@ def volume_mm3(
 ) -> Optional[float]:
     """Return the volume of the given object in mm³."""
     try:
+        if obj.TypeId == 'PartDesign::CoordinateSystem':
+            return 0
+    except (AttributeError, IndexError, RuntimeError):
+        pass
+
+    try:
         return obj.Shape.Volume
     except (AttributeError, IndexError, RuntimeError):
         pass
+
     try:
         return obj.Shape.Solids[0].Volume
     except (AttributeError, IndexError, RuntimeError):
         pass
-    return None
+
+    return 0
 
 
 def center_of_gravity_mm(
@@ -822,3 +837,16 @@ def lcs_attachmentsupport_name():
         return 'Support'
     else:
         return 'AttachmentSupport'
+    
+
+def adjustedGlobalPlacement(obj, locVector):
+    '''find global placement to make locVector the local origin with the correct orientation'''
+    # Gotten from BoundingBox_Tracing macro
+    try:
+        objectPlacement = obj.Shape.Placement
+        objectGlobalPlacement = obj.getGlobalPlacement()
+        locPlacement = fc.Placement(locVector, fc.Rotation(fc.Vector(1,0,0),0))
+        return objectGlobalPlacement.multiply(objectPlacement.inverse()).multiply(locPlacement)
+    except Exception:
+        locPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
+        return locPlacement
