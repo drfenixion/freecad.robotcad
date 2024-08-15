@@ -48,47 +48,38 @@ Tools of RobotCAD (FreeCAD OVERCROSS)
 ### Generated code:
 
 RViz
-
 ![RViz](https://github.com/user-attachments/assets/4e3f28ca-e798-44a5-9f5f-422c4de770e5)
 
 Gazebo - Basic view
-
 ![basic](https://github.com/user-attachments/assets/52aa2789-8cd1-442c-ad64-ae48f297cca7)
 
 Gazebo - Joints view
-
 ![joints](https://github.com/user-attachments/assets/8808ea8d-4784-4344-aa85-eaf12ab5917a)
 
 Gazebo - Collisions view
-
 ![collision](https://github.com/user-attachments/assets/b7cae031-40cc-41c3-8233-4d56ca29d2c1)
 
 Gazebo - Inertia view
+![inertia](https://github.com/user-attachments/assets/71983ee3-3995-47d2-a8dc-516c6c2b8a48)
 
 
 # One more robot
 Tools of RobotCAD (FreeCAD OVERCROSS)
-
 ![Tools of RobotCAD](https://github.com/user-attachments/assets/cde5a1b4-7c75-406c-9a8e-c0815eccfce4)
 
 Choosing of material of robot or link
-
 ![Choosing of material of robot or link](https://github.com/user-attachments/assets/54593e92-dba6-4280-9510-b77cb2048910)
 
 Generated ROS 2 package
-
 ![Generated ROS 2 package](https://github.com/drfenixion/freecad.overcross/assets/13005708/f366c2d2-af67-46e2-b7ea-8d03821e5646)
 
 Launched Rviz and Gazebo from generated Gazebo launcher
-
 ![Launched Rviz and Gazebo from gazebo launcher](https://github.com/drfenixion/freecad.cross/assets/13005708/9017aec4-70e5-45fa-82ad-6b4646453767)
 
 Generated inertia blocks and centers of mass in Gazebo
-
 ![Generated inertia blocks and centers of mass in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/a46715a0-0dc6-4f6e-b80e-e4c644589477)
 
 Generated collisions in Gazebo
-
 ![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c43a8d29-fe17-4268-b0dc-76f943c4b0b5)
 
 ## Description
