@@ -45,8 +45,6 @@ If docker is not installed look at docker/README.md. There is also additional in
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
 # Overview
-Tools of RobotCAD (FreeCAD OVERCROSS)
-![RobotCAD](https://github.com/user-attachments/assets/7c6a3a0b-35dd-4843-9656-5d7178d3d5e9)
 ### Launched RViz and Gazebo using generated code:
 
 RViz
