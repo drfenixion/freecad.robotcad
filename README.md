@@ -2,6 +2,10 @@
 
 RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2].
 
+
+[![RobotCAD video teaser](https://github.com/user-attachments/assets/f3a1646f-5205-44c9-9167-4e8750541be2)](https://www.youtube.com/watch?v=PGEWqatcUJM "RobotCAD video teaser"){target="_blank"}
+
+
 # Key features short list:
 1. Autoinstall and run by startup script
 1. Modeling parts (in FreeCAD),
