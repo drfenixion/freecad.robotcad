@@ -83,6 +83,10 @@ Generated inertia blocks and centers of mass in Gazebo
 Generated collisions in Gazebo
 ![Generated collisions in Gazebo](https://github.com/drfenixion/freecad.cross/assets/13005708/c43a8d29-fe17-4268-b0dc-76f943c4b0b5)
 
+## Usage
+
+[Common usage plan](https://github.com/drfenixion/freecad.overcross/wiki) 
+
 ## Description
 
 RobotCAD is a powerful ROS workbench for [FreeCAD](https://www.freecad.org/), a popular open-source 3D parametric modelling software.
