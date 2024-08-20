@@ -16,7 +16,7 @@ class _NewPoseCommand:
         }
 
     def IsActive(self):
-        return True
+        return fc.activeDocument() is not None
 
     def Activated(self):
         doc = fc.activeDocument()

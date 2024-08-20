@@ -1,6 +1,15 @@
-# Fusion2URDF
+# FreeCAD add-ins
 
-# Solidworks plugin
+- [RobotCAD](https://github.com/drfenixion/freecad.overcross/), fork of CROSS.
+- [RobotDescriptor](https://github.com/maidenone/RobotDescriptor)
+
+# Fusion add-ins
+
+- [Fusion2URDF](https://github.com/syuntoku14/fusion2urdf)
+- [Fusion2PyBullet](https://github.com/yanshil/Fusion2PyBullet)
+- [ACDC4Robot](https://github.com/bionicdl-sustech/ACDC4Robot)
+
+# Solidworks add-ins
 
 - [ROS-Industrial Conference 2022, 01 Manipulation Workshop](https://www.youtube.com/watch?v=1AGtBWfMwZk)
 - https://github.com/ros/solidworks_urdf_exporter

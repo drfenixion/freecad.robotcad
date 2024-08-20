@@ -13,6 +13,9 @@ import xml.etree.ElementTree as et
 
 import FreeCAD as fc
 
+from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
+from PySide.QtWidgets import QMenu  # FreeCAD's PySide
+
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
 from .freecad_utils import error
@@ -24,6 +27,7 @@ from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .gui_utils import tr
 from .ros.utils import split_package_path
+from .trajectory_proxy import make_trajectory
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
 from .urdf_utils import xml_comment_element
 from .utils import get_valid_filename
@@ -52,6 +56,7 @@ from pathlib import Path
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+from .trajectory import Trajectory as CrossTrajectory  # A Cross::Trajectory, i.e. a DocumentObject with Proxy "Trajectory". # noqa: E501
 BasicElement = Union[CrossJoint, CrossLink]
 DO = fc.DocumentObject
 DOList = List[DO]
@@ -931,6 +936,12 @@ class _ViewProviderRobot(ProxyBase):
             _dispatch_to_link_view_objects(robot, prop, prop)
             # robot.Proxy.execute(robot)
 
+    def setupContextMenu(self, vobj: VPDO, menu: QMenu) -> None:
+        action = menu.addAction("Load trajectories from YAML...")
+        action.triggered.connect(
+                lambda function=self.on_context_menu, argument=vobj: function(argument)
+        )
+
     def doubleClicked(self, vobj: VPDO):
         gui_doc = vobj.Document
         if not gui_doc.getInEdit():
@@ -951,6 +962,37 @@ class _ViewProviderRobot(ProxyBase):
 
     def loads(self, state) -> None:
         pass
+
+    def on_context_menu(self, vobj: VPDO) -> None:
+        import FreeCADGui as fcgui
+        import yaml
+
+        dialog = QFileDialog(
+            fcgui.getMainWindow(),
+            'Select a multi-doc YAML file to import trajectories from',
+        )
+        dialog.setNameFilter('YAML *.yaml;;All files (*.*)')
+        if dialog.exec_():
+            filename = str(dialog.selectedFiles()[0])
+        else:
+            return
+
+        display_trajs = yaml.load_all(
+                open(filename),
+                yaml.CLoader,
+        )
+
+        fcgui.Selection.clearSelection()
+        for display_traj in display_trajs:
+            if not display_traj:
+                continue
+            traj_obj = make_trajectory('Trajectory', vobj.Object.Document)
+            traj_obj.Robot = vobj.Object
+            traj_obj.Proxy.load_display_trajectory_dict(display_traj)
+            fcgui.Selection.addSelection(traj_obj)
+
+        vobj.Object.Document.recompute()
+        fcgui.runCommand('Std_ToggleFreeze', 0)
 
 
 def make_robot(name, doc: Optional[fc.Document] = None) -> CrossRobot:

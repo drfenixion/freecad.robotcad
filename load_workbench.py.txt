@@ -41,6 +41,7 @@ from freecad.cross.robot_from_urdf import *
 from freecad.cross.ros.node import *
 from freecad.cross.ros.planning_scene import *
 from freecad.cross.ros.utils import *
+from freecad.cross.trajectory_proxy import *
 from freecad.cross.urdf_loader import *
 from freecad.cross.urdf_parser_utils import *
 from freecad.cross.urdf_utils import *
