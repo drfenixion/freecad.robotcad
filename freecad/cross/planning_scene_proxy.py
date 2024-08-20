@@ -12,17 +12,15 @@ from pivy import coin
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
 from .freecad_utils import warn
-from  .wb_utils import is_robot
 from .gui_utils import tr
 from .planning_scene_utils import coin_from_planning_scene_msg
 from .wb_utils import ICON_PATH
+from .wb_utils import is_robot
 
 try:
     from moveit_msgs.msg import PlanningSceneMsg
-    imports_ok = True
 except ImportError:
     PlanningSceneMsg = Any
-    imports_ok = False
 
 # Stubs and type hints.
 from .planning_scene import PlanningScene as CrossPlanningScene  # A Cross::PlanningScene, i.e. a DocumentObject with Proxy "PlanningScene". # noqa: E501

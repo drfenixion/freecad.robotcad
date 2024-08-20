@@ -9,6 +9,7 @@ from .ui import command_new_joint
 from .ui import command_new_link
 from .ui import command_new_pose
 from .ui import command_new_robot
+from .ui import command_new_trajectory
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
 from .ui import command_reload # Developer tool.
@@ -57,6 +58,7 @@ class CrossWorkbench(fcgui.Workbench):
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
             'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
             'NewPose',  # Defined in ./ui/command_new_pose.py.
+            'NewTrajectory', # Defined in ./ui/command_new_trajectory.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.

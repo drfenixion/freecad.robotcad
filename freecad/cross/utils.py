@@ -5,11 +5,12 @@
 
 from __future__ import annotations
 
+from itertools import islice
 from itertools import zip_longest
 import os
 from pathlib import Path
 import string
-from typing import Any, Iterable, Optional
+from typing import Any, Generator, Iterable, Optional
 import xml.etree.ElementTree as et
 from xml.dom import minidom
 
@@ -120,6 +121,11 @@ def grouper(iterable, n, fillvalue=None):
     # From https://docs.python.org/3.8/library/itertools.html.
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
+
+
+def i_th_item(generator: Generator, i: int):
+    """Return the i-th item of the generator."""
+    return next(islice(generator, i, None))
 
 
 def get_parent_by_pattern(
