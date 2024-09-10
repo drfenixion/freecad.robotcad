@@ -40,7 +40,7 @@ bash run.bash
 ```
 Tested on Ubuntu 22.04.
 
-If docker is not installed look at docker/README.md. There is also additional information on how to use the startup script.
+If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.overcross/blob/main/docker/README.md). There is also additional information on how to use the startup script.
 
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
