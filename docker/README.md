@@ -13,7 +13,7 @@ sudo usermod -aG docker $USER
 reboot
 ```
 
-# Run FreeCAD with RobotCAD - OVERCROSS
+# Run FreeCAD with RobotCAD
 ```
 bash run.bash
 ```
