@@ -20,8 +20,8 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
     1. URDF
     1. Meshes
 1. Tool for use external extended code generating service (devops, multicopters)
-    1. External code generator (you dont need to install ROS2 or Gazebo, this is itself-packaged environment one command to run):
-        1. all of basic generator
+    1. External code generator (you dont need to manually install ROS2 or Gazebo, this is itself-packaged environment one command to run):
+        1. all of basic code generator
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
