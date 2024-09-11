@@ -41,15 +41,14 @@ class _CalculateMassAndInertiaCommand:
 
         # Implementation note: the command is active only when a robot is selected.
         robot = objs[0]
-
-        default_material = material_from_material_editor(robot.MaterialCardPath)
+        if robot.MaterialCardPath !='':
+            default_material = material_from_material_editor( )
 
         doc.openTransaction(tr('Calculate mass and inertia'))
         for link in robot.Proxy.get_links():
             print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
             
-            if link.MaterialNotCalculate:
-                continue
+            
 
             if not link.Real:
                 error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
@@ -65,14 +64,18 @@ class _CalculateMassAndInertiaCommand:
             center_of_gravity = center_of_gravity_mm(elem_with_volume)
             elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
             elem_volume_mm3 = volume_mm3(elem_with_volume)
-            elem_material = material_from_material_editor(link.MaterialCardPath)
-
-            if (elem_material.material_name is None) and (default_material.material_name is None):
-                error(
-                    f'Link "{link.Label}" skipped.'
-                    ' No material specified for Link and no default material specified for robot element.', gui=True,
-                )
-                continue
+            if link.MaterialCardPath !='':
+                elem_material = material_from_material_editor(link.MaterialCardPath)
+            else:
+                elem_material=None
+                
+            if elem_material is not None:    
+                if (elem_material.material_name is None) and (default_material.material_name is None) :
+                    error(
+                        f'Link "{link.Label}" skipped.'
+                        ' No material specified for Link and no default material specified for robot element.', gui=True,
+                    )
+                    continue
 
             if center_of_gravity is None:
                 error(
@@ -85,20 +88,30 @@ class _CalculateMassAndInertiaCommand:
             if elem_matrix_of_inertia is None:
                 error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
                 continue
+            if elem_material is not None:
+                if elem_material.material_name is None:
+                    material = default_material
+                    warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
+                else:
+                 material = elem_material
 
-            if elem_material.material_name is None:
-                material = default_material
-                warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
+                if ((material.density is None)
+                     or (material.density.Value <= 0.0)):
+                    error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
+                    continue
             else:
-                material = elem_material
-
-            if ((material.density is None)
-                    or (material.density.Value <= 0.0)):
-                error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
-                continue
+                material=None
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
-            link.Mass = quantity_as(volume * material.density, 'kg')
+            if not link.MaterialNotCalculate :
+                if material is not None:
+                    link.Mass = quantity_as(volume * material.density, 'kg')
+                else:
+                    continue
+            else:
+                if link.Mass==0:
+                    error(f'link "{link.Label}: has 0 masss skipping ...')
+                    continue
             
             # TODO: have matrix_of_inertia return a specified unit without correction
             elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)
