@@ -103,7 +103,7 @@ class _CalculateMassAndInertiaCommand:
                 material=None
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
-            if not link.MaterialNotCalculate :
+            if not link.CalculateInertiaBasedOnMass :
                 if material is not None:
                     link.Mass = quantity_as(volume * material.density, 'kg')
                 else:
