@@ -41,15 +41,21 @@ class _CalculateMassAndInertiaCommand:
 
         # Implementation note: the command is active only when a robot is selected.
         robot = objs[0]
-        if robot.MaterialCardPath !='':
-            default_material = material_from_material_editor( )
+       
+        default_material = material_from_material_editor(robot.MaterialCardPath)
 
         doc.openTransaction(tr('Calculate mass and inertia'))
         for link in robot.Proxy.get_links():
             print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
             
+            #both MaterialNotCalculate and CalculateInertiaBasedOnMass cannot be true
+            if link.CalculateInertiaBasedOnMass and link.MaterialNotCalculate:
+                error(f'''MaterialNotCalculate and CalculateMaterialBasedOnMass are both true for "{link.Label}"\n
+                      both cannot be true \n change state of one and try again \n''')
+                continue
+            if  link.MaterialNotCalculate:
+                continue
             
-
             if not link.Real:
                 error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
                 continue
@@ -64,16 +70,15 @@ class _CalculateMassAndInertiaCommand:
             center_of_gravity = center_of_gravity_mm(elem_with_volume)
             elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
             elem_volume_mm3 = volume_mm3(elem_with_volume)
-            if link.MaterialCardPath !='':
-                elem_material = material_from_material_editor(link.MaterialCardPath)
-            else:
-                elem_material=None
-                
-            if elem_material is not None:    
-                if (elem_material.material_name is None) and (default_material.material_name is None) :
+            
+            elem_material = material_from_material_editor(link.MaterialCardPath)
+        
+            #  show and error if material is not specified and inertia calculation based on mass is false
+            if (elem_material.material_name is None) and (default_material.material_name is None) :
+                if not link.CalculateInertiaBasedOnMass:
                     error(
-                        f'Link "{link.Label}" skipped.'
-                        ' No material specified for Link and no default material specified for robot element.', gui=True,
+                    f'Link "{link.Label}" skipped.'
+                    ' No material specified for Link and no default material specified for robot element.', gui=True,
                     )
                     continue
 
@@ -88,7 +93,7 @@ class _CalculateMassAndInertiaCommand:
             if elem_matrix_of_inertia is None:
                 error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
                 continue
-            if elem_material is not None:
+            if not link.CalculateInertiaBasedOnMass:
                 if elem_material.material_name is None:
                     material = default_material
                     warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
@@ -99,15 +104,11 @@ class _CalculateMassAndInertiaCommand:
                      or (material.density.Value <= 0.0)):
                     error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
                     continue
-            else:
-                material=None
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
             if not link.CalculateInertiaBasedOnMass :
-                if material is not None:
-                    link.Mass = quantity_as(volume * material.density, 'kg')
-                else:
-                    continue
+                link.Mass = quantity_as(volume * material.density, 'kg')
+                
             else:
                 if link.Mass==0:
                     error(f'link "{link.Label}: has 0 masss skipping ...')
