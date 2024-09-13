@@ -16,6 +16,7 @@ from .ui import command_reload # Developer tool.
 from .ui import command_robot_from_urdf
 from .ui import command_set_joints
 from .ui import command_set_placement
+from .ui import command_set_placement_fast
 from .ui import command_set_placement_in_absolute_coordinates
 from .ui import command_set_placement_by_orienteer
 from .ui import command_simplify_mesh
@@ -54,6 +55,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
+            'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.

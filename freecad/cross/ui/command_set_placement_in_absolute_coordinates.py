@@ -6,8 +6,11 @@ import FreeCADGui as fcgui
 
 from ..freecad_utils import message
 from ..freecad_utils import validate_types
-from ..freecadgui_utils import get_subobjects_and_placements
+from ..wb_utils import move_placement
+from ..wb_utils import is_joint
+from ..wb_utils import is_link
 from ..gui_utils import tr
+from ..freecad_utils import is_lcs
 
 
 # Stubs and type hints.
@@ -17,51 +20,6 @@ DO = fc.DocumentObject
 CrossLink = Link
 CrossJoint = Joint
 LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
-
-
-def get_placements(
-        orienteer1: DO,
-        orienteer2: DO,
-        ) -> fc.Placement:
-    """Return the transform from `lcs` to `obj`."""
-    resolve_mode_resolve = 0 # 0 - absolute, 1 relative
-    selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
-    objects_placements = get_subobjects_and_placements(selection)
-    objects, placements = zip(*objects_placements)
-    orienteer1_placement = placements[objects.index(orienteer1)]
-    orienteer2_placement = placements[objects.index(orienteer2)]
-
-    return orienteer1_placement, orienteer2_placement
-
-
-def move_local_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO, orienteer2: DO):
-    """Move element (joint or link) local placement (Origin or Mounted placement).
-
-    Move first orienteer to placement of second and second orienteer
-    and element to positions relative their bind system (element and orienteers) before.
-    This move does not change spatial relation between each other.
-    """
-
-    placement1, placement2 = get_placements(orienteer1, orienteer2)
-    
-    # prepare data
-    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
-    doc.recompute() # trigger compute element placement based on zero Origin
-    element_basic_placement = getattr(link_or_joint, 'Placement')
-    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
-    doc.recompute()
-
-    ## prepare data
-    element_local_placement = getattr(link_or_joint, origin_or_mounted_placement_name)
-    origin_placement1_diff = (element_basic_placement * element_local_placement).inverse() * placement1
-    origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
-
-    # do Origin move
-    # first orienteer come to second orienteer place and Origin respectively moved
-    # in local frame every tool click will result Origin move because both orienteers moved and received new position
-    new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
-    setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
 
 
 class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
@@ -76,13 +34,15 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
         return {'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
                 'MenuText': tr('Set placement - as system'),
                 'Accel': 'P, S',
-                'ToolTip': tr('Set the mounted placement of a link or the origin of a joint.\n'
-                              'Select either:\n'
-                              '  a) a CROSS::Link, a local frame LCS (first orienteer), any (second orienteer) \n'
-                              '  b) a CROSS::Joint, a local frame LCS (first orienteer), a LCS (second orienteer).\n'
+                'ToolTip': tr('Set the Mounted Placement of a link or the Origin of a joint.\n'
+                              '\n'
+                              'Select (with Ctlr) either:\n'
+                              '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
+                              '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n'
                               '\n'
                               'This will move first orienteer to position of second orienteer\n'
-                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n',
+                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
+                              'LCS is convenient as orienteers because of configurable orientation.',
                               )}
 
     def IsActive(self):
@@ -96,7 +56,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
         try:
             cross_link, orienteer1, orienteer2 = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Cross::Link', 'PartDesign::CoordinateSystem', 'Any'])
+                ['Cross::Link', 'Any', 'Any'])
             selection_ok = True
             selection_link = True
         except RuntimeError:
@@ -106,7 +66,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             try:
                 cross_joint, orienteer1, orienteer2 = validate_types(
                     fcgui.Selection.getSelection(),
-                    ['Cross::Joint', 'PartDesign::CoordinateSystem', 'PartDesign::CoordinateSystem'])
+                    ['Cross::Joint', 'Any', 'Any'])
                 selection_ok = True
                 selection_joint = True
             except RuntimeError:
@@ -114,18 +74,28 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
 
         if not selection_ok:
             message('Select either\n'
-                    '  a) a CROSS::Link, a local frame LCS (first orienteer), any (second orienteer) \n'
-                    '  b) a CROSS::Joint, a local frame LCS (first orienteer), a LCS (second orienteer).\n',
+                    '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
+                    '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n',
                     gui=True)
             return
+        
+        # for work with subelement
+        sel = fcgui.Selection.getSelectionEx()
+        orienteer1_sub_element = sel[1]
+        orienteer2_sub_element = sel[2]
+
+        if not is_lcs(orienteer1) and not is_joint(orienteer1) and not is_link(orienteer1):
+            orienteer1 = orienteer1_sub_element
+        if not is_lcs(orienteer2) and not is_joint(orienteer2) and not is_link(orienteer2):
+            orienteer2 = orienteer2_sub_element        
 
         if selection_link:
             doc.openTransaction(tr("Set link's mounted placement"))
-            move_local_placement(doc, cross_link, 'MountedPlacement', orienteer1, orienteer2)
+            move_placement(doc, cross_link, 'MountedPlacement', orienteer1, orienteer2)
             doc.commitTransaction()
         elif selection_joint:
             doc.openTransaction(tr("Set joint's origin"))
-            move_local_placement(doc, cross_joint, 'Origin', orienteer1, orienteer2)
+            move_placement(doc, cross_joint, 'Origin', orienteer1, orienteer2)
             doc.commitTransaction()
         doc.recompute()
 

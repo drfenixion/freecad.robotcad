@@ -7,15 +7,19 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol, Union
 
 import FreeCAD as fc
+import FreeCADGui as fcgui
 
 from . import wb_globals
 from .freecad_utils import get_param
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
+from .freecad_utils import is_lcs
+from .freecad_utils import is_part
 from .freecad_utils import message
 from .freecad_utils import set_param
 from .freecad_utils import warn
+from .freecadgui_utils import get_placement
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals
@@ -227,6 +231,14 @@ def is_subchain(subchain: DOList, chain: DOList) -> bool:
         if link_or_joint not in chain:
             return False
     return True
+
+
+def get_parent_link_of_obj(obj: DO) -> bool | CrossLink:
+    """Return first parent CrossLink of object or None."""
+    for parent in obj.InListRecursive:
+        if is_link(parent):
+            return parent
+    return None
 
 
 def get_xacro_object_attachments(
@@ -540,3 +552,126 @@ def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
     urdf_path = Path(urdf_path)
 
     return urdf_path
+
+
+def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO):
+    """Set element (joint or link) placement (Origin or Mounted placement) by orienteer.
+
+    Set placement with orienteer placement value
+    """
+
+    placement1 = get_placement_of_orienteer(orienteer1)
+
+    # prepare data
+    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
+    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
+    doc.recompute() # trigger compute element placement based on zero Origin
+    element_basic_placement = getattr(link_or_joint, 'Placement')
+    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
+    doc.recompute()
+
+    ## prepare data
+    placement1_diff = element_basic_placement.inverse() * placement1
+
+    # Set Origin or Mounted placement
+    setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
+
+
+def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, 
+                   orienteer1: DO, orienteer2: DO, delete_created_objects:bool = True):
+    """Move element (joint or link) placement (Origin or Mounted placement).
+
+    Move first orienteer to placement of second and second orienteer
+    and element to positions relative their bind system (element and orienteers) before.
+    This move does not change spatial relation between each other.
+    """
+
+    # if is_joint(orienteer1):
+    #     placement1 = orienteer1.Placement
+    # else:
+    #     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
+    # if is_joint(orienteer2):
+    #     placement2 = orienteer2.Placement
+    # else:
+    #     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects)
+    placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
+    placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects)
+    
+    # prepare data
+    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
+    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
+    doc.recompute() # trigger compute element placement based on zero Origin
+    element_basic_placement = getattr(link_or_joint, 'Placement')
+    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
+    doc.recompute()
+
+    ## prepare data
+    element_local_placement = getattr(link_or_joint, origin_or_mounted_placement_name)
+    origin_placement1_diff = (element_basic_placement * element_local_placement).inverse() * placement1
+    origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
+
+    # do Origin move
+    # first orienteer come to second orienteer place and Origin respectively moved
+    # in local frame every tool click will result Origin move because both orienteers moved and received new position
+    new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
+    setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
+
+
+
+def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True) -> fc.Placement :
+    '''Return placement of orienteer. 
+    If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
+
+    # TODO process Vertex
+    if is_lcs(orienteer) :
+        placement = get_placement(orienteer)
+    elif is_link(orienteer) or is_joint(orienteer):
+        placement = orienteer.Placement
+    else:
+        
+        try:
+            link = orienteer.Object.Parents[-1][0]
+        except (AttributeError, IndexError):
+            # orienteer not a subelement (face, edge, etc)
+            link = orienteer
+
+        obj = link.getLinkedObject(True)
+        obj_placement = obj.Placement
+        link_to_obj_placement = link.Placement
+
+        if not is_part(obj):
+            message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
+            return 
+
+        # placement_rel = obj_placement.inverse() * fc.Placement(orienteer.SubObjects[0].CenterOfMass, fc.Rotation(), fc.Vector())
+        # placement = link_to_obj_placement * placement_rel
+        
+        body_lcs_wrapper = fc.ActiveDocument.addObject("PartDesign::Body", "Body")
+        
+        sub_element_name = ''
+        try:
+            sub_element_name = orienteer.SubElementNames[0]
+        except (AttributeError, IndexError):
+            pass
+
+        body_lcs_wrapper.Label = "LCS wrapper " + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
+    
+        obj.addObject(body_lcs_wrapper)
+
+        lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS' )
+        body_lcs_wrapper.addObject(lcs)
+
+        lcs.Support = (orienteer.Object, orienteer.SubElementNames[0])
+        lcs.MapMode = 'InertialCS'
+
+        # find placement of lcs at link of obj. lcs.Placement is placement at support obj
+        placement_rel = obj_placement.inverse() * lcs.Placement
+        placement = link_to_obj_placement * placement_rel
+
+        if delete_created_objects:
+            fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
+            fc.ActiveDocument.removeObject(lcs.Name)
+
+        fc.activeDocument().recompute()
+
+    return placement

@@ -16,6 +16,7 @@ import MaterialEditor  # FreeCAD.
 from .utils import true_then_false
 from . import wb_constants
 
+
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
     from PySide import QtCore  # FreeCAD's PySide!
     from PySide import QtGui  # FreeCAD's PySide!

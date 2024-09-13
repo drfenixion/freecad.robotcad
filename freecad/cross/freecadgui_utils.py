@@ -8,6 +8,9 @@ import FreeCADGui as fcgui
 from .freecad_utils import get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
 from .freecad_utils import adjustedGlobalPlacement
+from .freecad_utils import is_lcs
+from .freecad_utils import is_part
+from .freecad_utils import message
 from .placement_utils import get_global_placement
 
 # Typing hints.
@@ -133,3 +136,31 @@ def createBoundAbstract(obj, createPrimitive = createBox):
         fc.Console.PrintError("Bad selection"+"\n")
 
     return boundObj
+
+
+def get_placement(
+        orienteer1: DO
+        ) -> fc.Placement:
+    """Return absolute coordinates of orienteer."""
+    resolve_mode_resolve = 0 # 0 - absolute, 1 relative
+    selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
+    objects_placements = get_subobjects_and_placements(selection)
+    objects, placements = zip(*objects_placements)
+    orienteer1_placement = placements[objects.index(orienteer1)]
+
+    return orienteer1_placement
+
+
+def get_placements(
+        orienteer1: DO,
+        orienteer2: DO
+        ) -> fc.Placement:
+    """Return the transform from `lcs` to `obj`."""
+    resolve_mode_resolve = 0 # 0 - absolute, 1 relative
+    selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
+    objects_placements = get_subobjects_and_placements(selection)
+    objects, placements = zip(*objects_placements)
+    orienteer1_placement = placements[objects.index(orienteer1)]
+    orienteer2_placement = placements[objects.index(orienteer2)]
+
+    return orienteer1_placement, orienteer2_placement
