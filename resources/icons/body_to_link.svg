@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <filter id="inner-shadow-filter-0" color-interpolation-filters="sRGB" x="-50%" y="-50%" width="200%" height="200%" bx:preset="inner-shadow 1 0 0 10 0.5 rgba(0,0,0,0.7)">
+      <feOffset dx="0" dy="0"/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feComposite operator="out" in="SourceGraphic"/>
+      <feComponentTransfer result="choke">
+        <feFuncA type="linear" slope="1"/>
+      </feComponentTransfer>
+      <feFlood flood-color="rgba(0,0,0,0.7)" result="color"/>
+      <feComposite operator="in" in="color" in2="choke" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect x="46.32" y="44.912" width="67.666" height="407.203" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); filter: url('#inner-shadow-filter-0');" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+  <rect x="336.7" y="77.062" width="78.864" height="368.007" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); filter: url('#inner-shadow-filter-0');" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+  <path style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); filter: url('#inner-shadow-filter-0');" d="M 415.564 77.062 L 450.021 60.282 C 450.573 59.864 460.74 54.495 460.74 54.495 L 381.111 55.653 L 336.7 77.062 L 415.564 77.062 Z" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+  <path style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); filter: url('#inner-shadow-filter-0');" d="M 414.8 444.49 L 459.975 414.98 L 460.74 55.075 L 415.564 77.062 L 414.8 444.49 Z" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, 0)"/>
+  <path d="M -299.298 -256.61 H -197.38 L -197.38 -298.401 L -146.831 -242.68 L -197.38 -186.958 L -197.38 -228.748 H -299.298 V -256.61 Z" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); filter: url('#inner-shadow-filter-0');" transform="matrix(-0.9999999999999999, 0, 0, -0.9999999999999999, -7.105427357601002e-15, 0)" bx:shape="arrow -299.298 -298.401 152.467 111.443 27.862 50.549 0 1@446a0f39"/>
+</svg>

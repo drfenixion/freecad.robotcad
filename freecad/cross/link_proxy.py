@@ -11,6 +11,8 @@ from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import is_link as is_freecad_link
 from .freecad_utils import warn
+from .freecad_utils import add_object
+from .freecad_utils import is_part
 from .mesh_utils import save_mesh_dae
 from .urdf_utils import XmlForExport
 from .urdf_utils import urdf_collision_from_object
@@ -756,3 +758,30 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
                         cross_link.ViewObject.ShowCollision = robot.ViewObject.ShowCollision
     doc.recompute()
     return cross_link
+
+
+def make_robot_link_filled(obj:fc.DO) -> CrossLink :
+    ''' Make robot link and fill Real and Visual of it by obj param  '''
+
+    if not is_part(obj):
+        part = add_object(fc.ActiveDocument, 'App::Part', obj.Label + '_part')
+        
+        parent_of_obj = None
+        try:
+            parent_of_obj = obj.Parents[0][0]
+        except (KeyError, AttributeError):
+            pass
+
+        part.addObject(obj)
+        
+        #add created part-wrapper as child to parent of object 
+        if parent_of_obj:
+            parent_of_obj.addObject(part)
+    else:
+        part = obj
+
+    ros_link = make_link(obj.Label)
+    ros_link.Real = part
+    ros_link.Visual = part
+
+    return ros_link

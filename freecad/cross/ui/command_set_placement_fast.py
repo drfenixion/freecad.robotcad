@@ -32,16 +32,17 @@ class _SetCROSSPlacementFastCommand:
         return {'Pixmap': 'set_cross_placement_fast.svg',
                 'MenuText': tr('Set placement - fast'),
                 'Accel': 'P, F',
-                'ToolTip': tr('Set the Origin of a joint and Mounted Placement of link and make LCS.\n'
+                'ToolTip': tr('Set the Origin of a joint and Mounted Placement of link and make LCSes at orienteers places.\n'
                               '\n'
-                              'Select (with Ctlr): face or edge of body of robot link (first orienteer), '
-                              'face or edge of body of robot link (second orienteer) \n'
+                              'Select (with Ctlr): \n'
+                              '    1) subelement (face, edge, vertex) of body (suboject of Real) of robot link or LCS at any Real subobject (first orienteer), \n'
+                              '    2) subelement (face, edge, vertex) of body (suboject of Real) of robot link or LCS at any Real subobject (second orienteer). \n'
                               '\n'
-                              'Robot links must be near to each other (parent, child) and have joint between.\n'
+                              'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
                               'This will connect 2 links (child to parent) in orienteers places.\n'
-                              'Also in connect position will be moved joint Origin and link Mounted Placement.\n'
-                              'At both orienteers places will be created LCS.\n'
-                              'You can correct LCS orietation if default not suited for you.\n'
+                              'Joint Origin and link Mounted Placement will be moved to connection position.\n'
+                              'At both orienteers places will be created LCS (if selected subelement).\n'
+                              'Be free to fix the default LCS orientation if it does not suit you.\n'
                               'After the LCS orientation correction you can use LCS with other Placements tools.',
                               )}
 
@@ -60,7 +61,7 @@ class _SetCROSSPlacementFastCommand:
             pass
 
         if not selection_ok:
-            message('Select: face or edge of body of robot link, face or edge of body of robot link.'
+            message('Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
                     'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True)
             return
 
@@ -85,37 +86,40 @@ class _SetCROSSPlacementFastCommand:
         chain2_len = len(chain2)
         parent_link = None # same link as parent in both orienteers
 
-        if(chain1_len > chain2_len):
+        if chain1_len > chain2_len:
             parent_link = link2
             child_link = link1
             chain = chain1
 
-            if(is_lcs(orienteer2)):
+            if is_lcs(orienteer2):
                 parent_orienteer = orienteer2
             else:
                 parent_orienteer = orienteer2_sub_obj
 
-            if(is_lcs(orienteer1)):
+            if is_lcs(orienteer1):
                 child_orienteer = orienteer1
             else:
                 child_orienteer = orienteer1_sub_obj
 
-        elif(chain1_len < chain2_len):
+        elif chain1_len < chain2_len:
             parent_link = link1
             child_link = link2
             chain = chain2
             parent_orienteer = orienteer1
             child_orienteer = orienteer2
 
-            if(is_lcs(orienteer1)):
+            if is_lcs(orienteer1):
                 parent_orienteer = orienteer1
             else:
                 parent_orienteer = orienteer1_sub_obj
 
-            if(is_lcs(orienteer2)):
+            if is_lcs(orienteer2):
                 child_orienteer = orienteer2
             else:
                 child_orienteer = orienteer2_sub_obj
+        elif chain1_len == chain2_len == 1:
+            message('Links must be connected by joints first.', gui=True)
+            return                
 
         if not parent_link:
             message('Tool does not work with orienteers in same robot link.'

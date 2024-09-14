@@ -7,11 +7,13 @@ from .ui import command_get_planning_scene
 from .ui import command_kk_edit
 from .ui import command_new_joint
 from .ui import command_new_link
+from .ui import command_new_links_filled
 from .ui import command_new_pose
 from .ui import command_new_robot
 from .ui import command_new_trajectory
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
+from .ui import command_new_lcs_at_robot_link_body
 from .ui import command_reload # Developer tool.
 from .ui import command_robot_from_urdf
 from .ui import command_set_joints
@@ -52,9 +54,11 @@ class CrossWorkbench(fcgui.Workbench):
         commands = [
             'NewRobot',  # Defined in ./ui/command_new_robot.py.
             'NewLink',  # Defined in ./ui/command_new_link.py.
+            'NewLinksFilled',  # Defined in ./ui/command_new_links_filled.py.
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
+            'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.

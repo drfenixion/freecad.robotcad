@@ -1,0 +1,4 @@
+
+
+class NoPartWrapperOfObject(Exception):
+    pass

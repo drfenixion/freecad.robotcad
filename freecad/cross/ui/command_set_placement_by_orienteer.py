@@ -38,7 +38,7 @@ class _SetCROSSPlacementByOrienteerCommand:
                 'ToolTip': tr('Set the Mounted Placement of a link or the Origin of a joint.\n'
                               '\n'
                               'Select (with Ctlr) either:\n'
-                              '  a) a CROSS::Link, any at body of this link (orienteer) \n'
+                              '  a) a CROSS::Link, any (face, edge, vertex) at body of this link (orienteer) \n'
                               '  b) a CROSS::Joint, any (orienteer) \n'
                               '\n'
                               'This will set Mounted Placement like a orienteer to joint Origin if selected link first.\n'
@@ -76,7 +76,7 @@ class _SetCROSSPlacementByOrienteerCommand:
 
         if not selection_ok:
             message('Select either\n'
-                    '  a) a CROSS::Link, any (orienteer) \n'
+                    '  a) a CROSS::Link, any (face, edge, vertex) at body of this link (orienteer) \n'
                     '  b) a CROSS::Joint, any (orienteer) \n',
                     gui=True)
             return

@@ -16,6 +16,7 @@ from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
+from .freecad_utils import is_link as is_fc_link
 from .freecad_utils import message
 from .freecad_utils import set_param
 from .freecad_utils import warn
@@ -25,6 +26,7 @@ from .ros.utils import without_ros_workspace
 from .utils import attr_equals
 from .utils import values_from_string
 from .utils import get_valid_filename
+from .exceptions import NoPartWrapperOfObject
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -555,10 +557,14 @@ def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
 
 
 def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO):
-    """Set element (joint or link) placement (Origin or Mounted placement) by orienteer.
+    """Set element (joint) placement (Origin) by orienteer.
 
     Set placement with orienteer placement value
     """
+
+    # set_placement_by_orienteer() does not work for MountedPlacement of link
+    # because link conjuction place in many cases not at origin (zero coordinates) of link
+    # Instead of this use move_placement()
 
     placement1 = get_placement_of_orienteer(orienteer1)
 
@@ -586,14 +592,6 @@ def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name:
     This move does not change spatial relation between each other.
     """
 
-    # if is_joint(orienteer1):
-    #     placement1 = orienteer1.Placement
-    # else:
-    #     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
-    # if is_joint(orienteer2):
-    #     placement2 = orienteer2.Placement
-    # else:
-    #     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects)
     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects)
     
@@ -628,50 +626,69 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True) ->
     elif is_link(orienteer) or is_joint(orienteer):
         placement = orienteer.Placement
     else:
-        
-        try:
-            link = orienteer.Object.Parents[-1][0]
-        except (AttributeError, IndexError):
-            # orienteer not a subelement (face, edge, etc)
-            link = orienteer
-
-        obj = link.getLinkedObject(True)
-        obj_placement = obj.Placement
-        link_to_obj_placement = link.Placement
-
-        if not is_part(obj):
-            message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
-            return 
-
-        # placement_rel = obj_placement.inverse() * fc.Placement(orienteer.SubObjects[0].CenterOfMass, fc.Rotation(), fc.Vector())
-        # placement = link_to_obj_placement * placement_rel
-        
-        body_lcs_wrapper = fc.ActiveDocument.addObject("PartDesign::Body", "Body")
-        
-        sub_element_name = ''
-        try:
-            sub_element_name = orienteer.SubElementNames[0]
-        except (AttributeError, IndexError):
-            pass
-
-        body_lcs_wrapper.Label = "LCS wrapper " + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
-    
-        obj.addObject(body_lcs_wrapper)
-
-        lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS' )
-        body_lcs_wrapper.addObject(lcs)
-
-        lcs.Support = (orienteer.Object, orienteer.SubElementNames[0])
-        lcs.MapMode = 'InertialCS'
-
-        # find placement of lcs at link of obj. lcs.Placement is placement at support obj
-        placement_rel = obj_placement.inverse() * lcs.Placement
-        placement = link_to_obj_placement * placement_rel
-
-        if delete_created_objects:
-            fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
-            fc.ActiveDocument.removeObject(lcs.Name)
-
-        fc.activeDocument().recompute()
+        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects)
 
     return placement
+
+
+def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list[fc.DO, fc.DO, fc.Placement] :
+    '''Make LCS at face of body of robot link. 
+    orienteer body must be wrapper by part and be Real element of robot link'''
+    
+    link = None
+    # trying get link from subelement
+    try:
+        orienteer_parents_reversed = reversed(orienteer.Object.Parents)
+        for parent in orienteer_parents_reversed:
+            parent = parent[0]
+            if is_fc_link(parent):
+                link = parent
+    except (AttributeError, IndexError, RuntimeError):
+        pass
+        
+    # orienteer not a subelement (face, edge, etc)
+    if not link:
+        link = orienteer
+
+    obj = link.getLinkedObject(True)
+    obj_placement = obj.Placement
+    link_to_obj_placement = link.Placement
+
+    if not is_part(obj):
+        message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
+        raise NoPartWrapperOfObject()
+    
+    sub_element_name = ''
+    sub_element_type = ''
+    try:
+        sub_element_name = orienteer.SubElementNames[0]
+        sub_element_type = orienteer.SubObjects[0].ShapeType
+    except (AttributeError, IndexError):
+        pass
+
+    body_lcs_wrapper = fc.ActiveDocument.addObject("PartDesign::Body", "Body")
+
+    body_lcs_wrapper.Label = "LCS wrapper " + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
+
+    obj.addObject(body_lcs_wrapper)
+
+    lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS' )
+    body_lcs_wrapper.addObject(lcs)
+
+    lcs.Support = (orienteer.Object, sub_element_name)
+    if sub_element_type == 'Vertex':
+        lcs.MapMode = 'Translate'
+    else:
+        lcs.MapMode = 'InertialCS'
+    
+
+    # find placement of lcs at link of obj. lcs.Placement is placement at support obj
+    placement = link_to_obj_placement * lcs.Placement
+
+    if delete_created_objects:
+        fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
+        fc.ActiveDocument.removeObject(lcs.Name)
+
+    fc.activeDocument().recompute()
+
+    return lcs, body_lcs_wrapper, placement
