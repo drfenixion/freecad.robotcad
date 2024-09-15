@@ -45,7 +45,7 @@ class _NewLinksFilledCommand:
 
         selection = fcgui.Selection.getSelection()
 
-        doc.openTransaction(tr("Set joint origin"))
+        doc.openTransaction(tr("Make robot filled robot links by selected objects"))
         for el in selection:
             make_robot_link_filled(el)
         doc.commitTransaction()
