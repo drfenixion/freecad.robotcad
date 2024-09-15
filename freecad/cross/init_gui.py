@@ -13,6 +13,7 @@ from .ui import command_new_robot
 from .ui import command_new_trajectory
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
+from .ui import command_explode_links
 from .ui import command_new_lcs_at_robot_link_body
 from .ui import command_reload # Developer tool.
 from .ui import command_robot_from_urdf
@@ -58,6 +59,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
+            'ExplodeLinks',  # Defined in ./ui/command_explode_links.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.

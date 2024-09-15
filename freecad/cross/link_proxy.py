@@ -31,6 +31,7 @@ from .wb_utils import is_name_used
 from .wb_utils import is_primitive
 from .wb_utils import is_robot
 from .wb_utils import ros_name
+from .wb_utils import get_parent_link_of_obj
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -499,7 +500,13 @@ class LinkProxy(ProxyBase):
         # Free the labels because of delayed removal.
         for o in old_fc_links:
             # Free the label.
-            o.Label = 'to_be_removed'
+            try:
+                # when do ShowReal=False and Ctrl+z after
+                # lead to empty DO appears in old_fc_links and throw errors
+                # Added try for this case
+                o.Label = 'to_be_removed'
+            except (AttributeError, ReferenceError):
+                pass
 
         # Clear the lists that are regenerated right after and create new
         # objects.
@@ -529,12 +536,33 @@ class LinkProxy(ProxyBase):
             + self._fc_links_collision
         )
         if new_group != link.Group:
+            # sometimes error appears with ctrl+z after ShowReal=False, ShowReal=True
+            # looks like problem with created back objects (it have FullName == '?')
+
+            # remove bad documents comebacked after Ctrl+z 
+            for i in range(len(new_group)):
+                if new_group[i].FullName == '?':
+                    try:
+                        link.Document.removeObject(new_group[i].Name)
+                    except (RuntimeError, ReferenceError):
+                        # object not a part of document (happens sometime with ctrl+z)
+                        pass
+                    new_group.remove(new_group[i])
+
+
             link.Group = new_group
 
         # Remove old objects.
         doc = link.Document
         for o in old_fc_links:
-            doc.removeObject(o.Name)
+            try:
+                doc.removeObject(o.Name)
+            except (RuntimeError, ReferenceError):
+                # object not a part of document (happens sometime with ctrl+z)
+                pass
+
+        #TODO Remove sometimes appering objects in doc root after ctrl+z (with name "to_be_removed", "real_[Label]", etc)
+
 
     def export_urdf(
         self,
@@ -780,8 +808,37 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink :
     else:
         part = obj
 
-    ros_link = make_link(obj.Label)
-    ros_link.Real = part
-    ros_link.Visual = part
+    link = make_link(obj.Label)
+    link.Real = part
+    link.Visual = part
 
-    return ros_link
+    link.ViewObject.ShowReal = False
+    link.ViewObject.ShowReal = True
+    fc.ActiveDocument.recompute()
+
+    return link
+
+
+def explode_link(orienteer:fc.DO, index:int) -> bool :
+    ''' Move link for see hiden faces (explode view)  '''
+
+    if not is_link(orienteer):
+        link = get_parent_link_of_obj(orienteer)
+    else:
+        link = orienteer
+
+    if not link:
+        # there is no parent link
+        return False
+
+    explodeDistance = (index + 1) * 100
+    base = link.MountedPlacement.Base
+    link.MountedPlacement.Base.x = base.x + explodeDistance
+    link.MountedPlacement.Base.y = base.y + explodeDistance
+    link.MountedPlacement.Base.z = base.y + explodeDistance
+
+    link.ViewObject.ShowReal = False
+    link.ViewObject.ShowReal = True
+    fc.ActiveDocument.recompute()
+
+    return True

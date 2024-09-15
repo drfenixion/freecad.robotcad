@@ -237,7 +237,7 @@ def is_subchain(subchain: DOList, chain: DOList) -> bool:
 
 def get_parent_link_of_obj(obj: DO) -> bool | CrossLink:
     """Return first parent CrossLink of object or None."""
-    for parent in obj.InListRecursive:
+    for parent in reversed(obj.InListRecursive):
         if is_link(parent):
             return parent
     return None

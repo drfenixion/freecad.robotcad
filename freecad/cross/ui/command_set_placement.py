@@ -55,7 +55,8 @@ class _SetCROSSPlacementCommand:
                               ' and the LCS on the child link.\n'
                               '\n'
                               'The behavior of this tool is too complicated in some cases.\n'
-                              'Use "Set Placement - as system" and "Set Placement - by orienteer" instead of this tool.\n'
+                              'Use: "Set Placement - fast", "Set Placement - by orienteer", "Set Placement - as system"'
+                              'instead of this tool.\n'
                               'This tool planned to be removed.\n',
                               )}
 
