@@ -110,8 +110,8 @@ class _CalculateMassAndInertiaCommand:
                 link.Mass = quantity_as(volume * material.density, 'kg')
                 
             else:
-                if link.Mass==0:
-                    error(f'link "{link.Label}: has 0 masss skipping ...')
+                if link.Mass <= 0.0:
+                    error(f'link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.')
                     continue
             
             # TODO: have matrix_of_inertia return a specified unit without correction
