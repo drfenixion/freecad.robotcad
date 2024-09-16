@@ -17,4 +17,5 @@ class Link(fc.DocumentObject):
     MaterialCardPath: str
     MaterialDensity: str
     MaterialNotCalculate: bool
+    CalculateInertiaBasedOnMass:bool
     _Type: str

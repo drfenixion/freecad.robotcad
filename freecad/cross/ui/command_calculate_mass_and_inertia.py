@@ -41,16 +41,21 @@ class _CalculateMassAndInertiaCommand:
 
         # Implementation note: the command is active only when a robot is selected.
         robot = objs[0]
-
+       
         default_material = material_from_material_editor(robot.MaterialCardPath)
 
         doc.openTransaction(tr('Calculate mass and inertia'))
         for link in robot.Proxy.get_links():
             print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
             
-            if link.MaterialNotCalculate:
+            #both MaterialNotCalculate and CalculateInertiaBasedOnMass cannot be true
+            if link.CalculateInertiaBasedOnMass and link.MaterialNotCalculate:
+                error(f'''MaterialNotCalculate and CalculateMaterialBasedOnMass are both true for "{link.Label}"\n
+                      both cannot be true \n change state of one and try again \n''')
                 continue
-
+            if  link.MaterialNotCalculate:
+                continue
+            
             if not link.Real:
                 error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
                 continue
@@ -65,14 +70,17 @@ class _CalculateMassAndInertiaCommand:
             center_of_gravity = center_of_gravity_mm(elem_with_volume)
             elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
             elem_volume_mm3 = volume_mm3(elem_with_volume)
+            
             elem_material = material_from_material_editor(link.MaterialCardPath)
-
-            if (elem_material.material_name is None) and (default_material.material_name is None):
-                error(
+        
+            #  show and error if material is not specified and inertia calculation based on mass is false
+            if (elem_material.material_name is None) and (default_material.material_name is None) :
+                if not link.CalculateInertiaBasedOnMass:
+                    error(
                     f'Link "{link.Label}" skipped.'
                     ' No material specified for Link and no default material specified for robot element.', gui=True,
-                )
-                continue
+                    )
+                    continue
 
             if center_of_gravity is None:
                 error(
@@ -85,20 +93,26 @@ class _CalculateMassAndInertiaCommand:
             if elem_matrix_of_inertia is None:
                 error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
                 continue
+            if not link.CalculateInertiaBasedOnMass:
+                if elem_material.material_name is None:
+                    material = default_material
+                    warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
+                else:
+                 material = elem_material
 
-            if elem_material.material_name is None:
-                material = default_material
-                warn(f'No material specified for Link "{link.Label}". Using material specified in the containing robot.', gui=False)
-            else:
-                material = elem_material
-
-            if ((material.density is None)
-                    or (material.density.Value <= 0.0)):
-                error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
-                continue
+                if ((material.density is None)
+                     or (material.density.Value <= 0.0)):
+                    error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
+                    continue
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
-            link.Mass = quantity_as(volume * material.density, 'kg')
+            if not link.CalculateInertiaBasedOnMass :
+                link.Mass = quantity_as(volume * material.density, 'kg')
+                
+            else:
+                if link.Mass <= 0.0:
+                    error(f'link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.')
+                    continue
             
             # TODO: have matrix_of_inertia return a specified unit without correction
             elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)

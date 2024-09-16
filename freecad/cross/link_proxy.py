@@ -159,6 +159,7 @@ class LinkProxy(ProxyBase):
                 'MaterialCardPath',
                 'MaterialDensity',
                 'MaterialNotCalculate',
+                'CalculateInertiaBasedOnMass',
                 '_Type',
             ],
         )
@@ -271,6 +272,10 @@ class LinkProxy(ProxyBase):
         add_property(
             obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
             'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.',
+        )
+        add_property(
+            obj, 'App::PropertyBool', 'CalculateInertiaBasedOnMass', 'Inertial Parameters',
+            'If true and the Mass property is greater than 0, the Mass property will override the material data and be used to calculate the element\'s inertia',
         )
 
         # Used when adding a link which shape in located at the origin but
