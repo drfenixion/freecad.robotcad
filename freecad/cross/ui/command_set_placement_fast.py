@@ -39,8 +39,10 @@ class _SetCROSSPlacementFastCommand:
                               '    2) subelement (face, edge, vertex) of body (suboject of Real) of robot link or LCS at any Real subobject (second orienteer). \n'
                               '\n'
                               'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
+                              '\n'
                               'This will connect 2 links (child to parent) in orienteers places.\n'
                               'Joint Origin and link Mounted Placement will be moved to connection position.\n'
+                              '\n'
                               'At both orienteers places will be created LCS (if selected subelement).\n'
                               'Be free to fix the default LCS orientation if it does not suit you.\n'
                               'After the LCS orientation correction you can use LCS with other Placements tools.',

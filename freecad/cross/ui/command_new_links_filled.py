@@ -8,7 +8,7 @@ from ..freecad_utils import message
 from ..freecad_utils import validate_types
 from ..freecad_utils import is_lcs
 from ..gui_utils import tr
-from ..link_proxy import make_robot_link_filled
+from ..link_proxy import make_robot_links_filled
 
 
 # Stubs and type hints.
@@ -27,8 +27,8 @@ class _NewLinksFilledCommand:
     def GetResources(self):
         return {'Pixmap': 'body_to_link.svg',
                 'MenuText': tr('New links with filled Real, Visual by selected objects'),
-                'Accel': 'L, B',
-                'ToolTip': tr('Make new links with filled Real, Visual by selected objects.\n'
+                'Accel': 'L, F',
+                'ToolTip': tr('New links with filled Real, Visual by selected objects.\n'
                               '\n'
                               'Select: object (part, body) or objects \n'
                               '\n'
@@ -43,11 +43,8 @@ class _NewLinksFilledCommand:
     def Activated(self):
         doc = fc.activeDocument()
 
-        selection = fcgui.Selection.getSelection()
-
-        doc.openTransaction(tr("Make robot filled robot links by selected objects"))
-        for el in selection:
-            make_robot_link_filled(el)
+        doc.openTransaction(tr("New filled robot links by selected objects"))
+        make_robot_links_filled()
         doc.commitTransaction()
 
         doc.recompute()

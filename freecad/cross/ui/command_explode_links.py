@@ -32,6 +32,8 @@ class _ExplodeLinksCommand:
                               '\n'
                               'Select: link(s) or subobject of link \n'
                               '\n'
+                              'Link(s) must be in joint(s) for visual effect.\n'
+                              '\n'
                               'Link will be moved by changing MountedPlacement.\n'
                               'This useful for see hidden faces of link subobject\n'
                               'for select contact faces for placement tools.\n'

@@ -5,14 +5,17 @@ from typing import ForwardRef, List, Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
+import FreeCADGui as fcgui
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import is_link as is_freecad_link
 from .freecad_utils import warn
+from .freecad_utils import message
 from .freecad_utils import add_object
 from .freecad_utils import is_part
+from .freecad_utils import is_derived_from
 from .mesh_utils import save_mesh_dae
 from .urdf_utils import XmlForExport
 from .urdf_utils import urdf_collision_from_object
@@ -788,27 +791,36 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
     return cross_link
 
 
-def make_robot_link_filled(obj:fc.DO) -> CrossLink :
-    ''' Make robot link and fill Real and Visual of it by obj param  '''
+def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
+    ''' Make robot link and fill Real and Visual of it by selected objects  '''
+    
+    if not is_derived_from(obj, 'App::GeoFeature'):
+        message(
+            'Not suited object to create robot link.',
+            True,
+        )      
+        return False
 
     if not is_part(obj):
-        part = add_object(fc.ActiveDocument, 'App::Part', obj.Label + '_part')
+        part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
         
         parent_of_obj = None
         try:
             parent_of_obj = obj.Parents[0][0]
         except (KeyError, AttributeError):
             pass
-
+        
+        obj.adjustRelativeLinks(part)
         part.addObject(obj)
         
         #add created part-wrapper as child to parent of object 
         if parent_of_obj:
+            part.adjustRelativeLinks(parent_of_obj)
             parent_of_obj.addObject(part)
     else:
         part = obj
 
-    link = make_link(obj.Label)
+    link = make_link(ros_name(obj))
     link.Real = part
     link.Visual = part
 
@@ -817,6 +829,27 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink :
     fc.ActiveDocument.recompute()
 
     return link
+
+
+def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = None) -> list[CrossLink] | False :
+    ''' Make robot links and fill Real and Visual of it by selected objects  '''
+
+    if len(objects):
+        selection = objects
+    else:
+        selection = fcgui.Selection.getSelection()
+
+    links:list[CrossLink] = []
+    for el in selection:
+        res = make_robot_link_filled(el)
+        if is_link(res):
+            link = res
+            links.append(link)
+            if robot:
+                link.adjustRelativeLinks(robot)
+                robot.addObject(link)
+
+    return links
 
 
 def explode_link(orienteer:fc.DO, index:int) -> bool :

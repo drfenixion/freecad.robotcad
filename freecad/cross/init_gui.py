@@ -6,6 +6,7 @@ from .ui import command_box_from_bounding_box
 from .ui import command_get_planning_scene
 from .ui import command_kk_edit
 from .ui import command_new_joint
+from .ui import command_new_joints_filled
 from .ui import command_new_link
 from .ui import command_new_links_filled
 from .ui import command_new_pose
@@ -57,6 +58,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewLink',  # Defined in ./ui/command_new_link.py.
             'NewLinksFilled',  # Defined in ./ui/command_new_links_filled.py.
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
+            'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'ExplodeLinks',  # Defined in ./ui/command_explode_links.py.

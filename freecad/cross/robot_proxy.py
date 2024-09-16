@@ -51,6 +51,8 @@ from .wb_utils import _has_meshes_directory
 from .wb_utils import get_urdf_path
 from xml.dom.minidom import parseString
 from pathlib import Path
+from .joint_proxy import make_robot_joints_filled
+from .link_proxy import make_robot_links_filled
 
 # Stubs and type hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -1013,4 +1015,18 @@ def make_robot(name, doc: Optional[fc.Document] = None) -> CrossRobot:
         robot.ViewObject.ShowCollision = False
 
     doc.recompute()
+    return robot
+
+
+def make_filled_robot(name:str = 'Robot') -> CrossRobot:
+    """Add a Cross::Robot to the current document and fill it with links and joints."""
+
+    robot = make_robot(name)
+    links = make_robot_links_filled(robot = robot)
+    fc.ActiveDocument.recompute()
+
+    if len(links):
+        make_robot_joints_filled(links, robot)
+
+    fc.ActiveDocument.recompute()
     return robot

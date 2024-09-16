@@ -5,11 +5,13 @@ from typing import Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
+import FreeCADGui as fcgui
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import warn
+from .freecad_utils import message
 from .urdf_utils import urdf_origin_from_placement
 from .wb_utils import ICON_PATH
 from .wb_utils import get_valid_urdf_name
@@ -559,7 +561,7 @@ class _ViewProviderJoint(ProxyBase):
         pass
 
 
-def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
+def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None = None) -> CrossJoint:
     """Add a Cross::Joint to the current document."""
     if doc is None:
         doc = fc.activeDocument()
@@ -571,6 +573,10 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
     # Default to type "fixed".
     joint.Type = 'fixed'
     joint.Label2 = joint.Label
+
+    if robot:
+        joint.adjustRelativeLinks(robot)
+        robot.addObject(joint)        
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
@@ -599,3 +605,53 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
                         joint.ViewObject.AxisLength = robot.ViewObject.JointAxisLength
     doc.recompute()
     return joint
+
+
+def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = None) -> CrossJoint :
+    ''' Make robot joint and fill it with links (parent, child)  '''
+
+    if is_link(link1) and is_link(link2):
+        joint = make_joint(ros_name(link1) + '__to__' + ros_name(link2), robot = robot)
+        try:
+            joint.Parent = ros_name(link1)
+            joint.Child = ros_name(link2)
+        except ValueError:
+            fc.ActiveDocument.removeObject(joint.Name)
+            message(
+                'Links must be in robot container for joint connection. Closed links loop does not supported.',
+                True,
+            )             
+        fc.ActiveDocument.recompute()
+
+        return joint
+    else:
+        message(
+            'Make filled robot joint(s) works only with selected links. Select minimum 2 links.',
+            True,
+        )        
+    
+    return False
+
+
+def make_robot_joints_filled(links:list[CrossLink] = [], robot:CrossRobot | None = None) -> list[CrossJoint] | False :
+    ''' Make robot joints and fill it with selected links (parent, child) '''
+
+    if not len(links):
+        selection = fcgui.Selection.getSelection()
+    else:
+        selection = links
+    
+    sel_len = len(selection)
+    if sel_len < 2:
+        message(
+            'Choose minimum 2 links.',
+            True,
+        )                
+        return False
+    
+    joints = [CrossJoint]
+    for i in range(sel_len):
+        if i+1 < sel_len:
+            joints.append(make_robot_joint_filled(selection[i], selection[i+1], robot))
+
+    return joints
