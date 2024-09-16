@@ -796,7 +796,7 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
     
     if not is_derived_from(obj, 'App::GeoFeature'):
         message(
-            'Not suited object to create robot link.',
+            f'Not suited object ({ros_name(obj)}) to create robot link.',
             True,
         )      
         return False
