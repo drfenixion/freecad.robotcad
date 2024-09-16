@@ -111,7 +111,7 @@ class _CalculateMassAndInertiaCommand:
                 
             else:
                 if link.Mass <= 0.0:
-                    error(f'link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.')
+                    error(f'Link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.', gui=True)
                     continue
             
             # TODO: have matrix_of_inertia return a specified unit without correction
