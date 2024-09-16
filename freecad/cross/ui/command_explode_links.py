@@ -27,7 +27,7 @@ class _ExplodeLinksCommand:
     def GetResources(self):
         return {'Pixmap': 'explode_links.svg',
                 'MenuText': tr('Move links (explode view) to see hiden faces.'),
-                'Accel': 'L, B',
+                'Accel': 'E, L',
                 'ToolTip': tr('Move links (explode view) to see hiden faces.\n'
                               '\n'
                               'Select: link(s) or subobject of link \n'
