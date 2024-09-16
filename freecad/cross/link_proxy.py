@@ -825,7 +825,7 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
     else:
         part = obj
 
-    link = make_link(ros_name(obj))
+    link = make_link('l_' + ros_name(part))
     link.Real = part
     link.Visual = part
 
