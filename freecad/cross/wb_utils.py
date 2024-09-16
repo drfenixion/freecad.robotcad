@@ -681,6 +681,15 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list
     else:
         lcs.MapMode = 'InertialCS'
     
+    # prevent automove back to InertialCS rotation
+    lcs.MapMode = 'Deactivated'
+    # go to default local frame by inverse
+    lcs_Placement_inversed = lcs.Placement.inverse()
+    rotXYZ = lcs_Placement_inversed.Rotation.toEulerAngles('XYZ')
+    # disable Z rotation in default local frame
+    lcs_Placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], 0)
+    # inverse back and get modificated rotation
+    lcs.Placement.Rotation = lcs_Placement_inversed.inverse().Rotation
 
     # find placement of lcs at link of obj. lcs.Placement is placement at support obj
     placement = link_to_obj_placement * lcs.Placement
