@@ -27,6 +27,7 @@ from .utils import attr_equals
 from .utils import values_from_string
 from .utils import get_valid_filename
 from .exceptions import NoPartWrapperOfObject
+from .freecad_utils import validate_types
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -683,13 +684,9 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list
     
     # prevent automove back to InertialCS rotation
     lcs.MapMode = 'Deactivated'
-    # go to default local frame by inverse
-    lcs_Placement_inversed = lcs.Placement.inverse()
-    rotXYZ = lcs_Placement_inversed.Rotation.toEulerAngles('XYZ')
-    # disable Z rotation in default local frame
-    lcs_Placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], 0)
-    # inverse back and get modificated rotation
-    lcs.Placement.Rotation = lcs_Placement_inversed.inverse().Rotation
+
+    # fix Z rotation to 0 in frame of origin
+    lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
     # find placement of lcs at link of obj. lcs.Placement is placement at support obj
     placement = link_to_obj_placement * lcs.Placement
@@ -701,3 +698,92 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list
     fc.activeDocument().recompute()
 
     return lcs, body_lcs_wrapper, placement
+
+
+def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | None = None, z:float | None = None) -> fc.Placement :
+    ''' Rotate (incremental) placement in frame of origin or set any axis to zero. 
+
+        This func let you rotate object how be you rotate it as it was at origin.
+
+        Params:
+            placement - to rotate
+            x,y,z - axis value as increment to rotate. 
+            If the value received is 0, the axis will be set to 0, otherwise the rotation will be incremented
+    '''
+
+    ## rotation
+    if x is not None:
+        placement.rotate(fc.Vector(0,0,0), fc.Vector(1,0,0), x)
+    if y is not None:
+        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,1,0), y)
+    if z is not None:
+        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,0,1), z)
+
+    ## setting axis angle to zero
+    # go to default frame by inverse
+    placement_inversed = placement.inverse()
+    rotXYZ = placement_inversed.Rotation.toEulerAngles('XYZ')
+    rotXYZ = list(rotXYZ)
+
+    if x == 0:
+        rotXYZ[0] = 0
+    if y == 0:
+        rotXYZ[1] = 0
+    if z == 0:
+        rotXYZ[2] = 0
+
+    # set to zero position by axis in default frame
+    placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], rotXYZ[2])
+    # inverse back and get modificated rotation
+    placement.Rotation = placement_inversed.inverse().Rotation
+
+    return placement
+
+
+def rotate_origin(x:float | None = None, y:float | None = None, z:float | None = None) -> bool :
+    ''' Rotate joint origin by rotate_placement() func. '''
+
+    doc = fc.activeDocument()
+    selection_ok = False
+    try:
+        orienteer1, = validate_types(
+            fcgui.Selection.getSelection(),
+            ['Any'])
+        selection_ok = True
+    except RuntimeError:
+        pass
+
+    if not selection_ok:
+        message('Select: subobject of robot link or link.'
+                , gui=True)
+        return
+
+    joint = None
+    if is_joint(orienteer1):
+        joint = orienteer1
+    if is_link(orienteer1):
+        link = orienteer1
+    else:
+        link = get_parent_link_of_obj(orienteer1)
+
+    # get parent joint from link
+    if not joint:
+        if link == None:
+            message('Can not get parent robot link of selected object', gui=True)
+            return      
+        
+        chain = get_chain(link)
+
+        if len(chain) < 2:
+            message('Link must be in chain (joint to link).', gui=True)
+            return                
+
+
+        joint = chain[-2]
+        if not is_joint(joint):
+            message('Can not get parent joint of link', gui=True)
+            return
+    
+    joint.Origin = rotate_placement(joint.Origin, x, y, z)
+
+    doc.recompute()

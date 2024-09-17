@@ -11,10 +11,10 @@ from .ui import command_new_link
 from .ui import command_new_links_filled
 from .ui import command_new_pose
 from .ui import command_new_robot
+from .ui import command_explode_links
 from .ui import command_new_trajectory
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
-from .ui import command_explode_links
 from .ui import command_new_lcs_at_robot_link_body
 from .ui import command_reload # Developer tool.
 from .ui import command_robot_from_urdf
@@ -23,6 +23,9 @@ from .ui import command_set_placement
 from .ui import command_set_placement_fast
 from .ui import command_set_placement_in_absolute_coordinates
 from .ui import command_set_placement_by_orienteer
+from .ui import command_rotate_joint_x
+from .ui import command_rotate_joint_y
+from .ui import command_rotate_joint_z
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
 from .ui import command_cylinder_from_bounding_box
@@ -55,18 +58,21 @@ class CrossWorkbench(fcgui.Workbench):
         # The order here defines the order of the icons in the GUI.
         commands = [
             'NewRobot',  # Defined in ./ui/command_new_robot.py.
+            'ExplodeLinks',  # Defined in ./ui/command_explode_links.py.
             'NewLink',  # Defined in ./ui/command_new_link.py.
             'NewLinksFilled',  # Defined in ./ui/command_new_links_filled.py.
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
-            'ExplodeLinks',  # Defined in ./ui/command_explode_links.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
+            'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
+            'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
+            'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
             'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
