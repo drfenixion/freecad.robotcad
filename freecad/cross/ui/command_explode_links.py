@@ -9,6 +9,7 @@ from ..freecad_utils import validate_types
 from ..freecad_utils import is_lcs
 from ..gui_utils import tr
 from ..link_proxy import explode_link
+from ..wb_utils import is_robot
 
 
 # Stubs and type hints.
@@ -40,7 +41,7 @@ class _ExplodeLinksCommand:
                               )}
 
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
         doc = fc.activeDocument()
@@ -48,6 +49,10 @@ class _ExplodeLinksCommand:
         selection = fcgui.Selection.getSelection()
 
         doc.openTransaction(tr("Explode links"))
+        if len(selection) and is_robot(selection[0]):
+            robot = selection[0]
+            selection = robot.Proxy.get_links()
+
         for i in range(len(selection)):
             explode_link(selection[i], i)
         doc.commitTransaction()

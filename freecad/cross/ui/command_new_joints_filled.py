@@ -9,6 +9,7 @@ from ..freecad_utils import validate_types
 from ..freecad_utils import is_lcs
 from ..gui_utils import tr
 from ..joint_proxy import make_robot_joints_filled
+from ..wb_utils import is_link
 
 
 # Stubs and type hints.
@@ -39,7 +40,7 @@ class _NewJointsFilledCommand:
                               )}
 
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection()) and is_link(fcgui.Selection.getSelection()[0])
 
     def Activated(self):
         doc = fc.activeDocument()

@@ -61,7 +61,7 @@ class _SetCROSSPlacementCommand:
                               )}
 
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
         doc = fc.activeDocument()

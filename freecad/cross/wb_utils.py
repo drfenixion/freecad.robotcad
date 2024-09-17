@@ -567,7 +567,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
     # because link conjuction place in many cases not at origin (zero coordinates) of link
     # Instead of this use move_placement()
 
-    placement1 = get_placement_of_orienteer(orienteer1)
+    placement1 = get_placement_of_orienteer(orienteer1, lcs_concentric_reversed = True)
 
     # prepare data
     origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
@@ -594,11 +594,12 @@ def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name:
     """
 
     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
-    placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects)
+    placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects, lcs_concentric_reversed = True)
     
     # prepare data
     origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
+    # set zero Origin
+    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))
     doc.recompute() # trigger compute element placement based on zero Origin
     element_basic_placement = getattr(link_or_joint, 'Placement')
     setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
@@ -617,7 +618,8 @@ def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name:
 
 
 
-def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True) -> fc.Placement :
+def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
+    -> fc.Placement :
     '''Return placement of orienteer. 
     If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
 
@@ -627,12 +629,13 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True) ->
     elif is_link(orienteer) or is_joint(orienteer):
         placement = orienteer.Placement
     else:
-        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects)
+        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
 
     return placement
 
 
-def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list[fc.DO, fc.DO, fc.Placement] :
+def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
+    -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link. 
     orienteer body must be wrapper by part and be Real element of robot link'''
     
@@ -661,9 +664,11 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list
     
     sub_element_name = ''
     sub_element_type = ''
+    sub_element = None
     try:
         sub_element_name = orienteer.SubElementNames[0]
         sub_element_type = orienteer.SubObjects[0].ShapeType
+        sub_element = orienteer.SubObjects[0]
     except (AttributeError, IndexError):
         pass
 
@@ -679,6 +684,13 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True) -> list
     lcs.Support = (orienteer.Object, sub_element_name)
     if sub_element_type == 'Vertex':
         lcs.MapMode = 'Translate'
+    elif sub_element_type == 'Edge' \
+        and (sub_element.Curve.TypeId == 'Part::GeomCircle' \
+            or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'):
+        
+        lcs.MapMode = 'Concentric'
+        if lcs_concentric_reversed:
+            lcs.MapReversed = True
     else:
         lcs.MapMode = 'InertialCS'
     

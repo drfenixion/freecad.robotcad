@@ -39,11 +39,12 @@ class _NewLCSAtRobotLinkBodyCommand:
                               'Select: face or edge or vertex of body of robot link \n'
                               '\n'
                               'LCS can be used with Set Placement tools. Be free with LCS params correction.\n'
-                              'By default LCS will use InertialCS MapMode for face or edge and Translate MapMode for vertex.'
+                              'By default LCS will use InertialCS MapMode \n'
+                              'and Translate MapMode for vertex and Concentric for curve and circle.'
                               )}
 
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
         doc = fc.activeDocument()

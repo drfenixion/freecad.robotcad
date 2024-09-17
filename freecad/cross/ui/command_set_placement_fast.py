@@ -45,11 +45,13 @@ class _SetCROSSPlacementFastCommand:
                               '\n'
                               'At both orienteers places will be created LCS (if selected subelement).\n'
                               'Be free to fix the default LCS orientation if it does not suit you.\n'
-                              'After the LCS orientation correction you can use LCS with other Placements tools.',
+                              'After the LCS orientation correction you can use LCS with other Placements tools.\n'
+                              'By default LCS will use InertialCS MapMode \n'
+                              'and Translate MapMode for vertex and Concentric for curve and circle.'
                               )}
 
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
         doc = fc.activeDocument()

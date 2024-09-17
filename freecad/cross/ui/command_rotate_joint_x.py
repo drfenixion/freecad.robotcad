@@ -33,9 +33,8 @@ class _RotateJointXCommand:
                               'Select: joint or link or subobject (body, part, etc) of link\n'
                               )}
 
-
     def IsActive(self):
-        return True
+        return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
         doc = fc.activeDocument()

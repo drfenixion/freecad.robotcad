@@ -812,7 +812,7 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
         parent_of_obj = None
         try:
             parent_of_obj = obj.Parents[0][0]
-        except (KeyError, AttributeError):
+        except (KeyError, IndexError, AttributeError):
             pass
         
         obj.adjustRelativeLinks(part)
