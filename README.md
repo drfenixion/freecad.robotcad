@@ -71,8 +71,6 @@ Gazebo - Inertia view
 
 
 ## One more robot
-Tools of RobotCAD (FreeCAD OVERCROSS)
-![Tools of RobotCAD](https://github.com/user-attachments/assets/cde5a1b4-7c75-406c-9a8e-c0815eccfce4)
 
 Choosing of material of robot or link
 ![Choosing of material of robot or link](https://github.com/user-attachments/assets/54593e92-dba6-4280-9510-b77cb2048910)
