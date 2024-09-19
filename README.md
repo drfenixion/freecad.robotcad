@@ -15,7 +15,7 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
     1. Set placement just by selecting faces of links and it will automatically connected
     1. Joint placement rotation tools
-    1. Tools for set placement of joints based on LCS and other orienteers.
+    1. Tools for set placement of joints based on LCS or other orienteers.
 1. Material setting (from library or custom) to link or whole robot
 1. Automatic calculation (based on material or custom mass):
     1. mass and inertia
