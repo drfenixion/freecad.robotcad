@@ -1,4 +1,4 @@
-# RobotCAD also known as FreeCAD OVERCROSS
+# RobotCAD
 
 RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2].
 
@@ -51,7 +51,7 @@ If docker is not installed look at [docker/README.md](https://github.com/drfenix
 
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
-# Overview
+# Screenshots
 ### Launched RViz and Gazebo using generated code:
 
 RViz
