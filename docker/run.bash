@@ -1,34 +1,5 @@
 #!/bin/bash
 
-# Usage info
-show_help() {
-cat << EOF
-Usage: ${0##*/} [-dh] 
-Run RobotCAD in container and open it window at host.
-
-    -h          display this help and exit
-    -d          debug
-EOF
-}
-
-# process params of script
-while getopts dh opt; do
-    case $opt in
-        h)
-            show_help
-            exit 0
-            ;;
-        d)  
-            debug=true
-            echo 'DEBUG is active.'
-            ;;
-        *)
-            show_help >&2
-            exit 1
-            ;;
-    esac
-done
-
 # Vars
 custom_fc_appimage=FreeCAD-0.21.2-Linux-x86_64.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
@@ -55,6 +26,43 @@ root_of_freecad_robotcad=$script_dir/../
 ws_path=$root_of_freecad_robotcad/docker/ros2_ws/
 build_data_path=$ws_path/build_data
 
+
+# Usage info
+show_help() {
+cat << EOF
+Usage: ${0##*/} [-dfh] 
+Run RobotCAD in container and open it window at host.
+
+    -h          display this help and exit
+    -f          force run new container (remove old one first if present also recreate build dirs)
+    -d          debug
+EOF
+}
+
+# process params of script
+while getopts dfh opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        f)  
+            force_run_new_container=true
+            echo 'Force run new container.'
+            ;;
+        d)  
+            debug=true
+            echo 'DEBUG is active.'
+            ;;
+        *)
+            show_help >&2
+            exit 1
+            ;;
+    esac
+done
+
+
+
 echo 'Paths: '
 echo '$script_dir: '$script_dir
 echo '$ws_path: '$ws_path
@@ -62,15 +70,14 @@ echo '$cont_path_ws: '$cont_path_ws
 echo '$root_of_freecad_robotcad: '$root_of_freecad_robotcad
 echo ''
 
-if [ "$use_default_stable_freecad" = "false" ]
-then
+if [ "$use_default_stable_freecad" = false ] ; then
     command=$custom_command
     force_run_new_container=true
 fi
 echo "Command to run in container: $command"
 
 
-[ "$force_run_new_container" = "true" ] && [ -d $build_data_path ] && rm -rf $build_data_path # remove build dirs if new container
+[ "$force_run_new_container" = true ] && [ -d $build_data_path ] && rm -rf $build_data_path # remove build dirs if new container
 # make dirs at host for builds, logs, other from container
 for dir in 'build' 'install' 'log' 'ros2_system_logs'
 do
@@ -92,7 +99,8 @@ fi
 
 
 # remove current container if want to run new one
-if [ "$force_run_new_container" = "true" ]; then
+if [ "$force_run_new_container" = true ]; then
+    echo "Stop and remove old container if present."
     # stop runnin container(s)
     docker ps -q --filter "name=$ros_container_name" | xargs -r docker stop > /dev/null
     # remove existing container(s)

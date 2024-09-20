@@ -47,6 +47,11 @@ bash run.bash
 ```
 Tested on Ubuntu 22.04.
 
+In case of issue recreate container by (transfer from 3.0.0 to next version may need "-f")
+```
+bash run.bash -f
+```
+
 If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
 
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
