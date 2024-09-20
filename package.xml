@@ -16,7 +16,7 @@
   <content>
     <workbench>
       <classname>CrossWorkbench</classname>
-	  <subdirectory>freecad/overcross</subdirectory>
+	  <subdirectory>freecad/robotcad</subdirectory>
 	  <pythonmin>3.8</pythonmin>
     </workbench>
   </content>

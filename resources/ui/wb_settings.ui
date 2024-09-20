@@ -72,10 +72,10 @@
       <item>
        <widget class="QLabel" name="label">
         <property name="toolTip">
-         <string>You can get this token from OVERCROSS site. It will used by external code generator.</string>
+         <string>You can get this token from robotcad.ru site. It will be used by external code generator.</string>
         </property>
         <property name="text">
-         <string>OVERCROSS token</string>
+         <string>External codegen token</string>
         </property>
        </widget>
       </item>
