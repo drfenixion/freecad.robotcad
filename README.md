@@ -47,7 +47,7 @@ bash run.bash
 ```
 Tested on Ubuntu 22.04.
 
-In case of issue recreate container by (transfer from 3.0.0 to next version may need "-f")
+In case of start issue (transfer from 3.0.0 to next version may need "-f") recreate container by
 ```
 bash run.bash -f
 ```
