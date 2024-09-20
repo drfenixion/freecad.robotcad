@@ -7,7 +7,7 @@
   <date>2024-09-18</date>
   <maintainer email="it.project.devel@gmail.com">Vasily S</maintainer>
   <license file="LICENSE">LGPL-2.1-or-later</license>
-  <url type="repository" branch="main">https://github.com/drfenixion/freecad.overcross</url>
+  <url type="repository" branch="dev">https://github.com/drfenixion/freecad.overcross</url>
   <url type="readme">https://github.com/drfenixion/freecad.overcross/blob/main/README.md</url>
   <icon>resources/icons/robotcad_overcross_joint.svg</icon>
 
