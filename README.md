@@ -171,7 +171,6 @@ git clone https://github.com/drfenixion/freecad.overcross.git
 cd freecad.overcross/docker
 bash run.bash -d
 ```
-Now you can use VSCODE debugger.
 - Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.overcross.git` on Linux
 - Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.overcross`)
 - Clone this repository and create a symbolic link to the directory `freecad.overcross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
