@@ -92,8 +92,8 @@ class CrossWorkbench(fcgui.Workbench):
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Reload',  # Comment out to disable this developer tool.
         ]
-        self.appendToolbar('CROSS', commands)
-        self.appendMenu('CROSS', commands)
+        self.appendToolbar('RobotCAD', commands)
+        self.appendMenu('RobotCAD', commands)
 
         fcgui.addIconPath(str(ICON_PATH))
         # fcgui.addLanguagePath(joinDir('Resources/translations'))

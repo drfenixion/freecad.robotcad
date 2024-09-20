@@ -96,11 +96,11 @@ class JointProxy(ProxyBase):
         obj.Type = JointProxy.type_enum
         add_property(
             obj, 'App::PropertyEnumeration', 'Parent', 'Elements',
-            'Parent link (from CROSS)',
+            'Parent link (from RobotCAD)',
         )
         add_property(
             obj, 'App::PropertyEnumeration', 'Child', 'Elements',
-            'Child link (from CROSS)',
+            'Child link (from RobotCAD)',
         )
         add_property(
             obj, 'App::PropertyPlacement', 'Origin', 'Elements',
