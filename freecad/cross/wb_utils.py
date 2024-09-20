@@ -40,7 +40,7 @@ CrossBasicElement = Union[CrossJoint, CrossLink]
 CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell]
 DOList = List[DO]
 
-MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.cross'
+MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.overcross'
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
