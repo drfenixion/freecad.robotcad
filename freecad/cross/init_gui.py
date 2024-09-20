@@ -69,7 +69,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
-            'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
+            # 'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
             'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
             'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
