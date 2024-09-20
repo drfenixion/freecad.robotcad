@@ -163,8 +163,15 @@ You will probably want to be able to use ROS-related functionalities and this re
 
 ## Testing/developing the workbench
 
-If you want to work on this workbench you have the following options:
+If you want to work on this workbench you have the following options (choose one):
 
+- Run RobotCAD by fast run script with -d flag (you need to remove RobotCAD docker container first if it was created before without -d flag)
+```
+git clone https://github.com/drfenixion/freecad.overcross.git
+cd freecad.overcross/docker
+bash run.bash -d
+```
+Now you can use VSCODE debugger.
 - Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.overcross.git` on Linux
 - Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.overcross`)
 - Clone this repository and create a symbolic link to the directory `freecad.overcross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
