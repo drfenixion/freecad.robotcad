@@ -51,15 +51,15 @@ cont_user_path=/home/$USER
 cont_path_ws=$cont_user_path/$parent_dir_of_ws_dir_name/$ws_dir_name
 basedir=`dirname $0`
 script_dir=`cd $basedir; pwd; cd - > /dev/null 2>&1;`
-root_of_freecad_cross=$script_dir/../
-ws_path=$root_of_freecad_cross/docker/ros2_ws/
+root_of_freecad_robotcad=$script_dir/../
+ws_path=$root_of_freecad_robotcad/docker/ros2_ws/
 build_data_path=$ws_path/build_data
 
 echo 'Paths: '
 echo '$script_dir: '$script_dir
 echo '$ws_path: '$ws_path
 echo '$cont_path_ws: '$cont_path_ws
-echo '$root_of_freecad_cross: '$root_of_freecad_cross
+echo '$root_of_freecad_robotcad: '$root_of_freecad_robotcad
 echo ''
 
 if [ "$use_default_stable_freecad" = "false" ]
@@ -139,10 +139,10 @@ else
         --mount dst=$cont_path_ws/install,volume-opt=device=$build_data_path/install$mount_options \
         --mount dst=$cont_path_ws/log,volume-opt=device=$build_data_path/log$mount_options \
         --mount dst=$cont_user_path/.ros/log,volume-opt=device=$build_data_path/ros2_system_logs$mount_options \
-        --volume=$root_of_freecad_cross/docker/ros2_ws/src:$cont_path_ws/src \
+        --volume=$root_of_freecad_robotcad/docker/ros2_ws/src:$cont_path_ws/src \
         --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
-        --volume=$root_of_freecad_cross:$cont_user_path/.local/share/FreeCAD/Mod/freecad.cross \
-        --volume=$root_of_freecad_cross/docker/freecad:$cont_path_ws/../freecad \
+        --volume=$root_of_freecad_robotcad:$cont_user_path/.local/share/FreeCAD/Mod/freecad.robotcad \
+        --volume=$root_of_freecad_robotcad/docker/freecad:$cont_path_ws/../freecad \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
         --privileged \
         $nvidia_options \
