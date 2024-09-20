@@ -126,7 +126,7 @@ def get_ros_distro_from_env() -> str:
     """
     if 'ROS_DISTRO' in os.environ:
         return os.environ.get('ROS_DISTRO')
-    candidates = ['rolling', 'humble', 'galactic', 'foxy']
+    candidates = ['rolling', 'jazzy', 'iron', 'humble', 'galactic', 'foxy']
     for c in candidates:
         if Path(f'/opt/ros/{c}').exists():
             return c
