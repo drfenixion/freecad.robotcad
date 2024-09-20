@@ -1,20 +1,21 @@
-# RobotCAD also known as FreeCAD OVERCROSS
+# RobotCAD
 
-RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2].
+RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2]. RobotCAD also known as OVERCROSS.
 
-<a href="https://www.youtube.com/watch?v=PGEWqatcUJM" target="_blank"><img src="https://github.com/user-attachments/assets/f3a1646f-5205-44c9-9167-4e8750541be2" alt="RobotCAD video teaser"/></a>
+<a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD video teaser"/></a>
+<a href="https://youtu.be/T_OGQFc9IMk" target="_blank">Workflow video</a>
 
 # Key features short list:
 1. Autoinstall and run by startup script
 1. Modeling parts (in FreeCAD),
 1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc),
-    1. Automatic creating full robot structure by selected objects (links in joints will have order of object selection)
+    1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
     1. Set placement just by selecting faces of links and it will automatically connected
     1. Joint placement rotation tools
-    1. Many other tools for set placement of joints based on LCS
+    1. Tools for set placement of joints based on LCS or other orienteers.
 1. Material setting (from library or custom) to link or whole robot
 1. Automatic calculation (based on material or custom mass):
     1. mass and inertia
@@ -50,7 +51,7 @@ If docker is not installed look at [docker/README.md](https://github.com/drfenix
 
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
-# Overview
+# Screenshots
 ### Launched RViz and Gazebo using generated code:
 
 RViz
@@ -69,9 +70,7 @@ Gazebo - Inertia view
 ![inertia](https://github.com/user-attachments/assets/71983ee3-3995-47d2-a8dc-516c6c2b8a48)
 
 
-# One more robot
-Tools of RobotCAD (FreeCAD OVERCROSS)
-![Tools of RobotCAD](https://github.com/user-attachments/assets/cde5a1b4-7c75-406c-9a8e-c0815eccfce4)
+## One more robot
 
 Choosing of material of robot or link
 ![Choosing of material of robot or link](https://github.com/user-attachments/assets/54593e92-dba6-4280-9510-b77cb2048910)
@@ -164,8 +163,14 @@ You will probably want to be able to use ROS-related functionalities and this re
 
 ## Testing/developing the workbench
 
-If you want to work on this workbench you have the following options:
+If you want to work on this workbench you have the following options (choose one):
 
+- Run RobotCAD by fast run script with -d flag (you need to remove RobotCAD docker container first if it was created before without -d flag). After that you will able to use VSCODE debugger.
+```
+git clone https://github.com/drfenixion/freecad.overcross.git
+cd freecad.overcross/docker
+bash run.bash -d
+```
 - Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.overcross.git` on Linux
 - Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.overcross`)
 - Clone this repository and create a symbolic link to the directory `freecad.overcross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
