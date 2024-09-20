@@ -41,13 +41,13 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 # Fast install and run
 If you have docker (buildx, compose plugins) installed just do
 ```
-git clone https://github.com/drfenixion/freecad.overcross.git
-cd freecad.overcross/docker
+git clone https://github.com/drfenixion/freecad.robotcad.git
+cd freecad.robotcad/docker
 bash run.bash
 ```
 Tested on Ubuntu 22.04.
 
-If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.overcross/blob/main/docker/README.md). There is also additional information on how to use the startup script.
+If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
 
 You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
@@ -77,7 +77,7 @@ Choosing of material of robot or link
 
 Generated ROS 2 package
 
-![Generated ROS 2 package](https://github.com/drfenixion/freecad.overcross/assets/13005708/f366c2d2-af67-46e2-b7ea-8d03821e5646)
+![Generated ROS 2 package](https://github.com/drfenixion/freecad.robotcad/assets/13005708/f366c2d2-af67-46e2-b7ea-8d03821e5646)
 
 Launched Rviz and Gazebo from generated Gazebo launcher
 ![Launched Rviz and Gazebo from gazebo launcher](https://github.com/drfenixion/freecad.cross/assets/13005708/9017aec4-70e5-45fa-82ad-6b4646453767)
@@ -90,7 +90,7 @@ Generated collisions in Gazebo
 
 ## Usage
 
-[Common usage plan](https://github.com/drfenixion/freecad.overcross/wiki) 
+[Common usage plan](https://github.com/drfenixion/freecad.robotcad/wiki) 
 
 ## Description
 
@@ -139,7 +139,7 @@ You need a recent version of FreeCAD v0.21.2 with the ability to configure custo
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"
 - Add an entry to "Custom repository" by clicking on the "+" sign.
-- Repository URL: `https://github.com/drfenixion/freecad.overcross.git`, branch: `main`
+- Repository URL: `https://github.com/drfenixion/freecad.robotcad.git`, branch: `main`
 - Click on "OK" to close the dialog "Preferences"
 - Back to FreeCAD's main window, menu "Tools / Addon manager"
 - Search and install the workbench via the [Addon Manager](https://wiki.freecad.org/Std_AddonMgr)
@@ -167,13 +167,13 @@ If you want to work on this workbench you have the following options (choose one
 
 - Run RobotCAD by fast run script with -d flag (you need to remove RobotCAD docker container first if it was created before without -d flag). After that you will able to use VSCODE debugger.
 ```
-git clone https://github.com/drfenixion/freecad.overcross.git
-cd freecad.overcross/docker
+git clone https://github.com/drfenixion/freecad.robotcad.git
+cd freecad.robotcad/docker
 bash run.bash -d
 ```
-- Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.overcross.git` on Linux
-- Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.overcross`)
-- Clone this repository and create a symbolic link to the directory `freecad.overcross` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
+- Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.robotcad.git` on Linux
+- Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.robotcad`)
+- Clone this repository and create a symbolic link to the directory `freecad.robotcad` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
 - `pip install -e .` adds the root-directory to `easy_install.path`.
 
 
