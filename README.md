@@ -181,6 +181,8 @@ bash run.bash -d
 - Clone this repository and create a symbolic link to the directory `freecad.robotcad` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
 - `pip install -e .` adds the root-directory to `easy_install.path`.
 
+New code will not automatically load to FreeCAD. You should restart FreeCAD by `bash run.bash -d` command for getting affect of corrected code.
+
 
 --------------------------------------------------------------------------------
 
