@@ -170,7 +170,7 @@ You will probably want to be able to use ROS-related functionalities and this re
 
 If you want to work on this workbench you have the following options (choose one):
 
-- Run RobotCAD by fast run script with -d flag (you need to remove RobotCAD docker container first if it was created before without -d flag). After that you will able to use VSCODE debugger.
+- Run RobotCAD by fast run script with `-d` flag. You need to remove RobotCAD docker container first if it was created before without `-d` flag. You can do remove old container and run with debug by `-fd` flags. After that you will able to use VSCODE debugger.
 ```
 git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
