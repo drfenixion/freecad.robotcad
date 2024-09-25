@@ -20,6 +20,7 @@ from .freecad_utils import is_link as is_fc_link
 from .freecad_utils import message
 from .freecad_utils import set_param
 from .freecad_utils import warn
+from .freecad_utils import lcs_attachmentsupport_name
 from .freecadgui_utils import get_placement
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
@@ -681,7 +682,8 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS' )
     body_lcs_wrapper.addObject(lcs)
 
-    lcs.Support = (orienteer.Object, sub_element_name)
+    setattr(lcs, lcs_attachmentsupport_name(), [(orienteer.Object, sub_element_name)])   # The X axis.
+
     if sub_element_type == 'Vertex':
         lcs.MapMode = 'Translate'
     elif sub_element_type == 'Edge' \
