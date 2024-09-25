@@ -119,6 +119,12 @@ def _add_joint_variable(
             min_, max_ = -1e999, 1e999
         else:
             min_, max_ = joint.LowerLimit, joint.UpperLimit
+            if value > max_:
+                error('Joint (' + var_name + ') value can not be more Upper limit')
+            if value < min_:
+                error('Joint (' + var_name + ') value can not be less LowerLimit limit')
+            if max_ < min_:
+                error('Joint (' + var_name + ') Upper limit can not be less LowerLimit limit')
         setattr(robot, used_var_name, (value, min_, max_, 1.0))
     value: Optional[float] = None
     if joint.Type == 'prismatic':
