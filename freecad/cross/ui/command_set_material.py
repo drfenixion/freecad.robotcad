@@ -4,6 +4,7 @@ import MaterialEditor
 
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected, is_link_selected
+from ..freecad_utils import error
 
 
 class _SetMaterialCommand:
@@ -45,9 +46,14 @@ class _SetMaterialCommand:
         try:
             card_name = material_editor.cards[material_editor.card_path]
             density = material_editor.materials[material_editor.card_path]['Density']
-        except AttributeError:
+        except (AttributeError, KeyError):
             card_name = ''
             density = ''
+
+        if not density:
+            error('Material without density. Choose other material or fill density.', True)
+        elif fc.Units.Quantity(density,) <= 0.0:
+            error('Material density must be stringly positive. Correct material density or choose another material.', True)
 
         obj.MaterialCardName = card_name
         # TODO: make MaterialCardPath portable.
