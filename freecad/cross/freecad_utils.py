@@ -8,8 +8,6 @@ from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
 import sys
-from freecad.utils import get_python_exe
-import addonmanager_utilities as utils
 import subprocess
 import os
 
@@ -854,39 +852,3 @@ def adjustedGlobalPlacement(obj, locVector):
     except Exception:
         locPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
         return locPlacement
-
-
-def pip_install(pkg_name, restart_freecad = True):
-    '''Python package installer for AppImage builds. It install python module inside AppImage'''
-
-    python_exe = get_python_exe()
-    print('python_exe: ', python_exe)
-    vendor_path = utils.get_pip_target_directory()
-    if not os.path.exists(vendor_path):
-        os.makedirs(vendor_path)
-
-    p = subprocess.Popen(
-        [python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--target", vendor_path, pkg_name],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-
-    for line in iter(p.stdout.readline, b''):
-        if line:
-            print(line.decode("utf-8"), end="")
-    print()
-        
-    for err in iter(p.stderr.readline, b''):
-        if err:
-            print(err.decode("utf-8"), end="")
-    print()
-    
-    p.stdout.close()
-    p.stderr.close()
-    p.wait(timeout=180)
-
-    if restart_freecad:
-        utils.restart_freecad()    
-
-
-def get_python_name() -> str:
-    return 'python' + str(sys.version_info.major) + '.' + str(sys.version_info.minor)
