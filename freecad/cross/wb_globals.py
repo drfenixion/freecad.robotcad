@@ -9,7 +9,6 @@ from .ros.utils import add_ros_library_path
 from .ros.utils import get_ros_workspace_from_env
 from .ros.utils import get_ros_distro_from_env
 from . import wb_constants
-import addonmanager_utilities as utils
 
 # Constants.
 PREFS_CATEGORY = wb_constants.PREFS_CATEGORY  # Category in the preferences dialog.
@@ -36,6 +35,8 @@ def get_python_name() -> str:
 def get_python_exe_path():
     ''' Get python exe path '''
 
+    import addonmanager_utilities as utils
+
     if hasattr(utils, "get_python_exe"):
         # For v0.21:
         python_exe = utils.get_python_exe()
@@ -49,6 +50,8 @@ def get_python_exe_path():
 
 def pip_install(pkg_name, restart_freecad = True):
     '''Python package installer for AppImage builds. It can install python module inside AppImage'''
+
+    import addonmanager_utilities as utils
 
     python_exe = get_python_exe_path()
     print('python_exe: ', python_exe)
