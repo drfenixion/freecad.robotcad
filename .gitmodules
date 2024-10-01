@@ -1,0 +1,4 @@
+[submodule "modules/ros2_controllers"]
+	path = modules/ros2_controllers
+	url = https://github.com/ros-controls/ros2_controllers
+	branch = iron
