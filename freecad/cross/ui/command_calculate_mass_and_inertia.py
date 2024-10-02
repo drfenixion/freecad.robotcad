@@ -73,9 +73,10 @@ class _CalculateMassAndInertiaCommand:
             
             elem_material = material_from_material_editor(link.MaterialCardPath)
         
-            #  show and error if material is not specified and inertia calculation based on mass is false
+            #  show and error if material is not specified , inertia calculation based on mass and 
+            #  material not calculate is false 
             if (elem_material.material_name is None) and (default_material.material_name is None) :
-                if not link.CalculateInertiaBasedOnMass:
+                if not link.CalculateInertiaBasedOnMass and not link.MaterialNotCalculate:
                     error(
                     f'Link "{link.Label}" skipped.'
                     ' No material specified for Link and no default material specified for robot element.', gui=True,
@@ -107,7 +108,11 @@ class _CalculateMassAndInertiaCommand:
 
             volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
             if not link.CalculateInertiaBasedOnMass :
+                # clear any expression that might have been used to enter the value for mass manually 
+                # without clearing an existing expression before updating mass the value for mass does not update 
+                link.clearExpression("Mass")
                 link.Mass = quantity_as(volume * material.density, 'kg')
+                
                 
             else:
                 if link.Mass <= 0.0:
@@ -118,7 +123,10 @@ class _CalculateMassAndInertiaCommand:
             elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, link.Mass)
 
             link.CenterOfMass = fc.Placement(link.MountedPlacement * center_of_gravity, link.MountedPlacement.Rotation, fc.Vector())
-
+            # clear expression for all inertia properties incase there are any
+            for exp in ['Ixx','Ixy','Ixz','Iyy','Iyz','Izz']:
+                link.clearExpression(exp)
+                
             link.Ixx = elem_matrix_of_inertia.A11
             link.Ixy = elem_matrix_of_inertia.A12
             link.Ixz = elem_matrix_of_inertia.A13
