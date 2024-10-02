@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>FreeCAD - CROSS - Set Joint Values</string>
+   <string>FreeCAD - RobotCAD - Set Joint Values</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
