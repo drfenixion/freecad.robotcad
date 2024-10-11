@@ -197,6 +197,16 @@ def get_joints(objs: DOList) -> list[CrossJoint]:
     return [o for o in objs if is_joint(o)]
 
 
+def get_controllers(objs: DOList) -> list[CrossController]:
+    """Return only the objects that are Cross::Controller instances."""
+    return [o for o in objs if is_controller(o)]
+
+
+def get_broadcasters(objs: DOList) -> list[CrossController]:
+    """Return only the objects that are Cross::Controller instances."""
+    return [o for o in objs if is_broadcaster(o)]
+
+
 def get_xacro_objects(objs: DOList) -> list[CrossXacroObject]:
     """Return only the objects that are Cross::XacroObject instances."""
     return [o for o in objs if is_xacro_object(o)]

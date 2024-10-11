@@ -40,6 +40,8 @@ from .wb_utils import export_templates
 from .wb_utils import get_chains
 from .wb_utils import get_joints
 from .wb_utils import get_links
+from .wb_utils import get_controllers
+from .wb_utils import get_broadcasters
 from .wb_utils import get_rel_and_abs_path
 from .wb_utils import get_valid_urdf_name
 from .wb_utils import is_joint
@@ -61,6 +63,7 @@ from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject 
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 from .trajectory import Trajectory as CrossTrajectory  # A Cross::Trajectory, i.e. a DocumentObject with Proxy "Trajectory". # noqa: E501
+from .controller import Controller as CrossController  # A Cross::Controller, i.e. a DocumentObject with Proxy "Controller". # noqa: E501
 BasicElement = Union[CrossJoint, CrossLink]
 DO = fc.DocumentObject
 DOList = List[DO]
@@ -306,6 +309,8 @@ class RobotProxy(ProxyBase):
             # Reset _links and _joints to provoke a recompute.
             self._links = None
             self._joints = None
+            self._controllers = None
+            self._broadcasters = None
             self.execute(obj)
         if prop == 'OutputPath':
             rel_path = remove_ros_workspace(obj.OutputPath)
@@ -569,6 +574,31 @@ class RobotProxy(ProxyBase):
             return []
         self._joints = get_joints(self.robot.Group)
         return list(self._joints)  # A copy.
+    
+
+    def get_controllers(self) -> list[CrossController]:
+        """Return the list of CROSS controllers in the order of creation."""
+        # TODO: as property.
+        if (self._controllers is not None):
+            # self._controllers is updated in self.onChanged().
+            return list(self._controllers)  # A copy.
+        if not self.is_execute_ready():
+            return []
+        self._controllers = get_controllers(self.robot.Group)
+        return list(self._controllers)  # A copy.
+    
+
+    def get_broadcasters(self) -> list[CrossController]:
+        """Return the list of CROSS broadcasters in the order of creation."""
+        # TODO: as property.
+        if (self._broadcasters is not None):
+            # self._broadcasters is updated in self.onChanged().
+            return list(self._broadcasters)  # A copy.
+        if not self.is_execute_ready():
+            return []
+        self._broadcasters = get_broadcasters(self.robot.Group)
+        return list(self._broadcasters)  # A copy.
+    
 
     def get_actuated_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS actuated joints in the order of creation."""
@@ -867,6 +897,29 @@ class RobotProxy(ProxyBase):
         jointsXml += f"""
     </joints>
         """
+
+    #     #TODO
+    #     controllersXml = f"""
+    # <controllers>
+    #     """
+
+    #     for controller in self.get_controllers():
+
+    #         controllersXml += f"""
+    #     <controller>
+    #         <name>{get_valid_urdf_name(ros_name(controller))}</name>
+    #         <jointSpecific>{joint.JointSpecific}</jointSpecific>
+    #         <jointRotationDirection>{joint.JoinRotationDirection}</jointRotationDirection>
+    #         <jointRelTotalCenterOfMass_x>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.x) + ' mm'), 'm')}</jointRelTotalCenterOfMass_x>
+    #         <jointRelTotalCenterOfMass_y>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.y) + ' mm'), 'm')}</jointRelTotalCenterOfMass_y>
+    #         <jointRelTotalCenterOfMass_z>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.z) + ' mm'), 'm')}</jointRelTotalCenterOfMass_z>
+    #     </controller>
+    #     """
+
+    #     controllersXml += f"""
+    # </controllers>
+    #     """
+    #     #TODO END
 
         robotMetaXmlDoc = parseString(robotMetaXml)
         jointsXmlDoc = parseString(jointsXml)
