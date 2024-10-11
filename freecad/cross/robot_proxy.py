@@ -45,6 +45,8 @@ from .wb_utils import get_valid_urdf_name
 from .wb_utils import is_joint
 from .wb_utils import is_link
 from .wb_utils import is_robot
+from .wb_utils import is_controller
+from .wb_utils import is_broadcaster
 from .wb_utils import remove_ros_workspace
 from .wb_utils import ros_name
 from .wb_utils import _has_meshes_directory
@@ -353,7 +355,7 @@ class RobotProxy(ProxyBase):
         if not self.is_execute_ready():
             return None
         for o in self.robot.Group[::-1]:
-            if is_link(o) or is_joint(o):
+            if is_link(o) or is_joint(o) or is_controller(o) or is_broadcaster(o):
                 # Supported.
                 continue
             warn_unsupported(o, by='CROSS::Robot', gui=True)

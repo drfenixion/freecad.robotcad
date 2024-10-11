@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <rect x="239.726" y="242.881" width="19.063" height="54.336" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="218.552" y="196.085" width="60.998" height="51.56" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="213.04" y="284.924" width="73.714" height="127.314" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="202.663" y="414.84" width="19.91" height="72.184" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="212.618" cy="411.842" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="286.751" y="277.032" width="78.369" height="17.453" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="286.323" cy="285.122" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="277.006" y="414.971" width="19.91" height="72.184" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="286.751" cy="411.247" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <rect x="134.88" y="277.475" width="78.369" height="17.453" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="212.193" cy="285.915" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="249.474" cy="284.131" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="248.627" cy="247.241" rx="13.132" ry="11.899" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-width: 13px;" x1="55.866" y1="188.268" x2="413.408" y2="22.346" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-linecap: round; stroke-width: 13px;" x1="431.285" y1="184.358" x2="92.737" y2="24.581" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 3px; stroke-linecap: round;" x1="430.168" y1="188.827" x2="296.648" y2="487.151" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 3px; stroke-linecap: round;" x1="364.246" y1="277.095" x2="412.849" y2="26.257" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 3px; stroke-linecap: round;" x1="135.754" y1="277.095" x2="92.179" y2="27.933" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+  <line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 3px; stroke-linecap: round;" x1="201.676" y1="485.475" x2="56.983" y2="191.62" transform="matrix(1, 0, 0, 1, 0, 3.552713678800501e-15)"/>
+</svg>

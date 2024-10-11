@@ -4,6 +4,11 @@ from __future__ import annotations
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from copy import deepcopy
+try:
+    from PySide import QtWidgets
+except:
+    from PySide2 import QtWidgets
 
 from .freecad_utils import get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
@@ -164,3 +169,63 @@ def get_placements(
     orienteer2_placement = placements[objects.index(orienteer2)]
 
     return orienteer1_placement, orienteer2_placement
+
+
+def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
+    """Get selected properties of treeView in order of selection. 
+
+    Return selected properties and objects."""
+
+    def has_parent(index):
+        return index.parent().isValid()
+
+    mw = fcgui.getMainWindow()
+    trees = mw.findChildren(QtWidgets.QTreeView)
+        
+    props=[]
+    for tree in trees:
+        prop_default = {'type': 'property', 'name': None, 'value': None, 'description': None}
+        prop = deepcopy(prop_default)
+        n= 0
+        for index in tree.selectedIndexes():
+
+            n=n+1
+            itemData = index.model().itemData(index)
+            if itemData!={} :
+                if 0 in itemData  :
+                    if 1 in itemData :
+                        object = fc.ActiveDocument.getObjectsByLabel(itemData[0])[0]
+                        props.append({'type': 'object', 'name': itemData[0], 'object': object})
+                        prop = deepcopy(prop_default)
+                        n = 0
+                    else:
+                        if n==1 :   
+                            tabProperty=[itemData[0]]
+                            parent = index.parent()
+                            tabProperty.append(parent.data())
+                            while has_parent(parent):
+                                parent=parent.parent()
+                                tabProperty.append(parent.data())
+
+                            prop['name'] = tabProperty
+
+                        elif n==2 :
+                            prop['value'] = itemData[0]  # value            
+            
+                            if 3 in itemData : # tip
+                                    prop['description'] = itemData[3]
+            if n == 2 :
+                props.append(prop)
+                prop = deepcopy(prop_default)
+                n = 0
+    
+    properties = []
+    objects = []
+    for el in props:
+        if 'type' in el:
+            if el['type'] == 'property':
+                properties.append(el)
+            elif el['type'] == 'object':
+                objects.append(el)
+
+    return properties, objects

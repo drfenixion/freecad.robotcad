@@ -10,9 +10,10 @@ import FreeCAD as fc
 # dependency.
 Joint = NewType('Joint', fc.DocumentObject)
 Link = NewType('Link', fc.DocumentObject)
+Controller = NewType('Controller', fc.DocumentObject)
 
 # Typing hints
-BasicElement = Union[Link, Joint]
+BasicElement = Union[Link, Joint, Controller]
 DO = fc.DocumentObject
 DOList = List[DO]
 
