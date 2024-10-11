@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from typing import ForwardRef, List, Optional, Union, cast
 from copy import deepcopy
+from pathlib import Path
+import os
+import yaml
+import xml.etree.ElementTree as ET
+import re
 
 import FreeCAD as fc
 
@@ -317,3 +322,290 @@ def add_controller_properties(controller: CrossController,
                 parameter_name_prefix.pop()
 
     return controller
+
+
+def get_controllers_data(ROS2_CONTROLLERS_PATH: Path) -> dict :
+    ''' Get controllers data. '''
+
+    def collect_controllers_parameters(controllers: dict) -> dict :
+        ''' Adding to controllers their collected parameters. '''
+
+        for controller_name in controllers:
+            controller = controllers[controller_name]
+
+            for path in list(controller['parameters_path'].values()):
+                with open(path) as stream:
+                    if 'parameters' in controllers[controller_name]:
+                        controllers[controller_name]['parameters'].update(yaml.safe_load(stream))
+                    else:
+                        controllers[controller_name]['parameters'] = yaml.safe_load(stream)
+        
+        return controllers
+    
+
+    def collect_controllers_plugin_data(controllers: dict) -> dict :
+        ''' Adding to controllers their plugin data. '''
+
+        for dir_name in controllers:
+            controller = controllers[dir_name]
+
+            for path in list(controller['plugin_path'].values()):
+                root = ET.parse(path).getroot()
+
+                for type_tag in root.findall('class'):
+                    full_class_name = type_tag.get('name')
+                    class_name = full_class_name.split('/')[-1]
+                    camelCaseToList = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
+                    controller_name = '_'.join(camelCaseToList).lower()
+                    plugin = {full_class_name: 
+                                {
+                                  'name': controller_name,
+                                  'description': type_tag.find('description').text.strip()
+                                }
+                              }
+
+                    if 'plugins_data' in controllers[dir_name]:
+                        controllers[dir_name]['plugins_data'].update(plugin)
+                    else:
+                        controllers[dir_name]['plugins_data'] = plugin
+        
+        return controllers
+
+    controllers = get_controllers_root_dirs(ROS2_CONTROLLERS_PATH)
+    controllers['controllers_dirs'] = collect_controllers_config_files(controllers['controllers_dirs'])
+    controllers['broadcasters_dirs'] = collect_controllers_config_files(controllers['broadcasters_dirs'])
+    controllers['controllers_dirs'] = collect_controllers_parameters(controllers['controllers_dirs'])
+    controllers['broadcasters_dirs'] = collect_controllers_parameters(controllers['broadcasters_dirs'])
+    controllers['controllers_dirs'] = collect_controllers_plugin_data(controllers['controllers_dirs'])
+    controllers['broadcasters_dirs'] = collect_controllers_plugin_data(controllers['broadcasters_dirs'])
+
+    controllers['controllers'] = separate_controllers_from_dirs(controllers['controllers_dirs'])
+    controllers['broadcasters'] = separate_controllers_from_dirs(controllers['broadcasters_dirs'])
+
+    return controllers
+
+
+def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
+    ''' Separate controllers from controllers directories dictionaries. 
+    
+    Directory can contains several controllers.
+    This make controllers as first level properties of dict.
+    '''
+
+    def add_fc_types_based_on_params_types(params: dict, param_name_prefix: list = []) -> dict:
+        ''' Return params with FreeCAD types in addition to ros2_controllers parameters types
+        '''
+
+        # some types required to be replaced to more suited because can be more convenient to use
+        replacement = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
+        for param_name, param in params.items():
+            try:
+                # param['type'] - KeyError trigger to recursion because type present only in leaf element
+                params[param_name]['type_fc'] = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[param['type']]
+                params[param_name]['type_fc_origin'] = param['type_fc']
+                if 'default_value' in param:
+                    params[param_name]['default_value_origin'] = param['default_value']
+                
+                # full_param_name means param_name + all parents prefixes
+                full_param_name = '__'.join(param_name_prefix + [param_name]) 
+                if full_param_name in replacement:
+                    params[param_name]['type_fc'] = replacement[full_param_name]['replace']
+                    # some types of replaced params must have other default value
+                    if 'default_value_replace' in replacement[full_param_name]:
+                        params[param_name]['default_value'] = replacement[full_param_name]['default_value_replace']
+            except KeyError:
+                param_name_prefix.append(param_name)
+                params[param_name] = add_fc_types_based_on_params_types(param, param_name_prefix)
+                param_name_prefix.pop()
+
+        return params
+
+
+    def exlude_params(params: dict, exluded_params: list) -> dict:
+        ''' Return params without exluded params
+        '''
+
+        params_without_exluded = {}
+        for param_name, param in params.items():
+            if param_name not in exluded_params:
+                params_without_exluded[param_name] = param
+
+        return params_without_exluded
+    
+
+    def add_validation_rules_str_to_params(params: dict) -> dict:
+        ''' Add validation rules string to every param with validation. 
+        
+        It convert rules to string and to every param where present validation.
+        '''
+
+        for param_name, param in params.items():
+            validation_str = ''
+            if 'validation' in param:
+                for validation_rule, validation_value in param['validation'].items():
+
+                    rule_desc = 'Validation rule: '
+                    try:
+                        rule_desc += wb_constants.ROS2_CONTROLLERS_VALIDATION_RULES_DESCRIPTIONS[validation_rule.rstrip("<>")]
+                    except KeyError:
+                        rule_desc += validation_rule.rstrip("<>")
+
+                    validation_value_str = ''
+                    if validation_value:
+                        validation_value_str += '. Validation value: '
+                        
+                        try:
+                            validation_value_str += ', '.join(str(el) for el in validation_value)
+                        except:
+                            validation_value_str += str(validation_value)
+
+                    validation_str += rule_desc + validation_value_str + '\n'
+
+                params[param_name]['validation_str'] = validation_str
+
+        return params
+    
+
+    special_cases = {
+        'joint_group_velocity_controller': {
+            'params_based_on_controller_dir': 'forward_command_controller',
+            'params_based_on_controller_name': 'forward_command_controller',
+            'excluded_params': ['interface_name'],
+        },
+        'joint_group_effort_controller': {
+            'params_based_on_controller_dir': 'forward_command_controller',
+            'params_based_on_controller_name': 'forward_command_controller',
+            'excluded_params': ['interface_name'],
+        },
+        'joint_group_position_controller': {
+            'params_based_on_controller_dir': 'forward_command_controller',
+            'params_based_on_controller_name': 'forward_command_controller',
+            'excluded_params': ['interface_name'],
+        },        
+    }
+
+    controllers = {}
+    for controller_dir_name, controller_dir in controllers_dirs.items():
+        if 'plugins_data' in controller_dir:
+            for plugin_class_name, plugin_data in controller_dir['plugins_data'].items():
+
+                plugin_data_name = plugin_data['name']
+
+                # prepare controller parameters
+                parameters = {}
+                try:
+                    parameters = controller_dir['parameters'][plugin_data_name]
+                except KeyError:
+                    # special cases for controllers that does not have their own params and uses params from other controllers
+                    params_based_on_controller_dir = special_cases[plugin_data_name]['params_based_on_controller_dir']
+                    params_based_on_controller_name = special_cases[plugin_data_name]['params_based_on_controller_name']
+                    params_to_exlude = special_cases[plugin_data_name]['excluded_params']
+                    parameters = exlude_params(
+                        controllers_dirs[params_based_on_controller_dir]['parameters'][params_based_on_controller_name],
+                        params_to_exlude
+                        )
+                if plugin_data_name in ['ackermann_steering_controller', 'bicycle_steering_controller', 'tricycle_steering_controller']:
+                    # must add steering_controllers_library params to steering controllers
+                    parameters.update(controllers_dirs['steering_controllers_library']['parameters']['steering_controllers_library'])
+                
+                parameters = add_fc_types_based_on_params_types(parameters)
+
+                parameters = add_validation_rules_str_to_params(parameters)
+
+
+                # assembly controller dict
+                controllers[plugin_data_name] = {
+                    'name': plugin_data_name,
+                    'description': plugin_data['description'],
+                    'controller_path': controller_dir['dir'],
+                    'plugin_path': controller_dir['plugin_path'],
+                    'parameters_path': controller_dir['parameters_path'],
+                    'parameters': parameters,
+                    'controller_dir_name': controller_dir_name,
+                    'controller_plugin_class_name': plugin_class_name,
+                }
+
+    return controllers
+
+
+def get_controllers_root_dirs(ROS2_CONTROLLERS_PATH: Path) -> dict :
+    ''' Get controllers root dirs. '''
+    controllers_and_broadcusters = {}
+
+    controller_key_words = ['controller']
+    controller_key_words_blacklist = ['test', 'ros2_controllers', 'rqt']
+    controllers = get_files_or_dirs_by_filter(ROS2_CONTROLLERS_PATH, 
+                                              files_or_dirs = 'dirs', 
+                                              key_words = controller_key_words, 
+                                              key_words_blacklist = controller_key_words_blacklist, 
+                                              attr_name_for_found_result = 'dir')
+
+    controller_key_words = ['broadcaster']
+    broadcasters = get_files_or_dirs_by_filter(ROS2_CONTROLLERS_PATH, 
+                                               files_or_dirs = 'dirs', 
+                                               key_words = controller_key_words, 
+                                               key_words_blacklist = controller_key_words_blacklist, 
+                                               attr_name_for_found_result = 'dir')
+
+    controllers_and_broadcusters['controllers_dirs'] = controllers
+    controllers_and_broadcusters['broadcasters_dirs'] = broadcasters
+
+    return controllers_and_broadcusters
+
+
+def collect_controllers_config_files(controllers: dict) -> dict :
+    ''' Get controllers plugin xml file and parameters yaml file. '''
+
+    for controller_folder_name, controller_value in controllers.items():
+
+        plugin = get_files_or_dirs_by_filter(
+            controller_value['dir'], 
+            key_words = ['.xml'], 
+            key_words_blacklist = ['package.xml'])
+        controllers[controller_folder_name].update({'plugin_path': plugin})
+
+        parameters = get_files_or_dirs_by_filter(
+            controller_value['dir'] / 'src', 
+            key_words = ['.yaml'])
+        controllers[controller_folder_name].update({'parameters_path': parameters})
+
+    return controllers
+
+
+def get_files_or_dirs_by_filter(dir: Path, 
+                                files_or_dirs:str = 'files',
+                                key_words:list = [],
+                                key_words_blacklist:list = [],
+                                attr_name_for_found_result:str | None = None) -> dict :
+    ''' Get files or dirs in path by included keywords in file name. '''
+
+    files_or_dirs_result = {}
+    for root, dirs, files in os.walk(dir):
+        for name in eval(files_or_dirs):
+            # check key words
+            for key_word in key_words:
+                if key_word in name:
+                    
+                    # check blacklist
+                    name_in_blacklist = False
+                    for key_word_bl in key_words_blacklist:
+                        if key_word_bl in name:
+                            name_in_blacklist = True
+                            break
+                    
+                    # forming result
+                    if not name_in_blacklist:  
+                        if name not in files_or_dirs_result:
+                            if not attr_name_for_found_result:
+                                files_or_dirs_result[name] = {Path(root) / name}
+                            else:
+                                files_or_dirs_result[name] = {}
+
+                        if not attr_name_for_found_result:
+                            files_or_dirs_result.update({name: Path(root) / name})  
+                        else:
+                            files_or_dirs_result.update({name: {attr_name_for_found_result: Path(root) / name}})
+        
+        break
+
+    return files_or_dirs_result
