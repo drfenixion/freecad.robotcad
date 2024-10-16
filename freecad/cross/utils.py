@@ -13,6 +13,7 @@ import string
 from typing import Any, Generator, Iterable, Optional
 import xml.etree.ElementTree as et
 from xml.dom import minidom
+import yaml
 
 import FreeCAD as fc
 
@@ -113,6 +114,15 @@ def save_xml(
     # printing.
     txt = minidom.parseString(et.tostring(xml)).toprettyxml(indent='  ')
     file_path.write_text(txt)
+
+
+def save_yaml(
+        content: str,
+        filename: [Path | str],
+        ) -> None:
+    """Save the yaml content into a file."""
+    with open(filename, 'w') as outfile:
+        yaml.dump(content, outfile, default_flow_style=False, sort_keys=False)
 
 
 def save_file(

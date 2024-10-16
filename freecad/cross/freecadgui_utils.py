@@ -5,6 +5,7 @@ from __future__ import annotations
 import FreeCAD as fc
 import FreeCADGui as fcgui
 from copy import deepcopy
+import re
 try:
     from PySide import QtWidgets
 except:
@@ -206,19 +207,25 @@ def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
                             while has_parent(parent):
                                 parent=parent.parent()
                                 tabProperty.append(parent.data())
-
-                            prop['name'] = tabProperty
+                            # if name have category with '___' in last it can miss one '_' in name
+                            # same as displayed name
+                            prop['name'] = tabProperty # name consists of segments of name
+                            if 3 in itemData : 
+                                # use full name instead of name
+                                prop['full_name'] = re.findall('\\nName: (.+)\\n\\n', itemData[3])[0]
 
                         elif n==2 :
                             prop['value'] = itemData[0]  # value            
             
                             if 3 in itemData : # tip
                                     prop['description'] = itemData[3]
+                                    
             if n == 2 :
                 props.append(prop)
                 prop = deepcopy(prop_default)
                 n = 0
     
+    # separate props and objects
     properties = []
     objects = []
     for el in props:

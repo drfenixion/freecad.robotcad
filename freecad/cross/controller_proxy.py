@@ -7,6 +7,7 @@ A controllers and broadcasters are representation of controllers and broadcaster
 from __future__ import annotations
 
 from typing import ForwardRef, List, Optional, Union, cast
+from typing import Iterable
 from copy import deepcopy
 from pathlib import Path
 import os
@@ -205,6 +206,33 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
         {controller_data['name']: controller_data['parameters']},
         controller_data['name'],
         )
+    
+    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
+    prop_name = 'controller_parameters_fullnames_list'
+    # add meta property
+    # there are only list of full names of controller parameters (gotten from controller YAML config)
+    controller, used_property_name = add_property(
+        controller,
+        'App::PropertyStringList',
+        prop_name,
+        'Internal',
+        'List of full names of parameters',
+        parameters_flatten_full_names,
+    )
+    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
+
+    
+    # add meta property
+    prop_name = 'plugin_class_name'
+    controller, used_property_name = add_property(
+        controller,
+        'App::PropertyString',
+        prop_name,
+        'Internal',
+        'Plugin class full name',
+        controller_data['controller_plugin_class_name'],
+    )
+    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         _ViewProviderController(controller.ViewObject)
@@ -220,37 +248,9 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
 def add_controller_properties(controller: CrossController,
                             parameters: dict, 
                             parameter_name: str, 
-                            parameter_name_prefix: list = [], 
-                            recursion_deep: int = 0) -> CrossController | None:
+                            recursion_deep: int = 0,
+                            parameter_full_name_glue: str = '___') -> CrossController | None:
     """Adding properties to controller."""
-
-
-    def modify_name_prefix(parameter_name_prefix: list, parameter_name: str, param_name: str) -> list:
-        """Modify parameter name prefix.
-         
-            Modify parameter name prefix by adding current param_name to prefix
-            when going dive in recursion or remove last prefix when rise from recursion.
-            
-            At zero recursion level it just add root param_name to prefix.
-            
-            parameter_name_prefix example: ['linear', 'x', 'has_velosity_limits' ]"""
-
-
-        if not parameter_name_prefix or parameter_name_prefix[-1] == parameter_name:
-            parameter_name_prefix.append(param_name)
-        else:
-            parameter_name_prefix_reversed = reversed(parameter_name_prefix)
-            for prefix in parameter_name_prefix_reversed:
-                if prefix != parameter_name:
-                    parameter_name_prefix.pop()
-                else:
-                    parameter_name_prefix.append(param_name)
-                    break
-
-        return parameter_name_prefix
-
-
-    # parameters = deepcopy(parameters)
 
     recursion_deep += 1
     if recursion_deep > 100:
@@ -259,32 +259,53 @@ def add_controller_properties(controller: CrossController,
 
     for param_name, param in parameters[parameter_name].items():
 
-        parameter_name_prefix = modify_name_prefix(parameter_name_prefix, parameter_name, param_name)
-
-        var_name = get_valid_property_name('__'.join(parameter_name_prefix))
-
         try:
             # type param present only in leaf element
             # and exception used for recursion call.
             # If throw exception then go recursion
             prop_type = param['type_fc']
 
-
             default_value = None
             if 'default_value' in param:
                 default_value = param['default_value']
 
+            try:
+                var_name = param['full_name']
+            except KeyError:
+                # avoiding except of outer try block by using other type error 
+                raise RuntimeError('param full_name - KeyError')
+            
             # for recursive props make category for grouping them from names of each recursion dive
             # example linear__x__has_velosity_limits 
-            if len(parameter_name_prefix) > 1:
-                category = '__'.join(parameter_name_prefix[:-1:])
+            full_name_splited = param['full_name'].split(parameter_full_name_glue)
+            if len(full_name_splited) > 1:
+                category = parameter_full_name_glue.join(full_name_splited[:-1])
             else:
-                if default_value is None:
-                    category = 'Root'
-                else:
-                    category = 'Root with default value'
-                
+                # root categories
+                category = 'Mandatory Root'
+                if default_value is None \
+                or (not default_value and default_value is not False):
+                    
+                    if 'description' in param:
+                        if '(Optional)' in param['description'] \
+                        or '(optional)' in param['description']:
+                            category = 'Root'
 
+                    if parameter_name == 'range_sensor_broadcaster' \
+                    and param['full_name'] in ['radiation_type', 'variance']:
+                        category = 'Root'
+                    elif parameter_name == 'admittance_controller' \
+                    and param['full_name'] in ['robot_description']:
+                        category = 'Root'
+                    elif parameter_name == 'joint_state_broadcaster' \
+                    and param['full_name'] in ['extra_joints', 'interfaces', 'joints']:
+                        category = 'Root'
+                    elif parameter_name == 'joint_trajectory_controller' \
+                    and param['full_name'] in ['cmd_timeout']:
+                        category = 'Root'
+                else:
+                    category = 'Root'
+                
             # make description
             help_txt = ''
             if 'description' in param:
@@ -292,7 +313,7 @@ def add_controller_properties(controller: CrossController,
 
             if 'validation_str' in param:
                 help_txt += '\n\n' + param['validation_str']
-
+            
             # add property
             controller, used_property_name = add_property(
                 controller,
@@ -303,23 +324,14 @@ def add_controller_properties(controller: CrossController,
                 default_value,
             )
 
-            # remove last recursion name prefix after add property
-            if parameter_name_prefix:
-                parameter_name_prefix.pop()
-
         except KeyError:
             # not type finded at this level and should dive deeper
             controller = add_controller_properties(
                 controller, 
                 parameters[parameter_name],
                 param_name, 
-                parameter_name_prefix, 
                 recursion_deep,
                 )
-            
-            # remove last recursion name prefix after rise from recursion
-            if parameter_name_prefix:
-                parameter_name_prefix.pop()
 
     return controller
 
@@ -385,6 +397,44 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path) -> dict :
     return controllers
 
 
+def add_full_name_to_params(params: dict, param_name_prefix: list = [], parameter_full_name_glue: str = '___') -> dict:
+    ''' Add full name with parent prefixes to every param.
+    
+    Params can be at various level of nested deep. 
+    full_param_name means all parents prefixes + param_name joined with parameter_full_name_glue
+    '''
+
+    for param_name, param in params.items():
+        try:
+            # param['type'] - KeyError trigger to recursion because type present only in leaf element
+            type = param['type']
+            
+            full_param_name = parameter_full_name_glue.join(param_name_prefix + [param_name]) 
+            params[param_name]['full_name'] = full_param_name
+        except KeyError:
+            param_name_prefix.append(param_name)
+            params[param_name] = add_full_name_to_params(param, param_name_prefix)
+            param_name_prefix.pop()
+
+    return params
+
+
+def flatten_params(params: dict, flat_params: dict) -> dict:
+    ''' flattens parameters dict.
+    Set full (with parent prefixes) param name as root dict attribute and this way make 1 level parameters
+    '''
+
+    for param_name, param in params.items():
+        try:
+            # param['type'] - KeyError trigger to recursion because type present only in leaf element
+            type = params['type']
+            flat_params[params['full_name']] = params
+        except KeyError:
+            flat_params = flatten_params(param, flat_params)
+
+    return flat_params
+
+
 def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
     ''' Separate controllers from controllers directories dictionaries. 
     
@@ -407,7 +457,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     params[param_name]['default_value_origin'] = param['default_value']
                 
                 # full_param_name means param_name + all parents prefixes
-                full_param_name = '__'.join(param_name_prefix + [param_name]) 
+                full_param_name = params[param_name]['full_name']
                 if full_param_name in replacement:
                     params[param_name]['type_fc'] = replacement[full_param_name]['replace']
                     # some types of replaced params must have other default value
@@ -508,9 +558,10 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     # must add steering_controllers_library params to steering controllers
                     parameters.update(controllers_dirs['steering_controllers_library']['parameters']['steering_controllers_library'])
                 
+                parameters = add_full_name_to_params(parameters)
                 parameters = add_fc_types_based_on_params_types(parameters)
-
                 parameters = add_validation_rules_str_to_params(parameters)
+                parameters_flatten = flatten_params(parameters, flat_params = {})
 
 
                 # assembly controller dict
@@ -521,6 +572,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     'plugin_path': controller_dir['plugin_path'],
                     'parameters_path': controller_dir['parameters_path'],
                     'parameters': parameters,
+                    'parameters_flatten': parameters_flatten,
                     'controller_dir_name': controller_dir_name,
                     'controller_plugin_class_name': plugin_class_name,
                 }

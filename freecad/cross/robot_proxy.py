@@ -33,6 +33,7 @@ from .urdf_utils import xml_comment_element
 from .utils import get_valid_filename
 from .utils import grouper
 from .utils import save_xml
+from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
 from .wb_utils import ICON_PATH
@@ -225,6 +226,9 @@ class RobotProxy(ProxyBase):
         # Save the links and joints to speed-up get_links() and get_joints().
         self._links: Optional[list[CrossLink]] = None
         self._joints: Optional[list[CrossJoint]] = None
+
+        self._controllers: Optional[list[CrossController]] = None
+        self._broadcasters: Optional[list[CrossController]] = None
 
         self._init_properties(obj)
 
@@ -851,6 +855,9 @@ class RobotProxy(ProxyBase):
         robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir)
         save_file(robot_meta, output_path / f'overcross/robot_meta.xml')
 
+        robot_controllers_yaml = self.get_robot_controllers_yaml()
+        save_yaml(robot_controllers_yaml, output_path / f'overcross/controllers.yaml')
+
         save_xml(xml, urdf_path)
         export_templates(template_files,
                          project_path,
@@ -862,6 +869,37 @@ class RobotProxy(ProxyBase):
 
         return xml
     
+    
+    def get_robot_controllers_yaml(self, parameter_full_name_glue: str = '___', parameter_full_name_glue_yaml: str = '.') -> dict:
+        """Make robot controllers data in yaml format"""
+        
+        yaml_data = {}
+        # controller manager and controllers plugin types
+        yaml_data['controller_manager'] = {'update_rate': 500}
+        for controller in self.get_controllers():
+            plugin_class_name = getattr(controller, 'plugin_class_name')
+            yaml_data['controller_manager'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
+            
+        # controllers and their params
+        for controller in self.get_controllers():
+            yaml_data[get_valid_urdf_name(ros_name(controller))] = {'ros__parameters': {}}
+            for param_full_name in controller.controller_parameters_fullnames_list:
+                param = getattr(controller, param_full_name)
+                param_full_name_yaml = param_full_name.replace(parameter_full_name_glue, parameter_full_name_glue_yaml)
+                
+                if isinstance(param, (float, int, str, type(None))):
+                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = param
+                elif isinstance(param, DO):
+                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
+                else:
+                    for el in param:
+                        value = el
+                        if isinstance(el, DO):
+                            value = get_valid_urdf_name(ros_name(el))
+                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = value
+                        
+        return yaml_data
+
 
     def get_robot_meta(self, package_name: str, urdf_file_name: str, meshes_dir: str) -> str:
         """Return robot meta info as xml. It can be used by external code generators"""
@@ -898,28 +936,6 @@ class RobotProxy(ProxyBase):
     </joints>
         """
 
-    #     #TODO
-    #     controllersXml = f"""
-    # <controllers>
-    #     """
-
-    #     for controller in self.get_controllers():
-
-    #         controllersXml += f"""
-    #     <controller>
-    #         <name>{get_valid_urdf_name(ros_name(controller))}</name>
-    #         <jointSpecific>{joint.JointSpecific}</jointSpecific>
-    #         <jointRotationDirection>{joint.JoinRotationDirection}</jointRotationDirection>
-    #         <jointRelTotalCenterOfMass_x>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.x) + ' mm'), 'm')}</jointRelTotalCenterOfMass_x>
-    #         <jointRelTotalCenterOfMass_y>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.y) + ' mm'), 'm')}</jointRelTotalCenterOfMass_y>
-    #         <jointRelTotalCenterOfMass_z>{quantity_as(fc.Units.Quantity(str(joint.PlacementRelTotalCenterOfMass.Base.z) + ' mm'), 'm')}</jointRelTotalCenterOfMass_z>
-    #     </controller>
-    #     """
-
-    #     controllersXml += f"""
-    # </controllers>
-    #     """
-    #     #TODO END
 
         robotMetaXmlDoc = parseString(robotMetaXml)
         jointsXmlDoc = parseString(jointsXml)

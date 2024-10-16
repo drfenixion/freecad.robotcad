@@ -145,11 +145,14 @@ class ControllersSelectorModalClass(QtGui.QDialog):
             # set selected interface to all selected properties of all selected objects
             for object in objects:
                 for prop in props:
-                    if hasattr(object['object'], prop['name'][0]):
+                    if hasattr(object['object'], prop['full_name']):
                         try:
-                            setattr(object['object'], prop['name'][0], selected_interfaces)
+                            setattr(object['object'], prop['full_name'], selected_interfaces)
                         except TypeError:
-                            setattr(object['object'], prop['name'][0], selected_interfaces[0])
+                            if len(selected_interfaces):
+                                setattr(object['object'], prop['full_name'], selected_interfaces[0])
+                            else:
+                                setattr(object['object'], prop['full_name'], '')
 
             doc.commitTransaction()
             doc.recompute()
