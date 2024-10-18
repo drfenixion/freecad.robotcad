@@ -25,7 +25,8 @@ def get_node_and_executor() -> Tuple[Optional[MultiThreadedExecutor], Optional[N
     if not imports_ok:
         return None, None
 
-    rclpy.init()
+    if not rclpy.ok():
+        rclpy.init()
     node = get_node()
     if node is None:
         return None, None
