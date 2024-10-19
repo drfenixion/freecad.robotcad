@@ -8,6 +8,10 @@ PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
 WORKBENCH_NAME = 'RobotCAD - ROS2'
 
+### ROS2_CONTROLLERS
+ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE = '___'
+ROS2_CONTROLLERS_PARAM_MAP_MARKER = '__map_'
+
 ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
     'bool': 'App::PropertyBool',
     'bool_array': 'App::PropertyBoolList',
@@ -185,4 +189,22 @@ ROS2_CONTROLLERS_VALIDATION_RULES_DESCRIPTIONS = {
     'element_bounds': 'Bounds checking each element (inclusive)',
     'lower_element_bounds': 'Lower bound for each element (inclusive)',
     'upper_element_bounds': 'Upper bound for each element (inclusive)',
+}
+
+ROS2_CONTROLLERS_EXCLUDED_PARAMS = {
+    'joint_group_velocity_controller': {
+        'params_based_on_controller_dir': 'forward_command_controller',
+        'params_based_on_controller_name': 'forward_command_controller',
+        'excluded_params': ['interface_name'],
+    },
+    'joint_group_effort_controller': {
+        'params_based_on_controller_dir': 'forward_command_controller',
+        'params_based_on_controller_name': 'forward_command_controller',
+        'excluded_params': ['interface_name'],
+    },
+    'joint_group_position_controller': {
+        'params_based_on_controller_dir': 'forward_command_controller',
+        'params_based_on_controller_name': 'forward_command_controller',
+        'excluded_params': ['interface_name'],
+    },        
 }

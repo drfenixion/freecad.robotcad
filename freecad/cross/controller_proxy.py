@@ -132,8 +132,24 @@ class _ViewProviderController(ProxyBase):
                 + replacements[prop]['check_func'] 
                 + '. Use filter of this type.', gui=True)
         
+        def get_param_to_replace(prop: str, 
+                                 param_map_marker: str = wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER,
+                                 ):
+            """Return param_to_replace. 
+            
+            param_to_replace is string that should replaced with f.e. joint name
+            from map source attr f.e. dof_names in mapped_params_templates 
+            example of mapping: 'gains_____map_dof_names___p' -> 'gains___joint_name___p'
+            examples of param_to_replace: '__map_dof_names', '__map_joints'
+            """
+            
+            return param_map_marker + prop
 
-        def map_param(prop: str, mapped_params_templates: dict, obj: CrossController, parameter_full_name_glue: str = '___'):
+
+        def map_param(prop: str, 
+                      mapped_params_templates: dict, 
+                      obj: CrossController, 
+                      ):
             """Map param by map param template. Add mapped param to obj
             
             mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
@@ -142,8 +158,8 @@ class _ViewProviderController(ProxyBase):
             after mapping param name will be like - gains___joint_name___p
             """
 
-            param_map_marker = '__map_'
-            param_to_replace = param_map_marker + prop
+            param_to_replace = get_param_to_replace(prop)
+
             mapped_params_templates_filtered = {}
             for template in mapped_params_templates:
                 if param_to_replace in template:
@@ -179,12 +195,14 @@ class _ViewProviderController(ProxyBase):
                         t = obj
 
 
-        def remove_redundant_mapped_attrs(prop: str, obj: CrossController, parameter_full_name_glue: str = '___') -> CrossController:
+        def remove_redundant_mapped_attrs(prop: str, 
+                                          obj: CrossController, 
+                                          parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+                                          ) -> CrossController:
             """ Remove redundant mapped attrebutes after thier source attr elements was deleted """
 
             params_to_map = getattr(obj, 'params_to_map', [])
-            param_map_marker = '__map_'
-            param_to_replace = param_map_marker + prop
+            param_to_replace = get_param_to_replace(prop)
 
             if prop in params_to_map:
                 
@@ -229,7 +247,7 @@ class _ViewProviderController(ProxyBase):
 
             return obj
 
-
+        # remove mapped attr after source joints was removed from source of mapping attr
         remove_redundant_mapped_attrs(prop, obj)
 
 
@@ -314,26 +332,8 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
     controller: CrossController = doc.addObject('App::FeaturePython', controller_data['name'])
     ControllerProxy(controller, dynamicType)
 
-    controller = add_controller_properties(
-        controller, 
-        {controller_data['name']: controller_data['parameters']},
-        controller_data['name'],
-        )
-    
-    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
-    prop_name = 'controller_parameters_fullnames_list'
-    # add meta property
-    # there are only list of full names of controller parameters (gotten from controller YAML config)
-    controller, used_property_name = add_property(
-        controller,
-        'App::PropertyStringList',
-        prop_name,
-        'Internal',
-        'List of full names of parameters',
-        parameters_flatten_full_names,
-    )
-    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-    
+    add_controller_properties_block(controller, controller_data)
+
     # add meta property
     prop_name = 'plugin_class_name'
     controller, used_property_name = add_property(
@@ -380,33 +380,16 @@ def add_controller_properties_block(controller: CrossController, controller_data
         parameters_flatten_full_names,
     )
     controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-    
-    # add meta property
-    prop_name = 'plugin_class_name'
-    controller, used_property_name = add_property(
-        controller,
-        'App::PropertyString',
-        prop_name,
-        'Internal',
-        'Plugin class full name',
-        controller_data['controller_plugin_class_name'],
-    )
-    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
     return controller
 
 
-def add_controller_properties(controller: CrossController,
-                            parameters: dict, 
-                            parameter_name: str, 
-                            recursion_deep: int = 0,
-                            parameter_full_name_glue: str = '___') -> CrossController | None:
+def add_controller_properties(controller: CrossController, 
+                              parameters: dict, 
+                              parameter_name: str, 
+                              parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+                              ) -> CrossController:
     """Adding properties to controller."""
-
-    recursion_deep += 1
-    if recursion_deep > 100:
-        error('Max recursion deep is reached in add_controller_property', True)
-        return None
 
     for param_name, param in parameters[parameter_name].items():
 
@@ -481,7 +464,6 @@ def add_controller_properties(controller: CrossController,
                 controller, 
                 parameters[parameter_name],
                 param_name, 
-                recursion_deep,
                 )
 
     return controller
@@ -548,7 +530,10 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
     return controllers
 
 
-def add_full_name_to_params(params: dict, param_name_prefix: list = [], parameter_full_name_glue: str = '___') -> dict:
+def add_full_name_to_params(params: dict, 
+                            param_name_prefix: list = [], 
+                            parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+                            ) -> dict:
     ''' Add full name with parent prefixes to every param.
     
     Params can be at various level of nested deep. 
@@ -579,6 +564,7 @@ def flatten_params(params: dict, flat_params: dict) -> dict:
         try:
             # param['type'] - KeyError trigger to recursion because type present only in leaf element
             type = params['type']
+
             flat_params[params['full_name']] = params
         except KeyError:
             flat_params = flatten_params(param, flat_params)
@@ -589,7 +575,8 @@ def flatten_params(params: dict, flat_params: dict) -> dict:
 def unflatten_params(flatten_params: dict, 
                      param_to_replace: str | None = None, 
                      replace: str | None = None, 
-                     parameter_full_name_glue: str = '___') -> dict:
+                     parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+                     ) -> dict:
     ''' Unflattens parameters dict.
 
     Split flatten params name by parameter_full_name_glue and make nested structure with list
@@ -658,13 +645,13 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
         return params
 
 
-    def exlude_params(params: dict, exluded_params: list) -> dict:
+    def exclude_params(params: dict, excluded_params: list) -> dict:
         ''' Return params without exluded params
         '''
 
         params_without_exluded = {}
         for param_name, param in params.items():
-            if param_name not in exluded_params:
+            if param_name not in excluded_params:
                 params_without_exluded[param_name] = param
 
         return params_without_exluded
@@ -703,23 +690,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
         return params
     
 
-    special_cases = {
-        'joint_group_velocity_controller': {
-            'params_based_on_controller_dir': 'forward_command_controller',
-            'params_based_on_controller_name': 'forward_command_controller',
-            'excluded_params': ['interface_name'],
-        },
-        'joint_group_effort_controller': {
-            'params_based_on_controller_dir': 'forward_command_controller',
-            'params_based_on_controller_name': 'forward_command_controller',
-            'excluded_params': ['interface_name'],
-        },
-        'joint_group_position_controller': {
-            'params_based_on_controller_dir': 'forward_command_controller',
-            'params_based_on_controller_name': 'forward_command_controller',
-            'excluded_params': ['interface_name'],
-        },        
-    }
+    excluded_params = wb_constants.ROS2_CONTROLLERS_EXCLUDED_PARAMS
 
     controllers = {}
     for controller_dir_name, controller_dir in controllers_dirs.items():
@@ -734,10 +705,10 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     parameters = controller_dir['parameters'][plugin_data_name]
                 except KeyError:
                     # special cases for controllers that does not have their own params and uses params from other controllers
-                    params_based_on_controller_dir = special_cases[plugin_data_name]['params_based_on_controller_dir']
-                    params_based_on_controller_name = special_cases[plugin_data_name]['params_based_on_controller_name']
-                    params_to_exlude = special_cases[plugin_data_name]['excluded_params']
-                    parameters = exlude_params(
+                    params_based_on_controller_dir = excluded_params[plugin_data_name]['params_based_on_controller_dir']
+                    params_based_on_controller_name = excluded_params[plugin_data_name]['params_based_on_controller_name']
+                    params_to_exlude = excluded_params[plugin_data_name]['excluded_params']
+                    parameters = exclude_params(
                         controllers_dirs[params_based_on_controller_dir]['parameters'][params_based_on_controller_name],
                         params_to_exlude
                         )
@@ -850,7 +821,9 @@ def get_files_or_dirs_by_filter(dir: Path,
     return files_or_dirs_result
 
 
-def get_mapped_params(obj: CrossController, parameter_full_name_glue: str = '___') -> tuple[dict, dict]:
+def get_mapped_params(obj: CrossController, 
+                      parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+                      ) -> tuple[dict, dict]:
     """Get mapped params templates and params for mapping.
     
     mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
@@ -868,7 +841,7 @@ def get_mapped_params(obj: CrossController, parameter_full_name_glue: str = '___
     except AttributeError:
         # calculate and fill attrs
 
-        param_map_marker = '__map_'
+        param_map_marker = wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER
         mapped_params_templates = {}
         for param_full_name in obj.controller_parameters_fullnames_list:
             if param_map_marker in param_full_name:
