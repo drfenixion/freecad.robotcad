@@ -523,12 +523,24 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 
                 for type_tag in root.findall('class'):
                     full_class_name = type_tag.get('name')
+                    type = type_tag.get('type')
+                    base_class_type = type_tag.get('base_class_type')
                     class_name = full_class_name.split('/')[-1]
-                    camelCaseToList = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
+
+                    # special cases for some of same controller names in xml 
+                    if 'GripperActionController' in full_class_name:
+                        gripper_interface = re.search(r'(.+)_', full_class_name).group(1) # effor, position
+                        class_name = class_name + gripper_interface.capitalize()
+                        controller['parameters']['gripper_action_controller_' + gripper_interface] = deepcopy(controller['parameters']['gripper_action_controller'])
+                        
+                    camelCaseToList = re.findall(r'[A-Za-z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
                     controller_name = '_'.join(camelCaseToList).lower()
                     plugin = {full_class_name: 
                                 {
                                   'name': controller_name,
+                                  'full_name': full_class_name,
+                                  'type': type,
+                                  'base_class_type': base_class_type,
                                   'description': type_tag.find('description').text.strip()
                                 }
                               }
@@ -537,6 +549,14 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
                         controllers[dir_name]['plugins_data'].update(plugin)
                     else:
                         controllers[dir_name]['plugins_data'] = plugin
+        
+        # special cases
+        # there are 2 gripper_action_controller (effor, position) in dir and only 1 yaml config
+        # above split controller and now delete origin gripper_action_controller
+        try:
+            del controllers['gripper_controllers']['parameters']['gripper_action_controller']
+        except KeyError:
+            pass
         
         return controllers
 
