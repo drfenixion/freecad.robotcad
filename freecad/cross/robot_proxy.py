@@ -58,6 +58,7 @@ from xml.dom.minidom import parseString
 from pathlib import Path
 from .joint_proxy import make_robot_joints_filled
 from .link_proxy import make_robot_links_filled
+from . import wb_constants
 
 # Stubs and type hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -870,7 +871,10 @@ class RobotProxy(ProxyBase):
         return xml
     
     
-    def get_robot_controllers_yaml(self, parameter_full_name_glue: str = '___', parameter_full_name_glue_yaml: str = '.') -> dict:
+    def get_robot_controllers_yaml(self, 
+                                   parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE, 
+                                   parameter_full_name_glue_yaml: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE_YAML
+                                   ) -> dict:
         """Make robot controllers data in yaml format"""
         
         yaml_data = {}
@@ -892,11 +896,12 @@ class RobotProxy(ProxyBase):
                 elif isinstance(param, DO):
                     yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
                 else:
+                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = []
                     for el in param:
                         value = el
                         if isinstance(el, DO):
                             value = get_valid_urdf_name(ros_name(el))
-                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = value
+                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
                         
         return yaml_data
 
