@@ -248,7 +248,7 @@ class _ViewProviderController(ProxyBase):
 
             def notice_not_suited_object_selected(element, replacements: dict, prop: str):
                 error('Selected not suited object (' + ros_name(element) + ') for ' 
-                    + prop + ' property. Verification function - ' 
+                    + prop + ' property. Object was excluded. Verification function - ' 
                     + replacements[prop]['check_func'] 
                     + '. Use filter of this type.', gui=True)
             
