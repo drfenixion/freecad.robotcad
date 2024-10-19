@@ -29,6 +29,7 @@ from .wb_utils import ROS2_CONTROLLERS_PATH
 from .wb_utils import is_joint # dont remove used by check_func()
 from .wb_utils import is_link # dont remove used by check_func()
 from .wb_utils import return_true # dont remove used by check_func()
+from .wb_utils import is_controllers_template_for_param_mapping
 from .wb_utils import ros_name
 from .wb_utils import get_valid_urdf_name
 from .utils import deepmerge
@@ -388,19 +389,29 @@ def add_controller_properties_block(controller: CrossController, controller_data
         controller_data['name'],
         )
     
+    adding_flatten_params = flatten_params(controller_data['parameters'], flat_params = {})
+    parameters_flatten = deepcopy(controller_data['parameters_flatten'])
+    controller_data['parameters_flatten'] = {
+        **parameters_flatten, 
+        **adding_flatten_params
+        }
     parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
     prop_name = 'controller_parameters_fullnames_list'
     # add meta property
     # there are only list of full names of controller parameters (gotten from controller YAML config)
-    controller, used_property_name = add_property(
-        controller,
-        'App::PropertyStringList',
-        prop_name,
-        'Internal',
-        'List of full names of parameters',
-        parameters_flatten_full_names,
-    )
-    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
+    if hasattr(controller, prop_name):
+        setattr(controller, prop_name, parameters_flatten_full_names)
+    else:
+        controller, used_property_name = add_property(
+            controller,
+            'App::PropertyStringList',
+            prop_name,
+            'Internal',
+            'List of full names of parameters',
+            parameters_flatten_full_names,
+        )
+        controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
+    
 
     return controller
 
@@ -479,7 +490,7 @@ def add_controller_properties(controller: CrossController,
                 default_value,
             )
 
-            if is_template_for_param_mapping(var_name):
+            if is_controllers_template_for_param_mapping(var_name):
                 controller.setPropertyStatus(var_name, ['Hidden', 'ReadOnly'])
 
         except KeyError:
@@ -921,9 +932,3 @@ def get_mapped_params(obj: CrossController,
         obj.setPropertyStatus(prop_name_params_to_map, ['Hidden', 'ReadOnly'])
 
     return mapped_params_templates, params_to_map
-
-
-def is_template_for_param_mapping(var_full_name: str) -> bool:
-    if wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE + wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER in var_full_name:
-        return True
-    return False

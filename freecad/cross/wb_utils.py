@@ -139,6 +139,13 @@ def is_primitive(obj: DO) -> bool:
     return is_box(obj) or is_sphere(obj) or is_cylinder(obj)
 
 
+def is_controllers_template_for_param_mapping(param_full_name: str) -> bool:
+    """Return True param_full_name contains marker of param mapping template."""
+    if wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE + wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER in param_full_name:
+        return True
+    return False
+
+
 def return_true(obj: DO) -> bool:
     """Return always True.
 

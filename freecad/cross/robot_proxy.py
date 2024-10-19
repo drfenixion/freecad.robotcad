@@ -50,6 +50,7 @@ from .wb_utils import is_link
 from .wb_utils import is_robot
 from .wb_utils import is_controller
 from .wb_utils import is_broadcaster
+from .wb_utils import is_controllers_template_for_param_mapping
 from .wb_utils import remove_ros_workspace
 from .wb_utils import ros_name
 from .wb_utils import _has_meshes_directory
@@ -889,19 +890,21 @@ class RobotProxy(ProxyBase):
             yaml_data[get_valid_urdf_name(ros_name(controller))] = {'ros__parameters': {}}
             for param_full_name in controller.controller_parameters_fullnames_list:
                 param = getattr(controller, param_full_name)
-                param_full_name_yaml = param_full_name.replace(parameter_full_name_glue, parameter_full_name_glue_yaml)
-                
-                if isinstance(param, (float, int, str, type(None))):
-                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = param
-                elif isinstance(param, DO):
-                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
-                else:
-                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = []
-                    for el in param:
-                        value = el
-                        if isinstance(el, DO):
-                            value = get_valid_urdf_name(ros_name(el))
-                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
+
+                if not is_controllers_template_for_param_mapping(param_full_name):
+                    param_full_name_yaml = param_full_name.replace(parameter_full_name_glue, parameter_full_name_glue_yaml)
+                    
+                    if isinstance(param, (float, int, str, type(None))):
+                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = param
+                    elif isinstance(param, DO):
+                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
+                    else:
+                        yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = []
+                        for el in param:
+                            value = el
+                            if isinstance(el, DO):
+                                value = get_valid_urdf_name(ros_name(el))
+                            yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
                         
         return yaml_data
 
