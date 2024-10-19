@@ -126,12 +126,6 @@ class _ViewProviderController(ProxyBase):
 
     def updateData(self, obj: CrossController, prop: str):
 
-        def notice_not_suited_object_selected(element, replacements: dict, prop: str):
-            error('Selected not suited object (' + ros_name(element) + ') for ' 
-                + prop + ' property. Verification function - ' 
-                + replacements[prop]['check_func'] 
-                + '. Use filter of this type.', gui=True)
-        
         def get_param_to_replace(prop: str, 
                                  param_map_marker: str = wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER,
                                  ):
@@ -247,40 +241,67 @@ class _ViewProviderController(ProxyBase):
 
             return obj
 
-        # remove mapped attr after source joints was removed from source of mapping attr
-        remove_redundant_mapped_attrs(prop, obj)
+
+        def custom_type_checks(prop: str, obj: CrossController) -> CrossController:
+            """ Check type of linked element(s) by custom type """
 
 
-        # map mapable params
-        mapped_params_templates, params_to_map = get_mapped_params(obj)
-        if len(params_to_map):
-            for param_to_map in params_to_map:
-                if prop == param_to_map:
-                    map_param(param_to_map, mapped_params_templates, obj)
-        
-        
-        # custom type checks
-        replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
-        if prop in replacements:
-            filtered_elements = deepcopy(replacements[prop]['default_value_replace'])
-            check_func = replacements[prop]['check_func']
-            attr = getattr(obj, prop)
-            if type(attr) is list:
-                for element in attr:
-                    if element:
-                        if not globals()[check_func](element):
-                            notice_not_suited_object_selected(element, replacements, prop)
+            def notice_not_suited_object_selected(element, replacements: dict, prop: str):
+                error('Selected not suited object (' + ros_name(element) + ') for ' 
+                    + prop + ' property. Verification function - ' 
+                    + replacements[prop]['check_func'] 
+                    + '. Use filter of this type.', gui=True)
+            
+            # custom type checks
+            replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
+            if prop in replacements:
+                filtered_elements = deepcopy(replacements[prop]['default_value_replace'])
+                check_func = replacements[prop]['check_func']
+                attr = getattr(obj, prop)
+                if type(attr) is list:
+                    for element in attr:
+                        if element:
+                            if not globals()[check_func](element):
+                                notice_not_suited_object_selected(element, replacements, prop)
+                            else:
+                                filtered_elements.append(element)
+                else:
+                    if attr:
+                        if not globals()[check_func](attr):
+                            notice_not_suited_object_selected(attr, replacements, prop)
                         else:
-                            filtered_elements.append(element)
-            else:
-                if attr:
-                    if not globals()[check_func](attr):
-                        notice_not_suited_object_selected(attr, replacements, prop)
-                    else:
-                        filtered_elements = attr
-                        
-            if attr != filtered_elements:
-                setattr(obj, prop, filtered_elements)
+                            filtered_elements = attr
+                            
+                if attr != filtered_elements:
+                    setattr(obj, prop, filtered_elements)
+
+            return obj
+
+
+        def map_mapable_params(prop: str, obj: CrossController):
+            """ Do mapping for every mapable element (f.e. joint) by source attr (f.e. dof_names or joints) of mapping
+            and map templates (present params with included map marker).
+
+            See description of functions get_mapped_params(), map_param()
+            """
+
+            # map mapable params
+            mapped_params_templates, params_to_map = get_mapped_params(obj)
+            if len(params_to_map):
+                for param_to_map in params_to_map:
+                    if prop == param_to_map:
+                        map_param(param_to_map, mapped_params_templates, obj)
+
+            return obj
+        
+
+        obj = custom_type_checks(prop, obj)
+
+        # remove mapped attr after source joints was removed from source of mapping attr
+        obj = remove_redundant_mapped_attrs(prop, obj)
+
+
+        obj = map_mapable_params(prop, obj)
 
 
     def onChanged(self, vobj: VPDO, prop: str):
