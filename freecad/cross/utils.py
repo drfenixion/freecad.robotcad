@@ -14,6 +14,7 @@ from typing import Any, Generator, Iterable, Optional
 import xml.etree.ElementTree as et
 from xml.dom import minidom
 import yaml
+import collections.abc
 
 import FreeCAD as fc
 
@@ -238,3 +239,15 @@ def values_from_string(
             except ValueError:
                 pass
     return []
+
+
+def deepmerge(dict1, dict2):
+    """ Merge dict like structures in deep nested levels """
+
+    for k, v in dict2.items():
+        if isinstance(v, collections.abc.Mapping):
+            dict1[k] = deepmerge(dict1.get(k, {}), v)
+        else:
+            dict1[k] = v
+
+    return dict1

@@ -25,10 +25,13 @@ from .freecad_utils import error
 from .freecad_utils import get_valid_property_name
 from .freecad_utils import warn
 from .wb_utils import ICON_PATH
+from .wb_utils import ROS2_CONTROLLERS_PATH
 from .wb_utils import is_joint # dont remove used by check_func()
 from .wb_utils import is_link # dont remove used by check_func()
 from .wb_utils import return_true # dont remove used by check_func()
 from .wb_utils import ros_name
+from .wb_utils import get_valid_urdf_name
+from .utils import deepmerge
 from . import wb_constants
 
 # Stubs and type hints.
@@ -128,7 +131,117 @@ class _ViewProviderController(ProxyBase):
                 + prop + ' property. Verification function - ' 
                 + replacements[prop]['check_func'] 
                 + '. Use filter of this type.', gui=True)
+        
+
+        def map_param(prop: str, mapped_params_templates: dict, obj: CrossController, parameter_full_name_glue: str = '___'):
+            """Map param by map param template. Add mapped param to obj
             
+            mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
+            params for mapping - params that should be mapped by teplate (ex: joints)
+            
+            after mapping param name will be like - gains___joint_name___p
+            """
+
+            param_map_marker = '__map_'
+            param_to_replace = param_map_marker + prop
+            mapped_params_templates_filtered = {}
+            for template in mapped_params_templates:
+                if param_to_replace in template:
+                    mapped_params_templates_filtered[template] = template
+
+
+            attr = getattr(obj, prop)
+
+            controllers = get_controllers_data()
+            controllers_merged = {}
+            controllers_merged.update(controllers['controllers'])
+            controllers_merged.update(controllers['broadcasters'])
+            
+            parameters_flatten_filtered = {}
+            for param_flatten in controllers_merged[ros_name(obj)]['parameters_flatten']:
+                if param_flatten in mapped_params_templates_filtered.keys():
+                    parameters_flatten_filtered[param_flatten] = controllers_merged[ros_name(obj)]['parameters_flatten'][param_flatten]
+
+
+            for el in attr:
+                if isinstance(el, DO):
+                    el = ros_name(el)
+
+                for template in mapped_params_templates_filtered:
+                    mapped_prop_name = template.replace(param_to_replace, el)
+                    
+                    try:
+                        attr = getattr(obj, mapped_prop_name)
+                    except AttributeError:
+                        parameters = unflatten_params(deepcopy(parameters_flatten_filtered), param_to_replace, el)
+                        controllers_merged[ros_name(obj)]['parameters'] = parameters
+                        obj = add_controller_properties_block(obj, controllers_merged[ros_name(obj)])
+                        t = obj
+
+
+        def remove_redundant_mapped_attrs(prop: str, obj: CrossController, parameter_full_name_glue: str = '___') -> CrossController:
+            """ Remove redundant mapped attrebutes after thier source attr elements was deleted """
+
+            params_to_map = getattr(obj, 'params_to_map', [])
+            param_map_marker = '__map_'
+            param_to_replace = param_map_marker + prop
+
+            if prop in params_to_map:
+                
+                # prepare param_to_map_value_as_str_list
+                param_to_map_value = getattr(obj, prop)
+                param_to_map_value_as_dict = {}
+                for el in param_to_map_value:
+                    if isinstance(el, DO):
+                        el = ros_name(el)
+                    param_to_map_value_as_dict[el] = el
+                param_to_map_value_as_str_list = list(param_to_map_value_as_dict.keys())
+                
+                # check diff old mapped param and new
+                mapped_params_prop_name = 'mapped_params' + parameter_full_name_glue + prop
+                mapped_params_prop_value_old = getattr(obj, mapped_params_prop_name, [])     
+                if param_to_map_value_as_str_list != mapped_params_prop_value_old:
+                    mapped_params_to_remove = list(set(mapped_params_prop_value_old) - set(param_to_map_value_as_str_list))
+
+                    # remove reduntdant params
+                    for mapped_param_to_remove in mapped_params_to_remove:
+                        mapped_params_templates = getattr(obj, 'mapped_params_templates')
+                        for mapped_params_template in mapped_params_templates:
+                            param_to_remove_name = mapped_params_template.replace(param_to_replace, mapped_param_to_remove)
+                            obj.removeProperty(param_to_remove_name)
+
+                # save mapped params to check diff in future
+                try:
+                    attr = getattr(obj, mapped_params_prop_name)
+                    if attr != param_to_map_value_as_str_list:
+                        setattr(obj, mapped_params_prop_name, param_to_map_value_as_str_list)
+                except AttributeError:
+                    # add meta property
+                    obj, used_property_name = add_property(
+                        obj,
+                        'App::PropertyStringList',
+                        mapped_params_prop_name,
+                        'Internal',
+                        'Mapped params',
+                        param_to_map_value_as_str_list,
+                    )
+                    obj.setPropertyStatus(mapped_params_prop_name, ['Hidden', 'ReadOnly'])
+
+            return obj
+
+
+        remove_redundant_mapped_attrs(prop, obj)
+
+
+        # map mapable params
+        mapped_params_templates, params_to_map = get_mapped_params(obj)
+        if len(params_to_map):
+            for param_to_map in params_to_map:
+                if prop == param_to_map:
+                    map_param(param_to_map, mapped_params_templates, obj)
+        
+        
+        # custom type checks
         replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
         if prop in replacements:
             filtered_elements = deepcopy(replacements[prop]['default_value_replace'])
@@ -220,7 +333,6 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
         parameters_flatten_full_names,
     )
     controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-
     
     # add meta property
     prop_name = 'plugin_class_name'
@@ -234,6 +346,8 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
     )
     controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
+    get_mapped_params(controller) # fill meta propeties about mapped params
+
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         _ViewProviderController(controller.ViewObject)
     else:
@@ -242,6 +356,43 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
         return None
 
     doc.recompute()
+    return controller
+
+
+def add_controller_properties_block(controller: CrossController, controller_data: dict) -> CrossController:
+    
+    controller = add_controller_properties(
+        controller, 
+        {controller_data['name']: controller_data['parameters']},
+        controller_data['name'],
+        )
+    
+    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
+    prop_name = 'controller_parameters_fullnames_list'
+    # add meta property
+    # there are only list of full names of controller parameters (gotten from controller YAML config)
+    controller, used_property_name = add_property(
+        controller,
+        'App::PropertyStringList',
+        prop_name,
+        'Internal',
+        'List of full names of parameters',
+        parameters_flatten_full_names,
+    )
+    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
+    
+    # add meta property
+    prop_name = 'plugin_class_name'
+    controller, used_property_name = add_property(
+        controller,
+        'App::PropertyString',
+        prop_name,
+        'Internal',
+        'Plugin class full name',
+        controller_data['controller_plugin_class_name'],
+    )
+    controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
+
     return controller
 
 
@@ -336,7 +487,7 @@ def add_controller_properties(controller: CrossController,
     return controller
 
 
-def get_controllers_data(ROS2_CONTROLLERS_PATH: Path) -> dict :
+def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) -> dict :
     ''' Get controllers data. '''
 
     def collect_controllers_parameters(controllers: dict) -> dict :
@@ -433,6 +584,42 @@ def flatten_params(params: dict, flat_params: dict) -> dict:
             flat_params = flatten_params(param, flat_params)
 
     return flat_params
+
+
+def unflatten_params(flatten_params: dict, 
+                     param_to_replace: str | None = None, 
+                     replace: str | None = None, 
+                     parameter_full_name_glue: str = '___') -> dict:
+    ''' Unflattens parameters dict.
+
+    Split flatten params name by parameter_full_name_glue and make nested structure with list
+    '''
+
+    def unflatten_params_recursion(params, param_name: str, leaf_param_data: dict = {}, params_nest_level_name: str = ''):
+        params_nest = param_name.split(parameter_full_name_glue)
+        params_nest_level_name = params_nest.pop(0)
+
+        if param_to_replace is not None and replace is not None:
+            if params_nest_level_name == param_to_replace:
+                params_nest_level_name = replace
+                leaf_param_data['full_name'] = leaf_param_data['full_name'].replace(param_to_replace, replace)
+
+        result_params = {}
+
+        if len(params_nest) > 0:
+            params = unflatten_params_recursion(params, parameter_full_name_glue.join(params_nest), leaf_param_data, params_nest_level_name)
+            result_params = {params_nest_level_name: params}
+        else:
+            result_params = {params_nest_level_name: leaf_param_data}
+        
+        return result_params
+    
+
+    params = {}
+    for param_name, leaf_param_data in flatten_params.items():
+        params = deepmerge(unflatten_params_recursion(params, param_name, leaf_param_data), params)
+
+    return params
 
 
 def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
@@ -661,3 +848,59 @@ def get_files_or_dirs_by_filter(dir: Path,
         break
 
     return files_or_dirs_result
+
+
+def get_mapped_params(obj: CrossController, parameter_full_name_glue: str = '___') -> tuple[dict, dict]:
+    """Get mapped params templates and params for mapping.
+    
+    mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
+    params for mapping - params that should be mapped by teplate (ex: joints)
+    
+    after mapping param name will be like - gains___joint_name___p
+    """
+
+    prop_name_mapped_params_templates = 'mapped_params_templates'
+    prop_name_params_to_map = 'params_to_map'
+
+    try:
+        mapped_params_templates = getattr(obj, prop_name_mapped_params_templates)
+        params_to_map = getattr(obj, prop_name_params_to_map)
+    except AttributeError:
+        # calculate and fill attrs
+
+        param_map_marker = '__map_'
+        mapped_params_templates = {}
+        for param_full_name in obj.controller_parameters_fullnames_list:
+            if param_map_marker in param_full_name:
+                mapped_params_templates[param_full_name] = param_full_name
+
+        params_to_map = {}
+        for mapped_params_template in mapped_params_templates:
+            param_name_to_map = re.search(param_map_marker + '(.+)' + parameter_full_name_glue, mapped_params_template).group(1)
+            params_to_map[param_name_to_map] = param_name_to_map
+
+
+        # add meta property
+        obj, used_property_name = add_property(
+            obj,
+            'App::PropertyStringList',
+            prop_name_mapped_params_templates,
+            'Internal',
+            'Mapped params templates (ex: gains_____map_joints___p)',
+            mapped_params_templates.keys(),
+        )
+        obj.setPropertyStatus(prop_name_mapped_params_templates, ['Hidden', 'ReadOnly'])
+
+        # add meta property
+        obj, used_property_name = add_property(
+            obj,
+            'App::PropertyStringList',
+            prop_name_params_to_map,
+            'Internal',
+            'Params to map (ex: joints) when present mapped params templates (ex: gains_____map_joints___p). \
+                Ex: after map gains___joint_name___p.',
+            params_to_map.keys(),
+        )
+        obj.setPropertyStatus(prop_name_params_to_map, ['Hidden', 'ReadOnly'])
+
+    return mapped_params_templates, params_to_map

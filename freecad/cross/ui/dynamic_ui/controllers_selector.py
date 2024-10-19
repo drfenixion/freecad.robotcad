@@ -3,7 +3,6 @@ from PySide import QtGui, QtCore, QtWidgets
 import FreeCADGui as fcgui
 import FreeCAD as fc
 
-from ...wb_utils import ROS2_CONTROLLERS_PATH
 from ...controller_proxy import get_controllers_data
 from ...wb_utils import is_robot_selected
 from ...wb_utils import is_controller_selected
@@ -28,7 +27,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         self.setWindowTitle("Select controller")
         
         # get controller and brodcasters data and make dropdowns
-        self.controllers = get_controllers_data(ROS2_CONTROLLERS_PATH)
+        self.controllers = get_controllers_data()
         self.controllers_dropdown = QtGui.QComboBox(self)
         self.broadcasters_dropdown = QtGui.QComboBox(self)
         for controller_name, controller in self.controllers['controllers'].items():
