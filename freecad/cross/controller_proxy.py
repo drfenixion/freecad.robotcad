@@ -479,6 +479,9 @@ def add_controller_properties(controller: CrossController,
                 default_value,
             )
 
+            if is_template_for_param_mapping(var_name):
+                controller.setPropertyStatus(var_name, ['Hidden', 'ReadOnly'])
+
         except KeyError:
             # not type finded at this level and should dive deeper
             controller = add_controller_properties(
@@ -898,3 +901,9 @@ def get_mapped_params(obj: CrossController,
         obj.setPropertyStatus(prop_name_params_to_map, ['Hidden', 'ReadOnly'])
 
     return mapped_params_templates, params_to_map
+
+
+def is_template_for_param_mapping(var_full_name: str) -> bool:
+    if wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE + wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER in var_full_name:
+        return True
+    return False
