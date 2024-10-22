@@ -91,6 +91,7 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     # Works only for workspace with colcon's merge install strategy.
     _add_python_path(f'{ros_workspace}/install/lib/{python_ver}/site-packages')
     _add_python_path(f'{ros_workspace}/install/local/lib/{python_ver}/dist-packages')
+    
     # On some systems (e.g. FreeCAD 0.21 on Ubuntu 20), $PYTHONPATH is not
     # taken into account in FreeCAD, add them manually.
     base = f'/opt/ros/{ros_distro}'

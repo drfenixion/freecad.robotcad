@@ -163,7 +163,7 @@ else
         --security-opt seccomp=unconfined \
         $debug_port \
         $localhost_address \
-        $image bash -c ". ./install/setup.bash && $debug_env $command"
+        $image bash -c ". ~/.profile && $debug_env $command"
     xhost -
 
 

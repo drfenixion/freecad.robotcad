@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
 import sys
-from freecad.utils import get_python_exe
 import addonmanager_utilities as utils
 import subprocess
 import os
@@ -18,6 +17,15 @@ import MaterialEditor
 
 from .utils import true_then_false
 from . import wb_constants
+from .ros.utils import _add_python_path
+
+
+try:
+    # For v0.21:
+    from addonmanager_utilities import get_python_exe
+except (ModuleNotFoundError, ImportError):
+    # For v0.22/v1.0:
+    from freecad.utils import get_python_exe
 
 
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
@@ -857,7 +865,7 @@ def adjustedGlobalPlacement(obj, locVector):
 
 
 def pip_install(pkg_name, restart_freecad = True):
-    '''Python package installer for AppImage builds. It install python module inside AppImage'''
+    '''Python package installer for AppImage builds. It installs python module inside AppImage'''
 
     python_exe = get_python_exe()
     print('python_exe: ', python_exe)
@@ -884,8 +892,13 @@ def pip_install(pkg_name, restart_freecad = True):
     p.stderr.close()
     p.wait(timeout=180)
 
+    # dynamically add module to sys.path
+    major = sys.version_info.major
+    minor = sys.version_info.minor
+    _add_python_path(f'~/.local/share/FreeCAD/AdditionalPythonPackages/py{major}{minor}')
+
     if restart_freecad:
-        utils.restart_freecad()    
+        utils.restart_freecad()
 
 
 def get_python_name() -> str:

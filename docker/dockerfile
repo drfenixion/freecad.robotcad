@@ -9,6 +9,7 @@ ARG ROS_DISTRO_ARG
 ARG USER=1000
 ARG PASSWD=ubuntu
 ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
+ENV PATH_TO_WS=$CONT_PATH_WS
 
 ENV USER=$USER
 ENV PASSWD=$PASSWD
@@ -65,8 +66,8 @@ USER $USER
 
 
 ### Copy project to image
-RUN mkdir -p $CONT_PATH_WS/src
-WORKDIR $CONT_PATH_WS/src
+RUN mkdir -p $PATH_TO_WS/src
+WORKDIR $PATH_TO_WS/src
 COPY --link --chown=$USER:$USER ros2_ws/src .
 ### END copy project to image
 
@@ -76,7 +77,7 @@ RUN mkdir -p $HOME/.local/share/FreeCAD/Mod
 ### END Make path for FreeCAD mods
 
 
-WORKDIR $CONT_PATH_WS
+WORKDIR $PATH_TO_WS
 
 
 ### Install ROS deps
