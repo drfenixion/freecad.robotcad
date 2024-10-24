@@ -60,6 +60,8 @@ from pathlib import Path
 from .joint_proxy import make_robot_joints_filled
 from .link_proxy import make_robot_links_filled
 from . import wb_constants
+from .wb_utils import get_xacro_wrapper_file_name
+from .wb_utils import get_controllers_config_file_name
 
 # Stubs and type hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -789,6 +791,7 @@ class RobotProxy(ProxyBase):
             'launch/display.launch.py',
             'launch/gazebo.launch.py',
             'rviz/robot_description.rviz',
+            'urdf/xacro_wrapper_template.urdf.xacro',
         ]
 
         write_files = template_files + [
@@ -852,13 +855,17 @@ class RobotProxy(ProxyBase):
         meshes_dir = ('meshes '
                 if _has_meshes_directory(Path(project_path), package_name)
                 else '')
-            
+        
+        robot_name = get_valid_urdf_name(ros_name(self.robot))
+        controllers_config_file_name = get_controllers_config_file_name(robot_name)
+        xacro_wrapper_file = get_xacro_wrapper_file_name(robot_name)
+
         # robot meta for external code generator
-        robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir)
+        robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir, controllers_config_file_name)
         save_file(robot_meta, output_path / f'overcross/robot_meta.xml')
 
         robot_controllers_yaml = self.get_robot_controllers_yaml()
-        save_yaml(robot_controllers_yaml, output_path / f'overcross/controllers.yaml')
+        save_yaml(robot_controllers_yaml, output_path / f'overcross/{controllers_config_file_name}')
 
         save_xml(xml, urdf_path)
         export_templates(template_files,
@@ -867,6 +874,8 @@ class RobotProxy(ProxyBase):
                          package_name=package_name,
                          urdf_file=urdf_file,
                          fixed_frame=ros_name(self.get_root_link()),
+                         xacro_wrapper_file=xacro_wrapper_file,
+                         robot_name=robot_name
                          )
 
         return xml
@@ -878,15 +887,13 @@ class RobotProxy(ProxyBase):
                                    ) -> dict:
         """Make robot controllers data in yaml format"""
         
-        yaml_data = {}
-        # controller manager and controllers plugin types
-        yaml_data['controller_manager'] = {'update_rate': 500}
-        for controller in self.get_controllers():
+        def add_controllers_types_to_yaml(controller: CrossController, yaml_data: dict):
             plugin_class_name = getattr(controller, 'plugin_class_name')
             yaml_data['controller_manager'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
-            
-        # controllers and their params
-        for controller in self.get_controllers():
+            return yaml_data
+
+
+        def add_controllers_data_to_yaml(controller: CrossController, yaml_data: dict):
             yaml_data[get_valid_urdf_name(ros_name(controller))] = {'ros__parameters': {}}
             for param_full_name in controller.controller_parameters_fullnames_list:
                 param = getattr(controller, param_full_name)
@@ -905,11 +912,26 @@ class RobotProxy(ProxyBase):
                             if isinstance(el, DO):
                                 value = get_valid_urdf_name(ros_name(el))
                             yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
-                        
+            return yaml_data
+        
+
+        yaml_data = {}
+        # controller manager and controllers plugin types
+        yaml_data['controller_manager'] = {'update_rate': 500}
+        for controller in self.get_controllers():
+            yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
+        for controller in self.get_broadcasters():
+            yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
+            
+        # controllers and their params
+        for controller in self.get_controllers():
+            yaml_data = add_controllers_data_to_yaml(controller, yaml_data)
+        for controller in self.get_broadcasters():
+            yaml_data = add_controllers_data_to_yaml(controller, yaml_data)
         return yaml_data
 
 
-    def get_robot_meta(self, package_name: str, urdf_file_name: str, meshes_dir: str) -> str:
+    def get_robot_meta(self, package_name: str, urdf_file_name: str, meshes_dir: str, controllers_config_file_name: str) -> str:
         """Return robot meta info as xml. It can be used by external code generators"""
 
         robotMetaXml = f"""<?xml version="1.0" ?>
@@ -920,6 +942,8 @@ class RobotProxy(ProxyBase):
     <meshesDir>{meshes_dir}</meshesDir>
     <robotType>{self.robot.RobotType}</robotType>
     <rootLinkName>{get_valid_urdf_name(ros_name(self.get_root_link()))}</rootLinkName>
+    <xacroWrapperFileName>{get_xacro_wrapper_file_name(ros_name(self.robot))}</xacroWrapperFileName>
+    <controllersConfigFileName>{controllers_config_file_name}</controllersConfigFileName>
 </robotMeta>
         """
 

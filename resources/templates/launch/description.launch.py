@@ -10,7 +10,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     pkg_share = Path(launch_ros.substitutions.FindPackageShare(package='{package_name}').find('{package_name}'))
-    default_model_path = pkg_share / 'urdf/{urdf_file}'
+    default_model_path = pkg_share / 'urdf/{xacro_wrapper_file}'
 
     robot_state_publisher_node = launch_ros.actions.Node(
         package='robot_state_publisher',

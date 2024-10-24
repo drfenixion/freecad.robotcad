@@ -3,6 +3,9 @@ from ..wb_utils import get_rel_and_abs_path
 import FreeCAD as fc
 import FreeCADGui as fcgui
 from ..wb_utils import get_urdf_path
+from ..wb_utils import get_xacro_wrapper_path
+from ..wb_utils import get_robot_meta_path
+from ..wb_utils import get_controllers_config_path
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected
 from pathlib import Path
@@ -48,10 +51,14 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       rel_output_path, abs_output_path = get_rel_and_abs_path(robot.OutputPath)
       project_path, package_name, description_package_path = split_package_path(abs_output_path)
       urdf_path = get_urdf_path(robot, description_package_path)
+      xacro_wrapper_path = get_xacro_wrapper_path(robot, description_package_path)
 
       path_to_overcross_meta_dir_rel_to_project = 'overcross/'
       path_to_overcross_meta_dir = str(project_path) + '/' + path_to_overcross_meta_dir_rel_to_project
-      path_to_robot_meta = Path(path_to_overcross_meta_dir + 'robot_meta.xml')
+
+      path_to_robot_meta = get_robot_meta_path(path_to_overcross_meta_dir)
+      path_to_controllers_config = get_controllers_config_path(robot, path_to_overcross_meta_dir)
+
       path_to_overcross_meta_tmp_dir = path_to_overcross_meta_dir + 'tmp/'
       
       print('Calculating mass and inertia started.')
@@ -90,10 +97,12 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       path_to_overcross_meta_dir_in_tmp_dir = path_to_overcross_meta_tmp_dir + path_to_overcross_meta_dir_rel_to_project
       Path(path_to_overcross_meta_dir_in_tmp_dir).mkdir(parents=True, exist_ok=True)
       shutil.copy(path_to_robot_meta, path_to_overcross_meta_dir_in_tmp_dir)
+      shutil.copy(path_to_controllers_config, path_to_overcross_meta_dir_in_tmp_dir)
 
       path_to_overcross_urdf_dir_in_tmp_dir = path_to_overcross_meta_tmp_dir + '/' + package_name + '/' + 'urdf'
       Path(path_to_overcross_urdf_dir_in_tmp_dir).mkdir(parents=True, exist_ok=True)
       shutil.copy(urdf_path, path_to_overcross_urdf_dir_in_tmp_dir)
+      shutil.copy(xacro_wrapper_path, path_to_overcross_urdf_dir_in_tmp_dir)
 
       # make archive with needed files
       zip_filename = "project"

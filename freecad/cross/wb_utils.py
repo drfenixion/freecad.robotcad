@@ -490,6 +490,12 @@ def export_templates(
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
         txt = template.format(**keys)
+        xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
+
+        #replace xacro wrapper file name
+        if xacro_wrapper_tmpl in f:
+            f = f.replace(xacro_wrapper_tmpl, keys['xacro_wrapper_file'])
+
         output_path = package_parent / package_name / f
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(txt)
@@ -605,6 +611,31 @@ def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
     urdf_path = Path(urdf_path)
 
     return urdf_path
+
+
+def get_xacro_wrapper_path(robot: CrossRobot, output_path: str) -> Path:
+    """Return xacro wrapper file path`.
+    """
+        
+    xacro_wrapper_file = get_xacro_wrapper_file_name(ros_name(robot))
+    xacro_wrapper_path = output_path / f'urdf/{xacro_wrapper_file}'
+    xacro_wrapper_path = Path(xacro_wrapper_path)
+
+    return xacro_wrapper_path
+
+
+def get_robot_meta_path(path_to_overcross_meta_dir: str) -> Path:
+    """Return robot meta file path`.
+    """
+
+    return Path(path_to_overcross_meta_dir + 'robot_meta.xml')
+
+
+def get_controllers_config_path(robot: CrossRobot, path_to_overcross_meta_dir: str) -> Path:
+    """Return ros2_control controllers config file path in source dir (overcross)`.
+    """
+
+    return Path(path_to_overcross_meta_dir + get_controllers_config_file_name(ros_name(robot)))
 
 
 def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO):
@@ -850,3 +881,19 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
     joint.Origin = rotate_placement(joint.Origin, x, y, z)
 
     doc.recompute()
+
+
+def get_xacro_wrapper_file_name(robot_name: str) -> str:
+    """ Return xacro wrapper file name. 
+    
+    Xacrot wrapper file includes URDF description file and other xacro files."""
+
+    return get_valid_filename(robot_name) + '_wrapper.urdf.xacro'
+
+
+
+def get_controllers_config_file_name(robot_name: str) -> str:
+    """ Return controllers config file name (yaml config of ros2_control). 
+    """
+
+    return get_valid_filename(robot_name) + '_controllers.yaml'

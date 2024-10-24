@@ -52,7 +52,7 @@ def generate_launch_description():
             package='ros_gz_sim',
             executable='create',
             arguments=[
-                '-name', '{urdf_file}',
+                '-name', '{robot_name}',
                 '-x', '1.2',
                 '-z', '2.3',
                 '-Y', '3.4',

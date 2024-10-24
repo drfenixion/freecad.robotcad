@@ -11,7 +11,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     pkg_share = Path(launch_ros.substitutions.FindPackageShare(package='{package_name}').find('{package_name}'))
-    default_model_path = pkg_share / 'urdf/{urdf_file}'
+    default_model_path = pkg_share / 'urdf/{xacro_wrapper_file}'
     default_rviz_config_path = pkg_share / 'rviz/robot_description.rviz'
 
     use_sim_time = LaunchConfiguration('use_sim_time')
