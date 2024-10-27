@@ -889,7 +889,7 @@ class RobotProxy(ProxyBase):
         
         def add_controllers_types_to_yaml(controller: CrossController, yaml_data: dict):
             plugin_class_name = getattr(controller, 'plugin_class_name')
-            yaml_data['controller_manager'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
+            yaml_data['controller_manager']['ros__parameters'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
             return yaml_data
 
 
@@ -912,12 +912,18 @@ class RobotProxy(ProxyBase):
                             if isinstance(el, DO):
                                 value = get_valid_urdf_name(ros_name(el))
                             yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
+                        
+                        if not len(yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]):
+                            # control manager throw error when detect empty list
+                            # delete empty element
+                            del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
             return yaml_data
         
 
         yaml_data = {}
+        yaml_data['controller_manager'] = {'ros__parameters': {}}
         # controller manager and controllers plugin types
-        yaml_data['controller_manager'] = {'update_rate': 500}
+        yaml_data['controller_manager']['ros__parameters'] = {'update_rate': 1000}
         for controller in self.get_controllers():
             yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
         for controller in self.get_broadcasters():
