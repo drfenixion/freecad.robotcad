@@ -923,7 +923,7 @@ class RobotProxy(ProxyBase):
         yaml_data = {}
         yaml_data['controller_manager'] = {'ros__parameters': {}}
         # controller manager and controllers plugin types
-        yaml_data['controller_manager']['ros__parameters'] = {'update_rate': 1000}
+        yaml_data['controller_manager']['ros__parameters'] = {'update_rate': 250}
         for controller in self.get_controllers():
             yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
         for controller in self.get_broadcasters():

@@ -32,12 +32,18 @@ def generate_launch_description():
         executable='joint_state_publisher',
         name='joint_state_publisher',
         condition=launch.conditions.UnlessCondition(LaunchConfiguration('gui')),
+        parameters=[{{
+            'use_sim_time': use_sim_time,
+        }}],
     )
     joint_state_publisher_gui_node = launch_ros.actions.Node(
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
         name='joint_state_publisher_gui',
         condition=launch.conditions.IfCondition(LaunchConfiguration('gui')),
+        parameters=[{{
+            'use_sim_time': use_sim_time,
+        }}],
     )
     rviz_node = launch_ros.actions.Node(
         package='rviz2',
@@ -45,13 +51,16 @@ def generate_launch_description():
         name='rviz2',
         output='screen',
         arguments=['-d', LaunchConfiguration('rvizconfig')],
+        parameters=[{{
+            'use_sim_time': use_sim_time,
+        }}],
     )
 
     return launch.LaunchDescription([
         launch.actions.DeclareLaunchArgument(
-                                            name='use_sim_time',
-                                            default_value='true',
-                                            description='Flag to enable usage of simulation time',
+            name='use_sim_time',
+            default_value='true',
+            description='Flag to enable usage of simulation time',
         ),
         launch.actions.DeclareLaunchArgument(
             name='gui',

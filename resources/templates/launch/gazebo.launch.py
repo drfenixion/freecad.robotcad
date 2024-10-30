@@ -62,11 +62,8 @@ def generate_launch_description():
     )
 
     use_sim_time = LaunchConfiguration('use_sim_time')
-
     use_sim_time_launch_arg = DeclareLaunchArgument('use_sim_time', default_value='true')
-
     use_rviz = LaunchConfiguration('use_rviz')
-
     use_rviz_arg = DeclareLaunchArgument("use_rviz", default_value='true')
 
     robot_state_publisher = IncludeLaunchDescription(
@@ -90,6 +87,7 @@ def generate_launch_description():
             ]),
         ]),
         condition=IfCondition(use_rviz),
+        launch_arguments=dict(use_sim_time=use_sim_time).items(),
     )
 
     return LaunchDescription([
