@@ -907,5 +907,5 @@ def git_init_submodules():
     files_and_dirs = os.listdir(ROS2_CONTROLLERS_PATH)
     # update if dir is empty
     if not len(files_and_dirs):
-        message('Installing ros2_controllers...', gui=True)
-        subprocess.run(["git submodule update", " --init"], capture_output=True)
+        message('Installing ros2_controllers.')
+        subprocess.run(["git submodule update", " --init"], shell=True, capture_output=True, cwd=MOD_PATH)
