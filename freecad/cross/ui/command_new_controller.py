@@ -2,8 +2,9 @@ import FreeCADGui as fcgui
 
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected
-from ..wb_utils import ROS2_CONTROLLERS_PATH
+from ..wb_utils import git_init_submodules
 from .dynamic_ui.controllers_selector import ControllersSelectorModalClass 
+from ..freecad_utils import message
 
 
 class _NewControllerCommand:
@@ -26,6 +27,7 @@ class _NewControllerCommand:
         return is_robot_selected()
 
     def Activated(self):
+        git_init_submodules()
         form = ControllersSelectorModalClass()
         form.exec_()
 

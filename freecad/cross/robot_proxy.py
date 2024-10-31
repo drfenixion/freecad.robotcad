@@ -55,6 +55,7 @@ from .wb_utils import remove_ros_workspace
 from .wb_utils import ros_name
 from .wb_utils import _has_meshes_directory
 from .wb_utils import get_urdf_path
+from .wb_utils import git_init_submodules
 from xml.dom.minidom import parseString
 from pathlib import Path
 from .joint_proxy import make_robot_joints_filled
@@ -863,7 +864,7 @@ class RobotProxy(ProxyBase):
         # robot meta for external code generator
         robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir, controllers_config_file_name)
         save_file(robot_meta, output_path / f'overcross/robot_meta.xml')
-
+        
         robot_controllers_yaml = self.get_robot_controllers_yaml()
         save_yaml(robot_controllers_yaml, output_path / f'overcross/{controllers_config_file_name}')
 
@@ -919,6 +920,7 @@ class RobotProxy(ProxyBase):
                             del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
             return yaml_data
         
+        git_init_submodules()
 
         yaml_data = {}
         yaml_data['controller_manager'] = {'ros__parameters': {}}

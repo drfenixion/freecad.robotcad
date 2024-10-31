@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol, Union
+import os
+import subprocess
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
@@ -897,3 +899,13 @@ def get_controllers_config_file_name(robot_name: str) -> str:
     """
 
     return get_valid_filename(robot_name) + '_controllers.yaml'
+
+
+def git_init_submodules():
+    """ Do git submodule update --init if ros2_controllers module dir is empty"""
+    
+    files_and_dirs = os.listdir(ROS2_CONTROLLERS_PATH)
+    # update if dir is empty
+    if not len(files_and_dirs):
+        message('Installing ros2_controllers...', gui=True)
+        subprocess.run(["git submodule update", " --init"], capture_output=True)
