@@ -892,6 +892,20 @@ class RobotProxy(ProxyBase):
             plugin_class_name = getattr(controller, 'plugin_class_name')
             yaml_data['controller_manager']['ros__parameters'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
             return yaml_data
+        
+
+        def separate_controllers_from_other_elements(param: list) -> tuple[list, list]:
+            """ Separate controllers and broadcasters from other elements (joints) in param elements list"""
+
+            controllers_broadcasters = []
+            others = []
+            for el in param:
+                if is_controller(el) or is_broadcaster(el):
+                    controllers_broadcasters.append(el)
+                else:
+                    others.append(el)
+
+            return controllers_broadcasters, others
 
 
         def add_controllers_data_to_yaml(controller: CrossController, yaml_data: dict):
@@ -908,18 +922,38 @@ class RobotProxy(ProxyBase):
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
                     else:
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = []
-                        for el in param:
-                            value = el
-                            if isinstance(el, DO):
-                                value = get_valid_urdf_name(ros_name(el))
-                            yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(value)
-                        
+                        controllers_broadcasters, others = separate_controllers_from_other_elements(param)
+
+                        # make chain reference names - ex: controller_name/joint_name
+                        if len(controllers_broadcasters):
+                            for cont_broad in controllers_broadcasters:
+                                cont_broad_name = cont_broad
+                                if isinstance(cont_broad, DO):
+                                    cont_broad_name = get_valid_urdf_name(ros_name(cont_broad))
+                                for other_el in others:
+                                    other_el_name = other_el
+                                    if isinstance(other_el, DO):
+                                        other_el_name = get_valid_urdf_name(ros_name(other_el))
+                                    chain_name = cont_broad_name + '/' + other_el_name
+                                    yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(chain_name)
+
+                        # make regular names - ex: joint_name
+                        else:
+                            for other_el in others:
+                                other_el_name = other_el
+                                if isinstance(other_el, DO):
+                                    other_el_name = get_valid_urdf_name(ros_name(other_el))
+                                yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(other_el_name)
+                            
+                        # clear empty list
                         if not len(yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]):
                             # control manager throw error when detect empty list
                             # delete empty element
                             del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
+
             return yaml_data
         
+
         git_init_submodules()
 
         yaml_data = {}

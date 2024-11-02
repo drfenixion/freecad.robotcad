@@ -26,9 +26,11 @@ from .freecad_utils import get_valid_property_name
 from .freecad_utils import warn
 from .wb_utils import ICON_PATH
 from .wb_utils import ROS2_CONTROLLERS_PATH
-from .wb_utils import is_joint # dont remove used by check_func()
-from .wb_utils import is_link # dont remove used by check_func()
-from .wb_utils import return_true # dont remove used by check_func()
+from .wb_utils import is_joint
+from .wb_utils import is_link
+from .wb_utils import is_controller
+from .wb_utils import is_broadcaster
+from .wb_utils import return_true
 from .wb_utils import is_controllers_template_for_param_mapping
 from .wb_utils import ros_name
 from .wb_utils import get_valid_urdf_name
@@ -41,7 +43,7 @@ DO = fc.DocumentObject
 DOList = List[DO]
 VPDO = ForwardRef('FreeCADGui.ViewProviderDocumentObject')  # Don't want to import FreeCADGui here. # noqa: E501
 AppLink = DO  # TypeId == 'App::Link'.
-check_functions = [is_joint, is_link, return_true]
+check_functions_required = [is_joint, is_link, return_true, is_controller, is_broadcaster] # dont remove used by check_functions()
 
 class ControllerProxy(ProxyBase):
     """The proxy for Controller objects."""
@@ -175,19 +177,22 @@ class _ViewProviderController(ProxyBase):
 
 
             for el in attr:
-                if isinstance(el, DO):
-                    el = ros_name(el)
+                # exclude controllers and broadcaster from mapping because they can be presented in mapped param but used for chain purposes
+                if not is_controller(el) and not is_broadcaster(el):
 
-                for template in mapped_params_templates_filtered:
-                    mapped_prop_name = template.replace(param_to_replace, el)
-                    
-                    try:
-                        attr = getattr(obj, mapped_prop_name)
-                    except AttributeError:
-                        parameters = unflatten_params(deepcopy(parameters_flatten_filtered), param_to_replace, el)
-                        controllers_merged[ros_name(obj)]['parameters'] = parameters
-                        obj = add_controller_properties_block(obj, controllers_merged[ros_name(obj)])
-                        t = obj
+                    if isinstance(el, DO):
+                        el = ros_name(el)
+
+                    for template in mapped_params_templates_filtered:
+                        mapped_prop_name = template.replace(param_to_replace, el)
+                        
+                        try:
+                            attr_not_exist_trigger = getattr(obj, mapped_prop_name)
+                        except AttributeError:
+                            parameters = unflatten_params(deepcopy(parameters_flatten_filtered), param_to_replace, el)
+                            controllers_merged[ros_name(obj)]['parameters'] = parameters
+                            obj = add_controller_properties_block(obj, controllers_merged[ros_name(obj)])
+                            t = obj
 
 
         def remove_redundant_mapped_attrs(prop: str, 
@@ -249,29 +254,39 @@ class _ViewProviderController(ProxyBase):
 
             def notice_not_suited_object_selected(element, replacements: dict, prop: str):
                 error('Selected not suited object (' + ros_name(element) + ') for ' 
-                    + prop + ' property. Object was excluded. Verification function - ' 
-                    + replacements[prop]['check_func'] 
+                    + prop + ' property. Object was excluded. Verification functions - ' 
+                    + ', '.join(replacements[prop]['check_functions']) 
                     + '. Use filter of this type.', gui=True)
             
             # custom type checks
             replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
             if prop in replacements:
                 filtered_elements = deepcopy(replacements[prop]['default_value_replace'])
-                check_func = replacements[prop]['check_func']
+                check_functions = replacements[prop]['check_functions']
                 attr = getattr(obj, prop)
                 if type(attr) is list:
                     for element in attr:
                         if element:
-                            if not globals()[check_func](element):
+                            suited_object_flag = False
+                            for check_function in check_functions:
+                                if globals()[check_function](element):
+                                    suited_object_flag = True
+                                    filtered_elements.append(element)
+                                    break
+                            if not suited_object_flag:
                                 notice_not_suited_object_selected(element, replacements, prop)
-                            else:
-                                filtered_elements.append(element)
+                                
+                                    
                 else:
                     if attr:
-                        if not globals()[check_func](attr):
+                        suited_object_flag = False
+                        for check_function in check_functions:
+                            if globals()[check_function](attr):
+                                suited_object_flag = True
+                                filtered_elements = attr
+                                break
+                        if not suited_object_flag:
                             notice_not_suited_object_selected(attr, replacements, prop)
-                        else:
-                            filtered_elements = attr
                             
                 if attr != filtered_elements:
                     setattr(obj, prop, filtered_elements)
