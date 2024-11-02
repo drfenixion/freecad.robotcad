@@ -907,8 +907,15 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
 
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
-        subprocess.run(["git submodule update", " --init", update_from_remote_branch_param], shell=True, capture_output=True, cwd=MOD_PATH)        
-    
+        p = subprocess.run(
+            ["git submodule update", " --init", update_from_remote_branch_param],
+            shell=True,
+            capture_output=True,
+            cwd=MOD_PATH,
+            check=True,
+        )
+        print('stdout:', p.stdout.decode())
+
 
     update_from_remote_branch_param = ''
     if update_from_remote_branch:
