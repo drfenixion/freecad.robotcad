@@ -6,7 +6,7 @@ FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
 # Must redeclare so that value is available after FROM statement.
 ARG ROS_DISTRO_ARG
 
-ARG USER=1000
+ARG USER=$(id -u)
 ARG PASSWD=ubuntu
 ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
 ENV PATH_TO_WS=$CONT_PATH_WS
