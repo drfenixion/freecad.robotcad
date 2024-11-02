@@ -1,16 +1,13 @@
 """Entry point of the CROSS workbench."""
-
 import os
 import sys
-
 import FreeCAD as fc
-
 from .ros.utils import add_ros_library_path
 from .version import __version__
 from .wb_globals import g_ros_distro
 from .freecad_utils import pip_install
-
     
+
 try:
     # For v0.21:
     from addonmanager_utilities import get_python_exe
@@ -40,11 +37,10 @@ if os.environ.get('DEBUG'):
     try:
         attach_debugger()
     except:
-        # needed restart freecad after install debugpy
         pip_install('debugpy', restart_freecad = False)
         attach_debugger()
-        
 
+        
 add_ros_library_path(g_ros_distro)
 
 # Must be imported after the call to `add_ros_library_path`.
@@ -62,6 +58,3 @@ try:
     import xacro
 except (ModuleNotFoundError, ImportError):
     pip_install('xacro', restart_freecad = False)
-    
-
-
