@@ -18,7 +18,7 @@ class _NewControllerCommand:
             'ToolTip': tr('Create a Controller or Broadcaster.\n'
                           '\n'
                           'Controllers are needed to control joints.\n'
-                          'Broadcasters are needed to receive data from sensors.\n'
+                          'Broadcasters are needed for receive and transfer data from sensors.\n'
                           '\n'
                           'See ros2_controllers and ros2_control documentation.'),
         }
