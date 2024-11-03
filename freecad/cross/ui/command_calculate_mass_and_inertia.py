@@ -45,6 +45,7 @@ class _CalculateMassAndInertiaCommand:
         default_material = material_from_material_editor(robot.MaterialCardPath)
 
         doc.openTransaction(tr('Calculate mass and inertia'))
+        # TODO refactor this code block to be more readable (split to functions)
         for link in robot.Proxy.get_links():
             print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
             
@@ -53,6 +54,7 @@ class _CalculateMassAndInertiaCommand:
                 error(f'''MaterialNotCalculate and CalculateMaterialBasedOnMass are both true for "{link.Label}"\n
                       both cannot be true \n change state of one and try again \n''')
                 continue
+
             if  link.MaterialNotCalculate:
                 continue
             
@@ -94,6 +96,7 @@ class _CalculateMassAndInertiaCommand:
             if elem_matrix_of_inertia is None:
                 error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
                 continue
+            
             if not link.CalculateInertiaBasedOnMass:
                 if elem_material.material_name is None:
                     material = default_material
@@ -112,8 +115,6 @@ class _CalculateMassAndInertiaCommand:
                 # without clearing an existing expression before updating mass the value for mass does not update 
                 link.clearExpression("Mass")
                 link.Mass = quantity_as(volume * material.density, 'kg')
-                
-                
             else:
                 if link.Mass <= 0.0:
                     error(f'Link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.', gui=True)
