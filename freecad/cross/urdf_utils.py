@@ -11,6 +11,7 @@ import xml.etree.ElementTree as et
 import FreeCAD as fc
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from .freecad_utils import get_leafs_and_subnames
 from .freecad_utils import is_box
@@ -47,7 +48,7 @@ class XmlForExport:
     mesh_filename: str = ''
 
 
-def quaternion_matrix(quaternion: QuatList) -> np.ndarray:
+def quaternion_matrix(quaternion: QuatList) -> ArrayLike:
     """Return the homogeneous rotation matrix from quaternion.
 
     The quaternion must have the format (qx, qy, qz, qw).

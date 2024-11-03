@@ -7,16 +7,19 @@ from __future__ import annotations
 
 from itertools import islice
 from itertools import zip_longest
+from functools import reduce
 import os
 from pathlib import Path
-import string
 from typing import Any, Generator, Iterable, Optional
 import xml.etree.ElementTree as et
 from xml.dom import minidom
 import yaml
 import collections.abc
+import re
 
 import FreeCAD as fc
+
+INVALID_FILENAME_CHARS = re.compile(r'[^A-Za-z0-9_\-.]+')
 
 # Stubs and type hints.
 DO = fc.DocumentObject
@@ -41,15 +44,15 @@ def add_path_to_environment_variable(path: [Path | str], env_var: str) -> None:
     if env_var not in os.environ:
         os.environ[env_var] = path_str
         return
-    existing_paths = os.environ.get(env_var).split(':')
+    path_sep = os.pathsep
+    existing_paths = os.environ.get(env_var).split(path_sep)
     if path_str not in existing_paths:
-        os.environ[env_var] += ':' + path_str
+        os.environ[env_var] += f'{path_sep}{path_str}'
 
 
 def get_valid_filename(text: str) -> str:
     """Return a string that is a valid file name."""
-    valids = string.ascii_letters + string.digits + '_-.'
-    return ''.join(c if c in valids else '_' for c in text)
+    return INVALID_FILENAME_CHARS.sub('_', text)
 
 
 def warn_unsupported(
@@ -80,11 +83,11 @@ def warn_unsupported(
 
 
 def attr_equals(instance: Any, attr: str, value: Any):
-    return hasattr(instance, attr) and getattr(instance, attr) == value
+    return getattr(instance, attr, None) == value
 
 
 def attr_is(instance: Any, attr: str, value: Any):
-    return hasattr(instance, attr) and getattr(instance, attr) is value
+    return getattr(instance, attr, None) is value
 
 
 def hasallattr(obj: Any, attrs: list[str]):
@@ -96,10 +99,7 @@ def hasallattr(obj: Any, attrs: list[str]):
         # Developer help, call error.
         warn(f'hasallattr({attrs}) was replaced by hasallattr([{attrs}])')
         attrs = [attrs]
-    for attr in attrs:
-        if not hasattr(obj, attr):
-            return False
-    return True
+    return all(hasattr(obj, attr) for attr in attrs)
 
 
 def save_xml(
@@ -136,7 +136,7 @@ def save_file(
     file_path.write_text(content)
 
 
-def grouper(iterable, n, fillvalue=None):
+def grouper(iterable: Iterable, n: int, fillvalue=None):
     """Collect data into fixed-length chunks or blocks."""
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
     # From https://docs.python.org/3.8/library/itertools.html.
@@ -192,7 +192,7 @@ def get_parent_by_pattern(
             return Path(), relative_file_path
 
 
-def true_then_false(list: Iterable[bool]) -> bool:
+def true_then_false(booleans: Iterable[bool]) -> bool:
     """Return True if no False is found after a True.
 
     >>> true_then_false([True])
@@ -207,38 +207,36 @@ def true_then_false(list: Iterable[bool]) -> bool:
     False
 
     """
-    if not list:
-        return True
-    v0 = list[0]
-    for v in list:
-        if v0 or not v:
-            v0 = v
-            continue
-        return False
-    return True
+    return reduce(lambda a, b: (a[0] and a[1] >= b, b), booleans, (True, True))[0]
 
 
 def values_from_string(
     values_str: str,
-    delimiters: Iterable[str] = (' ', ',', ';', '\t'),
+    delimiters: str = r'[ ,;\t]+',
 ) -> list[float]:
-    """Return a list of floats from a string."""
-    # Try a single value.
+    """
+    Return a list of floats from a delimited string.
+
+    :param str values_str: delimited string
+    :param str delimiters: regex pattern for valid delimiters, defaults to r'[ ,;\t]+'
+    :return list[float]: a list containing ONLY the valid parsed floats
+    """
+    conversions = (str_to_float(v) for v in re.split(delimiters, values_str))
+    return [v for v in conversions if v is not None]
+
+
+def str_to_float(text: str, default: float | None = None) -> float | None:
+    """
+    Converts a string into a valid float number or returns a default value.
+
+    :param str text: string representation of a float number
+    :param float | None default: returned if conversion fails, defaults to None
+    :return float | None: float number if conversion succeeds `default` if fails
+    """
     try:
-        return [float(values_str)]
-    except ValueError:
-        pass
-    # Try a list of values separated by the given delimiters.
-    for delimiter in delimiters:
-        if delimiter in values_str:
-            try:
-                return [
-                    float(value) for value in values_str.split(delimiter)
-                    if value != ''
-                ]
-            except ValueError:
-                pass
-    return []
+        return float(text)
+    except (TypeError, ValueError):
+        return default
 
 
 def deepmerge(dict1, dict2):

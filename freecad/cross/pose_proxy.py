@@ -68,7 +68,7 @@ class PoseProxy(ProxyBase):
     def _init_properties(self, obj: CrossPose) -> None:
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
-            'The type',
+            'The type of object',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type

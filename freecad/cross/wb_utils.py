@@ -34,6 +34,7 @@ from .exceptions import NoPartWrapperOfObject
 from .freecad_utils import validate_types
 
 # Stubs and typing hints.
+from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "AttachedCollisionObject". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
@@ -86,6 +87,11 @@ def set_workbench_param(
             f'User parameter:BaseApp/Preferences/Mod/{wb_globals.PREFS_CATEGORY}',
     )
     set_param(param_grp, param_name, value)
+
+
+def is_attached_collision_object(obj: DO) -> bool:
+    """Return True if the object is a Cross::AttachedCollisionObject."""
+    return _has_ros_type(obj, 'Cross::AttachedCollisionObject')
 
 
 def is_robot(obj: DO) -> bool:
@@ -190,6 +196,11 @@ def is_workcell_selected() -> bool:
 def is_planning_scene_selected() -> bool:
     """Return True if the first selected object is a Cross::PlanningScene."""
     return is_selected_from_lambda(is_planning_scene)
+
+
+def get_attached_collision_objects(objs: DOList) -> list[CrossAttachedCollisionObject]:
+    """Return only the objects that are Cross::AttachedCollisionObject instances."""
+    return [o for o in objs if is_attached_collision_object(o)]
 
 
 def get_links(objs: DOList) -> list[CrossLink]:
@@ -464,8 +475,8 @@ def export_templates(
                       directory `resources` of this workbench.
     - package_name: the directory containing the directory called
                     `package_name`, usually "$ROS_WORKSPACE/src".
-    - keys: dictionnary of replacement string in templates.
-            - package_name (compulsary): name of the ROS package and its containing
+    - keys: dictionary of replacement string in templates.
+            - package_name (compulsory): name of the ROS package and its containing
                                          directory.
             - urdf_file: name of the URDF/xacro file without directory.
                          Used in `launch/display.launch.py`.

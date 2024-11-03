@@ -38,6 +38,7 @@ from .utils import save_file
 from .utils import warn_unsupported
 from .wb_utils import ICON_PATH
 from .wb_utils import export_templates
+from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
 from .wb_utils import get_joints
 from .wb_utils import get_links
@@ -45,6 +46,7 @@ from .wb_utils import get_controllers
 from .wb_utils import get_broadcasters
 from .wb_utils import get_rel_and_abs_path
 from .wb_utils import get_valid_urdf_name
+from .wb_utils import is_attached_collision_object
 from .wb_utils import is_joint
 from .wb_utils import is_link
 from .wb_utils import is_robot
@@ -65,10 +67,10 @@ from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_controllers_config_file_name
 
 # Stubs and type hints.
+from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
-from .trajectory import Trajectory as CrossTrajectory  # A Cross::Trajectory, i.e. a DocumentObject with Proxy "Trajectory". # noqa: E501
 from .controller import Controller as CrossController  # A Cross::Controller, i.e. a DocumentObject with Proxy "Controller". # noqa: E501
 BasicElement = Union[CrossJoint, CrossLink]
 DO = fc.DocumentObject
@@ -195,15 +197,16 @@ class RobotProxy(ProxyBase):
     def __init__(self, obj: CrossRobot):
         # Implementation note: 'Group' is not required because
         # DocumentObjectGroupPython.
-        super().__init__('robot', [
-            'CreatedObjects',
-            'OutputPath',
-            'MaterialCardName',
-            'MaterialCardPath',
-            'MaterialDensity',
-            'RobotType',
-            '_Type',
-            'Mass',
+        super().__init__(
+            'robot', [
+                'CreatedObjects',
+                'OutputPath',
+                'MaterialCardName',
+                'MaterialCardPath',
+                'MaterialDensity',
+                'RobotType',
+                '_Type',
+                'Mass',
             ])
 
         if obj.Proxy is not self:
@@ -217,7 +220,7 @@ class RobotProxy(ProxyBase):
         # TODO: remove `_created_objects` and use `robot.CreatedObjects` instead.
         self._created_objects: DOList = []
 
-        # Map of joint names to joint variable names.
+        # Map of CROSS joints to joint variable names.
         # Only for actuated non-mimicking joints.
         self._joint_variables: dict[CrossJoint, str] = {}
 
@@ -225,10 +228,11 @@ class RobotProxy(ProxyBase):
         # Used to restore the joint variables from the dumped state because
         # DocumentObject instances cannot be saved.
         # Defined in onDocumentRestored().
-        # TODO: Mayber save as two lists (App::PropertyLinkList and App::PropertyStringList).
+        # TODO: Maybe save as two lists (App::PropertyLinkList and App::PropertyStringList).
         self._joint_variables_ros_map: dict[str, str]
 
-        # Save the links and joints to speed-up get_links() and get_joints().
+        # Save the children to speed-up get_links() and get_joints().
+        self._attached_collision_objects: Optional[list[CrossAttachedCollisionObject]] = None
         self._links: Optional[list[CrossLink]] = None
         self._joints: Optional[list[CrossJoint]] = None
 
@@ -244,13 +248,13 @@ class RobotProxy(ProxyBase):
 
     @property
     def joint_variables(self) -> dict[CrossJoint, str]:
-        """Map of joint names to joint variable names."""
+        """Map of CROSS joints to joint variable names."""
         return self._joint_variables
 
     def _init_properties(self, obj: CrossRobot):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
-            'The type',
+            'The type of object',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
@@ -259,7 +263,6 @@ class RobotProxy(ProxyBase):
             obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
             'Objects created for the robot',
         )
-        obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
 
         add_property(obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
                      'Mass of the link')
@@ -279,8 +282,15 @@ class RobotProxy(ProxyBase):
         )
 
         add_property(
-            obj, 'App::PropertyString', 'MaterialCardName', 'Material',
-            'Default material of robot. Used to calculate mass and inertia if link has not its own material. Use "Set material" tool to change',
+                obj,
+                'App::PropertyString',
+                'MaterialCardName',
+                'Material',
+                (
+                    'Default material of robot. Used to calculate mass and inertia'
+                    ' if link has not its own material. Use "Set material" tool to'
+                    ' change'
+                ),
         )
         obj.setPropertyStatus('MaterialCardName', ['ReadOnly'])
         add_property(
@@ -289,8 +299,16 @@ class RobotProxy(ProxyBase):
         )
         obj.setPropertyStatus('MaterialCardPath', ['Hidden', 'ReadOnly'])
         add_property(
-            obj, 'App::PropertyString', 'MaterialDensity', 'Material',
-            'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.',
+                obj,
+                'App::PropertyString',
+                'MaterialDensity',
+                'Material',
+                (
+                    'Density of material. Used to calculate mass. May be outdated'
+                    ' if you updated the material density outside RobotCAD workbench.'
+                    ' Actual density will taken from material (material editor) at'
+                    ' mass calculation moment.'
+                ),
         )
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
 
@@ -314,6 +332,8 @@ class RobotProxy(ProxyBase):
 
     def onChanged(self, obj: CrossRobot, prop: str) -> None:
         # print(f'{obj.Name}.onChanged({prop})') # DEBUG
+        if not self.is_execute_ready():
+            return
         if prop in ['Group']:
             # Reset _links and _joints to provoke a recompute.
             self._links = None
@@ -329,7 +349,12 @@ class RobotProxy(ProxyBase):
             self.compute_poses()
 
     def onDocumentRestored(self, obj):
-        """Restore attributes because __init__ is not called on restore."""
+        """Handle the object after a document restore.
+
+        Required by FreeCAD.
+
+        """
+        # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(obj)
         self._created_objects = obj.CreatedObjects
         # Rebuilt self._joint_variables from the map {ros_name: joint_variable_name}.
@@ -369,7 +394,7 @@ class RobotProxy(ProxyBase):
         if not self.is_execute_ready():
             return None
         for o in self.robot.Group[::-1]:
-            if is_link(o) or is_joint(o) or is_controller(o) or is_broadcaster(o):
+            if is_link(o) or is_joint(o) or is_controller(o) or is_broadcaster(o) or is_attached_collision_object(o):
                 # Supported.
                 continue
             warn_unsupported(o, by='CROSS::Robot', gui=True)
@@ -509,8 +534,8 @@ class RobotProxy(ProxyBase):
         # Get all old variables.
         old_vars: set[str] = set(
             get_properties_of_category(
-            self.robot,
-            self._category_of_joint_values,
+                self.robot,
+                self._category_of_joint_values,
             ),
         )
         # Add a variable for each actuated (supported) joint.
@@ -527,15 +552,14 @@ class RobotProxy(ProxyBase):
         return
 
     def compute_poses(self) -> None:
-        """Set `Placement` of all joints and links.
+        """Set `Placement` of all joints, links, and attached collision objects.
 
-        Compute and set the pose of all joints and links relative the the robot
-        root link.
+        Compute and set the pose of all joints, links, and attached collision
+        objects in the same frame as the robot.
 
         """
         joint_cache: dict[CrossJoint, fc.Placement] = {}
-        chains = self.get_chains()
-        for chain in chains:
+        for chain in self.get_chains():
             placement = self.robot.Placement  # A copy.
             for link, joint in grouper(chain, 2):
                 if joint in joint_cache:
@@ -562,11 +586,27 @@ class RobotProxy(ProxyBase):
                         * joint.Proxy.get_actuation_placement()
                     )
                     joint_cache[joint] = placement
+        for aco in self.get_attached_collision_objects():
+            if not aco.Link:
+                continue
+            if aco.Placement != aco.Link.Placement:
+                # Avoid recursive recompute.
+                aco.Placement = aco.Link.Placement
+
+    def get_attached_collision_objects(self) -> list[CrossAttachedCollisionObject]:
+        # TODO: as property.
+        if self._attached_collision_objects is not None:
+            return list(self._attached_collision_objects)  # A copy.
+        if not self.is_execute_ready():
+            return []
+        self._attached_collision_objects = get_attached_collision_objects(
+                self.robot.Group)
+        return list(self._attached_collision_objects)  # A copy.
 
     def get_links(self) -> list[CrossLink]:
         """Return the list of CROSS links in the order of creation."""
         # TODO: as property.
-        if (self._links is not None):
+        if self._links is not None:
             return list(self._links)  # A copy.
         if not self.is_execute_ready():
             return []
@@ -576,7 +616,7 @@ class RobotProxy(ProxyBase):
     def get_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS joints in the order of creation."""
         # TODO: as property.
-        if (self._joints is not None):
+        if self._joints is not None:
             # self._joints is updated in self.onChanged().
             return list(self._joints)  # A copy.
         if not self.is_execute_ready():
@@ -663,7 +703,7 @@ class RobotProxy(ProxyBase):
         if not self.is_execute_ready():
             return []
         if not is_robot(self.robot):
-            warn(f'{label_or(self.robot)} is not a CROSS::Robot', True)
+            warn(f'Internal error, {label_or(self.robot)} is not a CROSS::Robot', True)
             return []
         links = self.get_links()
         joints = self.get_joints()
@@ -1092,7 +1132,7 @@ class _ViewProviderRobot(ProxyBase):
     def setupContextMenu(self, vobj: VPDO, menu: QMenu) -> None:
         action = menu.addAction("Load trajectories from YAML...")
         action.triggered.connect(
-                lambda function=self.on_context_menu, argument=vobj: function(argument)
+                lambda function=self.load_trajectories_from_yaml, argument=vobj: function(argument),
         )
 
     def doubleClicked(self, vobj: VPDO):
@@ -1116,7 +1156,7 @@ class _ViewProviderRobot(ProxyBase):
     def loads(self, state) -> None:
         pass
 
-    def on_context_menu(self, vobj: VPDO) -> None:
+    def load_trajectories_from_yaml(self, vobj: VPDO) -> None:
         import FreeCADGui as fcgui
         import yaml
 
@@ -1130,10 +1170,7 @@ class _ViewProviderRobot(ProxyBase):
         else:
             return
 
-        display_trajs = yaml.load_all(
-                open(filename),
-                yaml.CLoader,
-        )
+        display_trajs = yaml.safe_load_all(open(filename))
 
         fcgui.Selection.clearSelection()
         for display_traj in display_trajs:

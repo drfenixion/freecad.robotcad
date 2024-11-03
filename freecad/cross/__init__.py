@@ -1,4 +1,4 @@
-"""Entry point of the CROSS workbench."""
+"""Entry point of the RobotCAD workbench."""
 import os
 import sys
 import FreeCAD as fc

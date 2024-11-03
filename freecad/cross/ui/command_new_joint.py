@@ -14,7 +14,7 @@ class _NewJointCommand:
     def GetResources(self):
         return {
             'Pixmap': 'joint.svg',
-            'MenuText': tr('Create a Joint'),
+            'MenuText': tr('New Joint'),
             'Accel': 'N, J',
             'ToolTip': tr('Create a Joint.'),
         }

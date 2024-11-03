@@ -6,15 +6,16 @@ from typing import NewType, List, Union
 
 import FreeCAD as fc
 
+# Typing hints
+DO = fc.DocumentObject
 # Implementation note: These cannot be imported because of circular
 # dependency.
-Joint = NewType('Joint', fc.DocumentObject)
-Link = NewType('Link', fc.DocumentObject)
-Controller = NewType('Controller', fc.DocumentObject)
+Joint = NewType('Joint', DO)
+Link = NewType('Link', DO)
+Controller = NewType('Controller', DO)
+AttachedCollisionObject = NewType('AttachedCollisionObject', DO)
 
-# Typing hints
-BasicElement = Union[Link, Joint, Controller]
-DO = fc.DocumentObject
+BasicElement = Union[AttachedCollisionObject, Joint, Link, Controller]
 DOList = List[DO]
 
 

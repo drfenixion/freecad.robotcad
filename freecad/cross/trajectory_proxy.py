@@ -1,3 +1,8 @@
+# A trajectory object to store and replay trajectories as list of joint-space
+# points.
+#
+# This file is part of the CROSS workbench for FreeCAD.
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,14 +26,18 @@ except ImportError:
     JointTrajectory = Any
     JointTrajectoryPoint = Any
 
+from .fpo import PropertyMode
+from .fpo import PropertyEditorMode
 from .fpo import PropertyIntegerConstraint
 from .fpo import PropertyLink
-from .fpo import PropertyEditorMode
+from .fpo import PropertyString
 from .fpo import proxy  # Cf. https://github.com/mnesarco/fcapi
 from .fpo import view_proxy
 from .freecad_utils import add_property
 from .freecad_utils import message
 from .freecad_utils import warn
+from .ui.replay_trajectory_dialog import ReplayTrajectoryDialog
+from .ui.choose_trajectory_dialog import ChooseTrajectoryDialog
 from .utils import i_th_item
 from .wb_utils import ICON_PATH
 from .wb_utils import is_robot
@@ -50,9 +59,11 @@ class TrajectoryViewProxy:
 
     def on_context_menu(
             self,
+            vobj: VPDO,
             menu: QMenu,
             ) -> None:
         menu.addAction('Load Trajectory from YAML file...', self.load_yaml)
+        menu.addAction('Replay...', self.replay)
 
     def load_yaml(self):
         import FreeCADGui as fcgui
@@ -62,7 +73,7 @@ class TrajectoryViewProxy:
             fcgui.getMainWindow(),
             'Select a multi-doc YAML file to import a trajectory from',
         )
-        dialog.setNameFilter('YAML *.yaml;;All files (*.*)')
+        dialog.setNameFilter('YAML *.yaml *.yml;;All files (*.*)')
         if dialog.exec_():
             filename = str(dialog.selectedFiles()[0])
         else:
@@ -71,23 +82,42 @@ class TrajectoryViewProxy:
         # Check and warn if the multi-doc YAML contains more than one message
         # (1 message == 1 document) with `ros2 topic echo`.
         # TODO: open a dialog to ask to choose a trajectory.
-        display_trajs = yaml.load_all(
-                open(filename),
-                yaml.CLoader,
-        )
-        try:
-            i_th_item(display_trajs, 1)
-            warn('Only the first DisplayTrajectory message is considered', True)
-        except StopIteration:
-            pass
-        self.Object.Proxy.load_yaml(filename, 0)
+        display_trajs = yaml.safe_load_all(open(filename))
+
+        dialog = ChooseTrajectoryDialog(
+                display_trajs,
+                self.Object.Robot,
+                fcgui.getMainWindow())
+        message_index, trajectory_index = dialog.exec()
+        if message_index >= 0:
+            self.Object.Proxy.load_yaml(filename, message_index)
+
+    def replay(self):
+        old_index = self.Object.Proxy.point_index
+        diag = ReplayTrajectoryDialog(self.Object)
+        index = diag.exec_()
+        diag.close()
+        if index == -1:
+            self.Object.Proxy.point_index = old_index
+
+
+_TRAJECTORY_TYPE = 'Cross::Trajectory'
 
 
 @proxy(
-        object_type='App::FeaturePython',
-        view_proxy=TrajectoryViewProxy,
+    object_type='App::FeaturePython',
+    subtype=_TRAJECTORY_TYPE,
+    view_proxy=TrajectoryViewProxy,
 )
 class TrajectoryProxy:
+
+    type = PropertyString(
+            name='_Type',
+            default=_TRAJECTORY_TYPE,
+            section='Internal',
+            description='The type of the object',
+            mode=PropertyMode.ReadOnly + PropertyMode.Hidden,
+    )
 
     robot = PropertyLink(
             name='Robot',
@@ -107,8 +137,8 @@ class TrajectoryProxy:
         super().__init__()
 
         # The map of joint names to FreeCAD properties, {joint_name: property}.
-        # It's more practical than a property `PropertyMap` because the property
-        # cannot be updated with indexing or `merge()`.
+        # It's more practical than a property `App::PropertyMap` because the
+        # property cannot be updated with indexing or `merge()`.
         self._joint_map: dict[str, str] = {}
 
     def on_create(self, obj: CrossTrajectory):
@@ -144,6 +174,8 @@ class TrajectoryProxy:
         if not self.robot:
             self._joint_map.clear()
             return
+        # We do not clear `self._joint_map` because we want to keep the
+        # values for the joints that are still present in the new robot.
         new_joint_names = [ros_name(j)
                            for j in self.robot.Proxy.get_joints()
                            if not j.Proxy.is_fixed()]
@@ -225,7 +257,11 @@ class TrajectoryProxy:
         self.point_index = (0, 0, self.point_count - 1, 1)
         self._set_editor_mode()
 
-    def load_yaml(self, file: Union[Path, str], trajectory_index: int = 0) -> None:
+    def load_yaml(self,
+                  file: Union[Path, str],
+                  message_index: int = 0,
+                  trajectory_index: int = 0,
+                  ) -> None:
         """Load a trajectory from a multi-doc YAML file.
 
         Such files are generated with `ros2 topic echo`.
@@ -233,25 +269,24 @@ class TrajectoryProxy:
         """
         import yaml
 
-        display_trajs = yaml.load_all(
-                open(file),
-                yaml.CLoader,
-        )
+        display_trajs = yaml.safe_load_all(open(file))
         try:
-            display_traj = i_th_item(display_trajs, trajectory_index)
+            display_traj = i_th_item(display_trajs, message_index)
         except StopIteration:
             warn(
-                 (f'Invalid index {trajectory_index},'
+                 (f'Invalid document index {message_index}'
+                  ' (i.e. message index),'
                   ' not enough trajectories in the multi-doc file'),
                  True,
              )
             return
 
-        self.load_display_trajectory_dict(display_traj)
+        self.load_display_trajectory_dict(display_traj, trajectory_index)
 
     def load_display_trajectory_dict(
             self,
             display_trajectory: dict[str, Any],
+            trajectory_index: int = 0,
     ) -> None:
         """Load a trajectory from a `DisplayTrajectory` message as dict.
 
@@ -259,15 +294,26 @@ class TrajectoryProxy:
             - `trajectory` with a list of `JointTrajectory` messages as dict,
             - `trajectory_start` with a `RobotState` message as dict.
         """
+        if 'trajectory' not in display_trajectory:
+            warn('Wrongly formatted DisplayTrajectory message', True)
+            return
+
         if not display_trajectory['trajectory']:
             message('No trajectory in the DisplayTrajectory message', False)
             self.Object.Proxy.update_trajectory(JointTrajectory())
 
-        if len(display_trajectory['trajectory']) > 1:
-            message('Only the first trajectory is considered', True)
+        if len(display_trajectory['trajectory']) > (trajectory_index + 1):
+            message(
+                    (
+                        'The DisplayTrajectory does not contain a RobotTrajectory'
+                        f' with index {trajectory_index} as it has only'
+                        f' {len(display_trajectory["trajectory"])} trajectories'
+                    ),
+                    True,
+            )
 
         traj = JointTrajectory()
-        joint_traj = display_trajectory['trajectory'][0]['joint_trajectory']
+        joint_traj = display_trajectory['trajectory'][trajectory_index]['joint_trajectory']
         traj.joint_names = joint_traj['joint_names']
         for point in joint_traj['points']:
             traj_point = JointTrajectoryPoint()

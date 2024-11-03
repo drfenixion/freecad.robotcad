@@ -192,9 +192,9 @@ def strip_subelement(sub_fullpath: str) -> str:
         Examples:
         - 'Face6' if you select the top face of a cube solid made in Part.
         - 'Body.Box001.' if you select the tip of a Part->Body->"additive
-            primitve" in PartDesign.
+            primitive" in PartDesign.
         - 'Body.Box001.Face6' if you select the top face of a Part->Body->
-            "additive primitve" in PartDesign.
+            "additive primitive" in PartDesign.
 
     """
     if (not sub_fullpath) or ('.' not in sub_fullpath):
@@ -233,9 +233,9 @@ def get_subobjects_by_full_name(
         Examples:
         - 'Face6' if you select the top face of a cube solid made in Part.
         - 'Body.Box001.' if you select the tip of a Part->Body->"additive
-            primitve" in PartDesign.
+            primitive" in PartDesign.
         - 'Body.Box001.Face6' if you select the top face of a Part->Body->
-            "additive primitve" in PartDesign.
+            "additive primitive" in PartDesign.
 
     """
     objects = []
@@ -299,8 +299,10 @@ def is_derived_from(obj: DO, typeid: str) -> bool:
 def has_type(obj: DO, typeid: str) -> bool:
     """Return True if the object has the given type, evaluating also its Proxy.
 
-    Return True if the object is derived from the given type or obj.Proxy.Type
-    is the given type.
+    Return True if
+    - the object is derived from the given type
+    - or obj.Proxy.Type is the given type
+    - or obj._Type is the given type.
 
     """
     return (
@@ -309,6 +311,11 @@ def has_type(obj: DO, typeid: str) -> bool:
             hasattr(obj, 'Proxy')
             and hasattr(obj.Proxy, 'Type')
             and obj.Proxy.Type == typeid
+        )
+        # Alternatively: some object have a `_Type` attribute.
+        or (
+            hasattr(obj, '_Type')
+            and obj._Type == typeid
         )
     )
 
@@ -531,7 +538,7 @@ def validate_types(
 
     """
     if len(objects) < len(types):
-        raise RuntimeError('Less types required that the number of objects')
+        raise RuntimeError('More types required that the number of objects')
     if isinstance(respect_order, bool):
         respect_order = [respect_order] * len(types)
     if len(respect_order) != len(types):

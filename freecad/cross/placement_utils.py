@@ -30,9 +30,9 @@ def get_global_placement_and_scale(
         Examples:
         - 'Face6' if you select the top face of a cube solid made in Part.
         - 'Body.Box001.' if you select the tip of a Part->Body->"additive
-            primitve" in PartDesign.
+            primitive" in PartDesign.
         - 'Body.Box001.Face6' if you select the top face of a Part->Body->
-            "additive primitve" in PartDesign.
+            "additive primitive" in PartDesign.
     """
     return_type_link_matrix = 6  # Cf. DocumentObjectPyImp.cpp::getSubObject (l.417).
     matrix = object.getSubObject(
@@ -85,9 +85,9 @@ def get_global_placement(
         Examples:
         - 'Face6' if you select the top face of a cube solid made in Part.
         - 'Body.Box001.' if you select the tip of a Part->Body->"additive
-            primitve" in PartDesign.
+            primitive" in PartDesign.
         - 'Body.Box001.Face6' if you select the top face of a Part->Body->
-            "additive primitve" in PartDesign.
+            "additive primitive" in PartDesign.
     """
     p_and_s = get_global_placement_and_scale(object, subobject_fullpath)
     if p_and_s is None:

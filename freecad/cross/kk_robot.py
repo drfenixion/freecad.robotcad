@@ -26,11 +26,12 @@ from .wb_utils import ros_name
 
 try:
     import numpy as np
+    from numpy.typing import ArrayLike
     from . import geometry_helpers as gh
-
-    ndarray = np.ndarray
-except ImportError:
-    ndarray = Any
+except ImportError as e:
+    warn(f'numpy not available, some functionalities will not work, error: {e}',
+         False)
+    ArrayLike = Any
 
 # Stubs and type hints.
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
@@ -101,9 +102,8 @@ class KKJoint:
     ) -> None:
         """Set the joint parameters from a placement.
 
-        Set the joint parameters from the joint's Origin (in the
-                                                          CROSS workbench).
-        Joints in CROSS are along/about the z-axis, no need for the `axis`
+        Set the joint parameters from the joint's Origin (in the RobotCAD workbench).
+        Joints in RobotCAD are along/about the z-axis, no need for the `axis`
         parameter as in `set_dh_from_matrix`.
 
         """
@@ -120,8 +120,8 @@ class KKJoint:
 
     def set_dh_from_matrix(
         self,
-        matrix: ndarray,
-        axis: Optional[ndarray] = None,
+        matrix: ArrayLike,
+        axis: Optional[ArrayLike] = None,
     ) -> None:
         """Set the joint parameters from a transformation matrix.
         Set the joint parameters from a transformation matrix between two

@@ -14,6 +14,7 @@ VPTrajectoryProxy = NewType('VPTrajectoryProxy', object)
 
 
 class Trajectory(DO):
+    PointIndex: int
     Proxy: TrajectoryProxy
     Robot: CrossRobot
     ViewObject: Optional[ViewProviderTrajectory]
@@ -23,7 +24,4 @@ class Trajectory(DO):
 class ViewProviderTrajectory:
     Object: Trajectory
     Proxy: VPTrajectoryProxy
-    ShowEndEffector: bool
     Visibility: bool
-
-    def addDisplayMode(self, separator, mode: str) -> None: ...

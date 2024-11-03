@@ -11,6 +11,7 @@ class _NewTrajectoryCommand:
     def GetResources(self):
         return {
             'Pixmap': 'trajectory.svg',
+            'MenuText': tr('New Trajectory'),
             'Accel': 'N, T',
             'ToolTip': tr('Create a Trajectory.'),
         }

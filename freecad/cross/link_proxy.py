@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import ForwardRef, List, Optional, cast
+from typing import NewType, List, Optional, cast
 import xml.etree.ElementTree as et
 
 import FreeCAD as fc
@@ -42,7 +42,7 @@ from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 DO = fc.DocumentObject
 DOList = List[DO]
-VPDO = ForwardRef('FreeCADGui.ViewProviderDocumentObject')  # Don't want to import FreeCADGui here. # noqa: E501
+VPDO = NewType('FreeCADGui.ViewProviderDocumentObject', DO)  # Don't want to import FreeCADGui here. # noqa: E501
 AppLink = DO  # TypeId == 'App::Link'.
 
 
@@ -51,10 +51,11 @@ def _add_fc_links_lod(
         objects: DOList,
         lod: str,
 ) -> list[AppLink]:
-    """Create links to real, visual or collision elements.
+    """Create FreeCAD links to real, visual or collision elements.
 
     Return the list of created FreeCAD link objects.
-    The objects are not added to the link.
+    The objects are not added to the CROSS::link (it's a group), just to the
+    document.
 
     Parameters
     ----------
@@ -163,10 +164,12 @@ class LinkProxy(ProxyBase):
                 '_Type',
             ],
         )
-        obj.Proxy = self
+        if obj.Proxy is not self:
+            obj.Proxy = self
         self.link = obj
 
-        # Lists to keep track of the objects that were added to the link.
+        # Lists to keep track of the objects that were added to the
+        # CROSS::link.
         self._fc_links_real: DOList = []
         self._fc_links_visual: DOList = []
         self._fc_links_collision: DOList = []
@@ -192,7 +195,7 @@ class LinkProxy(ProxyBase):
     def init_properties(self, obj: CrossLink):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
-            'The type',
+            'The type of object',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
@@ -266,12 +269,22 @@ class LinkProxy(ProxyBase):
         obj.setPropertyStatus('MaterialCardPath', ['Hidden', 'ReadOnly'])
         add_property(
             obj, 'App::PropertyString', 'MaterialDensity', 'Material',
-            'Density of material. Used to calculate mass. May be outdated if you updated the material density outside CROSS workbench. Actual density will taken from material (material editor) at mass calculation moment.',
+            (
+                'Density of the material. Used to calculate the mass. May be'
+                ' outdated if you updated the material density outside the'
+                ' RobotCAD workbench. The actual density will taken from the'
+                ' material (material editor) at the moment the mass is'
+                ' calculated.'
+            ),
         )
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
         add_property(
             obj, 'App::PropertyBool', 'MaterialNotCalculate', 'Material',
-            'If true this material will be not used to calculate mass and inertia of element. In this case you can use manually filled mass and inertia for some elements and auto calculation for others.',
+            (
+                'If true this material will be not used to calculate mass and'
+                ' inertia of this link. If true, the filled mass and inertia'
+                ' will not be changed.'
+            ),
         )
         add_property(
             obj, 'App::PropertyBool', 'CalculateInertiaBasedOnMass', 'Inertial Parameters',
@@ -305,10 +318,10 @@ class LinkProxy(ProxyBase):
 
     def onChanged(self, obj: CrossLink, prop: str) -> None:
         if prop == 'Group':
-            self.cleanup_children()
+            self._cleanup_children()
         if prop in ('Real', 'Visual', 'Collision'):
-            self.cleanup_children()
             self.update_fc_links()
+            self._cleanup_children()
         if prop in ('Label', 'Label2'):
             robot = self.get_robot()
             if robot and hasattr(robot, 'Proxy'):
@@ -358,7 +371,7 @@ class LinkProxy(ProxyBase):
         if state:
             self.Type, = state
 
-    def cleanup_children(self) -> DOList:
+    def _cleanup_children(self) -> DOList:
         """Remove and return all objects not supported by CROSS::Link."""
         if not self.is_execute_ready():
             return []
@@ -376,6 +389,7 @@ class LinkProxy(ProxyBase):
         # Clean-up `Real`.
         kept, removed = _skim_links_joints_from(self.link.Real)
         if self.link.Real != kept:
+            # Implementation note: the "if" avoids recursion.
             self.link.Real = kept
         warn_unsupported(removed, by='CROSS::Link', gui=True)
         removed_objects.update(removed)
@@ -383,6 +397,7 @@ class LinkProxy(ProxyBase):
         # Clean-up `Visual.
         kept, removed = _skim_links_joints_from(self.link.Visual)
         if self.link.Visual != kept:
+            # Implementation note: the "if" avoids recursion.
             self.link.Visual = kept
         warn_unsupported(removed, by='CROSS::Link', gui=True)
         removed_objects.update(removed)
@@ -390,6 +405,7 @@ class LinkProxy(ProxyBase):
         # Clean-up `Collision`.
         kept, removed = _skim_links_joints_from(self.link.Collision)
         if self.link.Collision != kept:
+            # Implementation note: the "if" avoids recursion.
             self.link.Collision = kept
         warn_unsupported(removed, by='CROSS::Link', gui=True)
         removed_objects.update(removed)
@@ -478,6 +494,8 @@ class LinkProxy(ProxyBase):
 
     def update_fc_links(self) -> None:
         """Update the FreeCAD link according to the level of details."""
+        # Implementation note: must be public because it is called by the ViewProxy.
+
         if not self.is_execute_ready():
             return
         link = self.link
@@ -611,14 +629,14 @@ class LinkProxy(ProxyBase):
                 link_xml.append(xml)
         link_xml.append(
             urdf_inertial(
-            mass=self.link.Mass.Value,
-            center_of_mass=self.link.CenterOfMass,
-            ixx=self.link.Ixx,
-            ixy=self.link.Ixy,
-            ixz=self.link.Ixz,
-            iyy=self.link.Iyy,
-            iyz=self.link.Iyz,
-            izz=self.link.Izz,
+                mass=self.link.Mass.Value,
+                center_of_mass=self.link.CenterOfMass,
+                ixx=self.link.Ixx,
+                ixy=self.link.Ixy,
+                ixz=self.link.Ixz,
+                iyy=self.link.Iyy,
+                iyz=self.link.Iyz,
+                izz=self.link.Izz,
             ),
         )
         return link_xml
@@ -677,7 +695,7 @@ class LinkProxy(ProxyBase):
 
 
 class _ViewProviderLink(ProxyBase):
-    """A view provider for the Cross::Link object """
+    """A view provider for the Cross::Link object."""
 
     def __init__(self, vobj: VPDO):
         super().__init__(
@@ -695,13 +713,13 @@ class _ViewProviderLink(ProxyBase):
 
     def attach(self, vobj: VPDO):
         self.view_object = vobj
-        self.init_extensions(vobj)
-        self.init_properties(vobj)
+        self._init_extensions(vobj)
+        self._init_properties(vobj)
 
-    def init_extensions(self, vobj: VPDO):
+    def _init_extensions(self, vobj: VPDO):
         vobj.addExtension('Gui::ViewProviderGroupExtensionPython')
 
-    def init_properties(self, vobj: VPDO):
+    def _init_properties(self, vobj: VPDO):
         # Level of detail.
         add_property(
             vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
@@ -720,7 +738,7 @@ class _ViewProviderLink(ProxyBase):
         self._old_show_visual = vobj.ShowVisual
         self._old_show_collision = vobj.ShowCollision
 
-    def updateData(self, obj: VPDO, prop):
+    def updateData(self, obj: CrossLink, prop):
         return
 
     def onChanged(self, vobj: VPDO, prop: str):
@@ -758,7 +776,7 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
     if doc is None:
         doc = fc.activeDocument()
     if doc is None:
-        warn('No active document, doing nothing', False)
+        warn('No active document and cannot create a new document, doing nothing', True)
         return
     cross_link: CrossLink = doc.addObject('App::FeaturePython', name)
     LinkProxy(cross_link)

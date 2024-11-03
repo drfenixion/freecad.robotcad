@@ -20,7 +20,7 @@
 __author__          = "Frank David Martínez Muñoz"
 __copyright__       = "(c) 2024 Frank David Martínez Muñoz."
 __license__         = "LGPL 2.1"
-__version__         = "1.0.0-beta1"
+__version__         = "1.0.0-beta2"
 __min_python__      = "3.8"
 __min_freecad__     = "0.21"
 
@@ -66,11 +66,11 @@ else:
 #: Conditional imports
 #: ─────────────────────────────────────────────────────────────────────────────
 try:
-    # ┌───────────────────────────────────┐ 
-    # │ FreeCAD Environment imports       │ 
-    # └───────────────────────────────────┘    
+    # ┌───────────────────────────────────┐
+    # │ FreeCAD Environment imports       │
+    # └───────────────────────────────────┘
     import FreeCAD as App  # type: ignore
-    
+
     if App.GuiUp:
         from pivy import coin               # type: ignore
         import FreeCADGui as Gui            # type: ignore
@@ -83,9 +83,9 @@ try:
         App.Console.PrintError(f"[error] {' '.join(str(a) for a in args)}\n")
 
 except ImportError:
-    # ┌────────────────────────────────────────────────────────┐ 
-    # │ Standalone Environment imports (Faked FreeCAD types)   │ 
-    # └────────────────────────────────────────────────────────┘    
+    # ┌────────────────────────────────────────────────────────┐
+    # │ Standalone Environment imports (Faked FreeCAD types)   │
+    # └────────────────────────────────────────────────────────┘
     App = object()
 
     def print_log(*args):
@@ -163,8 +163,8 @@ _FC_PROPERTY_TYPES = (
     'Bool', 'BoolList', 'Color', 'ColorList',
     'CurrentDensity', 'Density', 'Direction', 'DissipationRate',
     'Distance', 'DynamicViscosity', 'ElectricCharge', 'ElectricCurrent',
-    'ElectricPotential', 'ElectricalCapacitance', 'ElectricalConductance', 
-    'ElectricalConductivity', 'ElectricalInductance', 'ElectricalResistance', 
+    'ElectricPotential', 'ElectricalCapacitance', 'ElectricalConductance',
+    'ElectricalConductivity', 'ElectricalInductance', 'ElectricalResistance',
     'Enumeration', 'ExpressionEngine',
     'File', 'FileIncluded', 'Float', 'FloatConstraint',
     'FloatList', 'Font', 'Force', 'Frequency',
@@ -174,7 +174,7 @@ _FC_PROPERTY_TYPES = (
     'LinkGlobal', 'LinkHidden', 'LinkList', 'LinkListChild',
     'LinkListGlobal', 'LinkListHidden', 'LinkSub', 'LinkSubChild',
     'LinkSubGlobal', 'LinkSubHidden', 'LinkSubList', 'LinkSubListChild',
-    'LinkSubListGlobal', 'LinkSubListHidden', 'LuminousIntensity', 
+    'LinkSubListGlobal', 'LinkSubListHidden', 'LuminousIntensity',
     'MagneticFieldStrength',
     'MagneticFlux', 'MagneticFluxDensity', 'Magnetization', 'Map',
     'Mass', 'Material', 'MaterialList', 'Matrix',
@@ -214,7 +214,7 @@ def _snake_to_camel(text: str) -> str:
     """Transform text from snake naming to camel case"""
     if text:
         return "".join(token.capitalize() for token in text.split('_'))
-    
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _resolve_uri(path: str, base_dir: Path = None) -> str:
@@ -234,7 +234,7 @@ def _prop_constructor(prop_type):
         default: Any = None,
         description: str = '',
         mode: PropertyMode = PropertyMode.Default,
-        observer_func: Callable = None,        
+        observer_func: Callable = None,
         link_property: Union[str, bool] = False):
         return Property(
             type=prop_type,
@@ -259,13 +259,13 @@ def _is(types: Any) -> Callable:
 # ──────────────────────────────────────────────────────────────────────────────
 def _get_properties(cls) -> Iterable[Tuple[str, 'Property']]:
     '''Returns the list of Properties defined in a proxy class'''
-    return inspect.getmembers(cls, _is(Property))    
+    return inspect.getmembers(cls, _is(Property))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _get_display_modes(cls) -> Iterable[Tuple[str, 'DisplayMode']]:
     '''Returns the list of Display Modes defined in a proxy class'''
-    return inspect.getmembers(cls, _is(DisplayMode))    
+    return inspect.getmembers(cls, _is(DisplayMode))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ def _t_forward(cls, forward_from: str, forward_to: str):
     if overridden:
         raise NameError(f'{forward_from} is already reserved. ' +
                         f'use {forward_to} instead')
-    
+
     forward = getattr(cls, forward_to, None)
     if forward:
         def handler(self, *args, **kwargs):
@@ -289,7 +289,7 @@ def _t_forward(cls, forward_from: str, forward_to: str):
         handler.__doc__ = forward.__doc__
         handler.__name__ = forward_from
         setattr(cls, forward_from, handler)
-    
+
 #% ┌───────────────────────────────────────────────────────────────────────────┐
 #% │ Core types                                                                │
 #% └───────────────────────────────────────────────────────────────────────────┘
@@ -306,7 +306,7 @@ class _DocIntEnum(IntEnum):
         self._value_ = value
         self.__doc__ = doc
         return self
-    
+
 
 #% ─────────────────────────────────────────────────────────────────────────────
 class FeatureState(_DocIntEnum):
@@ -362,7 +362,7 @@ class EditMode(_DocIntEnum):
 #% ─────────────────────────────────────────────────────────────────────────────
 class Property:
     '''
-    Proxy object to create, access and manipulate remote freecad properties 
+    Proxy object to create, access and manipulate remote freecad properties
     in DocumentObject and ViewObject instances.
 
     Ref: https://wiki.freecad.org/FeaturePython_Custom_Properties
@@ -377,7 +377,7 @@ class Property:
     section: str                     # Capitalized single word due to FC limitations
     default: Any                     # Initial value
     description: str                 # GUI description
-    mode: PropertyMode               # PropertyEditor mode for the property           
+    mode: PropertyMode               # PropertyEditor mode for the property
     enum: Enum                       # Type of enum used by "App::PropertyEnumeration"
     options: Callable                # Callable that provides a list of options
 
@@ -489,9 +489,9 @@ class DisplayMode:
     is_default: bool
 
     # ──────────
-    def __init__(self, 
-                 name: str = None, 
-                 is_default: bool = False, 
+    def __init__(self,
+                 name: str = None,
+                 is_default: bool = False,
                  builder: Callable = None):
         self.name = name
         self.is_default = is_default
@@ -572,7 +572,7 @@ class ExtensionSupport:
     # ──────────
     def on_attach(self, proxy: Proxy, obj: ObjectRef, meta: 'TypeMeta'):
         '''Extension listener for on_attach event'''
-        pass
+        self.add_extension(proxy, obj)
 
     # ──────────
     def on_start(self, proxy: Proxy, obj: ObjectRef, meta: 'TypeMeta'):
@@ -605,7 +605,7 @@ class ExtensionSupport:
         _name = name or self.name
         if not _name in _extensions:
             raise NameError(f"Extension {_name} not found.")
-        
+
         if not obj.hasExtension(_name):
             obj.addExtension(_name)
             self.on_add(proxy, obj, self.find_meta(proxy))
@@ -622,7 +622,7 @@ class ExtensionSupport:
 #% ─────────────────────────────────────────────────────────────────────────────
 class Part_AttachExtensionPython(ExtensionSupport):
     '''Extension manager of: Part::AttachExtensionPython'''
-    
+
     # ──────────
     def on_execute(self, proxy: DataProxy, obj: DocumentObject, meta: 'TypeMeta'):
         obj.positionBySupport()
@@ -646,7 +646,7 @@ class App_LinkBaseExtensionPython(ExtensionSupport):
     def on_start(self, proxy: DataProxy, obj: DocumentObject, meta: 'TypeMeta'):
         super().on_start(proxy, obj, meta)
         mapping = {
-            self.resolve_link_prop(prop.link_property, prop.name): prop.name 
+            self.resolve_link_prop(prop.link_property, prop.name): prop.name
             for prop in meta.properties.values()
             if prop.link_property
         }
@@ -664,7 +664,7 @@ class App_LinkExtensionPython(App_LinkBaseExtensionPython):
 class TypeMeta:
     '''
     Metadata of the proxy classes. Inspects the original class and provides
-    mechanisms to enhance them by adding methods, properties, display modes, 
+    mechanisms to enhance them by adding methods, properties, display modes,
     extensions, etc...
     '''
 
@@ -682,12 +682,12 @@ class TypeMeta:
     icon: str                               # Icon path
 
     # ──────────
-    def __init__(self, 
-                 cls: Any, 
+    def __init__(self,
+                 cls: Any,
                  object_type: str = None,
                  base_dir: Path = None,
                  subtype: str = None,
-                 view_proxy: Any = None, 
+                 view_proxy: Any = None,
                  extensions: Iterable[str] = None,
                  version: int = 1,
                  view_provider_name_override: str = None,
@@ -735,17 +735,17 @@ class TypeMeta:
         '''Bind a property to a local proxy attribute'''
         def getter(self):
             return prop.read(self.__so_ref__)
-        
+
         def setter(self, value):
             prop.update(self.__so_ref__, value)
 
-        setattr(self.cls, 
-                prop.binding, 
+        setattr(self.cls,
+                prop.binding,
                 property(getter, setter, doc=prop.description))
 
     # ──────────
     def add_property(self, fp: ObjectRef, prop: Property):
-        '''Create and register a property'''        
+        '''Create and register a property'''
         if bool(prop.binding) and prop.binding in self.properties:
             raise NameError(
                 f'Binding "{self.cls.__name__}.{prop.binding}" already exists')
@@ -753,7 +753,7 @@ class TypeMeta:
         if prop.name in self.property_lookup:
             raise NameError(
                 f'Property "{self.cls.__name__}.Object.{prop.name}" already exists')
-        
+
         if prop.name in fp.PropertiesList:
             raise NameError(
                 f'Property "{self.cls.__name__}.Object.{prop.name}" already exists')
@@ -761,7 +761,7 @@ class TypeMeta:
         prop.create(fp)
 
     # ──────────
-    def apply_extensions(self, proxy: Proxy, obj: ObjectRef, method_name: str, 
+    def apply_extensions(self, proxy: Proxy, obj: ObjectRef, method_name: str,
                          *args, **kwargs):
         '''Call extensions runtime lifecycle'''
         if self.extensions:
@@ -781,12 +781,22 @@ class TypeMeta:
         '''Inject the fpo version into the proxy. (For migrations)'''
         if not _SO_VERSION in obj.PropertiesList:
             obj.addProperty(
-                'App::PropertyInteger', 
-                _SO_VERSION, 
-                'SO', 
-                'Internal Scripted Object Version', 
+                'App::PropertyInteger',
+                _SO_VERSION,
+                'SO',
+                'Internal Scripted Object Version',
                 PropertyMode.Hidden.value)
         setattr(obj, _SO_VERSION, self.version)
+
+    # ──────────
+    def ensure_properties(self, proxy: Proxy, obj: ObjectRef):
+        """
+        Add missing properties to the ObjectRef, used to add new properties
+        on start if the class have declared new properties since the file
+        was saved.
+        """
+        for prop in self.properties.values():
+            prop.create(obj)
 
     # ──────────
     def init_properties(self, proxy: Proxy, obj: ObjectRef):
@@ -820,12 +830,12 @@ class Preference:
     def __post_init__(self):
         if self.value_type is None:
             self.value_type = type(self.default) if self.default is not None else str
-        
+
     # ─────────
     @property
     def group_key(self):
         return f"User parameter:{self.root}/{self.group}"
-    
+
     # ─────────
     def read(self):
         group = App.ParamGet(self.group_key)
@@ -857,7 +867,7 @@ class Preference:
         if n > 1:
             raise ValueError("This function accepts only one argument")
         self.write(args[0])
-    
+
     # ─────────
     def write(self, value):
         group = App.ParamGet(self.group_key)
@@ -925,11 +935,11 @@ class Preference:
 def proxy(*,
           object_type: str = 'App::FeaturePython',
           subtype: str = None,
-          view_proxy: ViewProxy = None, 
+          view_proxy: ViewProxy = None,
           extensions: Iterable[str] = None,
           view_provider_name_override: str = None,
           version: int = 1):
-    
+
     '''
     Main decorator for DataProxy creation. Decorating a class with @proxy(...)
     adds support for the new API
@@ -940,12 +950,12 @@ def proxy(*,
 
     # Actual decorator that applies all the required transformations to the class
     def transformer(cls):
-        meta = TypeMeta(cls, 
-                        object_type, 
-                        base_dir, 
-                        subtype or cls.__name__, 
-                        view_proxy, 
-                        extensions, 
+        meta = TypeMeta(cls,
+                        object_type,
+                        base_dir,
+                        subtype or cls.__name__,
+                        view_proxy,
+                        extensions,
                         version,
                         view_provider_name_override)
         meta.apply_extensions_on_class()
@@ -969,7 +979,7 @@ def proxy(*,
         t_proxy_view_provider_name_override(meta)
         t_proxy_dirty(meta)
         return cls
-    
+
     return transformer
 
 
@@ -978,7 +988,7 @@ def view_proxy(*,
         view_provider_name_override: str = None,
         extensions: Iterable[str] = None,
         icon: str = None):
-    
+
     '''
     Decorator for ViewProxy creation. Decorating a class with @view_proxy(...)
     adds support for the new API.
@@ -989,9 +999,9 @@ def view_proxy(*,
 
     # Actual decorator that applies all the required transformations to the class
     def transformer(cls):
-        meta = TypeMeta(cls, 
-                        base_dir=base_dir, 
-                        extensions=extensions, 
+        meta = TypeMeta(cls,
+                        base_dir=base_dir,
+                        extensions=extensions,
                         view_provider_name_override=view_provider_name_override,
                         icon=icon)
         meta.apply_extensions_on_class()
@@ -1017,7 +1027,7 @@ def view_proxy(*,
         t_view_proxy_get_def_dm(meta)
         t_view_proxy_object_change(meta)
 
-        # Drag and Drop support: 
+        # Drag and Drop support:
         # https://github.com/FreeCAD/FreeCAD/blob/d5b90e50af6a758af748179f289bb8f09e357266/src/Mod/Part/BOPTools/SplitFeatures.py#L129
 
         _t_forward(meta.cls, 'canDragObjects', _CAN_DRAG_OBJECTS)
@@ -1026,25 +1036,25 @@ def view_proxy(*,
         _t_forward(meta.cls, 'canDropObject', _CAN_DROP_OBJECT)
         _t_forward(meta.cls, 'dragObject', _ON_DRAG_OBJECT)
         _t_forward(meta.cls, 'dropObject', _ON_DROP_OBJECT)
-        
+
         return cls
-    
+
     return transformer
 
 
 #@ Internal decorator to create class attribute templates
 #@ ─────────────────────────────────────────────────────────────────────────────
 def template(*,
-        name: str, 
-        aliases: Iterable = None, 
+        name: str,
+        aliases: Iterable = None,
         allow_override: bool = False,
         override_error_msg: str = None):
     def wrapper(func) -> _Template:
         return _Template(
-            name, 
-            aliases, 
-            func, 
-            allow_override, 
+            name,
+            aliases,
+            func,
+            allow_override,
             override_error_msg)
     return wrapper
 
@@ -1065,7 +1075,7 @@ def t_proxy_constructor(overridden: Any, meta: TypeMeta):
         self.__so_ref__ = None
         self.__so_old__ = dict()
         self.Type = meta.subtype
-        self.__so_state__ = FeatureState.Attaching    
+        self.__so_state__ = FeatureState.Attaching
         if overridden:
             overridden(self, *args, **kwargs)
     if overridden:
@@ -1076,7 +1086,7 @@ def t_proxy_constructor(overridden: Any, meta: TypeMeta):
 
 #$ ─────────────────────────────────────────────────────────────────────────────
 @template(
-        name='unsetupObject', 
+        name='unsetupObject',
         override_error_msg=f"Use {_ON_REMOVE} instead.")
 def t_proxy_remove(overridden: Any, meta: TypeMeta):
     call = getattr(meta.cls, _ON_REMOVE, None)
@@ -1139,12 +1149,12 @@ def t_proxy_attach(overridden: Any, meta: TypeMeta):
 
         meta.apply_extensions(self, fp, _ON_CREATE)
         _call(self, _ON_CREATE, fp)
-        
+
         self.__so_state__ = FeatureState.Created
-        
+
         meta.apply_extensions(self, fp, _ON_START)
         _call(self, _ON_START, fp)
-        
+
         self.__so_state__ = FeatureState.Active
     return handler
 
@@ -1156,7 +1166,7 @@ def t_proxy_create(overridden: Any, meta: TypeMeta):
         """Create the FreeCAD Objects, the Python Proxies and bind them"""
         _name = name or meta.subtype
         proxy = meta.cls()
-        
+
         view_proxy = None
         if meta.view_proxy and App.GuiUp:
             view_proxy = meta.view_proxy(None)
@@ -1170,7 +1180,7 @@ def t_proxy_create(overridden: Any, meta: TypeMeta):
             elif fp.ViewObject.Proxy != view_proxy:
                 fp.ViewObject.Proxy = view_proxy
 
-        fp.Label = label or _name       
+        fp.Label = label or _name
         return fp
     return staticmethod(create)
 
@@ -1211,13 +1221,14 @@ def t_proxy_restore(overridden: Any, meta: TypeMeta):
 
         meta.apply_extensions(self, fp, _ON_RESTORE)
         _call(self, _ON_RESTORE, fp)
-        
-        self._fp_state = FeatureState.Restored
+
+        self.__so_state__ = FeatureState.Restored
 
         meta.apply_extensions(self, fp, _ON_START)
+        meta.ensure_properties(self, fp)
         _call(self, _ON_START, fp)
-        
-        self._fp_state = FeatureState.Active
+
+        self.__so_state__ = FeatureState.Active
     return handler
 
 
@@ -1230,7 +1241,7 @@ def t_proxy_execute(overridden: Any, meta: TypeMeta):
         meta.apply_extensions(self, fp, _ON_EXECUTE)
         _call(self, _ON_EXECUTE, fp)
     return handler
-    
+
 
 #$ ─────────────────────────────────────────────────────────────────────────────
 @template(
@@ -1363,7 +1374,7 @@ def t_proxy_view_provider_name_override(overridden: Any, meta: TypeMeta):
         def handler(self, fp: DocumentObject):
             return meta.view_provider_name_override
         return handler
-    
+
     view_meta = None
     if meta.view_proxy and hasattr(meta.view_proxy, _SO_META):
         view_meta = meta.view_proxy.__so_meta__
@@ -1385,7 +1396,7 @@ def t_view_proxy_constructor(overridden: Any, meta: TypeMeta):
     Create the constructor for the ViewProxy. Calls the user defined
     constructor if any. If there is a user defined __init__, it must
     accept the ViewObject as it first argument_
-    
+
     ```python
         def __init__(self, vp, ...)
     ```
@@ -1430,7 +1441,7 @@ def t_view_proxy_ctx_menu(overridden: Any, meta: TypeMeta):
     call = getattr(meta.cls, _ON_CONTEXT_MENU, None)
     if call:
         def handler(self, vp: ViewProviderDocumentObject, menu: QMenu):
-            call(self, menu)
+            call(self, vp, menu)
         return handler
 
 
@@ -1563,7 +1574,7 @@ def t_view_proxy_get_def_dm(overridden: Any, meta: TypeMeta):
 
     if not meta.display_modes:
         return None
-    
+
     defaults = [dm.name for dm in meta.display_modes.values() if dm.is_default]
 
     if len(defaults) == 0:
@@ -1626,7 +1637,7 @@ class MigrationMeta:
         self.old = old
         self.current = current
         self.inplace = old is current
-        
+
         overridden = getattr(old, 'onDocumentRestored', None)
         onDocumentRestored = t_migrations_onDocumentRestored(overridden, self)
         setattr(old, 'onDocumentRestored', onDocumentRestored)
@@ -1668,59 +1679,59 @@ def t_migrations_onDocumentRestored(overridden, meta: MigrationMeta):
             overridden(self, fp)
     return handler
 
-# Case: migration to a different class 
+# Case: migration to a different class
 # ──────────────────────────────────────────────────────────────────────────────
-def _migrate_class(self, 
-                   meta: MigrationMeta, 
-                   version: int, 
-                   current_version: int, 
+def _migrate_class(self,
+                   meta: MigrationMeta,
+                   version: int,
+                   current_version: int,
                    fp: DocumentObject):
     old_v_id = f'{meta.old.__name__}:{version}'
     new_v_id = f'{meta.current.__name__}:{current_version}'
     print_log(f"Document contains a different version of {old_v_id}. ",
               f"Current version is {new_v_id}")
     if hasattr(self, _ON_MIGRATE_CLASS):
-        _try_migration(self, meta, version, current_version, fp, 
+        _try_migration(self, meta, version, current_version, fp,
                        lambda: self.on_migrate_class(version, fp))
 
 # Case: migration to a higher version
 # ──────────────────────────────────────────────────────────────────────────────
-def _migrate_upgrade(self, 
-                     meta: MigrationMeta, 
-                     version: int, 
-                     current_version: int, 
+def _migrate_upgrade(self,
+                     meta: MigrationMeta,
+                     version: int,
+                     current_version: int,
                      fp: DocumentObject):
     old_v_id = f'{meta.current.__name__}:{version}'
     print_log(f"Document contains an older version of {old_v_id}. ",
               f"Current version is {current_version}")
     if hasattr(self, _ON_MIGRATE_UP):
-        _try_migration(self, meta, version, current_version, fp, 
+        _try_migration(self, meta, version, current_version, fp,
                        lambda: self.on_migrate_upgrade(version, fp))
 
 # Case: migration to a lower version
 # ──────────────────────────────────────────────────────────────────────────────
-def _migrate_downgrade(self, 
-                       meta: MigrationMeta, 
-                       version: int, 
-                       current_version: int, 
+def _migrate_downgrade(self,
+                       meta: MigrationMeta,
+                       version: int,
+                       current_version: int,
                        fp: DocumentObject):
     old_v_id = f'{meta.current.__name__}:{version}'
     print_log(f"Document contains a newer version of {old_v_id}. ",
               f"Current version is {current_version}")
     if hasattr(self, _ON_MIGRATE_DOWN):
-        _try_migration(self, meta, version, current_version, fp, 
+        _try_migration(self, meta, version, current_version, fp,
                        lambda: self.on_migrate_downgrade(version, fp))
 
 # Apply migration logic and report error/status
 # ──────────────────────────────────────────────────────────────────────────────
-def _try_migration(self, 
-                   meta: MigrationMeta, 
-                   version: int, 
-                   current_version: int, 
-                   fp: DocumentObject, 
+def _try_migration(self,
+                   meta: MigrationMeta,
+                   version: int,
+                   current_version: int,
+                   fp: DocumentObject,
                    action: Callable):
     old_v_id = f'{meta.old.__name__}:{version}'
-    new_v_id = f'{meta.current.__name__}:{current_version}'    
+    new_v_id = f'{meta.current.__name__}:{current_version}'
     message = f"from {old_v_id} to {new_v_id}"
     print_log(f"A migration handler was found, attempting to migrate {message}")
     try:
@@ -1778,7 +1789,7 @@ def PropertyEnumeration(
     default: Any = None,
     description: str = '',
     mode: PropertyMode = PropertyMode.Default,
-    observer_func: Callable = None,        
+    observer_func: Callable = None,
     link_property: str = None):
     return Property(
         type='App::PropertyEnumeration',
@@ -1801,7 +1812,7 @@ def PropertyOptions(
     default: Any = None,
     description: str = '',
     mode: PropertyMode = PropertyMode.Default,
-    observer_func: Callable = None,        
+    observer_func: Callable = None,
     link_property: str = None):
     return Property(
         type='App::PropertyEnumeration',
@@ -1838,7 +1849,7 @@ def set_pd_shape(fp: DocumentObject, shape: Shape) -> None:
     # Validate type
     if not fp.TypeId.startswith('PartDesign::'):
         raise ValueError('Object fp is not a PartDesign Feature')
-    
+
     # Must be attachable
     if not fp.hasExtension('Part::AttachExtensionPython'):
         fp.addExtension('Part::AttachExtensionPython')
@@ -1859,7 +1870,7 @@ def set_pd_shape(fp: DocumentObject, shape: Shape) -> None:
     # Manage Pattern Feature
     if hasattr(fp,"AddSubShape"):
         shape.transformShape(fp.Placement.inverse().toMatrix(), True)
-        fp.AddSubShape = shape    
+        fp.AddSubShape = shape
 
 # ──────────────────────────────────────────────────────────────────────────────
 def set_immutable_prop(obj: ObjectRef, name: str, value: Any) -> None:
@@ -1900,14 +1911,14 @@ def get_selection(*args) -> Tuple:
     ```
 
     regex are supported for type matching and '*' is a general wildcard:
-    
+
     ```python
     ok, axis, part, other = get_selection('PartDesign::Line', re.compile('Part::.*'), '*')
     if ok:
         ...
     ```
 
-    this will parse selection for three elements, first one must be a 
+    this will parse selection for three elements, first one must be a
     `PartDesign::Line`, second one must be any object from the Part namespace,
     the last one can be anything. The user can select them
     in any order but they will be returned in the specified order. Take
@@ -1922,11 +1933,11 @@ def get_selection(*args) -> Tuple:
     :return bool, *List[DocumentObject]: If arguments are supplied, the first element returned\
     says if the selection matches the patterns, the rest are the selected objects in order
     """
-    
+
     n_args = len(args)
     if n_args == 0:
         return Gui.Selection.getSelection()
-    
+
     selection = Gui.Selection.getSelection()
     n_sel = len(selection)
     result = [None] * n_args
@@ -1948,14 +1959,14 @@ def get_selection(*args) -> Tuple:
             if result[i] is None and matchers[i](obj_type):
                 result[i] = obj
                 break
-    
+
     return all(result), *result
 
 # ──────────────────────────────────────────────────────────────────────────────
 def _basic_modal_dlg(
-        message: str, 
-        title: str = "Message", 
-        details: str = None) -> QMessageBox:    
+        message: str,
+        title: str = "Message",
+        details: str = None) -> QMessageBox:
     """
     Build a basic Qt dialog box
 
@@ -2026,7 +2037,7 @@ class TransactionAbortException(Exception):
 class TransactionCtrl:
     def abort(self):
         raise TransactionAbortException()
-    
+
 #@ ─────────────────────────────────────────────────────────────────────────────
 @contextlib.contextmanager
 def transaction(name: str, doc: Document = None):

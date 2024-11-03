@@ -136,7 +136,7 @@ class XacroObjectProxy(ProxyBase):
     def init_properties(self, obj: CrossXacroObject):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
-            'The type',
+            'The type of object',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
@@ -396,7 +396,7 @@ class XacroObjectProxy(ProxyBase):
         return urdf_robot
 
     def _get_xacro_params(self) -> dict[str, [Any | Element]]:
-        """Return the dictionnary of macro parameters for URDF generation."""
+        """Return the dictionary of macro parameters for URDF generation."""
         if not hasattr(self, 'xacro_object'):
             return {}
         xo: CrossXacroObject = self.xacro_object

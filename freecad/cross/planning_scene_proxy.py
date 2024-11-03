@@ -119,6 +119,10 @@ class PlanningSceneProxy(ProxyBase):
 class _ViewProviderPlanningScene(ProxyBase):
     """A view provider for the PlanningScene object """
 
+    # TODO: Add context menu:
+    #       - reload
+    #       - set robot pose
+
     def __init__(self, vobj: VP):
         super().__init__(
             'view_object',
