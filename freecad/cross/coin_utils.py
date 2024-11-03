@@ -345,7 +345,7 @@ def tcp_group(
         axis_length_mm: [float | fc.Units.Quantity] = 300.0,
         axis_diameter_ratio_to_length: float = 0.05,
 ) -> coin.SoSeparator:
-    """Return the SoSeparator reprenting a TCP.
+    """Return the SoSeparator representing a TCP.
 
     Return the SoSeparator representing a Tool Center Point, i.e. 3 cylinder
     representing the frame and a spiky cylinder symbolizing the tool (with the
@@ -515,3 +515,85 @@ def _cylinder_or_cone_between_points(
     separator.addChild(coin_shape)
 
     return separator
+
+
+def text_2d(
+        text: str,
+        position: tuple[float, float, float] = (0.0, 0.0, 0.002),
+        color: tuple[float, float, float] = (0.2, 0.2, 0.2),
+) -> tuple[coin.SoSeparator, coin.SoText2, coin.SoMatrixTransform, coin.SoMaterial]:
+    """
+
+    Show the text as 2D text in the 3D view.
+
+    Return (`text_node`, `material_node`).
+
+    Inspired by https://github.com/MariwanJ/COIN3D_Snippet.git,
+    13.8.Blinker.py.
+
+    Arguments
+    ---------
+    - text: string to show, Unicode seems to be unsupported.
+            For example, '◯' is unsupported.
+    - position: position on the screen, unknown units.
+                (-1.9, 0.9, 0.002) corresponds to top-left.
+    - color: a tuple with 3 values ∈ [0, 1]
+
+    """
+    if len(position) != 3:
+        raise RuntimeError('Argument `position` must be a tuple with 3 values')
+    if len(color) != 3:
+        raise RuntimeError('Argument `color` must be a tuple with 3 values ∈ [0, 1]')
+
+    root = coin.SoGroup()
+
+    camera = coin.SoOrthographicCamera()
+    root.addChild(camera)
+    root.addChild(coin.SoDirectionalLight())
+
+    separator1 = coin.SoSeparator()
+    root.addChild(separator1)
+    separator2 = coin.SoSeparator()
+    separator1.addChild(separator2)
+
+    material = coin.SoMaterial()
+    separator2.addChild(material)
+    material.ambientColor = (0, 0, 0)
+    material.diffuseColor = (0, 0, 0)
+    material.specularColor = (0.62244898, 0.62244898, 0.62244898)
+    material.emissiveColor = tuple(color)
+    material.shininess = 0.051020399
+    material.transparency = 0
+
+    font = coin.SoFont()
+    separator2.addChild(font)
+    font.name = "Liberation Serif"
+    font.size = 40
+
+    profile_coordinate = coin.SoProfileCoordinate2()
+    separator2.addChild(profile_coordinate)
+    profile_coordinate.point.setValues(0, 2, [[0, 0], [2, 0]])
+
+    linear_profile = coin.SoLinearProfile()
+    separator2.addChild(linear_profile)
+    linear_profile.index.setValues(0, 2, [0, 1])
+
+    separator3 = coin.SoSeparator()
+    separator2.addChild(separator3)
+
+    matrix_transform = coin.SoMatrixTransform()
+    separator3.addChild(matrix_transform)
+    matrix_transform.matrix = coin.SbMatrix(
+            0.0097401002, 0,            0,           0,
+            0,            0.00974009,   1.16877e-05, 0,
+            0,            -2.33755e-05, 0.0194802,   0,
+            position[0],  position[1],  position[2], 1,
+    )
+
+    text_node = coin.SoText3()
+    separator3.addChild(text_node)
+    text_node.string = text
+    text_node.justification = coin.SoText3.LEFT
+    # FRONT should suffice but doesn't work alone.
+    text_node.parts = coin.SoText3.FRONT | coin.SoText3.SIDES | coin.SoText3.BACK
+    return root, text_node, matrix_transform, material

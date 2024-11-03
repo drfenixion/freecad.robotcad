@@ -34,17 +34,14 @@ from .robot_proxy import make_robot
 from .wb_utils import get_joints
 
 # Stubs and typing hints.
-from .joint import Joint
-from .link import Link
-from .robot import Robot
+from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
+from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
+from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 DO = fc.DocumentObject
 DOList = List[DO]
 DOG = fc.DocumentObjectGroup
 AppLink = DO  # TypeId == 'App::Link'
 AppPart = DO  # TypeId == 'App::Part'
-CrossLink = Link
-CrossJoint = Joint
-CrossRobot = Robot
 # List of UrdfVisual or List of UrdfCollision.
 VisualList = List[UrdfVisual]
 CollisionList = List[UrdfCollision]
@@ -124,13 +121,13 @@ def _add_ros_link(
     - Add an "App::Part for the collision of each link.
     - Add a "Cross::Link" with references to them.
 
-    Return ???.
+    Return (CROSS::Link, part for visual, part for collision).
 
     Parameters
     ----------
+    - urdf_link: link from the URDF description.
     - robot: robot to add the Cross::Link to.
     - part_groups: group for geometries and "App::Part" objects.
-    - name: name of the link if the URDF description.
 
     """
     name = urdf_link.name
@@ -246,7 +243,7 @@ def _define_mimic_joints(
         mimicked_urdf_joint = urdf_robot.joint_map.get(urdf_joint.mimic.joint)
         if not mimicked_urdf_joint:
             warn(
-                f'Joint "{urdf_joint.name}" mimicks the unknown'
+                f'Joint "{urdf_joint.name}" mimics the unknown'
                 f' joint "{mimicked_urdf_joint}", ignoring', True,
             )
             continue

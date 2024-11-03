@@ -41,7 +41,7 @@ Missing features
 Nice to have
 ------------
 
-- Set `JointAxisLength` to a value adapated to the robot size when importing URDF. (EASY)
+- Set `JointAxisLength` to a value adapted to the robot size when importing URDF. (EASY)
 - Replace values such as 1.57 with ${pi / 2} in xacro exports. (EASY)
 - Visualize inertia. (MEDIUM)
 - Do not export twice the same mesh (only to gain time when exporting). (EASY)
@@ -68,6 +68,6 @@ Lower priority
 Implementation
 --------------
 
-- Use `convert_units` and `freecad_utils.unit_type` whereever possible
+- Use `convert_units` and `freecad_utils.unit_type` wherever possible
 - Use [tenacity](https://tenacity.readthedocs.io/en/latest/) to better manage unreliable functions.
 - Use urllib to parse filename element in URDF (cf. [rerun_urdf.py](https://github.com/rerun-io/rerun/blob/main/examples/python/ros_node/rerun_urdf.py))

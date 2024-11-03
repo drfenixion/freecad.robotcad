@@ -17,13 +17,18 @@ SO = 'FreeCADGui.SelectionObject'  # Could not get the class from Python.
 
 
 class _SimplifyMeshCommand:
-    """Command to make a simplifed mesh from the selected objects."""
+    """Command to make a simplified mesh from the selected objects."""
 
     def GetResources(self):
         return {
             'Pixmap': 'simplify_mesh.svg',
             'MenuText': tr('Simplify mesh'),
-            'ToolTip': tr('Generate an approximate convex decomposition mesh from the selected object with V-HACD from https://github.com/kmammou/v-hacd/'),
+            'ToolTip': tr(
+                'Generate an approximate convex decomposition mesh'
+                'from the selected object with V-HACD from'
+                ' https://github.com/kmammou/v-hacd/'
+                ' configured in the workbench settings'
+            ),
         }
 
     def Activated(self):

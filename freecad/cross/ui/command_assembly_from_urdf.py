@@ -30,7 +30,7 @@ class _AssemblyFromUrdfCommand:
             'Select URDF/xacro file to import part from',
         )
         # set option "DontUseNativeDialog"=True, as native Filedialog shows
-        # misbehavior on Unbuntu 18.04. It works case sensitively, what isn't wanted
+        # misbehavior on Ubuntu 18.04. It works case sensitively, what isn't wanted
         dialog.setNameFilter('Supported Formats *.urdf *.xacro;;All files (*.*)')
         if dialog.exec_():
             if not doc:

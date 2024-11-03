@@ -24,7 +24,7 @@ class SetJointsDialog(QtGui.QDialog):
     """A dialog to input DH and KK parameters.
 
     A dialog to set some of the joint values of the robot passed to the
-    constuctor.
+    constructor.
 
     """
 

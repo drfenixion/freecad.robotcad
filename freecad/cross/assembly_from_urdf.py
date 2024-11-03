@@ -42,7 +42,7 @@ DO = fc.DocumentObject
 DOG = fc.DocumentObjectGroup
 AppLink = DO  # TypeId == "App::Link"
 AppPart = DO  # TypeId == "App::Part"
-LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
+LCS = DO  # Local coordinate system, TypeId == "PartDesign::CoordinateSystem"
 # List of UrdfVisual or List of UrdfCollision.
 VisualList = Iterable[UrdfVisual]
 CollisionList = Iterable[UrdfCollision]
@@ -368,9 +368,9 @@ def _make_structure(
         joint: UrdfJoint,
         link_map: dict[str, DO],
 ) -> None:
-    """Create the parent-child inheritence.
+    """Create the parent-child inheritance.
 
-    The parent-child inheritence is done exclusively by the expression engines
+    The parent-child inheritance is done exclusively by the expression engines
     of the two local coordinate systems (LCS) associated with a joint, one in
     the parent `App::Part` and one in the child `App::Part`.
 

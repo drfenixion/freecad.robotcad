@@ -45,14 +45,16 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     """Add necessary paths to sys.path and os.environ['LD_LIBRARY_PATH'].
 
     If existing:
-    - Add {ros_workspace}/install/lib/{python_ver}/site-packages to sys.path.
-    - Add {ros_workspace}/install/local/lib/{python_ver}/dist-packages to sys.path.
+    - Add $ROS_WORKSPACE/install/lib/{python_ver}/site-packages to sys.path.
+    - Add $ROS_WORKSPACE/install/local/lib/{python_ver}/dist-packages to sys.path.
     - Add /opt/ros/$ROS_DISTRO/lib/python?.?/site-packages to sys.path.
     - Add /opt/ros/$ROS_DISTRO/local/lib/python?.?/dist-packages to sys.path.
-    - Add {ros_workspace}/install/lib to os.environ['LD_LIBRARY_PATH'].
+    - Add $ROS_WORKSPACE/install/lib to os.environ['LD_LIBRARY_PATH'].
     - Add /opt/ros/$ROS_DISTRO/lib to os.environ['LD_LIBRARY_PATH'].
     - Add /opt/ros/$ROS_DISTRO/opt/rviz_ogre_vendor/lib to os.environ['LD_LIBRARY_PATH'].
     - Add /opt/ros/$ROS_DISTRO/lib/x86_64-linux-gnu to os.environ['LD_LIBRARY_PATH'].
+
+    Return true if a ROS installation may have been found, false otherwise.
 
     """
 
@@ -117,7 +119,7 @@ def get_ros_distro_from_env() -> str:
     """Return or guess the ROS distribution.
 
     Return the environment variable `ROS_DISTRO` if defined or guess from
-    /opt/ros.
+    a system package installation in /opt/ros.
 
     When guessing, the most recent (and known) distro is returned, "rolling"
     having a higher priority.

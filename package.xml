@@ -3,8 +3,8 @@
 
   <name>CROSS</name>
   <description>CAD and ROS, Open-Source Synergy. Workbench to create or visualize robot description files (URDF and xacro) from FreeCAD.</description>
-  <version>0.4.0</version>
-  <date>2024-04-16</date>
+  <version>0.5.0</version>
+  <date>2024-10-08</date>
   <maintainer email="galou_breizh@yahoo.fr">Gaël Écorchard</maintainer>
   <license file="LICENSE">LGPL-2.1-or-later</license>
   <url type="repository" branch="main">https://github.com/galou/freecad.cross.git</url>

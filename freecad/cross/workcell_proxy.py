@@ -66,7 +66,7 @@ class WorkcellProxy(ProxyBase):
     def init_properties(self, obj: CrossWorkcell) -> None:
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
-            'The type',
+            'The type of object',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type

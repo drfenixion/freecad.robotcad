@@ -10,13 +10,13 @@ from ..freecadgui_utils import get_subobjects_and_placements
 from ..gui_utils import tr
 
 
-# Stubs and type hints.
+# Stubs and type hints
 from ..joint import Joint
 from ..link import Link
 DO = fc.DocumentObject
 CrossLink = Link
 CrossJoint = Joint
-LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
+LCS = DO  # Local coordinate system, TypeId == "PartDesign::CoordinateSystem"
 
 
 def get_relative_placement(
@@ -69,7 +69,11 @@ class _SetCROSSPlacementCommand:
         try:
             cross_link, lcs, obj = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Cross::Link', 'PartDesign::CoordinateSystem', 'Any'],
+                [
+                    'Cross::Link',
+                    'PartDesign::CoordinateSystem',
+                    'Any',
+                ],
             )
             selection_ok = True
             selection_link = True
@@ -80,7 +84,11 @@ class _SetCROSSPlacementCommand:
             try:
                 cross_joint, lcs_child, lcs_parent = validate_types(
                     fcgui.Selection.getSelection(),
-                    ['Cross::Joint', 'PartDesign::CoordinateSystem', 'PartDesign::CoordinateSystem'],
+                    [
+                        'Cross::Joint',
+                        'PartDesign::CoordinateSystem',
+                        'PartDesign::CoordinateSystem',
+                    ],
                 )
                 selection_ok = True
                 selection_joint = True

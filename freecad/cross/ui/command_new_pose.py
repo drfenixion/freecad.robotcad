@@ -11,6 +11,7 @@ class _NewPoseCommand:
     def GetResources(self):
         return {
             'Pixmap': 'pose.svg',
+            'MenuText': tr('New Pose'),
             'Accel': 'N, P',
             'ToolTip': tr('Create a Pose.'),
         }
