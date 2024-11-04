@@ -90,6 +90,16 @@ def generate_launch_description():
         launch_arguments=dict(use_sim_time=use_sim_time).items(),
     )
 
+    gz_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=['/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'],
+        output='screen',
+        parameters=[{{
+            'use_sim_time': use_sim_time,
+        }}],
+    )
+
     return LaunchDescription([
         use_sim_time_launch_arg,
         use_rviz_arg,
@@ -97,4 +107,5 @@ def generate_launch_description():
         rviz,
         gazebo,
         spawn,
+        gz_bridge,
     ])
