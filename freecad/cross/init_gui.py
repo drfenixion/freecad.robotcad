@@ -80,7 +80,7 @@ class CrossWorkbench(fcgui.Workbench):
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
             'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
-            'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
+            # 'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
             'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
             'NewAttachedCollisionObject',  # Defined in ./ui/command_new_attached_collision_object.py.
@@ -115,7 +115,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
-            # 'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
+            'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
             'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
             'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.

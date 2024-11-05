@@ -25,7 +25,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
     def GetResources(self):
         return {'Pixmap': 'urdf_export_external_generator.svg',
-                'MenuText': tr('External extended code generator (URDF, docker, startup script, etc)'),
+                'MenuText': tr('Extended external code generator'),
                 'ToolTip': tr('Select Robot and press this tool.\n'
                               'It will do needed mass/inertia calculation then locally generate ROS package files\n'
                               'and transfer it to external code generator service and save gotten result files locally.\n'
