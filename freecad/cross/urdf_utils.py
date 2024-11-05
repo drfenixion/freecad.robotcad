@@ -138,10 +138,19 @@ def xml_comment_element(obj_label: str) -> et.Element:
 
 
 def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
-    """Return an xml element 'origin'."""
-    rpy = rpy_from_quaternion(p.Rotation.Q)
+    """Return an xml element 'origin'.""" 
+    
+    # previous implementation had a precision bug. 
+    # rpy = rpy_from_quaternion(p.Rotation.Q)
+    # In some cases of joint rotation this gave incorrect URDF rpy radians,
+    # resulting in some apparent tilt of the orientation.
+    
+    # new implementation have less float operation
+    # and correct in all tested rotation cases
+    xyz = p.Rotation.toEulerAngles('XYZ')
+    xyz_rad = (math.radians(xyz[0]), math.radians(xyz[1]), math.radians(xyz[2]))
     pattern = '<origin xyz="{v.x:.6} {v.y:.6} {v.z:.6}" rpy="{r[0]} {r[1]} {r[2]}" />'
-    return et.fromstring(pattern.format(v=p.Base * 1e-3, r=rpy))
+    return et.fromstring(pattern.format(v=p.Base * 1e-3, r=xyz_rad))
 
 
 def urdf_geometry_box(length_x: float, length_y: float, length_z: float) -> et.Element:
