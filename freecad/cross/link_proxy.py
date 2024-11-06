@@ -201,16 +201,16 @@ class LinkProxy(ProxyBase):
         obj._Type = self.Type
 
         add_property(
-            obj, 'App::PropertyLinkList', 'Real', 'Elements',
+            obj, 'App::PropertyLinkListGlobal', 'Real', 'Elements',
             'The real part objects of this link, optional',
         )
         add_property(
-            obj, 'App::PropertyLinkList', 'Visual', 'Elements',
+            obj, 'App::PropertyLinkListGlobal', 'Visual', 'Elements',
             'The part objects this link that constitutes the URDF'
             ' visual elements, optional',
         )
         add_property(
-            obj, 'App::PropertyLinkList', 'Collision', 'Elements',
+            obj, 'App::PropertyLinkListGlobal', 'Collision', 'Elements',
             'The part objects this link that constitutes the URDF'
             ' collision elements, optional',
         )

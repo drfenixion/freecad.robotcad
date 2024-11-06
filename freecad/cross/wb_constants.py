@@ -37,7 +37,7 @@ ROS2_CONTROLLERS_INTERFACES = [
 # some types required to be replaced to more suited because can be more convenient to use
 ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
     'joints' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList', 
          # 'is_controller', 'is_broadcaster' used for chain mode. 
          # Check is success if any of check functions return True
@@ -45,73 +45,73 @@ ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
         'default_value_replace': [],
         },
     'joint' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString', 
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'], 
         'default_value_replace': None,
         },
     'front_wheels_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'rear_wheels_names' :{
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'front_wheels_state_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'rear_wheels_state_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'dof_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'reference_and_state_dof_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'command_joints' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList',
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
         },
     'traction_joint_name' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString', 
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'], 
         'default_value_replace': None,
         },        
     'steering_joint_name' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString', 
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'], 
         'default_value_replace': None,
         },      
     'left_wheel_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList', 
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'], 
         'default_value_replace': [],
         }, 
     'right_wheel_names' : {
-        'replace': 'App::PropertyLinkList', 
+        'replace': 'App::PropertyLinkListGlobal', 
         'origin': 'App::PropertyStringList', 
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'], 
         'default_value_replace': [],
@@ -119,37 +119,37 @@ ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
         
 
     'base_frame_id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
         },
     'odom_frame_id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
         },
     'control__frame__id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
         },
     'fixed_world_frame__frame__id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
         },
     'ft_sensor__frame__id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
         },
     'gravity_compensation__frame__id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
@@ -161,7 +161,7 @@ ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
         'default_value_replace': fc.Vector(),
         },
     'frame_id' : {
-        'replace': 'App::PropertyLink', 
+        'replace': 'App::PropertyLinkGlobal', 
         'origin': 'App::PropertyString',
         'check_functions': ['is_link'],
         'default_value_replace': None,
