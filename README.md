@@ -54,6 +54,8 @@ If docker is not installed look at [docker/README.md](https://github.com/drfenix
 
 You also can install RobotCAD manually via FreeCAD Addon manager by [Installation](#Installation) section
 
+RobotCAD will not work with CROSS workbench (same namespace). Remove CROSS before install RobotCAD.
+
 #### Update RobotCAD
 
 use commands in RobotCAD directory
