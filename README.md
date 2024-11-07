@@ -48,16 +48,26 @@ git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
 bash run.bash
 ```
-Tested on Ubuntu 22.04.
+Tested on Ubuntu 22.04 and Windows 10 via WSL2 (Ubuntu).
 
+If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
+
+You also can install RobotCAD manually via FreeCAD Addon manager by [Installation](#Installation) section
+
+#### Update RobotCAD
+
+use commands in RobotCAD directory
+```
+git pull
+cd docker
+bash run.bash
+```
+
+#### Recreate container
 In case of start issue (transfer from 3.0.0 to next version may need "-f") recreate container by
 ```
 bash run.bash -f
 ```
-
-If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
-
-You also can install RobotCAD manually (long way) by [Installation](#Installation) section
 
 # Screenshots
 ### Launched RViz and Gazebo using generated code:
