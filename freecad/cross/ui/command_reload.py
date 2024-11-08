@@ -32,6 +32,7 @@ class _ReloadCommand:
         _reload_module('freecad.cross.attached_collision_object_proxy')
         _reload_module('freecad.cross.coin_utils')
         _reload_module('freecad.cross.deep_copy')
+        _reload_module('freecad.cross.fpo')
         _reload_module('freecad.cross.freecad_utils')
         _reload_module('freecad.cross.freecadgui_utils')
         _reload_module('freecad.cross.gui_utils')

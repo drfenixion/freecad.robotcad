@@ -19,7 +19,7 @@ import re
 
 import FreeCAD as fc
 
-INVALID_FILENAME_CHARS = re.compile(r'[^A-Za-z0-9_\-.]+')
+INVALID_FILENAME_CHARS = re.compile(r'[^\w.\-]+')
 
 # Stubs and type hints.
 DO = fc.DocumentObject

@@ -121,8 +121,10 @@ def _add_joint_variable(
         prop_type = 'App::PropertyFloat'
     _, used_var_name = add_property(
         robot,
-        prop_type, var_name,
-        category, help_txt,
+        prop_type,
+        var_name,
+        category,
+        help_txt,
     )
     if joint.Type in ['prismatic', 'revolute']:
         # Set the default value to the current value to set min/max.
@@ -138,7 +140,10 @@ def _add_joint_variable(
                 error('Joint (' + var_name + ') value can not be less LowerLimit limit')
             if max_ < min_:
                 error('Joint (' + var_name + ') Upper limit can not be less LowerLimit limit')
+        # Deativate callback on change.
+        robot.setPropertyStatus(used_var_name, ['NoRecompute'])
         setattr(robot, used_var_name, (value, min_, max_, 1.0))
+        robot.setPropertyStatus(used_var_name, [])
     value: Optional[float] = None
     if joint.Type == 'prismatic':
         value = robot.getPropertyByName(used_var_name) * 0.001
@@ -178,7 +183,7 @@ def _dispatch_to_link_view_objects(
     if (not hasattr(robot, 'Proxy')) or (not robot.Proxy.is_execute_ready()):
         return
     prop_value = getattr(robot.ViewObject, prop)
-    for link in get_links(robot.Group):
+    for link in robot.Proxy.get_links():
         if hasattr(link.ViewObject, 'Proxy') and (link.ViewObject.Proxy is not None):
             link.ViewObject.Proxy.update_prop(link_prop, prop_value)
 
@@ -541,7 +546,8 @@ class RobotProxy(ProxyBase):
         # Add a variable for each actuated (supported) joint.
         for joint in self.get_joints():
             var = _add_joint_variable(
-                self.robot, joint,
+                self.robot,
+                joint,
                 self._category_of_joint_values,
             )
             if var:
@@ -1074,19 +1080,17 @@ class _ViewProviderRobot(ProxyBase):
                 'Visibility',
             ],
         )
-        vobj.Proxy = self
+        if vobj.Proxy is not self:
+            # Implementation note: triggers `self.attach`.
+            vobj.Proxy = self
+        self._init(vobj)
 
-    def getIcon(self):
-        # Implementation note: "return 'robot.svg'" works only after
-        # workbench activation in GUI.
-        return str(ICON_PATH / 'robot.svg')
-
-    def attach(self, vobj: VPDO):
+    def _init(self, vobj: VPDO) -> None:
         self.view_object = vobj
         self.robot = vobj.Object
+        self._init_properties(vobj)
 
-        # vobj.addExtension('Gui::ViewProviderGeoFeatureGroupExtensionPython')
-
+    def _init_properties(self, vobj: VPDO) -> None:
         # Level of detail.
         add_property(
             vobj, 'App::PropertyBool', 'ShowReal', 'ROS Display Options',
@@ -1114,6 +1118,17 @@ class _ViewProviderRobot(ProxyBase):
             "Length of the arrow for the joints axes",
             500.0,
         )
+
+    def getIcon(self):
+        # Implementation note: "return 'robot.svg'" works only after
+        # workbench activation in GUI.
+        return str(ICON_PATH / 'robot.svg')
+
+    def attach(self, vobj: VPDO):
+        # `self.__init__()` is not called on document restore, do it manually.
+        self.__init__(vobj)
+
+        # vobj.addExtension('Gui::ViewProviderGeoFeatureGroupExtensionPython')
 
     def updateData(self, obj: CrossRobot, prop: str):
         return

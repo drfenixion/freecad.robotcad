@@ -1,11 +1,12 @@
 Bugs
 ----
 
+- Port all proxies to fpo::Proxy.
 - Fix CROSS complaining about non-existing directory when exporting to URDF into a non-existing directory (the directory is created but CROSS complains though).
 - Fix "[Cross::Robot] still touched after recompute" when linking a planning scene to a robot.
 - Fix the placement of some parts in assembly_from_urdf.py (issue with `forearm_visual` when loading `robot_5r.urdf.xacro`).
 - Compute the `Origin` of a joint even if it doesn't have any `Child`.
-- Fix the placement of simplified mesh when selecting the visual- or collision part inside a Cross::Link.
+- Fix the placement of simplified mesh generated via CROSS when selecting the visual- or collision part inside a Cross::Link.
 - Clear necessary fields when `XacroObject.InputFile` is reset.
 - Handle empty star-style macro parameters (e.g. `*origin` in `robotiq-3f-gripper_articulated.urdf.xacro`).
 - Fix bug when setting a prefix in XacroObject, then setting it to ''. Some objects are deleted but not all and the Cross::Robot cannot be rebuilt.
