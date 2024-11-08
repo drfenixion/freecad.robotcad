@@ -645,7 +645,13 @@ class ProxyBase(ABC):
                 return False
         return True
 
-    def update_prop(self, prop: str, value: Any, tolerance=1e-6, debug=False) -> None:
+    def update_prop(
+            self,
+            prop: str,
+            value: Any,
+            tolerance: float | None = None,
+            debug=False,
+    ) -> None:
         """Update a property of the object if needed."""
         if not hasattr(self, '_object_name'):
             if debug:
@@ -664,8 +670,19 @@ class ProxyBase(ABC):
         old_value = getattr(obj, prop)
         if old_value != value:
             if debug:
-                message(f'{obj.Name}.{prop} = {value:.15f} was {old_value:.15f} ({obj.Label})')
-            setattr(obj, prop, value)
+                # Get the name from the object or from `obj.Object` if `obj` is
+                # a view object.
+                name = f'{obj.Name}' if hasattr(obj, 'Name') else f'{obj.Object.Name}'
+                label = f'{obj.Label}' if hasattr(obj, 'Label') else f'{obj.Object.Label}'
+                message(f'{name}.{prop} = {value:.15f} was {old_value:.15f} ({label})')
+            if type(old_value) is float:
+                if (
+                        (tolerance is None)
+                        or (abs(old_value - value) > tolerance)
+                ):
+                    setattr(obj, prop, value)
+            else:
+                setattr(obj, prop, value)
 
 
 def convert_units(

@@ -27,7 +27,7 @@ DOList = Iterable[DO]
 
 
 def read_mesh_dae(
-        filename: [Path | str],
+        filename: Path | str,
 ) -> Mesh.Mesh:
     current_doc = fc.activeDocument()
     path = Path(filename)
@@ -49,7 +49,7 @@ def read_mesh_dae(
 
 def save_mesh_dae(
     obj: DO,
-    filename: [Path | str],
+    filename: Path | str,
 ) -> None:
     """Save the mesh of a FreeCAD object into a Collada file."""
     current_doc = fc.activeDocument()
@@ -64,7 +64,7 @@ def save_mesh_dae(
 
 
 def read_mesh(
-        filename: [Path | str],
+        filename: Path | str,
 ) -> Mesh.Mesh:
     """Read a mesh from a file.
 
@@ -91,7 +91,7 @@ def read_mesh(
 
 def save_mesh(
     obj: DO,
-    filename: [Path | str],
+    filename: Path | str,
 ) -> None:
     """Save the mesh of a FreeCAD object into a file.
 
@@ -104,7 +104,7 @@ def save_mesh(
     Mesh.export([obj], str(filename))
 
 
-def scale_mesh_object(obj: DO, scale_factor: [float | Iterable[float]]) -> None:
+def scale_mesh_object(obj: DO, scale_factor: float | Iterable[float]) -> None:
     """Scale a mesh object in place.
 
     Parameters

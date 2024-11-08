@@ -665,7 +665,16 @@ class _ViewProviderLink(ProxyBase):
                 'Visibility',
             ],
         )
-        vobj.Proxy = self
+        if vobj.Proxy is not self:
+            # Implementation note: triggers `self.attach`.
+            vobj.Proxy = self
+        self._init(vobj)
+
+    def _init(self, vobj: VPDO) -> None:
+        self.view_object = vobj
+        self.link = vobj.Object
+        self._init_extensions(vobj)
+        self._init_properties(vobj)
 
     def getIcon(self):
         # Implementation note: "return 'link.svg'" works only after
@@ -673,9 +682,8 @@ class _ViewProviderLink(ProxyBase):
         return str(ICON_PATH / 'link.svg')
 
     def attach(self, vobj: VPDO):
-        self.view_object = vobj
-        self._init_extensions(vobj)
-        self._init_properties(vobj)
+        # `self.__init__()` is not called on document restore, do it manually.
+        self.__init__(vobj)
 
     def _init_extensions(self, vobj: VPDO):
         vobj.addExtension('Gui::ViewProviderGroupExtensionPython')

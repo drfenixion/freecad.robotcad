@@ -91,6 +91,7 @@
 - [trimesh interface to V-HACD](https://trimsh.org/trimesh.interfaces.vhacd.html)
 - [Mesh-to-SDF](https://github.com/kmammou/v-hacd/) converter (uses V-HACD).
 - [sdfopt from FusionSDF](https://github.com/andreasBihlmaier/FusionSDF/blob/main/sdfopt/README.md)
+- [mmoerdijk/generate_convex_hulls.py](https://gist.github.com/mmoerdijk/cbffdf69635adb62f6c73dbde22f8dd1)
 
 # Phobos add-on for Blender
 

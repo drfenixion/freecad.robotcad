@@ -16,7 +16,7 @@ _Shape = Enum('Shape', ['BOX', 'CONE', 'CUBE', 'CYLINDER', 'SPHERE'])
 
 
 def transform_from_placement(
-        placement: [fc.Placement | fc.Vector | fc.Rotation],
+        placement: fc.Placement | fc.Vector | fc.Rotation,
 ) -> coin.SoTransform:
     """Return the SoTransform equivalent to the placement.
 
@@ -49,74 +49,6 @@ def transform_from_placement(
     transform.translation = placement.Base
     transform.rotation = placement.Rotation.Q
     return transform
-
-
-def cylinder_between_points(
-        start_point_mm: Sequence[float],
-        end_point_mm: Sequence[float],
-        radius_mm: float,
-        color: Sequence[float],
-):
-    """
-    Create a cylinder between two points with a given color.
-
-    Parameters:
-    - start_point_mm: (x, y, z), the starting point
-    - end_point_mm: (x, y, z), the end point
-    - radius_mm: float, radius of the cylinder
-    - color: (r, g, b) representing the color
-             (RGB values between 0 and 1).
-
-    Returns:
-    - coin.SoSeparator containing the cylinder with the specified color
-
-    """
-    if len(start_point_mm) != 3:
-        raise RuntimeError('start_point_mm must have 3 values')
-    if len(end_point_mm) != 3:
-        raise RuntimeError('end_point_mm must have 3 values')
-    if len(color) != 3:
-        raise RuntimeError('color must have 3 values')
-    if radius_mm < 0:
-        raise RuntimeError('radius_mm must be strictly positive')
-
-    # Create an SoSeparator to encapsulate the cylinder and its properties.
-    separator = coin.SoSeparator()
-
-    # Create an SoMaterial node to set the color.
-    material = coin.SoMaterial()
-    material.diffuseColor = coin.SbColor(color[0], color[1], color[2])
-    separator.addChild(material)
-
-    height = coin.SbVec3f(
-        end_point_mm[0] - start_point_mm[0],
-        end_point_mm[1] - start_point_mm[1],
-        end_point_mm[2] - start_point_mm[2],
-    ).length()
-
-    cylinder = coin.SoCylinder()
-    cylinder.radius = radius_mm  # FreeCAD uses mm as unit.
-    cylinder.height = height
-
-    # Create an SoTransform node to position and orient the cylinder
-    transform = coin.SoTransform()
-    transform.translation = coin.SbVec3f(
-        start_point_mm[0],
-        start_point_mm[1],
-        start_point_mm[2],
-    )
-    transform.pointAt(
-        coin.SbVec3f(
-            end_point_mm[0],
-            end_point_mm[1],
-            end_point_mm[2],
-        ),
-    )
-
-    separator.addChild(transform)
-    separator.addChild(cylinder)
-
-    return separator
 
 
 def arrow_group(
@@ -285,7 +217,7 @@ def cone_between_points(
 
 
 def frame_group(
-        length_mm: [float | fc.Units.Quantity] = 200.0,
+        length_mm: float | fc.Units.Quantity = 200.0,
         diameter_ratio_to_length: float = 0.05,
         axis_start_ratio: float = 0.0,
 ) -> coin.SoSeparator:
@@ -339,10 +271,10 @@ def frame_group(
 
 
 def tcp_group(
-        tcp_length_mm: [float | fc.Units.Quantity] = 200.0,
+        tcp_length_mm: float | fc.Units.Quantity = 200.0,
         tcp_diameter_ratio_to_length: float = 0.25,
         tcp_color: Sequence[float] = (0.7, 0.7, 0.7),
-        axis_length_mm: [float | fc.Units.Quantity] = 300.0,
+        axis_length_mm: float | fc.Units.Quantity = 300.0,
         axis_diameter_ratio_to_length: float = 0.05,
 ) -> coin.SoSeparator:
     """Return the SoSeparator representing a TCP.
@@ -393,7 +325,7 @@ def tcp_group(
 
 def save_separator_to_file(
         separator: coin.SoSeparator,
-        filename: [Path | str],
+        filename: Path | str,
         file_format: str = 'iv',
 ) -> None:
     """Save the content of an SoSeparator to a file in Inventor or VRML format.
