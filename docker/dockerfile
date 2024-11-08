@@ -6,12 +6,18 @@ FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
 # Must redeclare so that value is available after FROM statement.
 ARG ROS_DISTRO_ARG
 
-ARG USER=$(id -u)
+ARG USER=$USER
+ARG UID=$(id -u)
+ARG GROUP=$USER
+ARG GID=$(id -g)
 ARG PASSWD=ubuntu
 ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
 ENV PATH_TO_WS=$CONT_PATH_WS
 
 ENV USER=$USER
+ENV UID=$UID
+ENV GROUP=$GROUP
+ENV GID=$GID
 ENV PASSWD=$PASSWD
 
 # fix - error: externally-managed-environment
@@ -51,11 +57,12 @@ RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
 
 ### Create user
 RUN echo "* enable custom user: $USER"
-RUN useradd --create-home --shell /bin/bash --user-group --groups adm,sudo $USER
+RUN getent group $GROUP || groupadd --force -g $GID $GROUP
+RUN useradd --create-home --shell /bin/bash --groups adm,sudo --uid $UID --gid $GID $USER
 RUN echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 ENV HOME=/home/$USER
 RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
-RUN export UBUNTU_USER_ID=$(id -u $USER) \
+RUN export UBUNTU_USER_ID=$UID \
     && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
     && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
     && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile 
