@@ -482,7 +482,14 @@ def add_controller_properties(controller: CrossController,
                     and param['full_name'] in ['extra_joints', 'interfaces', 'joints']:
                         category = 'Root'
                     elif parameter_name == 'joint_trajectory_controller' \
-                    and param['full_name'] in ['cmd_timeout']:
+                    and param['full_name'] in ['cmd_timeout', 'command_joints']:
+                        category = 'Root'
+                    elif parameter_name in ['bicycle_steering_controller', 
+                                            'tricycle_steering_controller', 
+                                            'ackermann_steering_controller', 
+                                            'diff_drive_controller', 
+                                            'tricycle_controller'] \
+                    and param['full_name'] in ['base_frame_id', 'odom_frame_id']:
                         category = 'Root'
                 else:
                     category = 'Root'
