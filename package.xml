@@ -10,15 +10,15 @@
   <url type="repository" branch="main">https://github.com/drfenixion/freecad.robotcad</url>
   <url type="readme">https://github.com/drfenixion/freecad.robotcad/blob/main/README.md</url>
   <icon>resources/icons/robotcad_overcross_joint.svg</icon>
-  <conflict>CROSS</conflict>
 
   <freecadmin>0.21.2</freecadmin>
 
   <content>
     <workbench>
       <classname>CrossWorkbench</classname>
-	  <subdirectory>freecad/robotcad</subdirectory>
-	  <pythonmin>3.10</pythonmin>
+      <subdirectory>freecad/robotcad</subdirectory>
+      <pythonmin>3.10</pythonmin>
+      <conflict type="addon">Remove CROSS workbench before install RobotCAD workbench</conflict>
     </workbench>
   </content>
 
