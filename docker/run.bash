@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Vars
-custom_fc_appimage=FreeCAD_1.0.0RC2-conda-Linux-x86_64-py311.AppImage
+custom_fc_appimage=FreeCAD_1.0.0-conda-Linux-x86_64-py311.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
 use_default_stable_freecad=true # set false if you want to use some other FreeCAD than default stable FreeCAD (default FC starts faster).
 # Dont forget place FC to docker/freecad/freecad_custom_appimage_dir in that case and fix $custom_fc_appimage variable value
