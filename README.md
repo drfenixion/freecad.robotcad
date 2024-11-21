@@ -2,12 +2,17 @@
 
 RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2]. RobotCAD also known as OVERCROSS.
 
-<a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD 3.0.0 workflow video"/></a>
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank">RobotCAD 3.0.0 workflow demo</a>
+<a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD 3.0.0 workflow video"/></a>
 
-<br /><br /><br />
-<a href="https://www.youtube.com/watch?v=26duvrKwHdU" target="_blank"><img src="https://github.com/user-attachments/assets/202f3a45-35ee-441d-b0e6-55c34616e701" alt="RobotCAD 4.0.0 functionality demo"/></a>
+<br /><br />
 <a href="https://www.youtube.com/watch?v=26duvrKwHdU" target="_blank">RobotCAD 4.0.0 functionality demo</a>
+<a href="https://www.youtube.com/watch?v=26duvrKwHdU" target="_blank"><img src="https://github.com/user-attachments/assets/202f3a45-35ee-441d-b0e6-55c34616e701" alt="RobotCAD 4.0.0 functionality demo"/></a>
+
+Video of creating controllable models: <br />
+<a href="https://www.youtube.com/watch?v=NUw6PLPC4x4" target="_blank">Diff drive chassis</a> <br />
+<a href="https://www.youtube.com/watch?v=o8casCU7c7Q" target="_blank">Manipulator on chassis</a> <br />
+<a href="https://www.youtube.com/watch?v=B62JW_0SFl0" target="_blank">Multicopter with manipulator and chassis</a> <br />
 
 # Key features short list:
 1. Autoinstall and run by startup script
