@@ -8,7 +8,7 @@ use_default_stable_freecad=true # set false if you want to use some other FreeCA
 command=freecad
 force_run_new_container=false
 
-ros_distro=iron
+ros_distro=jazzy
 ros_distro_assemble=desktop
 ws_dir_name=ros2_ws_with_freecad
 ros_container_name=ros2_${ros_distro}_with_freecad
