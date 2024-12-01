@@ -138,8 +138,6 @@ def get_ros_distro_from_env_or_default() -> str:
             'jazzy',
             'iron',
             'humble',
-            'galactic',
-            'foxy',
     ]
     for c in candidates:
         if Path(f'/opt/ros/{c}').exists():
