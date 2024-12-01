@@ -13,8 +13,9 @@ import xml.etree.ElementTree as et
 
 import FreeCAD as fc
 
-from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide2.QtWidgets import QFileDialog  # FreeCAD's PySide
+from PySide2.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide2.QtWidgets import QMessageBox
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -210,10 +211,11 @@ class RobotProxy(ProxyBase):
                 'MaterialCardPath',
                 'MaterialDensity',
                 'RobotType',
+                'format',
                 '_Type',
                 'Mass',
             ])
-
+        
         if obj.Proxy is not self:
             obj.Proxy = self
         self.robot = obj
@@ -255,7 +257,7 @@ class RobotProxy(ProxyBase):
     def joint_variables(self) -> dict[CrossJoint, str]:
         """Map of CROSS joints to joint variable names."""
         return self._joint_variables
-
+    
     def _init_properties(self, obj: CrossRobot):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
@@ -285,7 +287,12 @@ class RobotProxy(ProxyBase):
             'The path to the ROS package to export files to,'
             ' relative to $ROS_WORKSPACE/src',
         )
-
+        #  add the urdf and sdf properties 
+        add_property(obj,"App::PropertyEnumeration","format","Export",'''
+                      export format of robot description files
+                      ''')
+        obj.format=["urdf","sdf"]
+        
         add_property(
                 obj,
                 'App::PropertyString',
@@ -352,6 +359,30 @@ class RobotProxy(ProxyBase):
                 obj.OutputPath = rel_path
         if prop == 'Placement':
             self.compute_poses()
+        if prop=='format':
+            if obj.format=='urdf':
+                msgb=QMessageBox(None)
+                msgb.setWindowTitle("Format Change")
+                msgb.setText((
+                    'changing format to urdf\n'
+                    'all sdf configurations will be deleted\n'
+                    'do you want to proceed\n'
+                ))
+                msgb.setIcon(QMessageBox.Warning)
+                msgb.setStandardButtons(QMessageBox.Ok|QMessageBox.Cancel)
+                response=msgb.exec_()
+                if response==QMessageBox.Ok:
+                # to do 
+                # delete all sdf properties in links,joints and Robot 
+                    print("to be done")
+                else:
+                # reset format to sdf
+                    fc.Console.PrintMessage("reverting to sdf \n")
+                    obj.format='sdf'
+            if obj.format=='sdf':
+                # check to ensure properties  exist 
+                pass
+        # property is cahnged to sdf 
 
     def onDocumentRestored(self, obj):
         """Handle the object after a document restore.
