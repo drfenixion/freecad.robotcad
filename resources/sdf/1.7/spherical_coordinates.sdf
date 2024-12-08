@@ -1,0 +1,59 @@
+<element name="spherical_coordinates" required="0">
+  <element name="surface_model" type="string" default="EARTH_WGS84" required="1">
+    <description>
+      Name of planetary surface model, used to determine the surface altitude
+      at a given latitude and longitude. The default is an ellipsoid model of
+      the earth based on the WGS-84 standard. It is used in Gazebo's GPS sensor
+      implementation.
+    </description>
+  </element>
+
+  <element name="world_frame_orientation" type="string" default="ENU" required="0">
+    <description>
+      This field identifies how Gazebo world frame is aligned in Geographical
+      sense.  The final Gazebo world frame orientation is obtained by rotating
+      a frame aligned with following notation by the field heading_deg (Note
+      that heading_deg corresponds to positive yaw rotation in the NED frame,
+      so it's inverse specifies positive Z-rotation in ENU or NWU).
+      Options are:
+        - ENU (East-North-Up)
+        - NED (North-East-Down)
+        - NWU (North-West-Up)
+      For example, world frame specified by setting world_orientation="ENU"
+      and heading_deg=-90° is effectively equivalent to NWU with heading of 0°.
+    </description>
+  </element>
+  <element name="latitude_deg" type="double" default="0.0" required="1">
+    <description>
+      Geodetic latitude at origin of gazebo reference frame, specified
+      in units of degrees.
+    </description>
+  </element>
+
+  <element name="longitude_deg" type="double" default="0.0" required="1">
+    <description>
+      Longitude at origin of gazebo reference frame, specified in units
+      of degrees.
+    </description>
+  </element>
+
+  <element name="elevation" type="double" default="0.0" required="1">
+    <description>
+      Elevation of origin of gazebo reference frame, specified in meters.
+    </description>
+  </element>
+
+  <element name="heading_deg" type="double" default="0.0" required="1">
+    <description>
+      Heading offset of gazebo reference frame, measured as angle between
+      Gazebo world frame and the world_frame_orientation type (ENU/NED/NWU).
+      Rotations about the downward-vector (e.g. North to East) are positive.
+      The direction of rotation is chosen to be consistent with compass
+      heading convention (e.g. 0 degrees points North and 90 degrees
+      points East, positive rotation indicates counterclockwise rotation
+      when viewed from top-down direction).
+      The angle is specified in degrees.
+    </description>
+  </element>
+
+</element>
