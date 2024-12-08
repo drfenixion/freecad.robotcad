@@ -919,18 +919,18 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
         p = subprocess.run(
-            ["git submodule update", " --init", update_from_remote_branch_param],
+            ["git submodule update", "--init", update_from_remote_branch_param],
             shell=True,
             capture_output=True,
             cwd=MOD_PATH,
             check=True,
         )
-        print('stdout:', p.stdout.decode())
-
+        print('process:', p)
+        
 
     update_from_remote_branch_param = ''
     if update_from_remote_branch:
-        update_from_remote_branch_param = ' --remote'
+        update_from_remote_branch_param = '--remote'
 
     files_and_dirs = os.listdir(ROS2_CONTROLLERS_PATH)
     # update if dir is empty
