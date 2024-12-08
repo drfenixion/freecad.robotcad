@@ -1,0 +1,86 @@
+<!-- Actor -->
+<element name="actor" required="*">
+  <description>A special kind of model which can have a scripted motion. This includes both global waypoint type animations and skeleton animations.</description>
+
+  <attribute name="name" type="string" default="__default__" required="1">
+    <description>A unique name for the actor.</description>
+  </attribute>
+
+  <include filename="pose.sdf" required="0"/>
+
+  <element name="skin" required="0">
+    <description>Skin file which defines a visual and the underlying skeleton which moves it.</description>
+
+    <element name="filename" type="string" default="__default__" required="1">
+      <description>Path to skin file, accepted formats: COLLADA, BVH.</description>
+    </element>
+
+    <element name="scale" type="double" default="1.0" required="0">
+      <description>Scale the skin's size.</description>
+    </element>
+  </element> <!-- End Skin -->
+
+  <element name="animation" required="*">
+    <description>Animation file defines an animation for the skeleton in the skin. The skeleton must be compatible with the skin skeleton.</description>
+
+    <attribute name="name" type="string" default="__default__" required="1">
+      <description>Unique name for animation.</description>
+    </attribute>
+
+    <element name="filename" type="string" default="__default__" required="1">
+      <description>Path to animation file. Accepted formats: COLLADA, BVH.</description>
+    </element>
+    <element name="scale" type="double" default="1.0" required="0">
+      <description>Scale for the animation skeleton.</description>
+    </element>
+    <element name="interpolate_x" type="bool" default="false" required="0">
+      <description>Set to true so the animation is interpolated on X.</description>
+    </element>
+  </element> <!-- End Animation -->
+
+  <element name="script" required="1">
+    <description>Adds scripted trajectories to the actor.</description>
+
+    <element name="loop" type="bool" default="true" required="0">
+      <description>Set this to true for the script to be repeated in a loop. For a fluid continuous motion, make sure the last waypoint matches the first one.</description>
+    </element>
+
+    <element name="delay_start" type="double" default="0.0" required="0">
+      <description>This is the time to wait before starting the script. If running in a loop, this time will be waited before starting each cycle.</description>
+    </element>
+
+    <element name="auto_start" type="bool" default="true" required="0">
+      <description>Set to true if the animation should start as soon as the simulation starts playing. It is useful to set this to false if the animation should only start playing only when triggered by a plugin, for example.</description>
+    </element>
+
+    <element name="trajectory" required="*">
+      <description>The trajectory contains a series of keyframes to be followed.</description>
+      <attribute name="id" type="int" default="0" required="1">
+        <description>Unique id for a trajectory.</description>
+      </attribute>
+
+      <attribute name="type" type="string" default="__default__" required="1">
+        <description>If it matches the type of an animation, they will be played at the same time.</description>
+      </attribute>
+
+      <attribute name="tension" type="double" default="0.0" required="0" min="0.0" max="1.0">
+        <description>The tension of the trajectory spline. The default value of zero equates to a Catmull-Rom spline, which may also cause the animation to overshoot keyframes. A value of one will cause the animation to stick to the keyframes.</description>
+      </attribute>
+
+      <element name="waypoint" required="*">
+        <description>Each point in the trajectory.</description>
+        <element name="time" type="double" default="0.0" required="1">
+          <description>The time in seconds, counted from the beginning of the script, when the pose should be reached.</description>
+        </element>
+        <element name="pose" type="pose" default="0 0 0 0 0 0" required="1">
+          <description>The pose which should be reached at the given time.</description>
+        </element>
+      </element> <!-- End Waypoint -->
+    </element> <!-- End Action -->
+  </element> <!-- End Script -->
+
+  <include filename="link.sdf" required="+"/>
+  <include filename="joint.sdf" required="*"/>
+  <include filename="plugin.sdf" required="*"/>
+
+</element> <!-- End Actor -->

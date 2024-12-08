@@ -1,0 +1,245 @@
+<element name="surface" required="0">
+  <description>The surface parameters</description>
+  <element name="bounce" required="0">
+    <description></description>
+    <element name="restitution_coefficient" type="double" default="0" min="0.0" max="1.0" required="0">
+      <description>Bounciness coefficient of restitution, from [0...1], where 0=no bounciness.</description>
+    </element>
+    <element name="threshold" type="double" default="100000" required="0">
+      <description>Bounce capture velocity, below which effective coefficient of restitution is 0.</description>
+    </element>
+  </element> <!-- End Bounce -->
+
+  <element name="friction" required="0">
+    <description></description>
+
+    <element name="torsional" required="0">
+      <description>Parameters for torsional friction</description>
+      <element name="coefficient" type="double" default="1.0" min="0.0" required="0">
+        <description>
+          Torsional friction coefficient, unitless maximum ratio of
+          tangential stress to normal stress.
+        </description>
+      </element>
+      <element name="use_patch_radius" type="bool" default="true" required="0">
+        <description>
+          If this flag is true,
+          torsional friction is calculated using the "patch_radius" parameter.
+          If this flag is set to false,
+          "surface_radius" (R) and contact depth (d)
+          are used to compute the patch radius as sqrt(R*d).
+        </description>
+      </element>
+      <element name="patch_radius" type="double" default="0" min="0.0" required="0">
+        <description>Radius of contact patch surface.</description>
+      </element>
+      <element name="surface_radius" type="double" default="0.0" min="0.0" required="0">
+        <description>Surface radius on the point of contact.</description>
+      </element>
+      <element name="ode" required="0">
+        <description>Torsional friction parameters for ODE</description>
+        <element name="slip" type="double" default="0.0" required="0">
+          <description>
+            Force dependent slip for torsional friction,
+            equivalent to inverse of viscous damping coefficient
+            with units of rad/s/(Nm).
+            A slip value of 0 is infinitely viscous.
+          </description>
+        </element>
+      </element> <!-- End ODE -->
+    </element> <!-- End torsional -->
+
+    <element name="ode" required="0">
+      <description>ODE friction parameters</description>
+      <element name="mu" type="double" default="1" min="0.0" required="0">
+        <description>
+          Coefficient of friction in first friction pyramid direction,
+          the unitless maximum ratio of force in first friction pyramid
+          direction to normal force.
+        </description>
+      </element>
+      <element name="mu2" type="double" default="1" min="0.0" required="0">
+        <description>
+          Coefficient of friction in second friction pyramid direction,
+          the unitless maximum ratio of force in second friction pyramid
+          direction to normal force.
+        </description>
+      </element>
+      <element name="fdir1" type="vector3" default="0 0 0" required="0">
+        <description>
+          Unit vector specifying first friction pyramid direction in
+          collision-fixed reference frame.
+          If the friction pyramid model is in use,
+          and this value is set to a unit vector for one of the
+          colliding surfaces,
+          the ODE Collide callback function will align the friction pyramid directions
+          with a reference frame fixed to that collision surface.
+          If both surfaces have this value set to a vector of zeros,
+          the friction pyramid directions will be aligned with the world frame.
+          If this value is set for both surfaces, the behavior is undefined.
+        </description>
+      </element>
+      <element name="slip1" type="double" default="0.0" required="0">
+        <description>
+          Force dependent slip in first friction pyramid direction,
+          equivalent to inverse of viscous damping coefficient
+          with units of m/s/N.
+          A slip value of 0 is infinitely viscous.
+        </description>
+      </element>
+      <element name="slip2" type="double" default="0.0" required="0">
+        <description>
+          Force dependent slip in second friction pyramid direction,
+          equivalent to inverse of viscous damping coefficient
+          with units of m/s/N.
+          A slip value of 0 is infinitely viscous.
+        </description>
+      </element>
+    </element> <!-- End ODE -->
+    <element name="bullet" required="0">
+      <element name="friction" type="double" default="1" min="0.0" required="0">
+        <description>
+          Coefficient of friction in first friction pyramid direction,
+          the unitless maximum ratio of force in first friction pyramid
+          direction to normal force.
+        </description>
+      </element>
+      <element name="friction2" type="double" default="1" min="0.0" required="0">
+        <description>
+          Coefficient of friction in second friction pyramid direction,
+          the unitless maximum ratio of force in second friction pyramid
+          direction to normal force.
+        </description>
+      </element>
+      <element name="fdir1" type="vector3" default="0 0 0" required="0">
+        <description>
+          Unit vector specifying first friction pyramid direction in
+          collision-fixed reference frame.
+          If the friction pyramid model is in use,
+          and this value is set to a unit vector for one of the
+          colliding surfaces,
+          the friction pyramid directions will be aligned
+          with a reference frame fixed to that collision surface.
+          If both surfaces have this value set to a vector of zeros,
+          the friction pyramid directions will be aligned with the world frame.
+          If this value is set for both surfaces, the behavior is undefined.
+        </description>
+      </element>
+      <element name="rolling_friction" type="double" default="1" required="0">
+        <description>Coefficient of rolling friction</description>
+      </element>
+    </element> <!-- End Bullet -->
+  </element> <!-- End Friction -->
+
+  <element name="contact" required="0">
+    <description></description>
+    <element name="collide_without_contact" type="bool" default="false" required="0">
+      <description>Flag to disable contact force generation, while still allowing collision checks and contact visualization to occur.</description>
+    </element>
+    <element name="collide_without_contact_bitmask" type="unsigned int" default="1" required="0">
+      <description>Bitmask for collision filtering when collide_without_contact is on </description>
+    </element>
+
+    <element name="collide_bitmask" type="unsigned int" default="65535" required="0">
+      <description>Bitmask for collision filtering. This will override collide_without_contact. Parsed as 16-bit unsigned integer.</description>
+    </element>
+
+    <element name="category_bitmask" type="unsigned int" default="65535" required="0">
+      <description><![CDATA[Bitmask for category of collision filtering. Collision happens if ((category1 & collision2) | (category2 & collision1)) is not zero. If not specified, the category_bitmask should be interpreted as being the same as collide_bitmask. Parsed as 16-bit unsigned integer.]]></description>
+    </element>
+
+    <element name="poissons_ratio" type="double" default="0.3" required="0">
+      <description>
+        Poisson's ratio is the unitless ratio between transverse and axial strain.
+        This value must lie between (-1, 0.5).  Defaults to 0.3 for typical steel.
+        Note typical silicone elastomers have Poisson's ratio near 0.49 ~ 0.50.
+
+        For reference, approximate values for Material:(Young's Modulus, Poisson's Ratio)
+        for some of the typical materials are:
+          Plastic:  (1e8 ~ 3e9 Pa,  0.35 ~ 0.41),
+          Wood:     (4e9 ~ 1e10 Pa, 0.22 ~ 0.50),
+          Aluminum: (7e10 Pa,       0.32 ~ 0.35),
+          Steel:    (2e11 Pa,       0.26 ~ 0.31).
+      </description>
+    </element>
+    <element name="elastic_modulus" type="double" default="-1" required="0">
+      <description>
+        Young's Modulus in SI derived unit Pascal.
+        Defaults to -1.  If value is less or equal to zero,
+        contact using elastic modulus (with Poisson's Ratio) is disabled.
+
+        For reference, approximate values for Material:(Young's Modulus, Poisson's Ratio)
+        for some of the typical materials are:
+          Plastic:  (1e8 ~ 3e9 Pa,  0.35 ~ 0.41),
+          Wood:     (4e9 ~ 1e10 Pa, 0.22 ~ 0.50),
+          Aluminum: (7e10 Pa,       0.32 ~ 0.35),
+          Steel:    (2e11 Pa,       0.26 ~ 0.31).
+      </description>
+    </element>
+
+    <element name="ode" required="0">
+      <description>ODE contact parameters</description>
+      <element name="soft_cfm" type="double" default="0" required="0">
+        <description>Soft constraint force mixing.</description>
+      </element>
+      <element name="soft_erp" type="double" default="0.2" required="0">
+        <description>Soft error reduction parameter</description>
+      </element>
+      <element name="kp" type="double" default="1000000000000.0" required="0">
+        <description>dynamically "stiffness"-equivalent coefficient for contact joints</description>
+      </element>
+      <element name="kd" type="double" default="1.0" required="0">
+        <description>dynamically "damping"-equivalent coefficient for contact joints</description>
+      </element>
+      <element name="max_vel" type="double" default="0.01" required="0">
+        <description>maximum contact correction velocity truncation term.</description>
+      </element>
+      <element name="min_depth" type="double" default="0" required="0">
+        <description>minimum allowable depth before contact correction impulse is applied</description>
+      </element>
+    </element> <!-- End ODE -->
+    <element name="bullet" required="0">
+      <description>Bullet contact parameters</description>
+      <element name="soft_cfm" type="double" default="0" required="0">
+        <description>Soft constraint force mixing.</description>
+      </element>
+      <element name="soft_erp" type="double" default="0.2" required="0">
+        <description>Soft error reduction parameter</description>
+      </element>
+      <element name="kp" type="double" default="1000000000000.0" required="0">
+        <description>dynamically "stiffness"-equivalent coefficient for contact joints</description>
+      </element>
+      <element name="kd" type="double" default="1.0" required="0">
+        <description>dynamically "damping"-equivalent coefficient for contact joints</description>
+      </element>
+      <element name="split_impulse" type="bool" default="true" required="1">
+        <description>Similar to ODE's max_vel implementation.  See http://bulletphysics.org/mediawiki-1.5.8/index.php/BtContactSolverInfo#Split_Impulse for more information.</description>
+      </element>
+      <element name="split_impulse_penetration_threshold" type="double" default="-0.01" required="1">
+        <description>Similar to ODE's max_vel implementation.  See http://bulletphysics.org/mediawiki-1.5.8/index.php/BtContactSolverInfo#Split_Impulse for more information.</description>
+      </element>
+    </element> <!-- End Bullet -->
+  </element> <!-- End Contact -->
+
+  <!-- for deformable bodies -->
+  <element name="soft_contact" required="0">
+    <element name="dart" required="0">
+      <description>soft contact pamameters based on paper:
+             http://www.cc.gatech.edu/graphics/projects/Sumit/homepage/papers/sigasia11/jain_softcontacts_siga11.pdf
+      </description>
+      <element name="bone_attachment" type="double" default="100.0" required="1">
+        <description>This is variable k_v in the soft contacts paper.  Its unit is N/m.</description>
+      </element>
+      <element name="stiffness" type="double" default="100.0" required="1">
+        <description>This is variable k_e in the soft contacts paper.  Its unit is N/m.</description>
+      </element>
+      <element name="damping" type="double" default="10.0" required="1">
+        <description>Viscous damping of point velocity in body frame.  Its unit is N/m/s.</description>
+      </element>
+      <element name="flesh_mass_fraction" type="double" default="0.05" required="1">
+        <description>Fraction of mass to be distributed among deformable nodes.</description>
+      </element>
+    </element> <!-- dart -->
+  </element> <!-- soft_contact -->
+
+</element> <!-- End Surface -->

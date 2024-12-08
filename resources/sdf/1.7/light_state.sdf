@@ -1,0 +1,10 @@
+<!-- State information for a light -->
+<element name="light" required="*">
+  <description>Light state</description>
+
+  <attribute name="name" type="string" default="__default__" required="1">
+    <description>Name of the light</description>
+  </attribute>
+
+  <include filename="pose.sdf" required="0"/>
+</element> <!-- End Light -->

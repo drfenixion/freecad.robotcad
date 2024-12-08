@@ -1,0 +1,79 @@
+<!-- Model -->
+<element name="model" required="*">
+  <description>The model element defines a complete robot or any other physical object.</description>
+
+  <attribute name="name" type="string" default="__default__" required="1">
+    <description>
+      The name of the model and its implicit frame. This name must be unique
+      among all elements defining frames within the same scope, i.e., it must
+      not match another //model, //frame, //joint, or //link within the same
+      scope.
+    </description>
+  </attribute>
+
+  <attribute name="canonical_link" type="string" default="" required="0">
+    <description>
+      The name of the model's canonical link, to which the model's implicit
+      coordinate frame is attached. If unset or set to an empty string, the
+      first `/link` listed as a direct child of this model is chosen as the
+      canonical link. If the model has no direct `/link` children, it will
+      instead be attached to the first nested (or included) model's implicit
+      frame.
+    </description>
+  </attribute>
+
+  <element name="static" type="bool" default="false" required="0">
+    <description>
+      If set to true, the model is immovable; i.e., a dynamics engine will not
+      update its position. This will also overwrite this model's `@canonical_link`
+      and instead attach the model's implicit frame to the world's implicit frame.
+      This holds even if this model is nested (or included) by another model
+      instead of being a direct child of `//world`.
+    </description>
+  </element>
+
+  <element name="self_collide" type="bool" default="false" required="0">
+    <description>If set to true, all links in the model will collide with each other (except those connected by a joint). Can be overridden by the link or collision element self_collide property. Two links within a model will collide if link1.self_collide OR link2.self_collide. Links connected by a joint will never collide.</description>
+  </element>
+
+  <element name="allow_auto_disable" type="bool" default="true" required="0">
+    <description>Allows a model to auto-disable, which is means the physics engine can skip updating the model when the model is at rest. This parameter is only used by models with no joints.</description>
+  </element>
+
+  <include filename="frame.sdf" required="*"/>
+  <include filename="pose.sdf" required="0"/>
+  <include filename="link.sdf" required="*"/>
+  <include filename="joint.sdf" required="*"/>
+  <include filename="plugin.sdf" required="*"/>
+  <include filename="gripper.sdf" required="*"/>
+
+  <element name="include" required="*">
+    <description>Include resources from a URI. This can be used to nest models.</description>
+    <element name="uri" type="string" default="__default__" required="1">
+      <description>URI to a resource, such as a model</description>
+    </element>
+
+    <include filename="pose.sdf" required="0"/>
+    <include filename="plugin.sdf" required="*"/>
+
+    <element name="name" type="string" default="" required="0">
+      <description>Override the name of the included model.</description>
+    </element>
+
+    <element name="static" type="bool" default="false" required="0">
+      <description>Override the static value of the included model.</description>
+    </element>
+  </element>
+
+  <element name="model" ref="model" required="*">
+    <description>A nested model element</description>
+    <attribute name="name" type="string" default="__default__" required="1">
+      <description>A unique name for the model. This name must not match another nested model in the same level as this model.</description>
+    </attribute>
+  </element>
+
+  <element name="enable_wind" type="bool" default="false" required="0">
+    <description>If set to true, all links in the model will be affected by the wind. Can be overriden by the link wind property.</description>
+  </element>
+
+</element> <!-- End Model -->
