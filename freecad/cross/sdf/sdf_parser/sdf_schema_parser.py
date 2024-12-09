@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 import os 
+import re
 
 from ...wb_utils import SDFORMAT_SDF_TEMPLATES_PATH
 
@@ -61,7 +62,7 @@ class sdf_schema_parser:
             children:[] children is a list that has dictionaries that folow the same structure 
             }'''
            
-    def populate_structure(self,Element:ET.Element):
+    def populate_structure(self, Element:ET.Element):
         #add elements to structure 
         ElemDict={}
 
@@ -85,6 +86,16 @@ class sdf_schema_parser:
             e.name=result.attrib["name"]
             e.attr_value=result.attrib["default"]
             self._attr.append(e)
+
+        # add description child tag as attribute
+        e=Element_Attributes()
+        e.name="element_description"
+        description = Element.find("description")
+        if description is not None and description.text is not None:
+            e.attr_value = description.text
+        else:
+            e.attr_value = ""
+        self._attr.append(e)
         
         #check to see that attributes are not empty
         if len(self._attr)==0:
@@ -125,11 +136,12 @@ class sdf_schema_parser:
                 pass
             elif child.tag =="element" \
             and 'name' not in child.attrib:
-                # check for any other technical tag cases
+                # check for any other technical tag cases.
+                # There is not other cases but check saved for future
                 pass
             #add description item 
             elif child.tag =="description":
-                ElemDict["description"]=child.text
+                ElemDict["description"] = child.text
             else:
                pass 
            
