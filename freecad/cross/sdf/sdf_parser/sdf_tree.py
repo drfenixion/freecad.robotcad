@@ -1,10 +1,11 @@
 from .sdf_schema_parser import sdf_schema_parser
     
 import xml.etree.ElementTree as ET
+import xmltodict
 
 
 class sdf_tree:
-    def __init__(self,sfile:str):
+    def __init__(self, sfile:str):
         '''sfile : file name to read the element properties from  located in ../sdf \n
         use the get_elem  property  to get the initialized element '''
         #initialize class
@@ -19,7 +20,7 @@ class sdf_tree:
         if len(self.structured["children"])==0:
             self._root_elem.text=self.structured["value"]
         else:
-            self.construct_tree(self._root_elem,self.structured["children"])
+            self.construct_tree(self._root_elem, self.structured["children"])
     
         self.e_tree=ET.ElementTree(self._root_elem)
     #create the root element 
@@ -31,7 +32,7 @@ class sdf_tree:
             for attr in self.structured["attributes"]:
                 self._root_elem.set(attr.name,attr.attr_value)
         
-    def construct_tree(self,parent_elem:ET.Element,st_lst)->ET.Element:
+    def construct_tree(self, parent_elem: ET.Element, st_lst)->ET.Element:
         
         for child in st_lst:
             # attr=dict()
@@ -46,7 +47,7 @@ class sdf_tree:
 
             if child["value"] is not None:
                 s.text=child["value"]
-            if len(child["children"]) >0:
+            if len(child["children"]) > 0:
                 self.construct_tree(s,child["children"])
         
     @property
@@ -55,3 +56,6 @@ class sdf_tree:
     @property
     def get_element(self)->ET.Element:
         return self._root_elem
+    @property
+    def get_element_as_dict(self) -> dict:
+        return xmltodict.parse(ET.tostring(self._root_elem))
