@@ -15,6 +15,7 @@ reboot
 
 # Run FreeCAD with RobotCAD
 ```
+cd docker
 bash run.bash
 ```
 
