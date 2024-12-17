@@ -5,7 +5,7 @@ from . import sdf
 import os
 from PySide2.QtWidgets import QDialog, QVBoxLayout
 from PySide2.QtQuickWidgets import QQuickWidget
-from PySide2.QtCore import QUrl
+from PySide2.QtCore import QUrl,QSize
 
 class world_dialog(QDialog):
     def __init__(self, parent = ..., f = ...):
@@ -16,6 +16,9 @@ class world_dialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(view)
         self.setLayout(layout)
+        
+    def sizeHint(self):
+        return QSize(700,400)
     
         
     
