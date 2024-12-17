@@ -13,8 +13,9 @@ import xml.etree.ElementTree as et
 
 import FreeCAD as fc
 
-from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide2.QtWidgets import QFileDialog  # FreeCAD's PySide
+from PySide2.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide2.QtWidgets import QMessageBox
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -66,6 +67,7 @@ from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_controllers_config_file_name
 
+from . import sdf_world
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -210,14 +212,15 @@ class RobotProxy(ProxyBase):
                 'MaterialCardPath',
                 'MaterialDensity',
                 'RobotType',
+                'format',
                 '_Type',
                 'Mass',
             ])
-
+        
         if obj.Proxy is not self:
             obj.Proxy = self
         self.robot = obj
-
+        
         # List of objects created for the robot.
         # Used for example by `robot_from_urdf` to keep track of imported
         # meshes.
@@ -245,7 +248,8 @@ class RobotProxy(ProxyBase):
         self._broadcasters: Optional[list[CrossController]] = None
 
         self._init_properties(obj)
-
+        #  call make sdf object after initializing properties 
+        sdf_world.make_object(self.robot)
     @property
     def created_objects(self) -> DOList:
         """List of objects created for the robot."""
@@ -255,7 +259,7 @@ class RobotProxy(ProxyBase):
     def joint_variables(self) -> dict[CrossJoint, str]:
         """Map of CROSS joints to joint variable names."""
         return self._joint_variables
-
+    
     def _init_properties(self, obj: CrossRobot):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
@@ -285,7 +289,8 @@ class RobotProxy(ProxyBase):
             'The path to the ROS package to export files to,'
             ' relative to $ROS_WORKSPACE/src',
         )
-
+        #  add the urdf and sdf properties 
+        
         add_property(
                 obj,
                 'App::PropertyString',
@@ -335,23 +340,6 @@ class RobotProxy(ProxyBase):
         self.compute_poses()
         # self.reset_group()
 
-    def onChanged(self, obj: CrossRobot, prop: str) -> None:
-        # print(f'{obj.Name}.onChanged({prop})') # DEBUG
-        if not self.is_execute_ready():
-            return
-        if prop in ['Group']:
-            # Reset _links and _joints to provoke a recompute.
-            self._links = None
-            self._joints = None
-            self._controllers = None
-            self._broadcasters = None
-            self.execute(obj)
-        if prop == 'OutputPath':
-            rel_path = remove_ros_workspace(obj.OutputPath)
-            if rel_path != obj.OutputPath:
-                obj.OutputPath = rel_path
-        if prop == 'Placement':
-            self.compute_poses()
 
     def onDocumentRestored(self, obj):
         """Handle the object after a document restore.

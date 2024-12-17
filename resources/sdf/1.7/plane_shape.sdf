@@ -1,0 +1,9 @@
+<element name="plane" required="0">
+  <description>Plane shape</description>
+  <element name="normal" type="vector3" default="0 0 1" required="1">
+    <description>Normal direction for the plane. When a Plane is used as a geometry for a Visual or Collision object, then the normal is specified in the Visual or Collision frame, respectively.</description>
+  </element>
+  <element name="size" type="vector2d" default="1 1" min="0 0" required="1">
+    <description>Length of each side of the plane. Note that this property is meaningful only for visualizing the Plane, i.e., when the Plane is used as a geometry for a Visual object. The Plane has infinite size when used as a geometry for a Collision object.</description>
+  </element>
+</element>
