@@ -1,7 +1,6 @@
 
 #Todo 
-
-class create_ui:
+class world_item:
     '''
     this class will receive a dictionary of sdf properties and creates a ui  based on the info 
     e.g the ui will   have a group with the name of the key and all children of the key aka values will be
@@ -15,3 +14,6 @@ class create_ui:
     '''
     def __init__(self,obj,element_stucture:dict):
         pass
+    def config_ui(self):
+        pass
+    
