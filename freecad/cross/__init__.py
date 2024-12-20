@@ -58,3 +58,8 @@ try:
     import xacro
 except (ModuleNotFoundError, ImportError):
     pip_install('xacro', restart_freecad = False)
+
+try:
+    import xmltodict
+except (ModuleNotFoundError, ImportError):
+    pip_install('xmltodict', restart_freecad = False)
