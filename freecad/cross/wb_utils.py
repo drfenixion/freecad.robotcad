@@ -972,7 +972,7 @@ def get_controllers_config_file_name(robot_name: str) -> str:
     return get_valid_filename(robot_name) + '_controllers.yaml'
 
 
-def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True):
+def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
     """ Do git submodule update --init if ros2_controllers module dir is empty """
 
 
@@ -992,7 +992,7 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
     if update_from_remote_branch:
         update_from_remote_branch_param = '--remote'
 
-    files_and_dirs = os.listdir(ROS2_CONTROLLERS_PATH)
+    files_and_dirs = os.listdir(update_if_dir_is_empty)
     # update if dir is empty
     if only_first_update:
         if not len(files_and_dirs):
