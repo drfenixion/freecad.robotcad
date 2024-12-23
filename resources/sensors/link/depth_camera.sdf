@@ -18,7 +18,7 @@
                         <path>/tmp/camera_depth_data</path>
                     </save>
                     <triggered>false</triggered>
-                    <trigger_topic>camera_depth/trigger</trigger_topic>    
+                    <trigger_topic>camera_depth/trigger</trigger_topic>
                 </camera>
                 <always_on>true</always_on>
                 <update_rate>10</update_rate>

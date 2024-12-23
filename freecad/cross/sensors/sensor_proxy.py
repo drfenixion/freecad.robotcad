@@ -57,10 +57,12 @@ class SensorProxy(ProxyBase):
     Type = 'Cross::Sensor'
 
     def __init__(self, obj: CrossSensor):
-        super().__init__('sensor', [
+        super().__init__(
+            'sensor', [
             '_Type',
-            ])
-        
+            ],
+        )
+
         if obj.Proxy is not self:
             obj.Proxy = self
         self.sensor = obj
@@ -127,11 +129,13 @@ class _ViewProviderSensor(ProxyBase):
 
 
             def notice_not_suited_object_selected(element, replacements: dict, prop: str):
-                error('Selected not suited object (' + ros_name(element) + ') for ' 
-                    + prop + ' property. Object was excluded. Verification functions - ' 
-                    + ', '.join(replacements[prop]['check_functions']) 
-                    + '. Use filter of this type.', gui=True)
-            
+                error(
+                    'Selected not suited object (' + ros_name(element) + ') for '
+                    + prop + ' property. Object was excluded. Verification functions - '
+                    + ', '.join(replacements[prop]['check_functions'])
+                    + '. Use filter of this type.', gui=True,
+                )
+
             # custom type checks
             replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
             if prop in replacements:
@@ -149,8 +153,8 @@ class _ViewProviderSensor(ProxyBase):
                                     break
                             if not suited_object_flag:
                                 notice_not_suited_object_selected(element, replacements, prop)
-                                
-                                    
+
+
                 else:
                     if attr:
                         suited_object_flag = False
@@ -161,12 +165,12 @@ class _ViewProviderSensor(ProxyBase):
                                 break
                         if not suited_object_flag:
                             notice_not_suited_object_selected(attr, replacements, prop)
-                            
+
                 if attr != filtered_elements:
                     setattr(obj, prop, filtered_elements)
 
             return obj
-        
+
 
         obj = custom_type_checks(prop, obj)
 
@@ -205,16 +209,16 @@ class _ViewProviderSensor(ProxyBase):
 def add_sensor_properties_block(sensor: CrossSensor, sensor_data: dict) -> CrossSensor:
 
     sensor = add_sensor_properties(
-        sensor, 
+        sensor,
         {sensor_data['name']: sensor_data['parameters']},
         sensor_data['name'],
     )
-    
+
     adding_flatten_params = flatten_params(sensor_data['parameters'], flat_params = {})
     parameters_flatten = deepcopy(sensor_data['parameters_flatten'])
     sensor_data['parameters_flatten'] = {
-        **parameters_flatten, 
-        **adding_flatten_params
+        **parameters_flatten,
+        **adding_flatten_params,
     }
     parameters_flatten_full_names = sensor_data['parameters_flatten'].keys()
     prop_name = 'sensor_parameters_fullnames_list'
@@ -248,16 +252,17 @@ def add_sensor_properties_block(sensor: CrossSensor, sensor_data: dict) -> Cross
     #         prop_value,
     #     )
     #     sensor.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-    
+
 
     return sensor
 
 
-def add_sensor_properties(sensor: CrossSensor, 
-                              parameters: dict, 
-                              parameter_name: str, 
-                              parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                              ) -> CrossSensor:
+def add_sensor_properties(
+    sensor: CrossSensor,
+    parameters: dict,
+    parameter_name: str,
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> CrossSensor:
     """Adding properties to sensor."""
 
     for param_name, param in parameters[parameter_name].items():
@@ -275,11 +280,11 @@ def add_sensor_properties(sensor: CrossSensor,
             try:
                 var_name = param['full_name']
             except KeyError:
-                # avoiding except of outer try block by using other type error 
+                # avoiding except of outer try block by using other type error
                 raise RuntimeError('param full_name - KeyError')
-            
+
             # for recursive props make category for grouping them from names of each recursion dive
-            # example linear__x__has_velosity_limits 
+            # example linear__x__has_velosity_limits
             full_name_splited = param['full_name'].split(parameter_full_name_glue)
             if len(full_name_splited) > 1:
                 category = parameter_full_name_glue.join(full_name_splited[:-1])
@@ -288,14 +293,14 @@ def add_sensor_properties(sensor: CrossSensor,
                 category = 'Mandatory Root'
                 if default_value is None \
                 or (not default_value and default_value is not False):
-                    
+
                     if 'description' in param:
                         if '(Optional)' in param['description'] \
                         or '(optional)' in param['description']:
                             category = 'Root'
                 else:
                     category = 'Root'
-                
+
             # make description
             help_txt = ''
             if 'description' in param:
@@ -303,7 +308,7 @@ def add_sensor_properties(sensor: CrossSensor,
 
             if 'validation_str' in param:
                 help_txt += '\n\n' + param['validation_str']
-            
+
 
             if prop_type in wb_constants.TYPE_CONVERT_FUNCTIONS:
                 default_value = wb_constants.TYPE_CONVERT_FUNCTIONS[prop_type](default_value)
@@ -321,10 +326,10 @@ def add_sensor_properties(sensor: CrossSensor,
         except KeyError:
             # not type finded at this level and should dive deeper
             sensor = add_sensor_properties(
-                sensor, 
+                sensor,
                 parameters[parameter_name],
-                param_name, 
-                )
+                param_name,
+            )
 
     return sensor
 
@@ -357,16 +362,16 @@ def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
                     sensor_parameters = replace_substring_in_keys(
                         sensor_parameters,
                         wb_constants.XMLTODICT_ATTR_PREFIX_ORIGIN,
-                        wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME
+                        wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME,
                     )
-                    
+
                     if 'parameters' in sensor:
                         sensor['parameters'].update(sensor_parameters)
                     else:
                         sensor['parameters'] = sensor_parameters
 
         return sensors_dirs
-    
+
 
     def add_schema_data(sensors, sensor_schema_as_dict) -> dict :
 
@@ -377,7 +382,7 @@ def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
                 try:
                     if isinstance(elem, dict) and '#text' not in elem:
                         raise CallRecursion('go recursion to leaf element of dict')
-                    
+
                     if not isinstance(elem, dict) and not isinstance(elem, list) and '#text' not in key:
                         parameter[key] = {'#text': elem}
 
@@ -394,13 +399,13 @@ def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
                             parameter[index_type] = sensor_schema_as_dict[parameter_name][index_type]
                             parameter[index_description] = sensor_schema_as_dict[parameter_name][index_description]
                         except (KeyError, TypeError):
-                            pass                        
+                            pass
 
                 except CallRecursion:
                     parameter[key] = add_param_data(elem, key, sensor_schema_as_dict[parameter_name])
-                
+
             return parameter
-        
+
 
         for attached_group in sensors['sensors_dirs']:
             sensors_of_attached_group = sensors['sensors_dirs'][attached_group]['sensors']
@@ -416,8 +421,8 @@ def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
             sensors['sensors_dirs'][attached_group]['sensors'] = sensors_of_attached_group
 
         return sensors
-    
-    
+
+
     tree=sdf_tree("sensor.sdf")
     sensor_schema_as_dict=tree.get_element_as_dict['sensor']
 
@@ -430,13 +435,14 @@ def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
     return sensors
 
 
-def add_full_name_to_params(params: dict, 
-                            param_name_prefix: list = [], 
-                            parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                            ) -> dict:
+def add_full_name_to_params(
+    params: dict,
+    param_name_prefix: list = [],
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> dict:
     ''' Add full name with parent prefixes to every param.
-    
-    Params can be at various levels of nested deep. 
+
+    Params can be at various levels of nested deep.
     full_param_name means all parents prefixes + param_name joined with parameter_full_name_glue
     '''
 
@@ -444,9 +450,9 @@ def add_full_name_to_params(params: dict,
         try:
             if isinstance(param, dict) and '#text' not in param:
                 raise CallRecursion('go recursion to leaf element of dict')
-            
-            full_param_name = parameter_full_name_glue.join(param_name_prefix + [param_name]) 
-            
+
+            full_param_name = parameter_full_name_glue.join(param_name_prefix + [param_name])
+
             if not isinstance(param, dict):
                 params[param_name] = {}
                 params[param_name]['#text'] = param
@@ -478,11 +484,12 @@ def flatten_params(params: dict, flat_params: dict) -> dict:
     return flat_params
 
 
-def unflatten_params(flatten_params: dict, 
-                     param_to_replace: str | None = None, 
-                     replace: str | None = None, 
-                     parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                     ) -> dict:
+def unflatten_params(
+    flatten_params: dict,
+    param_to_replace: str | None = None,
+    replace: str | None = None,
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> dict:
     ''' Unflattens parameters dict.
 
     Split flatten params name by parameter_full_name_glue and make nested structure with list
@@ -504,9 +511,9 @@ def unflatten_params(flatten_params: dict,
             result_params = {params_nest_level_name: params}
         else:
             result_params = {params_nest_level_name: leaf_param_data}
-        
+
         return result_params
-    
+
 
     params = {}
     for param_name, leaf_param_data in flatten_params.items():
@@ -516,8 +523,8 @@ def unflatten_params(flatten_params: dict,
 
 
 def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
-    ''' Separate sensors from sensors directories dictionaries. 
-    
+    ''' Separate sensors from sensors directories dictionaries.
+
     Directory can contains several sensors.
     This make sensors as first level properties of dict.
     '''
@@ -532,10 +539,10 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
             try:
                 if isinstance(param, dict) and '#text' not in param:
                     raise CallRecursion('go recursion to leaf element of dict')
-                
-                try: 
+
+                try:
                     type = param[sdf_schema_parser.get_technical_attr_prefix_with_attr_symbol() + 'type']
-                    
+
                     try:
                         type_value = type['#text']
                     except (KeyError, TypeError):
@@ -555,11 +562,11 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
                 param_name_prefix.pop()
 
         return params
-    
+
 
     def add_validation_rules_str_to_params(params: dict) -> dict:
-        ''' Add validation rules string to every param with validation. 
-        
+        ''' Add validation rules string to every param with validation.
+
         It convert rules to string and to every param where present validation.
         '''
 
@@ -577,7 +584,7 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
                     validation_value_str = ''
                     if validation_value:
                         validation_value_str += '. Validation value: '
-                        
+
                         try:
                             validation_value_str += ', '.join(str(el) for el in validation_value)
                         except:
@@ -588,7 +595,7 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
                 params[param_name]['validation_str'] = validation_str
 
         return params
-    
+
 
     sensors = {}
     for sensor_dir_name, sensor_dir in sensors_dirs.items():
@@ -596,13 +603,13 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
 
             # prepare sensor parameters
             parameters = sensor['parameters']
-            
+
             parameters = add_full_name_to_params(parameters)
             parameters = add_fc_types_based_on_params_types(parameters)
             parameters = add_validation_rules_str_to_params(parameters)
             parameters_flatten = flatten_params(parameters, flat_params = {})
 
-            
+
             if sensor_dir_name not in sensors:
                 sensors[sensor_dir_name] = {}
 
@@ -626,11 +633,13 @@ def get_sensors_root_dirs(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
 
     sensor_key_words = ['joint', 'link'] # , 'model'
     sensor_key_words_blacklist = []
-    sensors_dirs = get_files_or_dirs_by_filter(SENSORS_PATH, 
-                                              files_or_dirs = 'dirs', 
-                                              key_words = sensor_key_words, 
-                                              key_words_blacklist = sensor_key_words_blacklist, 
-                                              attr_name_for_found_result = 'dir')
+    sensors_dirs = get_files_or_dirs_by_filter(
+        SENSORS_PATH,
+        files_or_dirs = 'dirs',
+        key_words = sensor_key_words,
+        key_words_blacklist = sensor_key_words_blacklist,
+        attr_name_for_found_result = 'dir',
+    )
 
     sensors['sensors_dirs'] = sensors_dirs
 
@@ -643,20 +652,23 @@ def collect_sensors_files_grouped_by_dirs(sensors_dirs: dict) -> dict :
     for sensor_folder_name, sensor_value in sensors_dirs.items():
 
         sensors_files = get_files_or_dirs_by_filter(
-            sensor_value['dir'], 
-            key_words = ['.sdf'], 
+            sensor_value['dir'],
+            key_words = ['.sdf'],
             key_words_blacklist = [],
-            attr_name_for_found_result = 'path')
+            attr_name_for_found_result = 'path',
+        )
         sensors_dirs[sensor_folder_name].update({'sensors': sensors_files})
 
     return sensors_dirs
 
 
-def get_files_or_dirs_by_filter(dir: Path, 
-                                files_or_dirs:str = 'files',
-                                key_words:list = [],
-                                key_words_blacklist:list = [],
-                                attr_name_for_found_result:str | None = None) -> dict :
+def get_files_or_dirs_by_filter(
+    dir: Path,
+    files_or_dirs:str = 'files',
+    key_words:list = [],
+    key_words_blacklist:list = [],
+    attr_name_for_found_result:str | None = None,
+) -> dict :
     ''' Get files or dirs in path by included keywords in file name. '''
 
     files_or_dirs_result = {}
@@ -665,19 +677,19 @@ def get_files_or_dirs_by_filter(dir: Path,
             # check key words
             for key_word in key_words:
                 if key_word in name:
-                    
+
                     # check blacklist
                     name_in_blacklist = False
                     for key_word_bl in key_words_blacklist:
                         if key_word_bl in name:
                             name_in_blacklist = True
                             break
-                    
+
                     # cut extention
                     name_without_file_extention = name.split('.')[0]
 
                     # forming result
-                    if not name_in_blacklist:  
+                    if not name_in_blacklist:
                         if name not in files_or_dirs_result:
                             if not attr_name_for_found_result:
                                 files_or_dirs_result[name_without_file_extention] = {Path(root) / name}
@@ -685,10 +697,10 @@ def get_files_or_dirs_by_filter(dir: Path,
                                 files_or_dirs_result[name_without_file_extention] = {attr_name_for_found_result: Path(root) / name}
 
                         if not attr_name_for_found_result:
-                            files_or_dirs_result.update({name_without_file_extention: Path(root) / name})  
+                            files_or_dirs_result.update({name_without_file_extention: Path(root) / name})
                         else:
                             files_or_dirs_result.update({name_without_file_extention: {attr_name_for_found_result: Path(root) / name}})
-        
+
         break
 
     return files_or_dirs_result

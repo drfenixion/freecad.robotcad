@@ -73,5 +73,5 @@ def sdf_dict_to_xml(sdf_dict: dict, full_document: bool = True, pretty: bool = F
         keys_to_remove_before_convert = sdf_schema_parser.get_manually_added_technical_attributes(),
         remove_keys_recursively = True,
         full_document = full_document,
-        pretty = pretty
+        pretty = pretty,
     )

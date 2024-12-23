@@ -144,21 +144,33 @@ class JointProxy(ProxyBase):
         obj.setEditorMode('Position', ['ReadOnly'])
 
         # Mimic joint.
-        add_property(obj, 'App::PropertyBool', 'Mimic', 'Mimic',
-                     'Whether this joint mimics another one')
-        add_property(obj, 'App::PropertyLink', 'MimickedJoint', 'Mimic',
-                     'Joint to mimic')
-        add_property(obj, 'App::PropertyFloat', 'Multiplier', 'Mimic',
-                     'value = Multiplier * other_joint_value + Offset', 1.0)
-        add_property(obj, 'App::PropertyFloat', 'Offset', 'Mimic',
-                     'value = Multiplier * other_joint_value + Offset, in mm or deg')
-        
-        add_property(obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
-                     'Propellers rotation direction. Can be used for code generation')
+        add_property(
+            obj, 'App::PropertyBool', 'Mimic', 'Mimic',
+            'Whether this joint mimics another one',
+        )
+        add_property(
+            obj, 'App::PropertyLink', 'MimickedJoint', 'Mimic',
+            'Joint to mimic',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Multiplier', 'Mimic',
+            'value = Multiplier * other_joint_value + Offset', 1.0,
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Offset', 'Mimic',
+            'value = Multiplier * other_joint_value + Offset, in mm or deg',
+        )
+
+        add_property(
+            obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
+            'Propellers rotation direction. Can be used for code generation',
+        )
         obj.JoinRotationDirection=["unset","cw","ccw"]
-        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])        
-        add_property(obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
-                     'Specific of joint working. Can be used for code generation')
+        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])
+        add_property(
+            obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
+            'Specific of joint working. Can be used for code generation',
+        )
         obj.JointSpecific=["unset","propeller"]
 
         add_property(
@@ -166,8 +178,10 @@ class JointProxy(ProxyBase):
             'Placement of the joint in the robot frame',
         )
         obj.setEditorMode('Placement', ['ReadOnly'])
-        add_property(obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
-                     'Placement of the joint in the center of mass frame of robot')
+        add_property(
+            obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
+            'Placement of the joint in the center of mass frame of robot',
+        )
         obj.setEditorMode('Placement', ['ReadOnly'])
 
         self._toggle_editor_mode()
@@ -300,7 +314,7 @@ class JointProxy(ProxyBase):
             # implementation note: removeobject doesn't raise any exception
             # and `o` exists even if already removed from the group.
             removed_objects.update(self.joint.removeObject(o))
-        
+
         return list(removed_objects)
 
     def is_fixed(self) -> bool:
@@ -646,7 +660,7 @@ def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None 
 
     if robot:
         joint.adjustRelativeLinks(robot)
-        robot.addObject(joint)        
+        robot.addObject(joint)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
@@ -690,7 +704,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
             message(
                 'Links must be in robot container for joint connection. Closed links loop does not supported.',
                 True,
-            )             
+            )
         fc.ActiveDocument.recompute()
 
         return joint
@@ -698,8 +712,8 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         message(
             'Make filled robot joint(s) works only with selected links. Select minimum 2 links.',
             True,
-        )        
-    
+        )
+
     return False
 
 
@@ -710,15 +724,15 @@ def make_robot_joints_filled(links:list[CrossLink] = [], robot:CrossRobot | None
         selection = fcgui.Selection.getSelection()
     else:
         selection = links
-    
+
     sel_len = len(selection)
     if sel_len < 2:
         message(
             'Choose minimum 2 links.',
             True,
-        )                
+        )
         return False
-    
+
     joints = [CrossJoint]
     for i in range(sel_len):
         if i+1 < sel_len:

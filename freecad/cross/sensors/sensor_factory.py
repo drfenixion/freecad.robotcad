@@ -18,11 +18,11 @@ def make_sensor(sensor_data: dict, sensor_dir_name: str, doc: Optional[fc.Docume
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    
+
     sensor: CrossSensor = doc.addObject('App::FeaturePython', sensor_data['name'])
     sensor_proxy_map = {
         'link': lambda sensor: SensorProxyLink(sensor),
-        'joint': lambda sensor: SensorProxyJoint(sensor)
+        'joint': lambda sensor: SensorProxyJoint(sensor),
     }
     sensor_proxy_map[sensor_dir_name](sensor) # ex. SensorProxyLink(sensor) or SensorProxyJoint(sensor)
 

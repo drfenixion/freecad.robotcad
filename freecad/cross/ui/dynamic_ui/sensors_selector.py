@@ -24,12 +24,12 @@ class SensorsSelectorModalClass(QtGui.QDialog):
     def initUI(self):
         self.resize(400, 350)
         self.setWindowTitle("Select sensor")
-        
+
         # get sensor data and make dropdowns
         self.sensors = get_sensors_data()
 
         main_layout = QtWidgets.QVBoxLayout()
-        form_layout = {} 
+        form_layout = {}
         formGroupBox = {}
         addSensorButton = {}
         self.sensors_dropdown = {}
@@ -52,7 +52,7 @@ class SensorsSelectorModalClass(QtGui.QDialog):
 
             # add sensors adding button
             addSensorButton[sensor_dir_name] = QtGui.QPushButton('Add sensor to ' + sensor_dir_name, self)
-            
+
             addSensorButton[sensor_dir_name].clicked.connect(partial(self.onAddSensorButton, sensor_dir_name))
             # addSensorButton[sensor_dir_name].clicked.connect(lambda sdn = sensor_dir_name: self.onAddSensorButton(sdn))
             addSensorButton[sensor_dir_name].setAutoDefault(False)
@@ -101,7 +101,7 @@ class SensorsSelectorModalClass(QtGui.QDialog):
             doc.openTransaction('Add Sensor')
 
             name = str(self.sensors_dropdown[sensor_dir_name].currentText())
-            sensor = make_sensor(self.sensors[sensor_dir_name][name], sensor_dir_name) 
+            sensor = make_sensor(self.sensors[sensor_dir_name][name], sensor_dir_name)
             sel = fcgui.Selection.getSelection()[0]
             sel.addObject(sensor)
 

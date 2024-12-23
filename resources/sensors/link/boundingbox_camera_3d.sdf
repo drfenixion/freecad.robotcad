@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
     <world>
-        <link>      
+        <link>
             <sensor name="3d" type="boundingbox_camera">
                 <topic>camera_boxes_3d</topic>
                 <camera>

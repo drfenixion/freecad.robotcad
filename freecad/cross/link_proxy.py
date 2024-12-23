@@ -224,11 +224,15 @@ class LinkProxy(ProxyBase):
             'Mass of the link',
         )
         obj.Mass = fc.Units.Mass
-        add_property(obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
-                     'Center of mass of the link, with orientation determining the principal axes of inertia')
-        add_property(obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
-                     'Center of mass of the link, with orientation determining the principal axes of inertia \
-                        in global coordinates.')
+        add_property(
+            obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
+            'Center of mass of the link, with orientation determining the principal axes of inertia',
+        )
+        add_property(
+            obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
+            'Center of mass of the link, with orientation determining the principal axes of inertia \
+                        in global coordinates.',
+        )
         # Implementation note: App.Units.MomentOfInertia is not a valid unit in
         # FC v0.21.
         add_property(
@@ -570,7 +574,7 @@ class LinkProxy(ProxyBase):
             # sometimes error appears with ctrl+z after ShowReal=False, ShowReal=True
             # looks like problem with created back objects (it have FullName == '?')
 
-            # remove bad documents comebacked after Ctrl+z 
+            # remove bad documents comebacked after Ctrl+z
             for i in range(len(new_group)):
                 if new_group[i].FullName == '?':
                     try:
@@ -840,27 +844,27 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
 
 def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
     ''' Make robot link and fill Real and Visual of it by selected objects  '''
-    
+
     if not is_derived_from(obj, 'App::GeoFeature'):
         message(
             f'Not suited object ({ros_name(obj)}) to create robot link.',
             True,
-        )      
+        )
         return False
 
     if not is_part(obj):
         part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
-        
+
         parent_of_obj = None
         try:
             parent_of_obj = obj.Parents[0][0]
         except (KeyError, IndexError, AttributeError):
             pass
-        
+
         obj.adjustRelativeLinks(part)
         part.addObject(obj)
-        
-        #add created part-wrapper as child to parent of object 
+
+        #add created part-wrapper as child to parent of object
         if parent_of_obj:
             part.adjustRelativeLinks(parent_of_obj)
             parent_of_obj.addObject(part)

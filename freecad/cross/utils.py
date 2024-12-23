@@ -284,7 +284,7 @@ def remove_key(dictionary: dict, key: str, recursively: bool = True):
 
 def dict_to_xml(
         dict: dict, keys_to_remove_before_convert: list = [], remove_keys_recursively: bool = True,
-        full_document: bool = True, pretty: bool = False
+        full_document: bool = True, pretty: bool = False,
 ):
     """Convert dictionary to xml"""
 
@@ -303,7 +303,7 @@ def str_to_bool(s: str) -> bool:
 def replace_substring_in_keys(dictionary, old_substring, new_substring):
     """
     Recursively replaces occurrences of a substring in dictionary keys.
-    
+
     :param dictionary: The dictionary in which to perform the replacement.
     :param old_substring: The substring to be replaced.
     :param new_substring: The new substring to replace with.
@@ -313,11 +313,11 @@ def replace_substring_in_keys(dictionary, old_substring, new_substring):
     for key, value in dictionary.items():
         # Replace the substring in the key
         new_key = key.replace(old_substring, new_substring)
-        
+
         # If the value is a dictionary, recursively process it
         if isinstance(value, dict):
             new_dict[new_key] = replace_substring_in_keys(value, old_substring, new_substring)
         else:
             new_dict[new_key] = value
-            
+
     return new_dict

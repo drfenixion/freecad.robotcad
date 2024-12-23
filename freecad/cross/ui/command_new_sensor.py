@@ -3,7 +3,7 @@ import FreeCADGui as fcgui
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected, is_link_selected, is_joint_selected
 from ..wb_utils import git_init_submodules
-from .dynamic_ui.sensors_selector import SensorsSelectorModalClass 
+from .dynamic_ui.sensors_selector import SensorsSelectorModalClass
 from ..freecad_utils import message
 
 
@@ -15,11 +15,13 @@ class _NewSensorCommand:
             'Pixmap': 'sensor.svg',
             'MenuText': tr('Create a Sensor'),
             'Accel': 'N, C',
-            'ToolTip': tr('Create a Sensor.\n'
-                          '\n'
-                          'Sensors are needed to receive data about environment.\n'
-                          '\n'
-                          'See https://gazebosim.org/docs/latest/sensors/ documentation.'),
+            'ToolTip': tr(
+                'Create a Sensor.\n'
+                '\n'
+                'Sensors are needed to receive data about environment.\n'
+                '\n'
+                'See https://gazebosim.org/docs/latest/sensors/ documentation.',
+            ),
         }
 
     def IsActive(self):
