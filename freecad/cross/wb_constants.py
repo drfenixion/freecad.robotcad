@@ -1,12 +1,16 @@
 """Global workbench constants. Excluded from wb_globals.py with reason eliminate circular dependency"""
 
 import FreeCAD as fc
+from .utils import str_to_bool
 
 # Constants.
 PREFS_CATEGORY = 'RobotCAD'  # Category in the preferences dialog.
 PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
 WORKBENCH_NAME = 'RobotCAD - ROS2'
+
+XMLTODICT_ATTR_PREFIX_ORIGIN = '@'
+XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME = 'attr_'
 
 ### ROS2_CONTROLLERS
 ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE = '___'
@@ -25,6 +29,12 @@ ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
     'double_array': 'App::PropertyFloatList',
     'string': 'App::PropertyString',
     'string_array': 'App::PropertyStringList',
+}
+
+TYPE_CONVERT_FUNCTIONS = {
+    'App::PropertyBool': lambda string: str_to_bool(string),
+    'App::PropertyInteger': lambda string: int(string),
+    'App::PropertyFloat': lambda string: float(string),
 }
 
 ROS2_CONTROLLERS_INTERFACES = [

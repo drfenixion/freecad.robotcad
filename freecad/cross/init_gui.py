@@ -16,6 +16,7 @@ from .ui import command_new_robot
 from .ui import command_explode_links
 from .ui import command_new_trajectory
 from .ui import command_new_controller
+from .ui import command_new_sensor
 from .ui import command_new_workcell
 from .ui import command_new_xacro_object
 from .ui import command_new_lcs_at_robot_link_body
@@ -67,6 +68,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
+            'NewSensor',  # Defined in ./ui/command_new_sensor.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
@@ -108,6 +110,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
+            'NewSensor',  # Defined in ./ui/command_new_sensor.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'Separator',

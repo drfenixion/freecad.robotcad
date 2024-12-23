@@ -1,0 +1,45 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name="depth_camera" type="depth_camera">
+                <plugin filename="gz-sim-opticaltactileplugin-system" name="gz::sim::systems::OpticalTactilePlugin">
+                    <enabled>true</enabled>
+                    <namespace>optical_tactile_plugin</namespace>
+                    <visualize_sensor>true</visualize_sensor>
+                    <visualize_contacts>true</visualize_contacts>
+                    <visualize_forces>true</visualize_forces>
+                    <visualization_resolution>15</visualization_resolution>
+                    <force_length>0.01</force_length>
+                    <extended_sensing>0.001</extended_sensing>
+                </plugin>
+                <update_rate>1</update_rate>
+                <always_on>true</always_on>
+                <topic>depth_camera</topic>
+                <pose relative_to="tactile_sensor">0 0 0 0 0 0</pose>
+                <camera>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R_FLOAT32</format>
+                    </image>
+                    <clip>
+                        <near>0.030</near>
+                        <far>10.0</far>
+                    </clip>
+                </camera>
+                <enable_metrics>true</enable_metrics>
+            </sensor>
+            <sensor name="contact_sensor" type="contact">
+                <plugin
+                    filename="gz-sim-contact-system"
+                    name="gz::sim::systems::Contact">
+                </plugin>
+                <always_on>true</always_on>
+                <contact>
+                    <collision>collision</collision>
+                </contact>
+            </sensor>
+        </link>
+    </world>
+</sdf>

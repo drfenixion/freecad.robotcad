@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name="depth_camera" type="depth_camera">
+                <camera>
+                    <horizontal_fov>1.05</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R_FLOAT32</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>10.0</far>
+                    </clip>
+                    <save enabled="false">
+                        <path>/tmp/camera_depth_data</path>
+                    </save>
+                    <triggered>false</triggered>
+                    <trigger_topic>camera_depth/trigger</trigger_topic>    
+                </camera>
+                <always_on>true</always_on>
+                <update_rate>10</update_rate>
+                <topic>camera_depth</topic>
+                <enable_metrics>true</enable_metrics>
+            </sensor>
+        </link>
+    </world>
+</sdf>

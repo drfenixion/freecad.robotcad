@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name="visible_2d" type="boundingbox_camera">
+                <topic>camera_boxes_visible_2d</topic>
+                <camera>
+                    <box_type>visible_2d</box_type>
+                    <horizontal_fov>1.047</horizontal_fov>
+                    <image>
+                        <width>800</width>
+                        <height>600</height>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>10</far>
+                    </clip>
+                    <save enabled="false">
+                        <path>/tmp/camera_boxes_visible_2d_data</path>
+                    </save>
+                    <triggered>false</triggered>
+                    <trigger_topic>camera_boxes_visible_2d/trigger</trigger_topic>
+                </camera>
+                <always_on>true</always_on>
+                <update_rate>30</update_rate>
+                <visualize>true</visualize>
+                <enable_metrics>true</enable_metrics>
+            </sensor>
+        </link>
+    </world>
+</sdf>

@@ -41,16 +41,25 @@ from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject 
 from .workcell import Workcell as CrossWorkcell  # A Cross::Workcell, i.e. a DocumentObject with Proxy "Workcell". # noqa: E501
 from .xacro_object import XacroObject as CrossXacroObject  # A Cross::XacroObject, i.e. a DocumentObject with Proxy "XacroObject". # noqa: E501
 from .controller import Controller as CrossController  # A Cross::Controller, i.e. a DocumentObject with Proxy "Controller". # noqa: E501
+from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a DocumentObject with Proxy "SensorProxyJoint" or "SensorProxyJoint". # noqa: E501
+
 DO = fc.DocumentObject
 CrossBasicElement = Union[CrossJoint, CrossLink]
-CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController]
+CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
 DOList = List[DO]
 
 MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
+MODULES_PATH = MOD_PATH / 'modules'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
+SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
+SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
+SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors'
+LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
+JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
+ROBOT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'robot'
 
 
 class SupportsStr(Protocol):
@@ -129,6 +138,21 @@ def is_broadcaster(obj: DO) -> bool:
     return _has_ros_type(obj, 'Cross::Broadcaster')
 
 
+def is_sensor(obj: DO) -> bool:
+    """Return True if the object is a Cross::Sensor."""
+    return is_sensor_link(obj) or is_sensor_joint(obj) or _has_ros_type(obj, 'Cross::Sensor')
+
+
+def is_sensor_link(obj: DO) -> bool:
+    """Return True if the object is a Cross::SensorLink."""
+    return _has_ros_type(obj, 'Cross::SensorLink')
+
+
+def is_sensor_joint(obj: DO) -> bool:
+    """Return True if the object is a Cross::SensorJoint."""
+    return _has_ros_type(obj, 'Cross::SensorJoint')
+
+
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
     return _has_ros_type(obj, 'Cross::PlanningScene')
@@ -188,6 +212,11 @@ def is_broadcaster_selected() -> bool:
     return is_selected_from_lambda(is_broadcaster)
 
 
+def is_sensor_selected() -> bool:
+    """Return True if the first selected object is a Cross::Sensor."""
+    return is_selected_from_lambda(is_sensor)
+
+
 def is_workcell_selected() -> bool:
     """Return True if the first selected object is a Cross::Workcell."""
     return is_selected_from_lambda(is_workcell)
@@ -211,6 +240,16 @@ def get_links(objs: DOList) -> list[CrossLink]:
 def get_joints(objs: DOList) -> list[CrossJoint]:
     """Return only the objects that are Cross::Joint instances."""
     return [o for o in objs if is_joint(o)]
+
+
+def get_link_sensors(objs: DOList) -> list[CrossSensor]:
+    """Return only the objects that are Cross::SensorLink instances."""
+    return [o for o in objs if is_sensor_link(o)]
+
+
+def get_joint_sensors(objs: DOList) -> list[CrossSensor]:
+    """Return only the objects that are Cross::SensorJoint instances."""
+    return [o for o in objs if is_sensor_joint(o)]
 
 
 def get_controllers(objs: DOList) -> list[CrossController]:
@@ -503,11 +542,16 @@ def export_templates(
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
         txt = template.format(**keys)
-        xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
 
+        xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
         #replace xacro wrapper file name
         if xacro_wrapper_tmpl in f:
             f = f.replace(xacro_wrapper_tmpl, keys['xacro_wrapper_file'])
+
+        sensors_tmpl = 'sensors_template.urdf.xacro'
+        #replace sensors_template file name
+        if sensors_tmpl in f:
+            f = f.replace(sensors_tmpl, keys['sensors_file'])
 
         output_path = package_parent / package_name / f
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -899,10 +943,17 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
 def get_xacro_wrapper_file_name(robot_name: str) -> str:
     """ Return xacro wrapper file name. 
     
-    Xacrot wrapper file includes URDF description file and other xacro files."""
+    Xacro wrapper file includes URDF description file and other xacro files."""
 
     return get_valid_filename(robot_name) + '_wrapper.urdf.xacro'
 
+
+def get_sensors_file_name(robot_name: str) -> str:
+    """ Return sensors xacro file name. 
+    
+    Sensors xacro file contains gazebo sensors declarations"""
+
+    return get_valid_filename(robot_name) + '_sensors.urdf.xacro'
 
 
 def get_controllers_config_file_name(robot_name: str) -> str:

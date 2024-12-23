@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name='logical_camera' type='logical_camera'>
+                <plugin
+                    filename="gz-sim-logical-camera-system"
+                    name="gz::sim::systems::LogicalCamera">
+                    <render_engine>ogre2</render_engine>
+                </plugin>
+                <update_rate>10</update_rate>
+                <logical_camera>
+                    <near>0.55</near>
+                    <far>5</far>
+                    <horizontal_fov>1.04719755</horizontal_fov>
+                    <aspect_ratio>1.778</aspect_ratio>
+                </logical_camera>
+                <always_on>true</always_on>
+                <visualize>true</visualize>
+                <topic>camera_logical</topic>
+                <enable_metrics>true</enable_metrics>
+            </sensor>
+        </link>
+    </world>
+</sdf>

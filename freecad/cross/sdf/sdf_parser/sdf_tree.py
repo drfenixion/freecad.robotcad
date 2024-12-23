@@ -64,7 +64,7 @@ class sdf_tree:
         return xmltodict.parse(ET.tostring(self._root_elem))
 
 
-def sdf_dict_to_xml(sdf_dict: dict) -> str:
+def sdf_dict_to_xml(sdf_dict: dict, full_document: bool = True, pretty: bool = False) -> str:
     """ Convert (sdf_dict -> xml). Also removes meta attributes before converting.
     Meta attributes (ex. @meta_description) were added manually and should be removed"""
 
@@ -72,4 +72,6 @@ def sdf_dict_to_xml(sdf_dict: dict) -> str:
         sdf_dict,
         keys_to_remove_before_convert = sdf_schema_parser.get_manually_added_technical_attributes(),
         remove_keys_recursively = True,
+        full_document = full_document,
+        pretty = pretty
     )

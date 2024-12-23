@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name="camera" type="camera">
+                <camera>
+                    <horizontal_fov>1.047</horizontal_fov>
+                    <image>
+                        <width>320</width>
+                        <height>240</height>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>100</far>
+                    </clip>
+                    <save enabled="false">
+                        <path>/tmp/camera_data</path>
+                    </save>
+                    <triggered>false</triggered>
+                    <trigger_topic>camera/trigger</trigger_topic>
+                </camera>
+                <always_on>true</always_on>
+                <update_rate>30</update_rate>
+                <visualize>true</visualize>
+                <topic>camera</topic>
+                <enable_metrics>true</enable_metrics>
+            </sensor>
+        </link>
+    </world>
+</sdf>

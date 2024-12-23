@@ -10,6 +10,7 @@ from __future__ import annotations
 from math import radians
 from typing import ForwardRef, List, Optional, Union, cast
 import xml.etree.ElementTree as et
+from copy import deepcopy
 
 import FreeCAD as fc
 
@@ -30,7 +31,7 @@ from .ros.utils import split_package_path
 from .trajectory_proxy import make_trajectory
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
 from .urdf_utils import xml_comment_element
-from .utils import get_valid_filename
+from .utils import get_valid_filename, replace_substring_in_keys
 from .utils import grouper
 from .utils import save_xml
 from .utils import save_yaml
@@ -64,7 +65,9 @@ from .joint_proxy import make_robot_joints_filled
 from .link_proxy import make_robot_links_filled
 from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
+from .wb_utils import get_sensors_file_name
 from .wb_utils import get_controllers_config_file_name
+from .sdf.sdf_parser.sdf_tree import sdf_dict_to_xml
 
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -839,6 +842,7 @@ class RobotProxy(ProxyBase):
             'launch/gazebo.launch.py',
             'rviz/robot_description.rviz',
             'urdf/xacro_wrapper_template.urdf.xacro',
+            'urdf/sensors_template.urdf.xacro',
         ]
 
         write_files = template_files + [
@@ -906,6 +910,9 @@ class RobotProxy(ProxyBase):
         robot_name = get_valid_urdf_name(ros_name(self.robot))
         controllers_config_file_name = get_controllers_config_file_name(robot_name)
         xacro_wrapper_file = get_xacro_wrapper_file_name(robot_name)
+        sensors_file = get_sensors_file_name(robot_name)
+
+        sensors_urdf = self.get_sensors_xml()
 
         # robot meta for external code generator
         robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir, controllers_config_file_name)
@@ -922,10 +929,84 @@ class RobotProxy(ProxyBase):
                          urdf_file=urdf_file,
                          fixed_frame=ros_name(self.get_root_link()),
                          xacro_wrapper_file=xacro_wrapper_file,
+                         sensors_file=sensors_file,
+                         sensors_urdf=sensors_urdf,
                          robot_name=robot_name
                          )
 
         return xml
+    
+    def get_sensors_xml(self) -> str:
+        
+        sensors_xml = ''
+        for sensor_xml_as_dict in self.get_sensors_data().values():
+            sensors_xml += '\n\n' + sdf_dict_to_xml(sensor_xml_as_dict, full_document = False, pretty = True)
+
+        return sensors_xml
+
+    def get_sensors_data(self, parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE) -> dict:
+        """Get sensors data as sensors dictionaries from all elements (links, joints) of robot"""
+        def construct_dict_branch(sensor_data: dict, param_name_level: str, param_full_name_stlited: list, param_value):
+            """Construct dict branch dict branch line by recursive travese dict deep levels."""
+            if len(param_full_name_stlited):
+                param_name_level_deeper = param_full_name_stlited.pop(0)
+                if param_name_level in sensor_data:
+                    param_level_data = sensor_data[param_name_level]
+                else:
+                    param_level_data = {}
+                sensor_data[param_name_level] = construct_dict_branch(
+                    deepcopy(param_level_data), param_name_level_deeper, param_full_name_stlited, param_value
+                )
+            else:
+                sensor_data[param_name_level] = param_value
+
+            return sensor_data
+        
+        def get_sensors(elem: CrossJoint | CrossLink | CrossRobot) -> dict:
+            """Get sensors data from element (CrossJoint, CrossLink, CrossRobot)"""
+            sensors = {}
+            for sensor in elem.Proxy.get_sensors():
+                sensor_data = {}
+                for param_full_name in sensor.sensor_parameters_fullnames_list:
+                    param_full_name_stlited = param_full_name.split(parameter_full_name_glue)
+                    param = getattr(sensor, param_full_name)
+
+                    # f.e. level1_name/level1_name/level1_name nested sctruct names in dict
+                    param_name_level = param_full_name_stlited.pop(0)
+                    sensor_data = construct_dict_branch(sensor_data, param_name_level, param_full_name_stlited, param)
+
+                # sensor_data['@type'] = sensor.sensor_type
+                sensor_data['@name'] = get_valid_urdf_name(ros_name(sensor))
+
+                # special case of contact sensor
+                # construct collision name (link_name_collision is default collision name)
+                if sensor_data[wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME + 'type'] == 'contact':
+                    sensor_data['contact']['collision'] = get_valid_urdf_name(ros_name(elem)) + '_collision'
+
+                # assemble sensors
+                sensors[get_valid_urdf_name(ros_name(sensor))] = {'gazebo': 
+                    {
+                        '@reference': get_valid_urdf_name(ros_name(elem)),
+                        'sensor': sensor_data
+                    }
+                }
+
+                # revert replace attr prefix to it is origin symbol (@)
+                sensors = replace_substring_in_keys(
+                    sensors,
+                    wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME,
+                    wb_constants.XMLTODICT_ATTR_PREFIX_ORIGIN
+                )
+
+            return sensors
+        
+        sensors = {}
+        for link in self.get_links():
+            sensors.update(get_sensors(link))
+        for joint in self.get_joints():
+            sensors.update(get_sensors(joint))
+
+        return sensors
     
     
     def get_robot_controllers_yaml(self, 
