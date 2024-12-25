@@ -153,6 +153,25 @@
         </gz-gui>
         <topic>camera</topic>
       </plugin>
+
+      <plugin name='Grid config' filename='GridConfig'>
+          <gz-gui>
+            <property type="string" key="state">docked_collapsed</property>
+          </gz-gui>
+          <insert>
+              <!-- total size = length * cell count-->
+              <horizontal_cell_count>50</horizontal_cell_count>
+
+              <!-- 0 actually means one plane-->
+              <vertical_cell_count>0</vertical_cell_count> 
+
+              <!--5m cells-->
+              <cell_length>2.0</cell_length> 
+
+              <pose>0 0 0  0 0 0</pose>
+              <color>1 1 1 0.7</color>
+          </insert>
+      </plugin>
     </gui>
 
     <light type="directional" name="sun">
@@ -168,6 +187,14 @@
       </attenuation>
       <direction>-0.5 0.1 -0.9</direction>
     </light>
+
+    <scene>
+      <grid>false</grid>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <!-- <background>0.7 0.7 0.7 1</background> -->
+      <background>0.8 0.8 0.8</background>
+      <shadows>true</shadows>
+    </scene>
 
     <model name="ground_plane">
       <static>true</static>
