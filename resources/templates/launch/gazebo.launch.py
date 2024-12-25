@@ -47,7 +47,7 @@ def generate_launch_description():
 
     # prepare custom world
     world = os.getenv('GZ_SIM_WORLD', 'cars_and_trees')
-    fly_world_path = resources_package + '/worlds/' + world + '.sdf'   
+    fly_world_path = resources_package + '/worlds/' + world + '.sdf'
     gz_version = subprocess.getoutput("gz sim --versions")
     gz_version_major = re.search(r'^\d{{1}}', gz_version).group()
     launch_arguments=dict(gz_args = '-r ' + str(fly_world_path) + ' --verbose ', gz_version = gz_version_major).items()
