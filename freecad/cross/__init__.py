@@ -25,19 +25,19 @@ def pip_install(pkg_name):
 
     p = subprocess.Popen(
         [python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--target", vendor_path, pkg_name],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
 
     for line in iter(p.stdout.readline, b''):
         if line:
             print(line.decode("utf-8"), end="")
     print()
-        
+
     for err in iter(p.stderr.readline, b''):
         if err:
             print(err.decode("utf-8"), end="")
     print()
-    
+
     p.stdout.close()
     p.stderr.close()
     p.wait(timeout=180)
@@ -99,7 +99,7 @@ from .ros.utils import add_ros_library_path
 from .version import __version__
 from .wb_globals import g_ros_distro
 
-        
+
 add_ros_library_path(g_ros_distro)
 
 # Must be imported after the call to `add_ros_library_path`.

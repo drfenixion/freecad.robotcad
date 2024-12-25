@@ -405,7 +405,7 @@ def first_object_with_volume_in_deepest_part(obj):
 
     if volume_mm3(obj) > 0.0:
         return obj
-    
+
     return None
 
 
@@ -869,7 +869,7 @@ def lcs_attachmentsupport_name():
         return 'Support'
     else:
         return 'AttachmentSupport'
-    
+
 
 def adjustedGlobalPlacement(obj, locVector):
     '''find global placement to make locVector the local origin with the correct orientation'''
