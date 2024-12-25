@@ -851,12 +851,14 @@ class RobotProxy(ProxyBase):
             'rviz/robot_description.rviz',
             'urdf/xacro_wrapper_template.urdf.xacro',
             'urdf/sensors_template.urdf.xacro',
+            'worlds/cars_and_trees.sdf',
         ]
 
         write_files = template_files + [
                 'meshes/',
                 'urdf/',
                 'overcross/',
+                'worlds/',
         ]
 
         if interactive and fc.GuiUp:

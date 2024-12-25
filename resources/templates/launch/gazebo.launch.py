@@ -1,4 +1,6 @@
 import os
+import re
+import subprocess
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -37,14 +39,27 @@ def generate_launch_description():
         else:
             os.environ["SDF_PATH"] = gz_sim_resource_path
 
-    # Gazebo Sim.
 
+    use_custom_world = LaunchConfiguration('use_custom_world')
+    use_custom_world_launch_arg = DeclareLaunchArgument('use_custom_world', default_value='true')
+    gazebo_world = LaunchConfiguration('gazebo_world')
+    gazebo_world_launch_arg = DeclareLaunchArgument('gazebo_world', default_value='empty.sdf')
+
+    # prepare custom world
+    world = os.getenv('GZ_SIM_WORLD', 'cars_and_trees')
+    fly_world_path = resources_package + '/worlds/' + world + '.sdf'   
+    gz_version = subprocess.getoutput("gz sim --versions")
+    gz_version_major = re.search(r'^\d{{1}}', gz_version).group()
+    launch_arguments=dict(gz_args = '-r ' + str(fly_world_path) + ' --verbose ', gz_version = gz_version_major).items()
+
+    # Gazebo Sim.
+    # by default the custom world is used, otherwise the gazebo world is used, which can be changed with the argument
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py'),
         ),
-        launch_arguments=dict(gz_args='-r empty.sdf --verbose').items(),
+        launch_arguments=launch_arguments if use_custom_world else dict(gz_args='-r ' + gazebo_world + ' --verbose').items(),
     )
 
     # Spawn
@@ -103,6 +118,8 @@ def generate_launch_description():
     return LaunchDescription([
         use_sim_time_launch_arg,
         use_rviz_arg,
+        use_custom_world_launch_arg,
+        gazebo_world_launch_arg,
         robot_state_publisher,
         rviz,
         gazebo,
