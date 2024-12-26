@@ -1,7 +1,7 @@
 """Proxy for Cross::Sensor FreeCAD objects
 
-A sensors are representation of Gazebo sensors https://gazebosim.org/docs/latest/sensors/ gotten from handly maked sdf files.
-
+A sensors are representation of Gazebo sensors https://gazebosim.org/docs/latest/sensors/ gotten from handly maked sdf files (resources/sensors)
+with added meta data (type, descriptions of fields, etc) from sdformat package (modules/sdformat) schema files via sdf_tree().
 """
 
 from __future__ import annotations
