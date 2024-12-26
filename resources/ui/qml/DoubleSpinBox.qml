@@ -1,80 +1,92 @@
 import QtQuick 2.9
 import QtQuick.Controls 2.0
 import QtQuick.Layouts 1.0
+
 Rectangle{
-    property alias value:spinBox.realValue
-    property alias min:spinBox.from
-    property alias max: spinBox.to
-    property alias decimalPlaces:spinBox.decimals
-    height:name.height+2
-    width: 170+name.width
-    property alias label:name.text
-    RowLayout
-    {
-        id:layout
+    id: root
+    property string textcolor:"white"
+    property string backgroundColor: "black"
+    property alias value: spinBox.realValue
+    property real min: 0
+    property real max: 100
+    property alias decimalPlaces: spinBox.decimals
+    property alias suffix: spinBox.suffix
+    property alias label: name.text
+    // Function to convert decimals to integers
+    function decimalToInt(decimal) {
+        return decimal * Math.pow(10, spinBox.decimals);
+    }
+    color: "transparent"
+    height: name.height + 10
+    width: layout.implicitWidth + 16
+
+    RowLayout {
+        id: layout
         anchors.fill: parent
-        spacing:2
+        spacing: 8
+
         Text {
             id: name
-            text: qsTr("text")
-            font.pixelSize:24
+            text: qsTr("Label")
+            font.pointSize: 12
+            color: root.textcolor
         }
+
         SpinBox {
             id: spinBox
-            from: -100
-            value: decimalToInt(1.1)
-            to: decimalToInt(100)
+            from: root.decimalToInt(root.min)
+            value: root.decimalToInt(1.1)
+            to: root.decimalToInt(root.max)
             stepSize: decimalFactor
             editable: true
-            height:name.implicitHeight
-
-            // text appearance
-            contentItem: TextInput {
-                     z: 2
-                     text: spinBox.textFromValue(spinBox.value, spinBox.locale)
-
-                     font: spinBox.font
-                     color: "black"
-                     selectionColor: "#21be2b"
-                     selectedTextColor: "#ffffff"
-                     horizontalAlignment: Qt.AlignHCenter
-                     verticalAlignment: Qt.AlignVCenter
-
-                     readOnly: !spinBox.editable
-                     validator: spinBox.validator
-                     inputMethodHints: Qt.ImhFormattedNumbersOnly
-                 }
-            // end of text appearence
-
-            //indicators
+            height: name.implicitHeight
+            width: contentItem.paintedWidth + 20
+            property string suffix
             property int decimals: 3
             property real realValue: value / decimalFactor
             readonly property int decimalFactor: Math.pow(10, decimals)
 
-            function decimalToInt(decimal) {
-                return decimal * decimalFactor
+            contentItem: TextInput {
+                id:ti
+                z: 2
+                text: spinBox.textFromValue(spinBox.value, spinBox.locale)
+                font: spinBox.font
+                color: root.textcolor
+                selectionColor: "#21be2b"
+                selectedTextColor: "#ffffff"
+                horizontalAlignment: Qt.AlignHCenter
+                verticalAlignment: Qt.AlignVCenter
+                readOnly: !spinBox.editable
+                validator: spinBox.validator
+                inputMethodHints: Qt.ImhFormattedNumbersOnly
             }
 
             validator: DoubleValidator {
                 bottom: Math.min(spinBox.from, spinBox.to)
-                top:  Math.max(spinBox.from, spinBox.to)
+                top: Math.max(spinBox.from, spinBox.to)
                 decimals: spinBox.decimals
                 notation: DoubleValidator.StandardNotation
             }
 
             textFromValue: function(value, locale) {
-                return Number(value / decimalFactor).toLocaleString(locale, 'f', spinBox.decimals)
+                return Number(value / decimalFactor).toLocaleString(locale, 'f', spinBox.decimals) + suffix;
             }
 
             valueFromText: function(text, locale) {
-                return Math.round(Number.fromLocaleString(locale, text) * decimalFactor)
+                let re = /\D*(-?\d*\.?\d*)\D*/;
+                let match = re.exec(text);
+                if (match && match[1] !== "") {
+                    return Math.round(Number.fromLocaleString(locale, match[1]) * decimalFactor);
+                }
+                return spinBox.value;
             }
-            background:Rectangle {
-                color:"white"
-                radius: 4
 
+            background: Rectangle {
+                color: root.backgroundColor
+                radius: 4
+                border.color: spinBox.activeFocus ? Qt.lighter("#404ec5"):"gray"
+                border.width: 2
             }
         }
     }
 }
-

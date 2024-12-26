@@ -1,9 +1,12 @@
 import QtQuick 2.9
 import QtQuick.Layouts 1.0
+
 FocusScope {
+    property string textColor: "green"
+    property string backgroundColor: "blue"
     property alias label:label.text
     property string text:ti.text
-    id: name
+    id: root
     RowLayout
     {
         Text {
@@ -11,6 +14,7 @@ FocusScope {
             text: qsTr("text")
             height:ti.height
             font.pixelSize: ti.font.pixelSize
+            color:root.textColor
         }
         spacing: 45
         Rectangle
@@ -20,16 +24,15 @@ FocusScope {
             width: ti.implicitWidth < 70 ? 70 :ti.implicitWidth
             implicitWidth: ti.implicitWidth
             border.color: "#404ec5"
-            color:"white"
+            color:root.backgroundColor
             radius: 4
             smooth:true
             TextInput{
                 id:ti
                 text:"enter Text"
-                color: focus ? "black":"gray"
+                color: root.textColor
                 height: parent.height
                 font.pixelSize: 24
-                focus:true
             }
 
 

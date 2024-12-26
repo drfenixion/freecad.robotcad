@@ -38,6 +38,7 @@ from .ui import command_set_material
 from .ui import command_calculate_mass_and_inertia
 from .ui import command_transfer_project_to_external_code_generator
 from .ui import command_wb_settings
+from .ui import command_edit_prameters
 from .wb_utils import ICON_PATH
 from . import wb_constants
 
@@ -87,6 +88,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewPose',  # Defined in ./ui/command_new_pose.py.
             'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
+            'EditParameters',
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
@@ -132,6 +134,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
             'NewObserver',  # Defined in ./ui/command_new_observer.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
+            'EditParameters',
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'Separator',
             'SetMaterial',  # Defined in ./ui/command_set_material.py.

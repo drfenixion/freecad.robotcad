@@ -67,7 +67,7 @@ from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_controllers_config_file_name
 
-from . import sdf_world
+from . import SdfUtilities
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -248,8 +248,10 @@ class RobotProxy(ProxyBase):
         self._broadcasters: Optional[list[CrossController]] = None
 
         self._init_properties(obj)
-        #  call make sdf object after initializing properties 
-        sdf_world.make_object(self.robot)
+#  initialize sdf world properties 
+#   sdf parameters
+        SdfUtilities.world_parameters(self.robot)
+        
     @property
     def created_objects(self) -> DOList:
         """List of objects created for the robot."""
@@ -289,7 +291,7 @@ class RobotProxy(ProxyBase):
             'The path to the ROS package to export files to,'
             ' relative to $ROS_WORKSPACE/src',
         )
-        #  add the urdf and sdf properties 
+       
         
         add_property(
                 obj,
