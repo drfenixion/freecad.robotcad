@@ -122,58 +122,7 @@ class _ViewProviderSensor(ProxyBase):
         self.sensor = vobj.Object
 
     def updateData(self, obj: CrossSensor, prop: str):
-
-
-        def custom_type_checks(prop: str, obj: CrossSensor) -> CrossSensor:
-            """ Check type of linked element(s) by custom type """
-
-
-            def notice_not_suited_object_selected(element, replacements: dict, prop: str):
-                error(
-                    'Selected not suited object (' + ros_name(element) + ') for '
-                    + prop + ' property. Object was excluded. Verification functions - '
-                    + ', '.join(replacements[prop]['check_functions'])
-                    + '. Use filter of this type.', gui=True,
-                )
-
-            # custom type checks
-            replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
-            if prop in replacements:
-                filtered_elements = deepcopy(replacements[prop]['default_value_replace'])
-                check_functions = replacements[prop]['check_functions']
-                attr = getattr(obj, prop)
-                if type(attr) is list:
-                    for element in attr:
-                        if element:
-                            suited_object_flag = False
-                            for check_function in check_functions:
-                                if globals()[check_function](element):
-                                    suited_object_flag = True
-                                    filtered_elements.append(element)
-                                    break
-                            if not suited_object_flag:
-                                notice_not_suited_object_selected(element, replacements, prop)
-
-
-                else:
-                    if attr:
-                        suited_object_flag = False
-                        for check_function in check_functions:
-                            if globals()[check_function](attr):
-                                suited_object_flag = True
-                                filtered_elements = attr
-                                break
-                        if not suited_object_flag:
-                            notice_not_suited_object_selected(attr, replacements, prop)
-
-                if attr != filtered_elements:
-                    setattr(obj, prop, filtered_elements)
-
-            return obj
-
-
-        obj = custom_type_checks(prop, obj)
-
+        return
 
     def onChanged(self, vobj: VPDO, prop: str):
         sensor: CrossSensor = vobj.Object
@@ -237,23 +186,6 @@ def add_sensor_properties_block(sensor: CrossSensor, sensor_data: dict) -> Cross
         )
         sensor.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
-    # # add sensor type
-    # prop_name = 'sensor_type'
-    # prop_value = sensor_data['type']
-    # if hasattr(sensor, prop_name):
-    #     setattr(sensor, prop_name, prop_value)
-    # else:
-    #     sensor, used_property_name = add_property(
-    #         sensor,
-    #         'App::PropertyString',
-    #         prop_name,
-    #         'Internal',
-    #         'Sensor type',
-    #         prop_value,
-    #     )
-    #     sensor.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-
-
     return sensor
 
 
@@ -306,10 +238,6 @@ def add_sensor_properties(
             if 'description' in param:
                 help_txt = param['description']
 
-            if 'validation_str' in param:
-                help_txt += '\n\n' + param['validation_str']
-
-
             if prop_type in wb_constants.TYPE_CONVERT_FUNCTIONS:
                 default_value = wb_constants.TYPE_CONVERT_FUNCTIONS[prop_type](default_value)
 
@@ -324,7 +252,7 @@ def add_sensor_properties(
             )
 
         except KeyError:
-            # not type finded at this level and should dive deeper
+            # the type is not found at this level and should dive deeper
             sensor = add_sensor_properties(
                 sensor,
                 parameters[parameter_name],
@@ -564,39 +492,6 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
         return params
 
 
-    def add_validation_rules_str_to_params(params: dict) -> dict:
-        ''' Add validation rules string to every param with validation.
-
-        It convert rules to string and to every param where present validation.
-        '''
-
-        for param_name, param in params.items():
-            validation_str = ''
-            if 'validation' in param:
-                for validation_rule, validation_value in param['validation'].items():
-
-                    rule_desc = 'Validation rule: '
-                    try:
-                        rule_desc += wb_constants.ROS2_CONTROLLERS_VALIDATION_RULES_DESCRIPTIONS[validation_rule.rstrip("<>")]
-                    except KeyError:
-                        rule_desc += validation_rule.rstrip("<>")
-
-                    validation_value_str = ''
-                    if validation_value:
-                        validation_value_str += '. Validation value: '
-
-                        try:
-                            validation_value_str += ', '.join(str(el) for el in validation_value)
-                        except:
-                            validation_value_str += str(validation_value)
-
-                    validation_str += rule_desc + validation_value_str + '\n'
-
-                params[param_name]['validation_str'] = validation_str
-
-        return params
-
-
     sensors = {}
     for sensor_dir_name, sensor_dir in sensors_dirs.items():
         for sensor_name, sensor in sensor_dir['sensors'].items():
@@ -606,7 +501,6 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
 
             parameters = add_full_name_to_params(parameters)
             parameters = add_fc_types_based_on_params_types(parameters)
-            parameters = add_validation_rules_str_to_params(parameters)
             parameters_flatten = flatten_params(parameters, flat_params = {})
 
 
