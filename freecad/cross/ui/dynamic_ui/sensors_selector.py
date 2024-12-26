@@ -10,7 +10,6 @@ from ...wb_utils import is_link_selected
 from ...wb_utils import is_joint_selected
 from ...sensors.sensor_factory import make_sensor
 from ...freecad_utils import message
-from ... import wb_constants
 
 
 class SensorsSelectorModalClass(QtGui.QDialog):
@@ -48,13 +47,11 @@ class SensorsSelectorModalClass(QtGui.QDialog):
             # sensors block
             self.sensor_description[sensor_dir_name] = QtWidgets.QLabel()
             form_layout[sensor_dir_name].addRow(QtWidgets.QLabel("Select sensor:"), self.sensors_dropdown[sensor_dir_name])
-            # form_layout[sensor_dir_name].addRow(QtWidgets.QLabel("Description:"), self.sensor_description[sensor_dir_name])
 
             # add sensors adding button
             addSensorButton[sensor_dir_name] = QtGui.QPushButton('Add sensor to ' + sensor_dir_name, self)
 
             addSensorButton[sensor_dir_name].clicked.connect(partial(self.onAddSensorButton, sensor_dir_name))
-            # addSensorButton[sensor_dir_name].clicked.connect(lambda sdn = sensor_dir_name: self.onAddSensorButton(sdn))
             addSensorButton[sensor_dir_name].setAutoDefault(False)
             form_layout[sensor_dir_name].addRow(QtWidgets.QLabel(""), addSensorButton[sensor_dir_name])
 
@@ -62,17 +59,9 @@ class SensorsSelectorModalClass(QtGui.QDialog):
             formGroupBox[sensor_dir_name].setLayout(form_layout[sensor_dir_name])
             main_layout.addWidget(formGroupBox[sensor_dir_name])
 
-            # init current state of sensors and brodcaster descriptions
-            # self.update_sensor_description(self.sensors_dropdown[sensor_dir_name].currentText(), sensor_dir_name)
-
-            # attach triggers of changing descriptions
-            # self.sensors_dropdown[sensor_dir_name].currentTextChanged.connect(
-            #     lambda: self.update_sensor_description(sensor_dir_name = sensor_dir_name)
-            #     )
-
         # Info
         info = QtWidgets.QLabel()
-        info.setText("Info: Add sensor (dependent on sensor attachment).")
+        info.setText("Info: sensors are positive x-oriented of parent joint (red arrow - the direction the sensor is looking)")
         main_layout.addWidget(info)
 
         # link to docks
