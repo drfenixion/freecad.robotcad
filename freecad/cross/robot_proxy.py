@@ -213,6 +213,7 @@ class RobotProxy(ProxyBase):
                 'MaterialCardPath',
                 'MaterialDensity',
                 'RobotType',
+                'GenerateCodeForRosVersion',
                 '_Type',
                 'Mass',
             ],
@@ -327,9 +328,16 @@ class RobotProxy(ProxyBase):
 
         add_property(
             obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
-            'Can be used for code generation.',
+            'Used by extended code generator.',
         )
         obj.RobotType=["nonspecific","multicopter"]
+
+        add_property(
+            obj, 'App::PropertyEnumeration', 'GenerateCodeForRosVersion', 'Robot',
+            'Generate code for choosed ROS version.',
+        )
+        obj.GenerateCodeForRosVersion=["jazzy", "iron"]
+
 
         # The `Placement` is not used directly by the robot but it is used to
         # transform the pose of its links.
@@ -1130,6 +1138,7 @@ class RobotProxy(ProxyBase):
     <packageName>{package_name}</packageName>
     <meshesDir>{meshes_dir}</meshesDir>
     <robotType>{self.robot.RobotType}</robotType>
+    <generateCodeForRosVersion>{self.robot.GenerateCodeForRosVersion}</generateCodeForRosVersion>
     <rootLinkName>{get_valid_urdf_name(ros_name(self.get_root_link()))}</rootLinkName>
     <xacroWrapperFileName>{get_xacro_wrapper_file_name(ros_name(self.robot))}</xacroWrapperFileName>
     <controllersConfigFileName>{controllers_config_file_name}</controllersConfigFileName>
