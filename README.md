@@ -15,6 +15,8 @@ Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=B62JW_0SFl0" target="_blank">Multicopter with manipulator and chassis</a> <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
+# RobotCAD is looking for sponsors and donations
+For main sponsors it is possible to place a link to your project in the repository or RobotCAD itself (f.e. sponsored by your_project/your_logo). Also it is posible to add developer motivation to some required to you RobotCAD feature or bugfix by donation. Write to it.project.devel@gmail.com
 
 # Key features short list:
 1. Autoinstall and run by startup script
