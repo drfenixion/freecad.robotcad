@@ -65,7 +65,7 @@ RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
 RUN export UBUNTU_USER_ID=$UID \
     && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
     && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
-    && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile 
+    && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile
 ### End create user
 
 
@@ -105,4 +105,4 @@ RUN echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
 ### Build ROS packages
 
 
-CMD ["bash", "-c", ". ./install/setup.bash && freecad"] 
+CMD ["bash", "-c", ". ./install/setup.bash && freecad"]
