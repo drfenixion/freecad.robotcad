@@ -27,6 +27,7 @@ class Robot(DO):
     MaterialCardPath: str
     MaterialDensity: str
     RobotType: dict
+    GenerateCodeForRosVersion: dict
     _Type: str
     Mass: float
 

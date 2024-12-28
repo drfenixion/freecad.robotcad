@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-ARG ROS_DISTRO_ARG=iron
+ARG ROS_DISTRO_ARG=jazzy
 ARG ROS_DISTRO_ASSEMBLY_ARG=desktop
 FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
 
