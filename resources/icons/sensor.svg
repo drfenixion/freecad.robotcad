@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <rect x="47.135" y="40.343" width="260.132" height="219.885" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 4px;"/>
+  <polygon style="fill: rgb(216, 216, 216); stroke-miterlimit: 1; stroke-linecap: round; stroke-dashoffset: -4px; stroke-dasharray: 20; stroke: rgb(0, 0, 0); stroke-width: 11px; paint-order: fill; fill-opacity: 0.35;" points="239.375 126.23 586.231 1438.335 1334.695 1522.768 1441.95 1319.676 1441.95 1052.689"/>
+  <polygon style="fill: rgb(216, 216, 216); stroke-miterlimit: 1; stroke-linecap: round; stroke-dashoffset: -4px; stroke-dasharray: 20; stroke: rgb(0, 0, 0); stroke-width: 11px; paint-order: fill; fill-opacity: 0.35;" points="118.435 126.23 100.176 1623.173 540.585 1680.22 1010.664 1675.658 1147.582 1561.563"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 7px;" cx="120.777" cy="136.147" rx="38.792" ry="26.242"/>
+  <ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 7px;" cx="241.72" cy="136.147" rx="38.792" ry="26.242"/>
+</svg>

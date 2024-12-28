@@ -10,6 +10,7 @@ from __future__ import annotations
 from math import radians
 from typing import ForwardRef, List, Optional, Union, cast
 import xml.etree.ElementTree as et
+from copy import deepcopy
 
 import FreeCAD as fc
 
@@ -30,7 +31,7 @@ from .ros.utils import split_package_path
 from .trajectory_proxy import make_trajectory
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
 from .urdf_utils import xml_comment_element
-from .utils import get_valid_filename
+from .utils import get_valid_filename, replace_substring_in_keys
 from .utils import grouper
 from .utils import save_xml
 from .utils import save_yaml
@@ -64,7 +65,9 @@ from .joint_proxy import make_robot_joints_filled
 from .link_proxy import make_robot_links_filled
 from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
+from .wb_utils import get_sensors_file_name
 from .wb_utils import get_controllers_config_file_name
+from .sdf.sdf_parser.sdf_tree import sdf_dict_to_xml
 
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -212,7 +215,8 @@ class RobotProxy(ProxyBase):
                 'RobotType',
                 '_Type',
                 'Mass',
-            ])
+            ],
+        )
 
         if obj.Proxy is not self:
             obj.Proxy = self
@@ -269,13 +273,17 @@ class RobotProxy(ProxyBase):
             'Objects created for the robot',
         )
 
-        add_property(obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
-                     'Mass of the link')
+        add_property(
+            obj, 'App::PropertyQuantity', 'Mass', 'Inertial Parameters',
+            'Mass of the link',
+        )
         obj.Mass = fc.Units.Mass
 
-        add_property(obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
-                     'Center of mass of the link, with orientation determining the principal axes of inertia \
-                        in global coordinates.')
+        add_property(
+            obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
+            'Center of mass of the link, with orientation determining the principal axes of inertia \
+                        in global coordinates.',
+        )
 
         # Managed in self.reset_group().
         obj.setPropertyStatus('Group', 'ReadOnly')
@@ -317,8 +325,10 @@ class RobotProxy(ProxyBase):
         )
         obj.setPropertyStatus('MaterialDensity', ['ReadOnly'])
 
-        add_property(obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
-                     'Can be used for code generation.')
+        add_property(
+            obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
+            'Can be used for code generation.',
+        )
         obj.RobotType=["nonspecific","multicopter"]
 
         # The `Placement` is not used directly by the robot but it is used to
@@ -606,7 +616,8 @@ class RobotProxy(ProxyBase):
         if not self.is_execute_ready():
             return []
         self._attached_collision_objects = get_attached_collision_objects(
-                self.robot.Group)
+                self.robot.Group,
+        )
         return list(self._attached_collision_objects)  # A copy.
 
     def get_links(self) -> list[CrossLink]:
@@ -629,7 +640,7 @@ class RobotProxy(ProxyBase):
             return []
         self._joints = get_joints(self.robot.Group)
         return list(self._joints)  # A copy.
-    
+
 
     def get_controllers(self) -> list[CrossController]:
         """Return the list of CROSS controllers in the order of creation."""
@@ -641,7 +652,7 @@ class RobotProxy(ProxyBase):
             return []
         self._controllers = get_controllers(self.robot.Group)
         return list(self._controllers)  # A copy.
-    
+
 
     def get_broadcasters(self) -> list[CrossController]:
         """Return the list of CROSS broadcasters in the order of creation."""
@@ -653,7 +664,7 @@ class RobotProxy(ProxyBase):
             return []
         self._broadcasters = get_broadcasters(self.robot.Group)
         return list(self._broadcasters)  # A copy.
-    
+
 
     def get_actuated_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS actuated joints in the order of creation."""
@@ -839,13 +850,16 @@ class RobotProxy(ProxyBase):
             'launch/gazebo.launch.py',
             'rviz/robot_description.rviz',
             'urdf/xacro_wrapper_template.urdf.xacro',
+            'urdf/sensors_template.urdf.xacro',
+            'worlds/cars_and_trees.sdf',
         ]
 
         write_files = template_files + [
                 'meshes/',
                 'urdf/',
                 'overcross/',
-                ]
+                'worlds/',
+        ]
 
         if interactive and fc.GuiUp:
             diag = FileOverwriteConfirmationDialog(
@@ -863,10 +877,13 @@ class RobotProxy(ProxyBase):
         # TODO: warn if package name doesn't end with `_description`.
         xml = et.fromstring('<robot/>')
         xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
-        xml.append(xml_comment_element(
+        xml.append(
+            xml_comment_element(
             'Generated by RobotCAD, a ROS Workbench for FreeCAD ('
-            'https://github.com/drfenixion/freecad.robotcad)'))
-        
+            'https://github.com/drfenixion/freecad.robotcad)',
+            ),
+        )
+
         for link in self.get_links():
             if not hasattr(link, 'Proxy'):
                 error(
@@ -886,9 +903,11 @@ class RobotProxy(ProxyBase):
             if hasattr(joint, 'Proxy') and joint.Proxy:
                 xml.append(joint.Proxy.export_urdf())
             else:
-                error(f"Internal error with joint '{joint.Label}'"
-                      ", has no 'Proxy' attribute", True)
-                
+                error(
+                    f"Internal error with joint '{joint.Label}'"
+                    ", has no 'Proxy' attribute", True,
+                )
+
         # Save the xml into a file.
         description_package_path.mkdir(parents=True, exist_ok=True)
         urdf_path = get_urdf_path(self.robot, description_package_path)
@@ -898,47 +917,129 @@ class RobotProxy(ProxyBase):
         if root_link == None:
             error('Bad kinematics. Double root link or link not in joint ralationship or empty kinematic chain detected. Fix it and repeat.', True)
             return
-        
-        meshes_dir = ('meshes '
-                if _has_meshes_directory(Path(project_path), package_name)
-                else '')
-        
+
+        meshes_dir = (
+            'meshes '
+            if _has_meshes_directory(Path(project_path), package_name)
+            else ''
+        )
+
         robot_name = get_valid_urdf_name(ros_name(self.robot))
         controllers_config_file_name = get_controllers_config_file_name(robot_name)
         xacro_wrapper_file = get_xacro_wrapper_file_name(robot_name)
+        sensors_file = get_sensors_file_name(robot_name)
+
+        sensors_urdf = self.get_sensors_xml()
 
         # robot meta for external code generator
         robot_meta = self.get_robot_meta(package_name, urdf_file, meshes_dir, controllers_config_file_name)
         save_file(robot_meta, output_path / f'overcross/robot_meta.xml')
-        
+
         robot_controllers_yaml = self.get_robot_controllers_yaml()
         save_yaml(robot_controllers_yaml, output_path / f'overcross/{controllers_config_file_name}')
 
         save_xml(xml, urdf_path)
-        export_templates(template_files,
-                         project_path,
-                         meshes_dir=meshes_dir,
-                         package_name=package_name,
-                         urdf_file=urdf_file,
-                         fixed_frame=ros_name(self.get_root_link()),
-                         xacro_wrapper_file=xacro_wrapper_file,
-                         robot_name=robot_name
-                         )
+        export_templates(
+            template_files,
+            project_path,
+            meshes_dir=meshes_dir,
+            package_name=package_name,
+            urdf_file=urdf_file,
+            fixed_frame=ros_name(self.get_root_link()),
+            xacro_wrapper_file=xacro_wrapper_file,
+            sensors_file=sensors_file,
+            sensors_urdf=sensors_urdf,
+            robot_name=robot_name,
+        )
 
         return xml
-    
-    
-    def get_robot_controllers_yaml(self, 
-                                   parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE, 
-                                   parameter_full_name_glue_yaml: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE_YAML
-                                   ) -> dict:
+
+    def get_sensors_xml(self) -> str:
+
+        sensors_xml = ''
+        for sensor_xml_as_dict in self.get_sensors_data().values():
+            sensors_xml += '\n\n' + sdf_dict_to_xml(sensor_xml_as_dict, full_document = False, pretty = True)
+
+        return sensors_xml
+
+    def get_sensors_data(self, parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE) -> dict:
+        """Get sensors data as sensors dictionaries from all elements (links, joints) of robot"""
+        def construct_dict_branch(sensor_data: dict, param_name_level: str, param_full_name_stlited: list, param_value):
+            """Construct dict branch dict branch line by recursive travese dict deep levels."""
+            if len(param_full_name_stlited):
+                param_name_level_deeper = param_full_name_stlited.pop(0)
+                if param_name_level in sensor_data:
+                    param_level_data = sensor_data[param_name_level]
+                else:
+                    param_level_data = {}
+                sensor_data[param_name_level] = construct_dict_branch(
+                    deepcopy(param_level_data), param_name_level_deeper, param_full_name_stlited, param_value,
+                )
+            else:
+                sensor_data[param_name_level] = param_value
+
+            return sensor_data
+
+        def get_sensors(elem: CrossJoint | CrossLink | CrossRobot) -> dict:
+            """Get sensors data from element (CrossJoint, CrossLink, CrossRobot)"""
+            sensors = {}
+            for sensor in elem.Proxy.get_sensors():
+                sensor_data = {}
+                for param_full_name in sensor.sensor_parameters_fullnames_list:
+                    param_full_name_stlited = param_full_name.split(parameter_full_name_glue)
+                    param = getattr(sensor, param_full_name)
+
+                    # f.e. level1_name/level1_name/level1_name nested sctruct names in dict
+                    param_name_level = param_full_name_stlited.pop(0)
+                    sensor_data = construct_dict_branch(sensor_data, param_name_level, param_full_name_stlited, param)
+
+                # sensor_data['@type'] = sensor.sensor_type
+                sensor_data['@name'] = get_valid_urdf_name(ros_name(sensor))
+
+                # special case of contact sensor
+                # construct collision name (link_name_collision is default collision name)
+                if sensor_data[wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME + 'type'] == 'contact':
+                    sensor_data['contact']['collision'] = get_valid_urdf_name(ros_name(elem)) + '_collision'
+
+                # assemble sensors
+                sensors[get_valid_urdf_name(ros_name(sensor))] = {
+                    'gazebo':
+                        {
+                            '@reference': get_valid_urdf_name(ros_name(elem)),
+                            'sensor': sensor_data,
+                        },
+                }
+
+                # revert replace attr prefix to it is origin symbol (@)
+                sensors = replace_substring_in_keys(
+                    sensors,
+                    wb_constants.XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME,
+                    wb_constants.XMLTODICT_ATTR_PREFIX_ORIGIN,
+                )
+
+            return sensors
+
+        sensors = {}
+        for link in self.get_links():
+            sensors.update(get_sensors(link))
+        for joint in self.get_joints():
+            sensors.update(get_sensors(joint))
+
+        return sensors
+
+
+    def get_robot_controllers_yaml(
+        self,
+        parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+        parameter_full_name_glue_yaml: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE_YAML,
+    ) -> dict:
         """Make robot controllers data in yaml format"""
-        
+
         def add_controllers_types_to_yaml(controller: CrossController, yaml_data: dict):
             plugin_class_name = getattr(controller, 'plugin_class_name')
             yaml_data['controller_manager']['ros__parameters'][get_valid_urdf_name(ros_name(controller))] = {'type': plugin_class_name}
             return yaml_data
-        
+
 
         def separate_controllers_from_other_elements(param: list) -> tuple[list, list]:
             """ Separate controllers and broadcasters from other elements (joints) in param elements list"""
@@ -961,7 +1062,7 @@ class RobotProxy(ProxyBase):
 
                 if not is_controllers_template_for_param_mapping(param_full_name):
                     param_full_name_yaml = param_full_name.replace(parameter_full_name_glue, parameter_full_name_glue_yaml)
-                    
+
                     if isinstance(param, (float, int, str, type(None))):
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = param
                     elif isinstance(param, DO):
@@ -990,7 +1091,7 @@ class RobotProxy(ProxyBase):
                                 if isinstance(other_el, DO):
                                     other_el_name = get_valid_urdf_name(ros_name(other_el))
                                 yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml].append(other_el_name)
-                            
+
                         # clear empty list
                         if not len(yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]):
                             # control manager throw error when detect empty list
@@ -998,7 +1099,7 @@ class RobotProxy(ProxyBase):
                             del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
 
             return yaml_data
-        
+
 
         git_init_submodules()
 
@@ -1010,7 +1111,7 @@ class RobotProxy(ProxyBase):
             yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
         for controller in self.get_broadcasters():
             yaml_data = add_controllers_types_to_yaml(controller, yaml_data)
-            
+
         # controllers and their params
         for controller in self.get_controllers():
             yaml_data = add_controllers_data_to_yaml(controller, yaml_data)

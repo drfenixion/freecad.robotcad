@@ -2,3 +2,7 @@
 	path = modules/ros2_controllers
 	url = https://github.com/ros-controls/ros2_controllers
 	branch = iron
+[submodule "modules/sdformat"]
+	path = modules/sdformat
+	url = https://github.com/gazebosim/sdformat
+	branch = sdf13

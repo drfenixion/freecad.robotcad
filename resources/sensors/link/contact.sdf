@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name='sensor_contact' type='contact'>
+                <plugin
+                    filename="gz-sim-contact-system"
+                    name="gz::sim::systems::Contact">
+                </plugin>
+                <contact>
+                    <collision>collision</collision>
+                    <topic>/contact_sensor</topic>
+                </contact>
+                <always_on>true</always_on>
+                <update_rate>100</update_rate>
+            </sensor>
+        </link>
+    </world>
+</sdf>

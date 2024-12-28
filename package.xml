@@ -17,7 +17,7 @@
     <workbench>
       <classname>CrossWorkbench</classname>
       <subdirectory>freecad/robotcad</subdirectory>
-      <pythonmin>3.10</pythonmin>
+      <pythonmin>3.11</pythonmin>
       <conflict type="addon">CROSS</conflict>
     </workbench>
   </content>

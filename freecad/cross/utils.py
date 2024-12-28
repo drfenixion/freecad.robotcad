@@ -16,6 +16,9 @@ from xml.dom import minidom
 import yaml
 import collections.abc
 import re
+from copy import deepcopy
+
+import xmltodict
 
 import FreeCAD as fc
 
@@ -120,7 +123,7 @@ def save_xml(
 def save_yaml(
         content: str,
         filename: [Path | str],
-        ) -> None:
+) -> None:
     """Save the yaml content into a file."""
     with open(filename, 'w') as outfile:
         yaml.dump(content, outfile, default_flow_style=False, sort_keys=False)
@@ -129,7 +132,7 @@ def save_yaml(
 def save_file(
         content: str,
         filename: [Path | str],
-        ) -> None:
+) -> None:
     """Save the content into a file."""
     file_path = Path(filename)
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,3 +252,72 @@ def deepmerge(dict1, dict2):
             dict1[k] = v
 
     return dict1
+
+
+def remove_key(dictionary: dict, key: str, recursively: bool = True):
+    """
+    Remove a key from a dictionary (recursively or not).
+
+    :param dictionary: The dictionary from which to remove the key.
+    :param key: The key to remove.
+    :param recursively: Flag to remove key recursively.
+    :return: The modified dictionary with the key removed.
+    """
+    if isinstance(dictionary, dict):
+        # Iterate over a copy of the dictionary items to avoid runtime errors
+        # when modifying the dictionary during iteration
+        for k, v in list(dictionary.items()):
+            if k == key:
+                del dictionary[k]
+            elif isinstance(v, dict):
+                # Recursively call the function on nested dictionaries
+                if recursively:
+                    remove_key(v, key, recursively)
+            elif isinstance(v, list):
+                # If the value is a list, iterate over it to check for dictionaries
+                if recursively:
+                    for item in v:
+                        if isinstance(item, dict):
+                            remove_key(item, key, recursively)
+    return dictionary
+
+
+def dict_to_xml(
+        dict: dict, keys_to_remove_before_convert: list = [], remove_keys_recursively: bool = True,
+        full_document: bool = True, pretty: bool = False,
+):
+    """Convert dictionary to xml"""
+
+    dict = deepcopy(dict)
+    for key_to_remove in keys_to_remove_before_convert:
+        dict = remove_key(dict, key_to_remove, remove_keys_recursively)
+
+    xml_str = xmltodict.unparse(dict, full_document = full_document, pretty = pretty)
+    return xml_str
+
+
+def str_to_bool(s: str) -> bool:
+    return s.lower() == "true"
+
+
+def replace_substring_in_keys(dictionary, old_substring, new_substring):
+    """
+    Recursively replaces occurrences of a substring in dictionary keys.
+
+    :param dictionary: The dictionary in which to perform the replacement.
+    :param old_substring: The substring to be replaced.
+    :param new_substring: The new substring to replace with.
+    :return: A dictionary with replaced keys.
+    """
+    new_dict = {}
+    for key, value in dictionary.items():
+        # Replace the substring in the key
+        new_key = key.replace(old_substring, new_substring)
+
+        # If the value is a dictionary, recursively process it
+        if isinstance(value, dict):
+            new_dict[new_key] = replace_substring_in_keys(value, old_substring, new_substring)
+        else:
+            new_dict[new_key] = value
+
+    return new_dict

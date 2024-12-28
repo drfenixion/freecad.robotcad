@@ -3,6 +3,7 @@ from __future__ import annotations
 from math import degrees, radians
 from typing import Optional, cast
 import xml.etree.ElementTree as et
+from typing import NewType, List, Optional, cast
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
@@ -13,19 +14,25 @@ from .freecad_utils import error
 from .freecad_utils import warn
 from .freecad_utils import message
 from .urdf_utils import urdf_origin_from_placement
-from .wb_utils import ICON_PATH
+from .wb_utils import ICON_PATH, get_joint_sensors
 from .wb_utils import get_valid_urdf_name
 from .wb_utils import is_link
 from .wb_utils import is_name_used
 from .wb_utils import is_robot
 from .wb_utils import is_workcell
+from .wb_utils import is_sensor_joint
 from .wb_utils import ros_name
+from .utils import warn_unsupported
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import ViewProviderJoint as VP
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a DocumentObject with Proxy "SensorProxyJoint" or "SensorProxyJoint". # noqa: E501
+
+DO = fc.DocumentObject
+DOList = List[DO]
 
 
 class JointProxy(ProxyBase):
@@ -44,6 +51,7 @@ class JointProxy(ProxyBase):
         super().__init__(
             'joint',
             [
+                'Group',
                 'Child',
                 'Effort',
                 'LowerLimit',
@@ -79,7 +87,14 @@ class JointProxy(ProxyBase):
         # Save the robot to speed-up self.get_robot().
         self._robot: Optional[CrossRobot] = None
 
+        self._sensors: Optional[list[CrossSensor]] = None
+
+        self.init_extensions(obj)
         self.init_properties(obj)
+
+    def init_extensions(self, obj: CrossJoint) -> None:
+        # Need a group to put the generated FreeCAD links in.
+        obj.addExtension('App::GroupExtensionPython')
 
     def init_properties(self, obj: CrossJoint):
         add_property(
@@ -129,21 +144,33 @@ class JointProxy(ProxyBase):
         obj.setEditorMode('Position', ['ReadOnly'])
 
         # Mimic joint.
-        add_property(obj, 'App::PropertyBool', 'Mimic', 'Mimic',
-                     'Whether this joint mimics another one')
-        add_property(obj, 'App::PropertyLink', 'MimickedJoint', 'Mimic',
-                     'Joint to mimic')
-        add_property(obj, 'App::PropertyFloat', 'Multiplier', 'Mimic',
-                     'value = Multiplier * other_joint_value + Offset', 1.0)
-        add_property(obj, 'App::PropertyFloat', 'Offset', 'Mimic',
-                     'value = Multiplier * other_joint_value + Offset, in mm or deg')
-        
-        add_property(obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
-                     'Propellers rotation direction. Can be used for code generation')
+        add_property(
+            obj, 'App::PropertyBool', 'Mimic', 'Mimic',
+            'Whether this joint mimics another one',
+        )
+        add_property(
+            obj, 'App::PropertyLink', 'MimickedJoint', 'Mimic',
+            'Joint to mimic',
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Multiplier', 'Mimic',
+            'value = Multiplier * other_joint_value + Offset', 1.0,
+        )
+        add_property(
+            obj, 'App::PropertyFloat', 'Offset', 'Mimic',
+            'value = Multiplier * other_joint_value + Offset, in mm or deg',
+        )
+
+        add_property(
+            obj, 'App::PropertyEnumeration', 'JoinRotationDirection', 'Robot',
+            'Propellers rotation direction. Can be used for code generation',
+        )
         obj.JoinRotationDirection=["unset","cw","ccw"]
-        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])        
-        add_property(obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
-                     'Specific of joint working. Can be used for code generation')
+        obj.setPropertyStatus('JoinRotationDirection', ['Hidden'])
+        add_property(
+            obj, 'App::PropertyEnumeration', 'JointSpecific', 'Robot',
+            'Specific of joint working. Can be used for code generation',
+        )
         obj.JointSpecific=["unset","propeller"]
 
         add_property(
@@ -151,8 +178,10 @@ class JointProxy(ProxyBase):
             'Placement of the joint in the robot frame',
         )
         obj.setEditorMode('Placement', ['ReadOnly'])
-        add_property(obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
-                     'Placement of the joint in the center of mass frame of robot')
+        add_property(
+            obj, 'App::PropertyPlacement', 'PlacementRelTotalCenterOfMass', 'Internal',
+            'Placement of the joint in the center of mass frame of robot',
+        )
         obj.setEditorMode('Placement', ['ReadOnly'])
 
         self._toggle_editor_mode()
@@ -170,6 +199,9 @@ class JointProxy(ProxyBase):
     def onChanged(self, obj: CrossJoint, prop: str) -> None:
         """Called when a property has changed."""
         # print(f'{obj.Label}.onChanged({prop})') # DEBUG
+        if prop == 'Group':
+            self._sensors = None
+            self._cleanup_children()
         if prop == 'Mimic':
             self._toggle_editor_mode()
         if prop == 'MimickedJoint':
@@ -240,6 +272,26 @@ class JointProxy(ProxyBase):
 
     def onDocumentRestored(self, obj: CrossJoint):
         self.__init__(obj)
+        self._fix_lost_fc_links()
+
+    def _fix_lost_fc_links(self) -> None:
+        """Fix linked objects in CROSS joints lost on restore.
+
+        Probably because these elements are restored before the CROSS links.
+
+        """
+        if not self.is_execute_ready():
+            return
+        elem = self.joint
+        for obj in elem.Document.Objects:
+            if (not hasattr(obj, 'InList')) or (len(obj.InList) != 1):
+                continue
+            potential_self = obj.InList[0]
+            if ((obj is elem)
+                    or (potential_self is not elem)
+                    or (obj in elem.Group)):
+                continue
+            elem.addObject(obj)
 
     def dumps(self):
         return self.Type,
@@ -247,6 +299,23 @@ class JointProxy(ProxyBase):
     def loads(self, state):
         if state:
             self.Type, = state
+
+    def _cleanup_children(self) -> DOList:
+        """Remove and return all objects not supported by CROSS::Link."""
+        if not self.is_execute_ready():
+            return []
+        removed_objects: set[DO] = set()
+        # Group is managed by us and the containing robot.
+        for o in self.joint.Group:
+            if is_sensor_joint(o):
+                # Supported, and managed by us.
+                continue
+            warn_unsupported(o, by='CROSS::Joint', gui=True)
+            # implementation note: removeobject doesn't raise any exception
+            # and `o` exists even if already removed from the group.
+            removed_objects.update(self.joint.removeObject(o))
+
+        return list(removed_objects)
 
     def is_fixed(self) -> bool:
         """Return whether the joint is of type 'fixed'."""
@@ -416,6 +485,17 @@ class JointProxy(ProxyBase):
         joint.setEditorMode('Velocity', fixed_editor_mode)
         joint.setEditorMode('Effort', fixed_editor_mode)
 
+    def get_sensors(self) -> list[CrossSensor]:
+        """Return the list of CROSS sensors in the order of creation."""
+        # TODO: as property.
+        if self._sensors is not None:
+            # self._sensors is updated in self.onChanged().
+            return list(self._sensors)  # A copy.
+        if not self.is_execute_ready():
+            return []
+        self._sensors = get_joint_sensors(self.joint.Group)
+        return list(self._sensors)  # A copy.
+
 
 class _ViewProviderJoint(ProxyBase):
     """The view provider for CROSS::Joint objects."""
@@ -437,7 +517,11 @@ class _ViewProviderJoint(ProxyBase):
     def _init(self, vobj: VP) -> None:
         self.view_object = vobj
         self.pose = vobj.Object
+        self._init_extensions(vobj)
         self._init_properties(vobj)
+
+    def _init_extensions(self, vobj: VP):
+        vobj.addExtension('Gui::ViewProviderGroupExtensionPython')
 
     def _init_properties(self, vobj: VP) -> None:
         """Set properties of the view provider."""
@@ -576,7 +660,7 @@ def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None 
 
     if robot:
         joint.adjustRelativeLinks(robot)
-        robot.addObject(joint)        
+        robot.addObject(joint)
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui
@@ -620,7 +704,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
             message(
                 'Links must be in robot container for joint connection. Closed links loop does not supported.',
                 True,
-            )             
+            )
         fc.ActiveDocument.recompute()
 
         return joint
@@ -628,8 +712,8 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         message(
             'Make filled robot joint(s) works only with selected links. Select minimum 2 links.',
             True,
-        )        
-    
+        )
+
     return False
 
 
@@ -640,15 +724,15 @@ def make_robot_joints_filled(links:list[CrossLink] = [], robot:CrossRobot | None
         selection = fcgui.Selection.getSelection()
     else:
         selection = links
-    
+
     sel_len = len(selection)
     if sel_len < 2:
         message(
             'Choose minimum 2 links.',
             True,
-        )                
+        )
         return False
-    
+
     joints = [CrossJoint]
     for i in range(sel_len):
         if i+1 < sel_len:

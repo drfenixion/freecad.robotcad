@@ -41,16 +41,25 @@ from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject 
 from .workcell import Workcell as CrossWorkcell  # A Cross::Workcell, i.e. a DocumentObject with Proxy "Workcell". # noqa: E501
 from .xacro_object import XacroObject as CrossXacroObject  # A Cross::XacroObject, i.e. a DocumentObject with Proxy "XacroObject". # noqa: E501
 from .controller import Controller as CrossController  # A Cross::Controller, i.e. a DocumentObject with Proxy "Controller". # noqa: E501
+from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a DocumentObject with Proxy "SensorProxyJoint" or "SensorProxyJoint". # noqa: E501
+
 DO = fc.DocumentObject
 CrossBasicElement = Union[CrossJoint, CrossLink]
-CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController]
+CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
 DOList = List[DO]
 
 MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
+MODULES_PATH = MOD_PATH / 'modules'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
+SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
+SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
+SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors'
+LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
+JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
+ROBOT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'robot'
 
 
 class SupportsStr(Protocol):
@@ -129,6 +138,21 @@ def is_broadcaster(obj: DO) -> bool:
     return _has_ros_type(obj, 'Cross::Broadcaster')
 
 
+def is_sensor(obj: DO) -> bool:
+    """Return True if the object is a Cross::Sensor."""
+    return is_sensor_link(obj) or is_sensor_joint(obj) or _has_ros_type(obj, 'Cross::Sensor')
+
+
+def is_sensor_link(obj: DO) -> bool:
+    """Return True if the object is a Cross::SensorLink."""
+    return _has_ros_type(obj, 'Cross::SensorLink')
+
+
+def is_sensor_joint(obj: DO) -> bool:
+    """Return True if the object is a Cross::SensorJoint."""
+    return _has_ros_type(obj, 'Cross::SensorJoint')
+
+
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
     return _has_ros_type(obj, 'Cross::PlanningScene')
@@ -188,6 +212,11 @@ def is_broadcaster_selected() -> bool:
     return is_selected_from_lambda(is_broadcaster)
 
 
+def is_sensor_selected() -> bool:
+    """Return True if the first selected object is a Cross::Sensor."""
+    return is_selected_from_lambda(is_sensor)
+
+
 def is_workcell_selected() -> bool:
     """Return True if the first selected object is a Cross::Workcell."""
     return is_selected_from_lambda(is_workcell)
@@ -213,6 +242,16 @@ def get_joints(objs: DOList) -> list[CrossJoint]:
     return [o for o in objs if is_joint(o)]
 
 
+def get_link_sensors(objs: DOList) -> list[CrossSensor]:
+    """Return only the objects that are Cross::SensorLink instances."""
+    return [o for o in objs if is_sensor_link(o)]
+
+
+def get_joint_sensors(objs: DOList) -> list[CrossSensor]:
+    """Return only the objects that are Cross::SensorJoint instances."""
+    return [o for o in objs if is_sensor_joint(o)]
+
+
 def get_controllers(objs: DOList) -> list[CrossController]:
     """Return only the objects that are Cross::Controller instances."""
     return [o for o in objs if is_controller(o)]
@@ -231,8 +270,8 @@ def get_xacro_objects(objs: DOList) -> list[CrossXacroObject]:
 def get_chains(
         links: list[CrossLink],
         joints: list[CrossJoint],
-        check_kinematics = True
-        ) -> list[list[CrossBasicElement]]:
+        check_kinematics = True,
+) -> list[list[CrossBasicElement]]:
     """Return the list of chains.
 
     A chain starts at the root link, alternates links and joints, and ends
@@ -489,7 +528,7 @@ def export_templates(
         raise RuntimeError('Parameter "package_name" must be given')
 
     package_parent = Path(package_parent)
-    
+
     try:
         meshes_dir
     except NameError:
@@ -503,11 +542,16 @@ def export_templates(
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
         txt = template.format(**keys)
-        xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
 
+        xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
         #replace xacro wrapper file name
         if xacro_wrapper_tmpl in f:
             f = f.replace(xacro_wrapper_tmpl, keys['xacro_wrapper_file'])
+
+        sensors_tmpl = 'sensors_template.urdf.xacro'
+        #replace sensors_template file name
+        if sensors_tmpl in f:
+            f = f.replace(sensors_tmpl, keys['sensors_file'])
 
         output_path = package_parent / package_name / f
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -610,14 +654,16 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
                     ' or `x, y, z, qw, qx, qy, qz`',
             )
     ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
-    return fc.Placement(fc.Vector(x, y, z) * ros_to_freecad_factor,
-                        fc.Rotation(qw, qx, qy, qz))
+    return fc.Placement(
+        fc.Vector(x, y, z) * ros_to_freecad_factor,
+        fc.Rotation(qw, qx, qy, qz),
+    )
 
 
 def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
     """Return URDF file path`.
     """
-        
+
     file_base = get_valid_filename(ros_name(robot))
     urdf_file = f'{file_base}.urdf'
     urdf_path = output_path / f'urdf/{urdf_file}'
@@ -629,7 +675,7 @@ def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
 def get_xacro_wrapper_path(robot: CrossRobot, output_path: str) -> Path:
     """Return xacro wrapper file path`.
     """
-        
+
     xacro_wrapper_file = get_xacro_wrapper_file_name(ros_name(robot))
     xacro_wrapper_path = output_path / f'urdf/{xacro_wrapper_file}'
     xacro_wrapper_path = Path(xacro_wrapper_path)
@@ -678,8 +724,10 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
     setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
 
 
-def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, 
-                   orienteer1: DO, orienteer2: DO, delete_created_objects:bool = True):
+def move_placement(
+    doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str,
+    orienteer1: DO, orienteer2: DO, delete_created_objects:bool = True,
+):
     """Move element (joint or link) placement (Origin or Mounted placement).
 
     Move first orienteer to placement of second and second orienteer
@@ -689,7 +737,7 @@ def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name:
 
     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects, lcs_concentric_reversed = True)
-    
+
     # prepare data
     origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
     # set zero Origin
@@ -714,7 +762,7 @@ def move_placement(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name:
 
 def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
     -> fc.Placement :
-    '''Return placement of orienteer. 
+    '''Return placement of orienteer.
     If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
 
     # TODO process Vertex
@@ -730,9 +778,9 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
 
 def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
     -> list[fc.DO, fc.DO, fc.Placement] :
-    '''Make LCS at face of body of robot link. 
+    '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by part and be Real element of robot link'''
-    
+
     link = None
     # trying get link from subelement
     try:
@@ -743,7 +791,7 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
                 link = parent
     except (AttributeError, IndexError, RuntimeError):
         pass
-        
+
     # orienteer not a subelement (face, edge, etc)
     if not link:
         link = orienteer
@@ -755,7 +803,7 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     if not is_part(obj):
         message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
         raise NoPartWrapperOfObject()
-    
+
     sub_element_name = ''
     sub_element_type = ''
     sub_element = None
@@ -772,7 +820,7 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
 
     obj.addObject(body_lcs_wrapper)
 
-    lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS' )
+    lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS')
     body_lcs_wrapper.addObject(lcs)
 
     setattr(lcs, lcs_attachmentsupport_name(), [(orienteer.Object, sub_element_name)])   # The X axis.
@@ -780,15 +828,17 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     if sub_element_type == 'Vertex':
         lcs.MapMode = 'Translate'
     elif sub_element_type == 'Edge' \
-        and (sub_element.Curve.TypeId == 'Part::GeomCircle' \
-            or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'):
-        
+        and (
+            sub_element.Curve.TypeId == 'Part::GeomCircle' \
+            or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'
+        ):
+
         lcs.MapMode = 'Concentric'
         if lcs_concentric_reversed:
             lcs.MapReversed = True
     else:
         lcs.MapMode = 'InertialCS'
-    
+
     # prevent automove back to InertialCS rotation
     lcs.MapMode = 'Deactivated'
 
@@ -808,13 +858,13 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
 
 
 def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | None = None, z:float | None = None) -> fc.Placement :
-    ''' Rotate (incremental) placement in frame of origin or set any axis to zero. 
+    ''' Rotate (incremental) placement in frame of origin or set any axis to zero.
 
         This func let you rotate object how be you rotate it as it was at origin.
 
         Params:
             placement - to rotate
-            x,y,z - axis value as increment to rotate. 
+            x,y,z - axis value as increment to rotate.
             If the value received is 0, the axis will be set to 0, otherwise the rotation will be incremented
     '''
 
@@ -855,14 +905,17 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
     try:
         orienteer1, = validate_types(
             fcgui.Selection.getSelection(),
-            ['Any'])
+            ['Any'],
+        )
         selection_ok = True
     except RuntimeError:
         pass
 
     if not selection_ok:
-        message('Select: subobject of robot link or link.'
-                , gui=True)
+        message(
+            'Select: subobject of robot link or link.'
+            , gui=True,
+        )
         return
 
     joint = None
@@ -877,42 +930,49 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
     if not joint:
         if link == None:
             message('Can not get parent robot link of selected object', gui=True)
-            return      
-        
+            return
+
         chain = get_chain(link)
 
         if len(chain) < 2:
             message('Link must be in chain (joint to link).', gui=True)
-            return                
+            return
 
 
         joint = chain[-2]
         if not is_joint(joint):
             message('Can not get parent joint of link', gui=True)
             return
-    
+
     joint.Origin = rotate_placement(joint.Origin, x, y, z)
 
     doc.recompute()
 
 
 def get_xacro_wrapper_file_name(robot_name: str) -> str:
-    """ Return xacro wrapper file name. 
-    
-    Xacrot wrapper file includes URDF description file and other xacro files."""
+    """ Return xacro wrapper file name.
+
+    Xacro wrapper file includes URDF description file and other xacro files."""
 
     return get_valid_filename(robot_name) + '_wrapper.urdf.xacro'
 
 
+def get_sensors_file_name(robot_name: str) -> str:
+    """ Return sensors xacro file name.
+
+    Sensors xacro file contains gazebo sensors declarations"""
+
+    return get_valid_filename(robot_name) + '_sensors.urdf.xacro'
+
 
 def get_controllers_config_file_name(robot_name: str) -> str:
-    """ Return controllers config file name (yaml config of ros2_control). 
+    """ Return controllers config file name (yaml config of ros2_control).
     """
 
     return get_valid_filename(robot_name) + '_controllers.yaml'
 
 
-def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True):
+def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
     """ Do git submodule update --init if ros2_controllers module dir is empty """
 
 
@@ -926,17 +986,16 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
             check=True,
         )
         print('process:', p)
-        
+
 
     update_from_remote_branch_param = ''
     if update_from_remote_branch:
         update_from_remote_branch_param = '--remote'
 
-    files_and_dirs = os.listdir(ROS2_CONTROLLERS_PATH)
+    files_and_dirs = os.listdir(update_if_dir_is_empty)
     # update if dir is empty
     if only_first_update:
         if not len(files_and_dirs):
             git_update_submodules(update_from_remote_branch_param)
     else:
-        git_update_submodules(update_from_remote_branch_param)  
-    
+        git_update_submodules(update_from_remote_branch_param)
