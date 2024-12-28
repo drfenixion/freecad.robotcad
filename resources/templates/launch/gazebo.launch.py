@@ -46,7 +46,7 @@ def generate_launch_description():
     gazebo_world_launch_arg = DeclareLaunchArgument('gazebo_world', default_value='empty.sdf')
 
     # prepare custom world
-    world = os.getenv('GZ_SIM_WORLD', 'cars_and_trees')
+    world = os.getenv('GZ_SIM_WORLD', 'empty')
     fly_world_path = resources_package + '/worlds/' + world + '.sdf'
     gz_version = subprocess.getoutput("gz sim --versions")
     gz_version_major = re.search(r'^\d{{1}}', gz_version).group()
