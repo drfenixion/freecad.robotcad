@@ -32,20 +32,21 @@ class _SetCROSSPlacementFastCommand:
         return {'Pixmap': 'set_cross_placement_fast.svg',
                 'MenuText': tr('Set placement - fast'),
                 'Accel': 'P, F',
-                'ToolTip': tr('Set the Origin of a joint and Mounted Placement of link and make LCSes at orienteers places.\n'
+                'ToolTip': tr('Set the Origin of a joint and Mounted Placement of link and make LCS at reference places.\n'
                               '\n'
                               'Select (with Ctlr): \n'
-                              '    1) subelement (face, edge, vertex) of body (subobject of Real) of robot link or LCS at any Real subobject (first orienteer), \n'
-                              '    2) subelement (face, edge, vertex) of body (subobject of Real) of robot link or LCS at any Real subobject (second orienteer). \n'
+                              '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
+                              '    2) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (second reference)\n'
                               '\n'
                               'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
                               '\n'
-                              'This will connect 2 links (child to parent) in orienteers places.\n'
+                              'This will connect 2 links (child to parent) in reference places.\n'
                               'Joint Origin and link Mounted Placement will be moved to connection position.\n'
                               '\n'
-                              'At both orienteers places will be created LCS (if selected subelement).\n'
+                              'At both reference places will be created LCS (if selected subelement).\n'
                               'Be free to fix the default LCS orientation if it does not suit you.\n'
-                              'After the LCS orientation correction you can use LCS with other Placements tools.\n'
+                              'It is posible to use other Placements tools with the LCS.\n'
+                              'Also you can remove LCS, it only helpers for set placement.\n'
                               'By default LCS will use InertialCS MapMode \n'
                               'and Translate MapMode for vertex and Concentric for curve and circle.'
                               )}

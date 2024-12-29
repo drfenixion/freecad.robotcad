@@ -37,12 +37,12 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
                 'ToolTip': tr('Set the Mounted Placement of a link or the Origin of a joint.\n'
                               '\n'
                               'Select (with Ctlr) either:\n'
-                              '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
-                              '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n'
+                              '  a) a CROSS::Link, any (first reference), any (second reference)\n'
+                              '  b) a CROSS::Joint, any (first reference), any (second reference)\n'
                               '\n'
-                              'This will move first orienteer to position of second orienteer\n'
-                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
-                              'LCS is convenient as orienteers because of configurable orientation.',
+                              'This will move first reference to position of second reference\n'
+                              'and binded system (first reference + Link or Joint) will moved respectively.\n'
+                              'LCS is convenient as reference because of configurable orientation.',
                               )}
 
     def IsActive(self):
