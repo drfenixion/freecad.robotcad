@@ -327,7 +327,7 @@ class RobotProxy(ProxyBase):
 
         add_property(
             obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
-            'Used by extended code generator.',
+            'Used by extended code generator. For multicopter use ROS2 Iron code generation because PX4 does not released for Ubuntu 24.04 yet',
         )
         obj.RobotType=["nonspecific","multicopter"]
 

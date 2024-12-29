@@ -56,6 +56,12 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         form_layout.addRow(QtWidgets.QLabel("Select controller:"), self.controllers_dropdown)
         form_layout.addRow(QtWidgets.QLabel("Description:"), self.controller_desctiption)
         form_layout.addRow(QtWidgets.QLabel(""), addControllerButton)
+        form_layout.addRow(
+            QtWidgets.QLabel(''), 
+            QtWidgets.QLabel('Tip: controllers chaining is posible by adding target controller to property (with other linked objects).\n'
+                             'Only some controllers and properties can be chained, RobotCAD does not check correctness of chaining.\n'
+                             'See docs to know where chain is applicable.'),
+        )
         formGroupBox.setLayout(form_layout)
 
         # brodcasters block
