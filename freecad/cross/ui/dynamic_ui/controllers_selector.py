@@ -25,7 +25,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
     def initUI(self):
         self.resize(400, 350)
         self.setWindowTitle("Select controller")
-        
+
         # get controller and brodcasters data and make dropdowns
         self.controllers = get_controllers_data()
         self.controllers_dropdown = QtGui.QComboBox(self)
@@ -57,10 +57,12 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         form_layout.addRow(QtWidgets.QLabel("Description:"), self.controller_desctiption)
         form_layout.addRow(QtWidgets.QLabel(""), addControllerButton)
         form_layout.addRow(
-            QtWidgets.QLabel(''), 
-            QtWidgets.QLabel('Tip: controllers chaining is posible by adding target controller to property (with other linked objects).\n'
-                             'Only some controllers and properties can be chained, RobotCAD does not check correctness of chaining.\n'
-                             'See docs to know where chain is applicable.'),
+            QtWidgets.QLabel(''),
+            QtWidgets.QLabel(
+                'Tip: controllers chaining is posible by adding target controller to property (with other linked objects).\n'
+                'Only some controllers and properties can be chained, RobotCAD does not check correctness of chaining.\n'
+                'See docs to know where chain is applicable.',
+            ),
         )
         formGroupBox.setLayout(form_layout)
 
@@ -92,19 +94,21 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         form_layout.addRow(QtWidgets.QLabel("Select interfaces:"), self.listControllersInterfaces)
         form_layout.addRow(
             QtWidgets.QLabel('Description:'),
-            QtWidgets.QLabel('Select required interfaces for selected interface property of controller or broadcaster.\n'
-                             'Seleted interface property means current selected in Comboview (Model) Data tab of added controller or broadcaster.\n'
-                             'It is just a helper for setting interfaces for interface properties of controllers and broadcasters.\n'
-                             '\n'
-                             'Interfaces used to communicate with hardware or simulation. \n'
-                             'Controller <-> interface <-> hardware/simulation. See ros2_control documentaion.')
-            )        
+            QtWidgets.QLabel(
+                'Select required interfaces for selected interface property of controller or broadcaster.\n'
+                'Seleted interface property means current selected in Comboview (Model) Data tab of added controller or broadcaster.\n'
+                'It is just a helper for setting interfaces for interface properties of controllers and broadcasters.\n'
+                '\n'
+                'Interfaces used to communicate with hardware or simulation. \n'
+                'Controller <-> interface <-> hardware/simulation. See ros2_control documentaion.',
+            ),
+        )
         setInterfacesButton = QtGui.QPushButton('Add interfaces to selected property', self)
         setInterfacesButton.clicked.connect(self.onSetInterfacesToPropertyButton)
         setInterfacesButton.setAutoDefault(False)
         form_layout.addRow(QtWidgets.QLabel(""), setInterfacesButton)
         formGroupBox2.setLayout(form_layout)
-        # add interfaces adding button       
+        # add interfaces adding button
 
 
         # adding widgets to main layout
@@ -140,7 +144,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         if is_controller_selected() or is_broadcaster_selected():
             doc = fc.activeDocument()
             doc.openTransaction('Set Interfaces to property')
-            
+
             selected_interfaces = [item.text() for item in self.listControllersInterfaces.selectedItems()]
             props, objects = getSelectedPropertiesAndObjectsInTreeView()
 
@@ -171,7 +175,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
             doc.openTransaction('Add Controller')
 
             name = str(self.controllers_dropdown.currentText())
-            controller = make_controller(self.controllers['controllers'][name]) 
+            controller = make_controller(self.controllers['controllers'][name])
             robot = fcgui.Selection.getSelection()[0]
             robot.addObject(controller)
 
@@ -187,10 +191,10 @@ class ControllersSelectorModalClass(QtGui.QDialog):
             doc.openTransaction('Add Broadcaster')
 
             name = str(self.broadcasters_dropdown.currentText())
-            broadcaster = make_broadcaster(self.controllers['broadcasters'][name])  
+            broadcaster = make_broadcaster(self.controllers['broadcasters'][name])
             robot = fcgui.Selection.getSelection()[0]
             robot.addObject(broadcaster)
-        
+
             doc.commitTransaction()
             doc.recompute()
         else:
