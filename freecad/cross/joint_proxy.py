@@ -468,6 +468,8 @@ class _ViewProviderJoint(ProxyBase):
         # print(f'{self.view_object.Object.Name}.onChanged({prop})') # DEBUG
         if prop in ('ShowAxis', 'AxisLength'):
             self.draw()
+        if prop == 'Visibility':
+            self.draw()
 
     def draw(self) -> None:
         from .coin_utils import arrow_group

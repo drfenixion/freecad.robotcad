@@ -21,7 +21,8 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
 
     # Cache the joint order and units, so that we can restore them when
     # called a second time.
-    _cache: OrderedDict[CrossJoint, str] = OrderedDict()
+    # One cache per robot.
+    _cache: dict[CrossRobot, OrderedDict[CrossJoint, str]] = {}
 
     def __init__(self, robot: CrossRobot, *args):
         super().__init__(*args)
@@ -81,19 +82,22 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
         self.setColumnCount(3)
 
         # Complete (or populate) the cache.
+        robot = self.robot
+        if robot not in self._cache:
+            self._cache[robot] = OrderedDict()
         all_joints = self.robot.Proxy.get_actuated_joints()
         for joint in all_joints:
-            if joint not in self._cache:
-                self._cache[joint] = _get_joint_unit(joint)
+            if joint not in self._cache[robot]:
+                self._cache[robot][joint] = _get_joint_unit(joint)
 
         # Populate the first column of the table with the joint names, the
         # second column with the joint values and the third column with the
         # joint units (mm and deg).
-        for i, joint in enumerate(self._cache.keys()):
+        for i, joint in enumerate(self._cache[robot].keys()):
             name_item = QtGui.QTableWidgetItem(ros_name(joint))
             name_item.setFlags(name_item.flags() & ~QtCore.Qt.ItemIsEditable)
             self.setItem(i, 0, name_item)
-            unit = self._cache[joint]
+            unit = self._cache[robot][joint]
             value = _get_joint_value(joint, unit)
             # TODO: Show a rounded value but use the exact value as output and
             # propose the original value when starting to edit.
@@ -143,14 +147,14 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
 
     def _update_cache(self) -> None:
         """Update the cache with the current joint units."""
-        self._cache.clear()
+        self._cache[self.robot].clear()
         joint_name_column = 0
         unit_column = 2
         for i in range(self.rowCount()):
             name_item = self.item(i, joint_name_column)
             unit_item = self.item(i, unit_column)
             joint = self.robot.Proxy.get_joint(name_item.text())
-            self._cache[joint] = unit_item.text()
+            self._cache[self.robot][joint] = unit_item.text()
 
 
 def dnd(values, old_index, drop_index):

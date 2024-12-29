@@ -5,10 +5,11 @@
 
 # Fusion add-ins
 
-- [Fusion2URDF](https://github.com/syuntoku14/fusion2urdf)
+- [Fusion2URDF](https://github.com/syuntoku14/fusion2urdf), ROS 1 only
 - [Fusion2PyBullet](https://github.com/yanshil/Fusion2PyBullet)
 - [ACDC4Robot](https://github.com/bionicdl-sustech/ACDC4Robot)
 - [FusionSDF](https://github.com/andreasBihlmaier/FusionSDF)
+- [fusion2urdf ROS2](https://github.com/dheena2k2/fusion2urdf-ros2), port of Fusion2URDF to ROS2.
 
 # Solidworks add-ins
 
