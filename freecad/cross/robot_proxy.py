@@ -859,6 +859,7 @@ class RobotProxy(ProxyBase):
             'urdf/xacro_wrapper_template.urdf.xacro',
             'urdf/sensors_template.urdf.xacro',
             'worlds/cars_and_trees.sdf',
+            'worlds/empty.sdf',
         ]
 
         write_files = template_files + [
