@@ -37,12 +37,14 @@ def lines_intersect(point1, vec1, point2, vec2):
     epsilon = 1e-6
     x = np.zeros(2)
 
+    # If lines are collinear, they have an infinite number of intersections.
+    # Choose point1.
     if are_collinear(point1, vec1, point2, vec2):
-        return False
+        return True, np.atleast_1d(point1).copy()
 
-    # If lines are parallel, lines don't intersect.
+    # If lines are parallel, they don't intersect.
     if are_parallel(vec1, vec2):
-        return False
+        return False, np.zeros_like(point1)
 
     # Test if lines intersect. Need to find non-singular
     # pair to solve for coefficients.

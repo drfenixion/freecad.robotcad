@@ -28,7 +28,6 @@ from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .gui_utils import tr
 from .ros.utils import split_package_path
-from .trajectory_proxy import make_trajectory
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
 from .urdf_utils import xml_comment_element
 from .utils import get_valid_filename, replace_substring_in_keys
@@ -143,7 +142,7 @@ def _add_joint_variable(
                 error('Joint (' + var_name + ') value can not be less LowerLimit limit')
             if max_ < min_:
                 error('Joint (' + var_name + ') Upper limit can not be less LowerLimit limit')
-        # Deativate callback on change.
+        # Deactivate callback on change.
         robot.setPropertyStatus(used_var_name, ['NoRecompute'])
         setattr(robot, used_var_name, (value, min_, max_, 1.0))
         robot.setPropertyStatus(used_var_name, [])
@@ -1282,8 +1281,10 @@ class _ViewProviderRobot(ProxyBase):
         pass
 
     def load_trajectories_from_yaml(self, vobj: VPDO) -> None:
+        # Import late to avoid slowing down workbench start-up.
         import FreeCADGui as fcgui
         import yaml
+        from .trajectory_proxy import make_trajectory
 
         dialog = QFileDialog(
             fcgui.getMainWindow(),

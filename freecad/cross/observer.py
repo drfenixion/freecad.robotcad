@@ -7,7 +7,6 @@ from typing import NewType, Optional
 import FreeCAD as fc
 
 # Typing hints
-from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 DO = fc.DocumentObject
 ObserverProxy = NewType('ObserverProxy', object)
 VPObserverProxy = NewType('VPObserverProxy', object)

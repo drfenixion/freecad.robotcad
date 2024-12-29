@@ -47,11 +47,15 @@ class ObserverViewProxy:
             name='Position',
             section='Display Options',
             default=default_position,
-            description=('position on the screen, unknown units.'
-                         ' (-1.85, 0.9, 0.002) corresponds to top-left'),
+            description=(
+                'position on the screen, unknown units.'
+                ' (-2.0, 0.75, 0.002) corresponds approximately'
+                ' to top-left (depends on screen geometry)'
+            ),
     )
 
-    def on_attach(self, vobj: VPDO) -> None:
+    def on_attach(self) -> None:
+        # `self.position` is not yet initialized, use `self.ViewObject.Position`.
         (
             self.root_node,
             self.text_node,
@@ -59,13 +63,10 @@ class ObserverViewProxy:
             self.material_node,
         ) = text_2d(
                 '',
-                tuple(self.position),
+                self.ViewObject.Position,
         )
 
-    def on_create(self, vobj: VPDO) -> None:
-        self.on_position_changed(vobj)
-
-    def on_object_change(self, obj: CrossObserver, prop_name: str) -> None:
+    def on_object_change(self, prop_name: str) -> None:
         if not self.Object.ExpressionEngine:
             self.text_node.string = ''
         else:
@@ -74,31 +75,30 @@ class ObserverViewProxy:
         self._set_color(self.material_node)
 
     @dot_display_mode.builder
-    def dot_display_mode_builder(self, vobj: VPDO):
+    def dot_display_mode_builder(self):
         return self.root_node
 
     def _set_color(self, material_node: coin.SoMaterial) -> None:
         if self.Object.Formula != 0:
-            material_node.emissiveColor = (0, 0.5, 0)
+            material_node.emissiveColor = (0.0, 0.5, 0.0)
         else:
-            material_node.emissiveColor = (1, 0, 0)
+            material_node.emissiveColor = (1.0, 0.0, 0.0)
 
     @position.observer
     def on_position_changed(
             self,
-            vobj: VPDO,
     ) -> None:
         self.matrix_transform_node.matrix = coin.SbMatrix(
-            0.0097401002,    0,               0,               0,
-            0,               0.00974009,      1.16877e-05,     0,
-            0,               -2.33755e-05,    0.0194802,       0,
-            self.position.x, self.position.y, self.position.z, 1,
+               0.0097401002,             0.0,             0.0, 0.0,
+                        0.0,      0.00974009,     1.16877e-05, 0.0,
+                        0.0,    -2.33755e-05,       0.0194802, 0.0,
+            self.position.x, self.position.y, self.position.z, 1.0,
         )
 
 
 @proxy(
-        object_type='App::FeaturePython',
-        view_proxy=ObserverViewProxy,
+    object_type='App::FeaturePython',
+    view_proxy=ObserverViewProxy,
 )
 class ObserverProxy:
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import degrees
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import FreeCAD as fc
 
@@ -11,6 +12,7 @@ try:
     from urdf_parser_py.urdf import Collision as UrdfCollision
     from urdf_parser_py.urdf import Joint as UrdfJoint
     from urdf_parser_py.urdf import Link as UrdfLink
+    from urdf_parser_py.urdf import Material as UrdfMaterial
     from urdf_parser_py.urdf import Robot as UrdfRobot
     from urdf_parser_py.urdf import Visual as UrdfVisual
 
@@ -22,6 +24,7 @@ except ModuleNotFoundError:
     UrdfCollision = Any
     UrdfJoint = Any
     UrdfLink = Any
+    UrdfMaterial = Any
     UrdfRobot = Any
     UrdfVisual = Any
 
@@ -47,6 +50,30 @@ VisualList = List[UrdfVisual]
 CollisionList = List[UrdfCollision]
 
 
+@dataclass
+class Color:
+    """An RGBA color with float values ∈ [0, 1]."""
+    r: float
+    g: float
+    b: float
+    a: float
+
+    def to_rgb_tuple(self) -> tuple[float, float, float]:
+        return (self.r, self.g, self.b)
+
+    def to_material(self) -> fc.Material:
+        # TODO: Get the AmbientColor, SpecularColor, EmissiveColor, and
+        # Shininess from FreeCAD's preferences.
+        return fc.Material(
+            DiffuseColor=self.to_rgb_tuple(),
+            AmbientColor=(0.33, 0.33, 0.33),
+            SpecularColor=(0.53, 0.53, 0.53),
+            EmissiveColor=(0.00, 0.00, 0.00),
+            Transparency=1.0 - self.a,
+            Shininess=0.90,
+        )
+
+
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
@@ -54,6 +81,9 @@ def robot_from_urdf(
     """Creates a CROSS::Robot from URDF."""
 
     robot, parts_group = _make_robot(doc, urdf_robot.name)
+
+    colors = _get_colors(urdf_robot)
+
     # visual_map: dict[str, AppPart] = {}
     # collision_map: dict[str, AppPart] = {}
     for urdf_link in urdf_robot.links:
@@ -62,16 +92,21 @@ def robot_from_urdf(
         )
         # visual_map[urdf_link.name] = visual_part
         # collision_map[urdf_link.name] = collision_part
-        geoms, fc_links = _add_visual(urdf_link, parts_group, ros_link, visual_part)
+        geoms, fc_links = _add_visual(
+                urdf_link, parts_group, ros_link, visual_part, colors,
+        )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
         for fc_link in fc_links:
             robot.Proxy.created_objects.append(fc_link)
-        geoms, fc_links = _add_collision(urdf_link, parts_group, ros_link, collision_part)
+        geoms, fc_links = _add_collision(
+                urdf_link, parts_group, ros_link, collision_part, colors,
+        )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
         for fc_link in fc_links:
             robot.Proxy.created_objects.append(fc_link)
+
     joint_map: dict[str, CrossJoint] = {}
     for urdf_joint in urdf_robot.joints:
         ros_joint = _add_ros_joint(urdf_joint, robot)
@@ -108,6 +143,51 @@ def _make_robot(
     robot.Proxy.created_objects.append(parts_group)
 
     return robot, parts_group
+
+
+def _get_colors(
+        urdf_robot: UrdfRobot,
+) -> dict[str, Color]:
+    """
+    Get the colors of the links from the URDF description.
+
+    Return a dictionary ({material_name: Color}) with the available colors, the key is the material
+    name, the value is the color.
+
+    """
+    colors: dict[str, Color] = {}
+    if not hasattr(urdf_robot, 'materials'):
+        return colors
+    for material in urdf_robot.materials:
+        color = _material_color(material)
+        if (color and (material.name is not None)):
+            colors[material.name] = color
+    return colors
+
+
+def _material_color(material: UrdfMaterial) -> Optional[Color]:
+    def clamp(v: float) -> float:
+        return max(0.0, min(1.0, v))
+
+    if not hasattr(material, 'color'):
+        return None
+
+    if not material.color:
+        return None
+
+    try:
+        r, g, b, a = [float(c) for c in material.color.rgba]
+    except (AttributeError, IndexError, ValueError):
+        r, g, b = [float(c) for c in material.color.rgba]
+        a = 1.0
+    except (AttributeError, IndexError, ValueError):
+        return None
+    return Color(
+        clamp(r),
+        clamp(g),
+        clamp(b),
+        clamp(a),
+    )
 
 
 def _add_ros_link(
@@ -307,8 +387,9 @@ def _add_visual(
         parts_group: DOG,
         ros_link: CrossLink,
         visual_part: AppPart,
+        colors: dict[str, Color],
 ) -> tuple[DOList, DOList]:
-    """Add the visual geometries to an assembly.
+    """Add the visual geometries to a robot.
 
     Return the list of objects representing the geometries and the list of
     FreeCAD links.
@@ -316,7 +397,7 @@ def _add_visual(
     Parameters
     ==========
 
-    - robot: an UrdfRobot.
+    - All parameters of `_add_geometries` except `name_linked_geom`.
 
     """
     name_linked_geom = f'{urdf_link.name}_visual'
@@ -326,6 +407,7 @@ def _add_visual(
         visual_part,
         urdf_link.visuals,
         name_linked_geom,
+        colors,
     )
 
 
@@ -334,8 +416,9 @@ def _add_collision(
         parts_group: DOG,
         ros_link: CrossLink,
         collision_part: AppPart,
+        colors: dict[str, Color],
 ) -> tuple[DOList, DOList]:
-    """Add the visual geometries to an assembly.
+    """Add the collision geometries to a robot.
 
     Return the list of objects representing the geometries and the list of
     FreeCAD links.
@@ -343,14 +426,45 @@ def _add_collision(
     Parameters
     ==========
 
-    - robot: an UrdfRobot.
+    - All parameters of `_add_geometries` except `name_linked_geom`.
 
     """
     name_linked_geom = f'{urdf_link.name}_collision'
     return _add_geometries(
-        parts_group, ros_link,
-        collision_part, urdf_link.collisions, name_linked_geom,
+        parts_group,
+        ros_link,
+        collision_part,
+        urdf_link.collisions,
+        name_linked_geom,
+        colors,
     )
+
+
+def _material(
+        visual: UrdfVisual,
+        colors: dict[str, Color],
+) -> Optional[fc.Material]:
+    if not hasattr(visual, 'material'):
+        return None
+
+    if not visual.material:
+        return None
+
+    # Inline material.
+    color = _material_color(visual.material)
+    if color:
+        return color.to_material()
+
+    # Reference to a material defined externally.
+    if not hasattr(visual.material, 'name'):
+        # Should not happen, just in case.
+        return None
+
+    if visual.material.name not in colors:
+        warn(f'Material "{visual.material.name}" not found in URDF description.', gui=True)
+        return None
+
+    return colors[visual.material.name].to_material()
 
 
 def _add_geometries(
@@ -359,6 +473,7 @@ def _add_geometries(
         part: AppPart,
         geometries: [VisualList | CollisionList],
         name_linked_geom: str,
+        colors: dict[str, Color],
 ) -> tuple[DOList, DOList]:
     """Add the geometries from URDF into `group` and an App::Link to it into `link`.
 
@@ -380,6 +495,7 @@ def _add_geometries(
     - name_linked_geom: base pattern for the generated "App::Link" objects
                         generated. The final name may then be
                         `name_linked_geom`, `name_linked_geom`001, ...
+    - colors: a dictionary {material_name: Color} with the available colors.
 
     """
     geom_objs: DOList = []
@@ -393,11 +509,21 @@ def _add_geometries(
         if not geom_obj:
             warn(f'Error when importing geometry for {ros_link.Label}')
             continue
+
+        # Set the color.
+        material = _material(geometry, colors)
+        if material:
+            try:
+                geom_obj.ViewObject.ShapeAppearance = (material,)
+            except (AttributeError, IndexError):
+                pass
+
         geom_obj.Visibility = False
         geom_objs.append(geom_obj)
         # Add a reference to geom_obj to `ros_link.Visual` or
         # `ros_link.Collision`.
         link_to_geom = add_object(part, 'App::Link', name_linked_geom)
+
         link_to_geom.setLink(geom_obj)
         if hasattr(geometry, 'origin'):
             placement = (

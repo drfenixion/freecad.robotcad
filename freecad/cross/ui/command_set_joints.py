@@ -35,7 +35,6 @@ class _SetJointsCommand:
         joint_values = diag.exec_()
         diag.close()
         if joint_values:
-            print(f'Activated(), {joint_values=}')
             robot.Proxy.set_joint_values(joint_values)
         doc.recompute()
         doc.commitTransaction()

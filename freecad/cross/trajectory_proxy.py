@@ -59,7 +59,6 @@ class TrajectoryViewProxy:
 
     def on_context_menu(
             self,
-            vobj: VPDO,
             menu: QMenu,
             ) -> None:
         menu.addAction('Load Trajectory from YAML file...', self.load_yaml)
@@ -141,22 +140,10 @@ class TrajectoryProxy:
         # property cannot be updated with indexing or `merge()`.
         self._joint_map: dict[str, str] = {}
 
-    def on_create(self, obj: CrossTrajectory):
+    def on_create(self):
         self._set_editor_mode()
 
-    def on_attach(self, obj: CrossTrajectory):
-        pass
-
-    def on_start(self, obj: CrossTrajectory):
-        pass
-
-    def on_remove(self, obj: CrossTrajectory):
-        pass
-
-    def on_restore(self, obj: CrossTrajectory):
-        pass
-
-    def on_execute(self, obj: CrossTrajectory):
+    def on_execute(self):
         if is_robot(self.robot):
             self._update_robot_joint_values()
 
@@ -167,7 +154,7 @@ class TrajectoryProxy:
         self._joint_map = state['_joint_map']
 
     @robot.observer
-    def on_robot_changed(self, obj: CrossTrajectory, new, old) -> None:
+    def on_robot_changed(self, new, old) -> None:
         if self.robot and (not is_robot(self.robot)):
             warn('The selected object is not a robot', True)
             self.robot = None
@@ -191,7 +178,7 @@ class TrajectoryProxy:
         self._set_editor_mode()
 
     @point_index.observer
-    def on_point_index_changed(self, obj: CrossTrajectory, new, old):
+    def on_point_index_changed(self, new, old):
         if not (0 <= new < self.point_count):
             warn(
                 f'Invalid point index: {new}, must be within [0, {self.point_count})',
