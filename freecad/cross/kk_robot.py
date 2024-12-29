@@ -29,8 +29,10 @@ try:
     from numpy.typing import ArrayLike
     from . import geometry_helpers as gh
 except ImportError as e:
-    warn(f'numpy not available, some functionalities will not work, error: {e}',
-         False)
+    warn(
+        f'numpy not available, some functionalities will not work, error: {e}',
+        False,
+    )
     ArrayLike = Any
 
 # Stubs and type hints.
