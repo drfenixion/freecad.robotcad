@@ -32,24 +32,27 @@ class _SetCROSSPlacementByOrienteerCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'set_cross_placement_by_orienteer.svg',
-                'MenuText': tr('Set placement - by orienteer'),
-                'Accel': 'P, O',
-                'ToolTip': tr('Set the Mounted Placement of a link or the Origin of a joint.\n'
-                              '\n'
-                              'Select (with Ctlr) either:\n'
-                              '  a) a CROSS::Link, any (face, edge, vertex, LCS) at Real of this link (orienteer)\n'
-                              '  b) a CROSS::Joint, any (orienteer)\n'
-                              '\n'
-                              'This will set Mounted Placement if select link first. \n'
-                              'Placement of orienteer will be placement of conjunction link to joint.\n'
-                              '\n'
-                              'This will set Origin if selected joint first.\n'
-                              'Placement of orienteer will be placement of join origin\n'
-                              '\n'
-                              'LCS is convenient as reference because of configurable orientation.\n'
-                              'Use this when you want just move Origin or Mounted placement to some placement.\n'
-                              )}
+        return {
+            'Pixmap': 'set_cross_placement_by_orienteer.svg',
+            'MenuText': tr('Set placement - by orienteer'),
+            'Accel': 'P, O',
+            'ToolTip': tr(
+                'Set the Mounted Placement of a link or the Origin of a joint.\n'
+                '\n'
+                'Select (with Ctlr) either:\n'
+                '  a) a CROSS::Link, any (face, edge, vertex, LCS) at Real of this link (orienteer)\n'
+                '  b) a CROSS::Joint, any (orienteer)\n'
+                '\n'
+                'This will set Mounted Placement if select link first. \n'
+                'Placement of orienteer will be placement of conjunction link to joint.\n'
+                '\n'
+                'This will set Origin if selected joint first.\n'
+                'Placement of orienteer will be placement of join origin\n'
+                '\n'
+                'LCS is convenient as reference because of configurable orientation.\n'
+                'Use this when you want just move Origin or Mounted placement to some placement.\n',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection())
@@ -62,7 +65,8 @@ class _SetCROSSPlacementByOrienteerCommand:
         try:
             cross_link, orienteer1 = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Cross::Link', 'Any'])
+                ['Cross::Link', 'Any'],
+            )
             selection_ok = True
             selection_link = True
         except RuntimeError:
@@ -72,19 +76,22 @@ class _SetCROSSPlacementByOrienteerCommand:
             try:
                 cross_joint, orienteer1 = validate_types(
                     fcgui.Selection.getSelection(),
-                    ['Cross::Joint', 'Any'])
+                    ['Cross::Joint', 'Any'],
+                )
                 selection_ok = True
                 selection_joint = True
             except RuntimeError:
                 pass
 
         if not selection_ok:
-            message('Select either\n'
-                    '  a) a CROSS::Link, any (face, edge, vertex) at body of this link (orienteer) \n'
-                    '  b) a CROSS::Joint, any (orienteer) \n',
-                    gui=True)
+            message(
+                'Select either\n'
+                '  a) a CROSS::Link, any (face, edge, vertex) at body of this link (orienteer) \n'
+                '  b) a CROSS::Joint, any (orienteer) \n',
+                gui=True,
+            )
             return
-        
+
         # for work with subelement
         sel = fcgui.Selection.getSelectionEx()
         orienteer1_sub_element = sel[1]
