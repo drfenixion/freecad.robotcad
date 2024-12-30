@@ -594,6 +594,8 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
         return controllers
 
     controllers = get_controllers_root_dirs(ROS2_CONTROLLERS_PATH)
+    controllers['controllers_dirs'] = filter_controllers_dirs(controllers['controllers_dirs'])
+
     controllers['controllers_dirs'] = collect_controllers_config_files(controllers['controllers_dirs'])
     controllers['broadcasters_dirs'] = collect_controllers_config_files(controllers['broadcasters_dirs'])
     controllers['controllers_dirs'] = collect_controllers_parameters(controllers['controllers_dirs'])
@@ -603,6 +605,18 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 
     controllers['controllers'] = separate_controllers_from_dirs(controllers['controllers_dirs'])
     controllers['broadcasters'] = separate_controllers_from_dirs(controllers['broadcasters_dirs'])
+
+    return controllers
+
+
+def filter_controllers_dirs(controllers: dict):
+    """Filter controllers directories for that not coded parsing yet"""
+
+    filter_controllers_dirs = ['mecanum_drive_controller', 'parallel_gripper_controller', 'gpio_controllers']
+
+    for controller in list(controllers):
+        if controller in filter_controllers_dirs:
+            del controllers[controller]
 
     return controllers
 
