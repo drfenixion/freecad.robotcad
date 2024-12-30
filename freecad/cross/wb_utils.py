@@ -990,7 +990,7 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
         p = subprocess.run(
-            ["git submodule update --init " + update_from_remote_branch_param], 
+            ["git submodule update --init " + update_from_remote_branch_param],
             shell=True,
             capture_output=True,
             cwd=MOD_PATH,
@@ -1016,7 +1016,7 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
     else:
         git_update_submodules(update_from_remote_branch_param)
 
-    
+
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
     """Check .gitmodules file for changes by backup file with md5 if .gitmodules"""
     gitmodules_md5_filepath = workbench_path / '.gitmodules_md5'
@@ -1032,7 +1032,7 @@ def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
             pass
         else:
             print(f'Error reading file {gitmodules_md5_filepath}: {e}')
-       
+
     if gitmodules_md5 != gitmodules_md5_backup:
         try:
             f = open(gitmodules_md5_filepath, "w")
