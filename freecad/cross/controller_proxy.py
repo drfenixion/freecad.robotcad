@@ -56,13 +56,15 @@ class ControllerProxy(ProxyBase):
 
     Type = ControllerType
 
-    # dinamic type at creating time. 
+    # dinamic type at creating time.
     # type can be 'Cross::Controller' and 'Cross::Broadcaster'
     def __init__(self, obj: CrossController, dynamicType:str | None = None):
-        super().__init__('controller', [
+        super().__init__(
+            'controller', [
             '_Type',
-            ])
-        
+            ],
+        )
+
         if dynamicType:
             if dynamicType in self.dynamicTypes:
                 self.Type = dynamicType
@@ -129,29 +131,31 @@ class _ViewProviderController(ProxyBase):
 
     def updateData(self, obj: CrossController, prop: str):
 
-        def get_param_to_replace(prop: str, 
-                                 param_map_marker: str = wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER,
-                                 ):
-            """Return param_to_replace. 
-            
+        def get_param_to_replace(
+            prop: str,
+            param_map_marker: str = wb_constants.ROS2_CONTROLLERS_PARAM_MAP_MARKER,
+        ):
+            """Return param_to_replace.
+
             param_to_replace is string that should replaced with f.e. joint name
-            from map source attr f.e. dof_names in mapped_params_templates 
+            from map source attr f.e. dof_names in mapped_params_templates
             example of mapping: 'gains_____map_dof_names___p' -> 'gains___joint_name___p'
             examples of param_to_replace: '__map_dof_names', '__map_joints'
             """
-            
+
             return param_map_marker + prop
 
 
-        def map_param(prop: str, 
-                      mapped_params_templates: dict, 
-                      obj: CrossController, 
-                      ):
+        def map_param(
+            prop: str,
+            mapped_params_templates: dict,
+            obj: CrossController,
+        ):
             """Map param by map param template. Add mapped param to obj
-            
+
             mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
             params for mapping - params that should be mapped by teplate (ex: joints)
-            
+
             after mapping param name will be like - gains___joint_name___p
             """
 
@@ -169,7 +173,7 @@ class _ViewProviderController(ProxyBase):
             controllers_merged = {}
             controllers_merged.update(controllers['controllers'])
             controllers_merged.update(controllers['broadcasters'])
-            
+
             parameters_flatten_filtered = {}
             for param_flatten in controllers_merged[ros_name(obj)]['parameters_flatten']:
                 if param_flatten in mapped_params_templates_filtered.keys():
@@ -185,7 +189,7 @@ class _ViewProviderController(ProxyBase):
 
                     for template in mapped_params_templates_filtered:
                         mapped_prop_name = template.replace(param_to_replace, el)
-                        
+
                         try:
                             attr_not_exist_trigger = getattr(obj, mapped_prop_name)
                         except AttributeError:
@@ -195,17 +199,18 @@ class _ViewProviderController(ProxyBase):
                             t = obj
 
 
-        def remove_redundant_mapped_attrs(prop: str, 
-                                          obj: CrossController, 
-                                          parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                                          ) -> CrossController:
+        def remove_redundant_mapped_attrs(
+            prop: str,
+            obj: CrossController,
+            parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+        ) -> CrossController:
             """ Remove redundant mapped attrebutes after thier source attr elements was deleted """
 
             params_to_map = getattr(obj, 'params_to_map', [])
             param_to_replace = get_param_to_replace(prop)
 
             if prop in params_to_map:
-                
+
                 # prepare param_to_map_value_as_str_list
                 param_to_map_value = getattr(obj, prop)
                 param_to_map_value_as_dict = {}
@@ -214,10 +219,10 @@ class _ViewProviderController(ProxyBase):
                         el = ros_name(el)
                     param_to_map_value_as_dict[el] = el
                 param_to_map_value_as_str_list = list(param_to_map_value_as_dict.keys())
-                
+
                 # check diff old mapped param and new
                 mapped_params_prop_name = 'mapped_params' + parameter_full_name_glue + prop
-                mapped_params_prop_value_old = getattr(obj, mapped_params_prop_name, [])     
+                mapped_params_prop_value_old = getattr(obj, mapped_params_prop_name, [])
                 if param_to_map_value_as_str_list != mapped_params_prop_value_old:
                     mapped_params_to_remove = list(set(mapped_params_prop_value_old) - set(param_to_map_value_as_str_list))
 
@@ -253,11 +258,13 @@ class _ViewProviderController(ProxyBase):
 
 
             def notice_not_suited_object_selected(element, replacements: dict, prop: str):
-                error('Selected not suited object (' + ros_name(element) + ') for ' 
-                    + prop + ' property. Object was excluded. Verification functions - ' 
-                    + ', '.join(replacements[prop]['check_functions']) 
-                    + '. Use filter of this type.', gui=True)
-            
+                error(
+                    'Selected not suited object (' + ros_name(element) + ') for '
+                    + prop + ' property. Object was excluded. Verification functions - '
+                    + ', '.join(replacements[prop]['check_functions'])
+                    + '. Use filter of this type.', gui=True,
+                )
+
             # custom type checks
             replacements = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
             if prop in replacements:
@@ -275,8 +282,8 @@ class _ViewProviderController(ProxyBase):
                                     break
                             if not suited_object_flag:
                                 notice_not_suited_object_selected(element, replacements, prop)
-                                
-                                    
+
+
                 else:
                     if attr:
                         suited_object_flag = False
@@ -287,7 +294,7 @@ class _ViewProviderController(ProxyBase):
                                 break
                         if not suited_object_flag:
                             notice_not_suited_object_selected(attr, replacements, prop)
-                            
+
                 if attr != filtered_elements:
                     setattr(obj, prop, filtered_elements)
 
@@ -309,7 +316,7 @@ class _ViewProviderController(ProxyBase):
                         map_param(param_to_map, mapped_params_templates, obj)
 
             return obj
-        
+
 
         obj = custom_type_checks(prop, obj)
 
@@ -365,7 +372,7 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
     if doc is None:
         warn('No active document, doing nothing', False)
         return
-    
+
     controller: CrossController = doc.addObject('App::FeaturePython', controller_data['name'])
     ControllerProxy(controller, dynamicType)
 
@@ -397,19 +404,19 @@ def make_controller(controller_data: dict, dynamicType = None, doc: Optional[fc.
 
 
 def add_controller_properties_block(controller: CrossController, controller_data: dict) -> CrossController:
-    
+
     controller = add_controller_properties(
-        controller, 
+        controller,
         {controller_data['name']: controller_data['parameters']},
         controller_data['name'],
-        )
-    
+    )
+
     adding_flatten_params = flatten_params(controller_data['parameters'], flat_params = {})
     parameters_flatten = deepcopy(controller_data['parameters_flatten'])
     controller_data['parameters_flatten'] = {
-        **parameters_flatten, 
-        **adding_flatten_params
-        }
+        **parameters_flatten,
+        **adding_flatten_params,
+    }
     parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
     prop_name = 'controller_parameters_fullnames_list'
     # add meta property
@@ -426,16 +433,17 @@ def add_controller_properties_block(controller: CrossController, controller_data
             parameters_flatten_full_names,
         )
         controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
-    
+
 
     return controller
 
 
-def add_controller_properties(controller: CrossController, 
-                              parameters: dict, 
-                              parameter_name: str, 
-                              parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                              ) -> CrossController:
+def add_controller_properties(
+    controller: CrossController,
+    parameters: dict,
+    parameter_name: str,
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> CrossController:
     """Adding properties to controller."""
 
     for param_name, param in parameters[parameter_name].items():
@@ -453,11 +461,11 @@ def add_controller_properties(controller: CrossController,
             try:
                 var_name = param['full_name']
             except KeyError:
-                # avoiding except of outer try block by using other type error 
+                # avoiding except of outer try block by using other type error
                 raise RuntimeError('param full_name - KeyError')
-            
+
             # for recursive props make category for grouping them from names of each recursion dive
-            # example linear__x__has_velosity_limits 
+            # example linear__x__has_velosity_limits
             full_name_splited = param['full_name'].split(parameter_full_name_glue)
             if len(full_name_splited) > 1:
                 category = parameter_full_name_glue.join(full_name_splited[:-1])
@@ -466,7 +474,7 @@ def add_controller_properties(controller: CrossController,
                 category = 'Mandatory Root'
                 if default_value is None \
                 or (not default_value and default_value is not False):
-                    
+
                     if 'description' in param:
                         if '(Optional)' in param['description'] \
                         or '(optional)' in param['description']:
@@ -484,16 +492,18 @@ def add_controller_properties(controller: CrossController,
                     elif parameter_name == 'joint_trajectory_controller' \
                     and param['full_name'] in ['cmd_timeout', 'command_joints']:
                         category = 'Root'
-                    elif parameter_name in ['bicycle_steering_controller', 
-                                            'tricycle_steering_controller', 
-                                            'ackermann_steering_controller', 
-                                            'diff_drive_controller', 
-                                            'tricycle_controller'] \
+                    elif parameter_name in [
+                        'bicycle_steering_controller',
+                        'tricycle_steering_controller',
+                        'ackermann_steering_controller',
+                        'diff_drive_controller',
+                        'tricycle_controller',
+                    ] \
                     and param['full_name'] in ['base_frame_id', 'odom_frame_id']:
                         category = 'Root'
                 else:
                     category = 'Root'
-                
+
             # make description
             help_txt = ''
             if 'description' in param:
@@ -501,7 +511,7 @@ def add_controller_properties(controller: CrossController,
 
             if 'validation_str' in param:
                 help_txt += '\n\n' + param['validation_str']
-            
+
             # add property
             controller, used_property_name = add_property(
                 controller,
@@ -518,10 +528,10 @@ def add_controller_properties(controller: CrossController,
         except KeyError:
             # not type finded at this level and should dive deeper
             controller = add_controller_properties(
-                controller, 
+                controller,
                 parameters[parameter_name],
-                param_name, 
-                )
+                param_name,
+            )
 
     return controller
 
@@ -541,9 +551,9 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
                         controllers[controller_name]['parameters'].update(yaml.safe_load(stream))
                     else:
                         controllers[controller_name]['parameters'] = yaml.safe_load(stream)
-        
+
         return controllers
-    
+
 
     def collect_controllers_plugin_data(controllers: dict) -> dict :
         ''' Adding to controllers their plugin data. '''
@@ -560,29 +570,30 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
                     base_class_type = type_tag.get('base_class_type')
                     class_name = full_class_name.split('/')[-1]
 
-                    # special cases for some of same controller names in xml 
+                    # special cases for some of same controller names in xml
                     if 'GripperActionController' in full_class_name:
                         gripper_interface = re.search(r'(.+)_', full_class_name).group(1) # effor, position
                         class_name = class_name + gripper_interface.capitalize()
                         controller['parameters']['gripper_action_controller_' + gripper_interface] = deepcopy(controller['parameters']['gripper_action_controller'])
-                        
+
                     camelCaseToList = re.findall(r'[A-Za-z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
                     controller_name = '_'.join(camelCaseToList).lower()
-                    plugin = {full_class_name: 
-                                {
-                                  'name': controller_name,
-                                  'full_name': full_class_name,
-                                  'type': type,
-                                  'base_class_type': base_class_type,
-                                  'description': type_tag.find('description').text.strip()
-                                }
-                              }
+                    plugin = {
+                        full_class_name:
+                          {
+                            'name': controller_name,
+                            'full_name': full_class_name,
+                            'type': type,
+                            'base_class_type': base_class_type,
+                            'description': type_tag.find('description').text.strip(),
+                          },
+                    }
 
                     if 'plugins_data' in controllers[dir_name]:
                         controllers[dir_name]['plugins_data'].update(plugin)
                     else:
                         controllers[dir_name]['plugins_data'] = plugin
-        
+
         # special cases
         # there are 2 gripper_action_controller (effor, position) in dir and only 1 yaml config
         # above split controller and now delete origin gripper_action_controller
@@ -590,7 +601,7 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
             del controllers['gripper_controllers']['parameters']['gripper_action_controller']
         except KeyError:
             pass
-        
+
         return controllers
 
     controllers = get_controllers_root_dirs(ROS2_CONTROLLERS_PATH)
@@ -621,13 +632,14 @@ def filter_controllers_dirs(controllers: dict):
     return controllers
 
 
-def add_full_name_to_params(params: dict, 
-                            param_name_prefix: list = [], 
-                            parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                            ) -> dict:
+def add_full_name_to_params(
+    params: dict,
+    param_name_prefix: list = [],
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> dict:
     ''' Add full name with parent prefixes to every param.
-    
-    Params can be at various level of nested deep. 
+
+    Params can be at various level of nested deep.
     full_param_name means all parents prefixes + param_name joined with parameter_full_name_glue
     '''
 
@@ -635,8 +647,8 @@ def add_full_name_to_params(params: dict,
         try:
             # param['type'] - KeyError trigger to recursion because type present only in leaf element
             type = param['type']
-            
-            full_param_name = parameter_full_name_glue.join(param_name_prefix + [param_name]) 
+
+            full_param_name = parameter_full_name_glue.join(param_name_prefix + [param_name])
             params[param_name]['full_name'] = full_param_name
         except KeyError:
             param_name_prefix.append(param_name)
@@ -663,11 +675,12 @@ def flatten_params(params: dict, flat_params: dict) -> dict:
     return flat_params
 
 
-def unflatten_params(flatten_params: dict, 
-                     param_to_replace: str | None = None, 
-                     replace: str | None = None, 
-                     parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                     ) -> dict:
+def unflatten_params(
+    flatten_params: dict,
+    param_to_replace: str | None = None,
+    replace: str | None = None,
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> dict:
     ''' Unflattens parameters dict.
 
     Split flatten params name by parameter_full_name_glue and make nested structure with list
@@ -689,9 +702,9 @@ def unflatten_params(flatten_params: dict,
             result_params = {params_nest_level_name: params}
         else:
             result_params = {params_nest_level_name: leaf_param_data}
-        
+
         return result_params
-    
+
 
     params = {}
     for param_name, leaf_param_data in flatten_params.items():
@@ -701,8 +714,8 @@ def unflatten_params(flatten_params: dict,
 
 
 def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
-    ''' Separate controllers from controllers directories dictionaries. 
-    
+    ''' Separate controllers from controllers directories dictionaries.
+
     Directory can contains several controllers.
     This make controllers as first level properties of dict.
     '''
@@ -720,7 +733,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                 params[param_name]['type_fc_origin'] = param['type_fc']
                 if 'default_value' in param:
                     params[param_name]['default_value_origin'] = param['default_value']
-                
+
                 # full_param_name means param_name + all parents prefixes
                 full_param_name = params[param_name]['full_name']
                 if full_param_name in replacement:
@@ -746,11 +759,11 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                 params_without_exluded[param_name] = param
 
         return params_without_exluded
-    
+
 
     def add_validation_rules_str_to_params(params: dict) -> dict:
-        ''' Add validation rules string to every param with validation. 
-        
+        ''' Add validation rules string to every param with validation.
+
         It convert rules to string and to every param where present validation.
         '''
 
@@ -768,7 +781,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     validation_value_str = ''
                     if validation_value:
                         validation_value_str += '. Validation value: '
-                        
+
                         try:
                             validation_value_str += ', '.join(str(el) for el in validation_value)
                         except:
@@ -779,7 +792,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                 params[param_name]['validation_str'] = validation_str
 
         return params
-    
+
 
     excluded_params = wb_constants.ROS2_CONTROLLERS_EXCLUDED_PARAMS
 
@@ -801,12 +814,12 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     params_to_exlude = excluded_params[plugin_data_name]['excluded_params']
                     parameters = exclude_params(
                         controllers_dirs[params_based_on_controller_dir]['parameters'][params_based_on_controller_name],
-                        params_to_exlude
-                        )
+                        params_to_exlude,
+                    )
                 if plugin_data_name in ['ackermann_steering_controller', 'bicycle_steering_controller', 'tricycle_steering_controller']:
                     # must add steering_controllers_library params to steering controllers
                     parameters.update(controllers_dirs['steering_controllers_library']['parameters']['steering_controllers_library'])
-                
+
                 parameters = add_full_name_to_params(parameters)
                 parameters = add_fc_types_based_on_params_types(parameters)
                 parameters = add_validation_rules_str_to_params(parameters)
@@ -835,18 +848,22 @@ def get_controllers_root_dirs(ROS2_CONTROLLERS_PATH: Path) -> dict :
 
     controller_key_words = ['controller']
     controller_key_words_blacklist = ['test', 'ros2_controllers', 'rqt']
-    controllers = get_files_or_dirs_by_filter(ROS2_CONTROLLERS_PATH, 
-                                              files_or_dirs = 'dirs', 
-                                              key_words = controller_key_words, 
-                                              key_words_blacklist = controller_key_words_blacklist, 
-                                              attr_name_for_found_result = 'dir')
+    controllers = get_files_or_dirs_by_filter(
+        ROS2_CONTROLLERS_PATH,
+        files_or_dirs = 'dirs',
+        key_words = controller_key_words,
+        key_words_blacklist = controller_key_words_blacklist,
+        attr_name_for_found_result = 'dir',
+    )
 
     controller_key_words = ['broadcaster']
-    broadcasters = get_files_or_dirs_by_filter(ROS2_CONTROLLERS_PATH, 
-                                               files_or_dirs = 'dirs', 
-                                               key_words = controller_key_words, 
-                                               key_words_blacklist = controller_key_words_blacklist, 
-                                               attr_name_for_found_result = 'dir')
+    broadcasters = get_files_or_dirs_by_filter(
+        ROS2_CONTROLLERS_PATH,
+        files_or_dirs = 'dirs',
+        key_words = controller_key_words,
+        key_words_blacklist = controller_key_words_blacklist,
+        attr_name_for_found_result = 'dir',
+    )
 
     controllers_and_broadcusters['controllers_dirs'] = controllers
     controllers_and_broadcusters['broadcasters_dirs'] = broadcasters
@@ -860,24 +877,28 @@ def collect_controllers_config_files(controllers: dict) -> dict :
     for controller_folder_name, controller_value in controllers.items():
 
         plugin = get_files_or_dirs_by_filter(
-            controller_value['dir'], 
-            key_words = ['.xml'], 
-            key_words_blacklist = ['package.xml'])
+            controller_value['dir'],
+            key_words = ['.xml'],
+            key_words_blacklist = ['package.xml'],
+        )
         controllers[controller_folder_name].update({'plugin_path': plugin})
 
         parameters = get_files_or_dirs_by_filter(
-            controller_value['dir'] / 'src', 
-            key_words = ['.yaml'])
+            controller_value['dir'] / 'src',
+            key_words = ['.yaml'],
+        )
         controllers[controller_folder_name].update({'parameters_path': parameters})
 
     return controllers
 
 
-def get_files_or_dirs_by_filter(dir: Path, 
-                                files_or_dirs:str = 'files',
-                                key_words:list = [],
-                                key_words_blacklist:list = [],
-                                attr_name_for_found_result:str | None = None) -> dict :
+def get_files_or_dirs_by_filter(
+    dir: Path,
+    files_or_dirs:str = 'files',
+    key_words:list = [],
+    key_words_blacklist:list = [],
+    attr_name_for_found_result:str | None = None,
+) -> dict :
     ''' Get files or dirs in path by included keywords in file name. '''
 
     files_or_dirs_result = {}
@@ -886,16 +907,16 @@ def get_files_or_dirs_by_filter(dir: Path,
             # check key words
             for key_word in key_words:
                 if key_word in name:
-                    
+
                     # check blacklist
                     name_in_blacklist = False
                     for key_word_bl in key_words_blacklist:
                         if key_word_bl in name:
                             name_in_blacklist = True
                             break
-                    
+
                     # forming result
-                    if not name_in_blacklist:  
+                    if not name_in_blacklist:
                         if name not in files_or_dirs_result:
                             if not attr_name_for_found_result:
                                 files_or_dirs_result[name] = {Path(root) / name}
@@ -903,23 +924,24 @@ def get_files_or_dirs_by_filter(dir: Path,
                                 files_or_dirs_result[name] = {}
 
                         if not attr_name_for_found_result:
-                            files_or_dirs_result.update({name: Path(root) / name})  
+                            files_or_dirs_result.update({name: Path(root) / name})
                         else:
                             files_or_dirs_result.update({name: {attr_name_for_found_result: Path(root) / name}})
-        
+
         break
 
     return files_or_dirs_result
 
 
-def get_mapped_params(obj: CrossController, 
-                      parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
-                      ) -> tuple[dict, dict]:
+def get_mapped_params(
+    obj: CrossController,
+    parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+) -> tuple[dict, dict]:
     """Get mapped params templates and params for mapping.
-    
+
     mapped params templates - params that is templates for mapping other params (ex: gains_____map_joints___p)
     params for mapping - params that should be mapped by teplate (ex: joints)
-    
+
     after mapping param name will be like - gains___joint_name___p
     """
 
