@@ -27,7 +27,7 @@ from .freecad_utils import lcs_attachmentsupport_name
 from .freecadgui_utils import get_placement
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
-from .utils import attr_equals
+from .utils import attr_equals, calc_md5
 from .utils import values_from_string
 from .utils import get_valid_filename
 from .exceptions import NoPartWrapperOfObject
@@ -975,11 +975,22 @@ def get_controllers_config_file_name(robot_name: str) -> str:
 def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
     """ Do git submodule update --init if ros2_controllers module dir is empty """
 
+    def git_deinit_submodules():
+        message('Deinit git submodules.')
+        p = subprocess.run(
+            ["git submodule deinit -f ."],
+            shell=True,
+            capture_output=True,
+            cwd=MOD_PATH,
+            check=True,
+        )
+        print('process:', p)
+
 
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
         p = subprocess.run(
-            ["git submodule update", "--init", update_from_remote_branch_param],
+            ["git submodule update --init " + update_from_remote_branch_param], 
             shell=True,
             capture_output=True,
             cwd=MOD_PATH,
@@ -992,10 +1003,44 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
     if update_from_remote_branch:
         update_from_remote_branch_param = '--remote'
 
+
     files_and_dirs = os.listdir(update_if_dir_is_empty)
     # update if dir is empty
     if only_first_update:
+        gitmodules_changed = is_gitmodules_changed()
         if not len(files_and_dirs):
+            git_update_submodules(update_from_remote_branch_param)
+        elif gitmodules_changed:
+            git_deinit_submodules()
             git_update_submodules(update_from_remote_branch_param)
     else:
         git_update_submodules(update_from_remote_branch_param)
+
+    
+def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
+    """Check .gitmodules file for changes by backup file with md5 if .gitmodules"""
+    gitmodules_md5_filepath = workbench_path / '.gitmodules_md5'
+    gitmodules_changed = True
+    gitmodules_md5_backup = False
+    try:
+        gitmodules_md5 = calc_md5(workbench_path / ".gitmodules")
+        f = open(gitmodules_md5_filepath, "r")
+        gitmodules_md5_backup = f.read()
+        f.close()
+    except (FileNotFoundError, IOError) as e:
+        if isinstance(e, FileNotFoundError):
+            pass
+        else:
+            print(f'Error reading file {gitmodules_md5_filepath}: {e}')
+       
+    if gitmodules_md5 != gitmodules_md5_backup:
+        try:
+            f = open(gitmodules_md5_filepath, "w")
+            f.write(gitmodules_md5)
+            f.close()
+        except (FileNotFoundError, IOError) as e:
+            print(f'Error writing file {gitmodules_md5_filepath}: {e}')
+    else:
+        gitmodules_changed = False
+
+    return gitmodules_changed

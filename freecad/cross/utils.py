@@ -17,6 +17,7 @@ import yaml
 import collections.abc
 import re
 from copy import deepcopy
+import hashlib
 
 import xmltodict
 
@@ -321,3 +322,21 @@ def replace_substring_in_keys(dictionary, old_substring, new_substring):
             new_dict[new_key] = value
 
     return new_dict
+
+
+def calc_md5(file_path: str) -> str:
+    """
+    Calculates the MD5 hash of a file's content.
+    param:
+        file_path: The path to the file.
+    Return:
+        The MD5 hash of the file's content.
+    Raises:
+        FileNotFoundError: If the file is not found.
+        IOError: If an error occurs while reading the file.
+    """
+    md5 = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            md5.update(chunk)
+    return md5.hexdigest()
