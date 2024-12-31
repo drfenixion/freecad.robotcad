@@ -9,6 +9,8 @@ PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
 WORKBENCH_NAME = 'RobotCAD - ROS2'
 
+lcs_wrapper_prefix = "LCS wrapper "
+
 XMLTODICT_ATTR_PREFIX_ORIGIN = '@'
 XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME = 'attr_'
 

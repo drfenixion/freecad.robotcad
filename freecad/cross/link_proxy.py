@@ -36,6 +36,7 @@ from .wb_utils import is_primitive
 from .wb_utils import is_robot
 from .wb_utils import ros_name
 from .wb_utils import get_parent_link_of_obj
+from . import wb_constants
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -130,6 +131,9 @@ def _get_xmls_and_export_meshes(
     )
     xmls: list[et.Element] = []
     for export_datum in export_data:
+        if wb_constants.lcs_wrapper_prefix in ros_name(export_datum.object):
+            # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
+            continue
         if not is_primitive(export_datum.object):
             mesh_path = (
                 package_parent / package_name

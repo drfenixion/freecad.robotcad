@@ -816,7 +816,7 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
 
     body_lcs_wrapper = fc.ActiveDocument.addObject("PartDesign::Body", "Body")
 
-    body_lcs_wrapper.Label = "LCS wrapper " + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
+    body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
 
     obj.addObject(body_lcs_wrapper)
 
