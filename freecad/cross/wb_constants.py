@@ -15,9 +15,14 @@ XMLTODICT_ATTR_PREFIX_ORIGIN = '@'
 XMLTODICT_ATTR_PREFIX_FIXED_FOR_PROP_NAME = 'attr_'
 
 ### ROS2_CONTROLLERS
+ROS2_CONTROLLERS_CURRENT_ROS_VERSION_PARAM_NAME = 'controllers_current_ros_version'
 ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE = '___'
 ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE_YAML = '.'
 ROS2_CONTROLLERS_PARAM_MAP_MARKER = '__map_'
+ROS2_CONTROLLERS_ROS_VERSIONS = [
+    {'ros_version': 'jazzy', 'controllers_branch': 'master'},
+    {'ros_version': 'iron', 'controllers_branch': 'iron'}
+]
 
 ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
     'bool': 'App::PropertyBool',

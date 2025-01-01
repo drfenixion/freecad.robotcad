@@ -4,7 +4,7 @@ import FreeCADGui as fcgui
 import FreeCAD as fc
 
 from ...controller_proxy import get_controllers_data
-from ...wb_utils import is_robot_selected
+from ...wb_utils import get_workbench_param, git_change_submodule_branch, is_robot_selected, set_workbench_param
 from ...wb_utils import is_controller_selected
 from ...wb_utils import is_broadcaster_selected
 from ...controller_proxy import make_controller
@@ -38,6 +38,42 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         # attach triggers of changing descriptions
         self.controllers_dropdown.currentTextChanged.connect(self.update_controller_description)
         self.broadcasters_dropdown.currentTextChanged.connect(self.update_broadcaster_description)
+
+
+        ### change controllers ros version
+        # get ros_versions
+        current_ros_version = get_workbench_param(wb_constants.ROS2_CONTROLLERS_CURRENT_ROS_VERSION_PARAM_NAME, 'jazzy')
+        self.ros_versions = wb_constants.ROS2_CONTROLLERS_ROS_VERSIONS
+        # fill ros_versions dropdown
+        self.ros_versions_dropdown = QtGui.QComboBox(self)
+        for ros_version in self.ros_versions:
+            self.ros_versions_dropdown.addItem(ros_version['ros_version'], ros_version['ros_version'])
+        self.ros_versions_dropdown.setCurrentText(current_ros_version)
+        # create ros_versions box
+        formGroupBoxRosVersions = QtWidgets.QGroupBox("ROS versions")
+        form_layout = QtWidgets.QFormLayout(self)
+        self.ros_version_desctiption = QtWidgets.QLabel()
+        form_layout.addRow(QtWidgets.QLabel("Select ROS version:"), self.ros_versions_dropdown)
+        form_layout.addRow(
+            QtWidgets.QLabel(''),
+            QtWidgets.QLabel(
+                'Tip: choosen ROS version will be used to checkout ros2_controllers repository\n'
+                'and forming related controllers forms.\n'
+                'Use ROS version you plan to code generation for. It will update only new controllers.\n'
+                'Controllers added before will persist is own version. Delete them and create new ones if required.'
+            ),
+        )
+        # update ros controllers to choosen ros version
+        updateControllersToROSversionBotton = QtGui.QPushButton('Update ros controllers to choosen ros version', self)
+        updateControllersToROSversionBotton.clicked.connect(self.updateControllersToROSversionBotton)
+        updateControllersToROSversionBotton.setAutoDefault(False)
+        form_layout.addRow(QtWidgets.QLabel(""), updateControllersToROSversionBotton)
+        # add form to ros_versions box
+        formGroupBoxRosVersions.setLayout(form_layout)
+
+
+        # attach triggers of changing descriptions
+        self.controllers_dropdown.currentTextChanged.connect(self.update_controller_description)
 
         # add controllers adding button
         addControllerButton = QtGui.QPushButton('Add controller to project', self)
@@ -116,6 +152,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         main_layout.addWidget(formGroupBox)
         main_layout.addWidget(formGroupBox1)
         main_layout.addWidget(formGroupBox2)
+        main_layout.addWidget(formGroupBoxRosVersions)
         main_layout.addWidget(weblink)
         self.setLayout(main_layout)
 
@@ -183,6 +220,22 @@ class ControllersSelectorModalClass(QtGui.QDialog):
             doc.recompute()
         else:
             message('Select robot container first', gui = True)
+            
+
+    def updateControllersToROSversionBotton(self):
+        # close window
+        self.close()
+        # update controllers submodule
+        ros_version = next((el for el in self.ros_versions if el['ros_version'] == self.ros_versions_dropdown.currentText()), None)
+        git_change_submodule_branch(
+            module_path = 'modules/ros2_controllers',
+            branch = ros_version['controllers_branch']
+        )
+        # save choosen ros version
+        set_workbench_param(wb_constants.ROS2_CONTROLLERS_CURRENT_ROS_VERSION_PARAM_NAME, ros_version['ros_version'])
+        # open new window
+        form = ControllersSelectorModalClass()
+        form.exec_()
 
 
     def onAddBroadcasterButton(self):

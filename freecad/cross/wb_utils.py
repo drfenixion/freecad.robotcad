@@ -972,6 +972,19 @@ def get_controllers_config_file_name(robot_name: str) -> str:
     return get_valid_filename(robot_name) + '_controllers.yaml'
 
 
+def git_change_submodule_branch(module_path: str, branch: str):
+        message('Git change submodule branch.')
+        p = subprocess.run(
+            ["git submodule set-branch -b " + branch + ' ' + module_path],
+            shell=True,
+            capture_output=True,
+            cwd=MOD_PATH,
+            check=True,
+        )
+        print('process:', p)
+        git_init_submodules()
+
+
 def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
     """ Do git submodule update --init if ros2_controllers module dir is empty """
 
