@@ -60,7 +60,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
                 'Tip: choosen ROS version will be used to checkout ros2_controllers repository\n'
                 'and forming related controllers forms.\n'
                 'Use ROS version you plan to code generation for. It will update only new controllers.\n'
-                'Controllers added before will persist is own version. Delete them and create new ones if required.'
+                'Controllers added before will persist is own version. Delete them and create new ones if required.',
             ),
         )
         # update ros controllers to choosen ros version
@@ -220,7 +220,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
             doc.recompute()
         else:
             message('Select robot container first', gui = True)
-            
+
 
     def updateControllersToROSversionBotton(self):
         # close window
@@ -229,7 +229,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
         ros_version = next((el for el in self.ros_versions if el['ros_version'] == self.ros_versions_dropdown.currentText()), None)
         git_change_submodule_branch(
             module_path = 'modules/ros2_controllers',
-            branch = ros_version['controllers_branch']
+            branch = ros_version['controllers_branch'],
         )
         # save choosen ros version
         set_workbench_param(wb_constants.ROS2_CONTROLLERS_CURRENT_ROS_VERSION_PARAM_NAME, ros_version['ros_version'])

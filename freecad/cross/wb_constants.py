@@ -21,7 +21,7 @@ ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE_YAML = '.'
 ROS2_CONTROLLERS_PARAM_MAP_MARKER = '__map_'
 ROS2_CONTROLLERS_ROS_VERSIONS = [
     {'ros_version': 'jazzy', 'controllers_branch': 'master'},
-    {'ros_version': 'iron', 'controllers_branch': 'iron'}
+    {'ros_version': 'iron', 'controllers_branch': 'iron'},
 ]
 
 ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
