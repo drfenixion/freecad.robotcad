@@ -60,7 +60,7 @@ class ControllersSelectorModalClass(QtGui.QDialog):
                 'Tip: choosen ROS version will be used to checkout ros2_controllers repository\n'
                 'and forming related controllers forms.\n'
                 'Use ROS version you plan to code generation for. It will update only new controllers.\n'
-                'Controllers added before will persist is own version. Delete them and create new ones if required.',
+                'Controllers added earlier will retain their own version. Delete them and create new ones if required.',
             ),
         )
         # update ros controllers to choosen ros version
