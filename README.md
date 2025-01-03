@@ -37,6 +37,8 @@ For main sponsors it is possible to place a link to your project in the reposito
 1. Collisions automatic making tools (based on Real element of robot link)
 1. Controllers and sensor data broadcasters based on ros2_controllers (ros2_control)
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
+1. Sensors based on Gazebo sensors
+    1. Add the necessary sensors and use it in Gazebo.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF
