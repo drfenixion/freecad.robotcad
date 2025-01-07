@@ -25,14 +25,17 @@ class _RotateJointXCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'rotate_joint_x.svg',
-                'MenuText': tr('Rotate joint by X axis'),
-                'Accel': 'R, X',
-                'ToolTip': tr('Rotate joint or link by X axis.\n'
-                              '\n'
-                              'Select: joint or link or subobject (body, part, etc) of link.\n'
-                              'It rotates joint Origin or Link MountedPlacement dependent on selection.\n'
-                              )}
+        return {
+            'Pixmap': 'rotate_joint_x.svg',
+            'MenuText': tr('Rotate joint by X axis'),
+            'Accel': 'R, X',
+            'ToolTip': tr(
+                'Rotate joint or link by X axis.\n'
+                '\n'
+                'Select: joint or link or subobject (body, part, etc) of link.\n'
+                'It rotates joint Origin or Link MountedPlacement dependent on selection.\n',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection())
