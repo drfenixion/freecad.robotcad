@@ -13,6 +13,8 @@ import FreeCAD as fc
 import numpy as np
 from numpy.typing import ArrayLike
 
+from freecad.cross.placement_utils import get_absolute_placement
+
 from .freecad_utils import get_leafs_and_subnames
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -717,7 +719,13 @@ def _urdf_generic_from_object(
         if not placement:
             this_placement = placement_for_dae_export
         else:
-            this_placement = placement * placement_for_dae_export
+            # subobj_to_obj_diff is needed in case of wrapper with non-zero placement between subobject and object (f.e. of Visual)
+            obj_ab_pl = get_absolute_placement(obj)
+            subobj_ab_pl = get_absolute_placement(subobj, with_leaf_el = False)
+            subobj_to_obj_diff = subobj_ab_pl * obj_ab_pl.inverse()
+            
+            this_placement = placement * subobj_to_obj_diff * placement_for_dae_export
+            
         filename = ''
         if subobj is obj:
             # No FreeCAD link.

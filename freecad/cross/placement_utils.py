@@ -7,6 +7,7 @@ from __future__ import annotations
 from math import copysign, hypot
 
 import FreeCAD as fc
+from freecad.cross.freecad_utils import get_linked_obj
 
 
 def get_global_placement_and_scale(
@@ -93,3 +94,23 @@ def get_global_placement(
     if p_and_s is None:
         return
     return p_and_s[0]
+
+
+def get_absolute_placement(obj, with_obj_placement: bool = True):
+    """ Get absolute placement of obj or first non-link object in link chain.
+    Considers only Part and Assembly ancestors for calculation of placement.
+
+    param: with_obj_placement - with object placement 
+    """
+    obj = get_linked_obj(obj)
+
+    globalPlace = fc.Placement()
+    if with_obj_placement:
+        globalPlace = obj.Placement
+    # loop via non-link ancestors to get absolute placement
+    for ancestor in obj.InListRecursive:
+        if ancestor.TypeId != 'App::Part' or ancestor.TypeId != 'Assembly::AssemblyObject':
+            break
+        globalPlace = globalPlace.multiply(ancestor.Placement)
+
+    return globalPlace
