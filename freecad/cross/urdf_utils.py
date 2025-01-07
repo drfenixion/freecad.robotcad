@@ -140,13 +140,13 @@ def xml_comment_element(obj_label: str) -> et.Element:
 
 
 def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
-    """Return an xml element 'origin'.""" 
-    
-    # previous implementation had a precision bug. 
+    """Return an xml element 'origin'."""
+
+    # previous implementation had a precision bug.
     # rpy = rpy_from_quaternion(p.Rotation.Q)
     # In some cases of joint rotation this gave incorrect URDF rpy radians,
     # resulting in some apparent tilt of the orientation.
-    
+
     # new implementation have less float operation
     # and correct in all tested rotation cases
     xyz = p.Rotation.toEulerAngles('XYZ')
@@ -723,9 +723,9 @@ def _urdf_generic_from_object(
             obj_ab_pl = get_absolute_placement(obj)
             subobj_ab_pl = get_absolute_placement(subobj, with_leaf_el = False)
             subobj_to_obj_diff = subobj_ab_pl * obj_ab_pl.inverse()
-            
+
             this_placement = placement * subobj_to_obj_diff * placement_for_dae_export
-            
+
         filename = ''
         if subobj is obj:
             # No FreeCAD link.

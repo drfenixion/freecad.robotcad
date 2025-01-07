@@ -100,7 +100,7 @@ def get_absolute_placement(obj, with_obj_placement: bool = True):
     """ Get absolute placement of obj or first non-link object in link chain.
     Considers only Part and Assembly ancestors for calculation of placement.
 
-    param: with_obj_placement - with object placement 
+    param: with_obj_placement - with object placement
     """
     obj = get_linked_obj(obj)
 
