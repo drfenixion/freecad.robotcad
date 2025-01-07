@@ -877,22 +877,23 @@ def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | No
         placement.rotate(fc.Vector(0,0,0), fc.Vector(0,0,1), z)
 
     ## setting axis angle to zero
-    # go to default frame by inverse
-    placement_inversed = placement.inverse()
-    rotXYZ = placement_inversed.Rotation.toEulerAngles('XYZ')
-    rotXYZ = list(rotXYZ)
+    if x == 0 or y == 0 or z == 0:
+        # go to default frame by inverse
+        placement_inversed = placement.inverse()
+        rotXYZ = placement_inversed.Rotation.toEulerAngles('XYZ')
+        rotXYZ = list(rotXYZ)
 
-    if x == 0:
-        rotXYZ[0] = 0
-    if y == 0:
-        rotXYZ[1] = 0
-    if z == 0:
-        rotXYZ[2] = 0
+        if x == 0:
+            rotXYZ[0] = 0
+        if y == 0:
+            rotXYZ[1] = 0
+        if z == 0:
+            rotXYZ[2] = 0
 
-    # set to zero position by axis in default frame
-    placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], rotXYZ[2])
-    # inverse back and get modificated rotation
-    placement.Rotation = placement_inversed.inverse().Rotation
+        # set to zero position by axis in default frame
+        placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], rotXYZ[2])
+        # inverse back and get modificated rotation
+        placement.Rotation = placement_inversed.inverse().Rotation
 
     return placement
 
@@ -926,25 +927,13 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
     else:
         link = get_parent_link_of_obj(orienteer1)
 
-    # get parent joint from link
     if not joint:
         if link == None:
             message('Can not get parent robot link of selected object', gui=True)
             return
-
-        chain = get_chain(link)
-
-        if len(chain) < 2:
-            message('Link must be in chain (joint to link).', gui=True)
-            return
-
-
-        joint = chain[-2]
-        if not is_joint(joint):
-            message('Can not get parent joint of link', gui=True)
-            return
-
-    joint.Origin = rotate_placement(joint.Origin, x, y, z)
+        link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
+    else:
+        joint.Origin = rotate_placement(joint.Origin, x, y, z)
 
     doc.recompute()
 

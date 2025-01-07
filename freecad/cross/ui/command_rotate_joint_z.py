@@ -28,9 +28,10 @@ class _RotateJointZCommand:
         return {'Pixmap': 'rotate_joint_z.svg',
                 'MenuText': tr('Rotate joint by Z axis'),
                 'Accel': 'R, Z',
-                'ToolTip': tr('Rotate joint by Z axis.\n'
+                'ToolTip': tr('Rotate joint or link by Z axis.\n'
                               '\n'
                               'Select: joint or link or subobject (body, part, etc) of link\n'
+                              'It rotates joint Origin or Link MountedPlacement dependent on selection.\n'
                               )}
 
     def IsActive(self):
