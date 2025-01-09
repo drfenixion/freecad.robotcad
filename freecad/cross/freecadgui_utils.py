@@ -11,7 +11,7 @@ try:
 except:
     from PySide2 import QtWidgets
 
-from .freecad_utils import adjustedShapePlacement, get_subobjects_by_full_name
+from .freecad_utils import get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
