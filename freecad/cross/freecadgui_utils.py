@@ -65,9 +65,9 @@ def createBox(boundBox_, nameLabel):
     boundObj.Height.Value = boundBox_.ZLength
 
     boundBoxLocation = fc.Vector(boundBox_.XMin,boundBox_.YMin,boundBox_.ZMin)
-    
+
     return boundObj, boundBoxLocation
-    
+
 
 def createCylinder(boundBox_, nameLabel):
     boundObj = fc.ActiveDocument.addObject('Part::Cylinder', nameLabel + "_BoundCylinder")
@@ -103,7 +103,7 @@ def createBoundAbstract(obj, createPrimitive = createBox):
         red   = 1.0  # 1 = 255
         green = 1.0  #
         blue  = 0.4  #
-    
+
         # boundBox
         boundBox_    = s.BoundBox
         boundBoxLX   = boundBox_.XLength
@@ -116,14 +116,14 @@ def createBoundAbstract(obj, createPrimitive = createBox):
         nameLabel  = obj.Label
 
         try:
-            import unicodedata    
+            import unicodedata
             nameLabel = str(unicodedata.normalize('NFKD', nameLabel).encode('ascii','ignore'))[2:]
         except Exception:
             None
 
         fc.Console.PrintMessage(str(boundBox_)+"\r\n")
         fc.Console.PrintMessage("Rectangle      : "+str(boundBoxLX)+" x "+str(boundBoxLY)+" x "+str(boundBoxLZ)+"\r\n")
-        
+
         if (boundBoxLX > 0) and (boundBoxLY > 0) and (boundBoxLZ > 0):  # Create Volume
 
             boundObj, boundBoxLocation = createPrimitive(boundBox_, nameLabel)
@@ -135,7 +135,7 @@ def createBoundAbstract(obj, createPrimitive = createBox):
             boundObjGui.ShapeColor = (red, green, blue)
             boundObjGui.LineWidth = 1
             boundObjGui.Transparency = 90
-    
+
     except Exception:
         fc.Console.PrintError("Bad selection"+"\n")
 
@@ -143,8 +143,8 @@ def createBoundAbstract(obj, createPrimitive = createBox):
 
 
 def get_placement(
-        orienteer1: DO
-        ) -> fc.Placement:
+        orienteer1: DO,
+) -> fc.Placement:
     """Return absolute coordinates of orienteer."""
     resolve_mode_resolve = 0 # 0 - absolute, 1 relative
     selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
@@ -157,8 +157,8 @@ def get_placement(
 
 def get_placements(
         orienteer1: DO,
-        orienteer2: DO
-        ) -> fc.Placement:
+        orienteer2: DO,
+) -> fc.Placement:
     """Return the transform from `lcs` to `obj`."""
     resolve_mode_resolve = 0 # 0 - absolute, 1 relative
     selection = fcgui.Selection.getSelectionEx('', resolve_mode_resolve)
@@ -171,7 +171,7 @@ def get_placements(
 
 
 def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
-    """Get selected properties of treeView in order of selection. 
+    """Get selected properties of treeView in order of selection.
 
     Return selected properties and objects."""
 
@@ -180,7 +180,7 @@ def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
 
     mw = fcgui.getMainWindow()
     trees = mw.findChildren(QtWidgets.QTreeView)
-        
+
     props=[]
     for tree in trees:
         prop_default = {'type': 'property', 'name': None, 'value': None, 'description': None}
@@ -198,7 +198,7 @@ def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
                         prop = deepcopy(prop_default)
                         n = 0
                     else:
-                        if n==1 :   
+                        if n==1 :
                             tabProperty=[itemData[0]]
                             parent = index.parent()
                             tabProperty.append(parent.data())
@@ -208,21 +208,21 @@ def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
                             # if name have category with '___' in last it can miss one '_' in name
                             # same as displayed name
                             prop['name'] = tabProperty # name consists of segments of name
-                            if 3 in itemData : 
+                            if 3 in itemData :
                                 # use full name instead of name
                                 prop['full_name'] = re.findall('\\nName: (.+)\\n\\n', itemData[3])[0]
 
                         elif n==2 :
-                            prop['value'] = itemData[0]  # value            
-            
+                            prop['value'] = itemData[0]  # value
+
                             if 3 in itemData : # tip
                                     prop['description'] = itemData[3]
-                                    
+
             if n == 2 :
                 props.append(prop)
                 prop = deepcopy(prop_default)
                 n = 0
-    
+
     # separate props and objects
     properties = []
     objects = []

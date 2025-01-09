@@ -76,7 +76,7 @@ def guess_vhacd_path() -> Path:
 
 def createBoundObjects(createBoundFunc = createBoundBox):
     """Crete bounding object(s) based on creation function parameter.
-    
+
     If you selected a link, an object based on Real element will be created.
 
     """
@@ -90,9 +90,9 @@ def createBoundObjects(createBoundFunc = createBoundBox):
         # create bound object with zero placement
         bound = createBoundFunc(obj)
         obj.Placement = obj_placement_old
-        
+
         return bound
-    
+
 
     if len(objs) >= 1:
         doc.openTransaction(tr(createBoundFunc.__name__ + 'from bounding box'))
@@ -110,7 +110,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 else:
                     fc.Console.PrintWarning("Can`t create collision for link: " + obj.Label + ". Add Real element to link firstly !"+"\n")
                     continue
-            
+
             obj_global_placement = obj.getGlobalPlacement() #dont move below (obj will be deleted in is_part block)
             if is_part(obj):
                 # get compound shape for all objects inside Part
@@ -124,7 +124,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     doc.removeObject(obj.Name)
             else:
                 bound = createBound(obj)
-            
+
             boundObj = fc.ActiveDocument.getObject(bound.Name)
 
             # if link was selected do collision bind
@@ -174,11 +174,12 @@ class WbSettingsGetter:
         self.vhacd_path = _get_vhacd_path(self, self._old_vhacd_path)
         self.overcross_token = get_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, '')
 
-    def get_settings(self,
-                     get_ros_workspace: bool = True,
-                     get_vhacd_path: bool = True,
-                     get_overcross_token: bool = True,
-                     ) -> bool:
+    def get_settings(
+        self,
+        get_ros_workspace: bool = True,
+        get_vhacd_path: bool = True,
+        get_overcross_token: bool = True,
+    ) -> bool:
         """Get the settings for this workbench.
 
         Return True if the settings' dialog was confirmed.
@@ -204,8 +205,9 @@ class WbSettingsGetter:
 
         self.form.lineedit_vhacd_path.setText(str(self.vhacd_path))
         self.form.button_browse_vhacd_path.clicked.connect(
-                self.on_button_browse_vhacd_path)
-        
+                self.on_button_browse_vhacd_path,
+        )
+
         self.form.lineedit_overcross_token.setText(str(self.overcross_token))
 
         self.form.button_box.accepted.connect(self.on_ok)
