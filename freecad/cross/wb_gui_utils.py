@@ -109,8 +109,8 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
             link = get_parent_link_of_obj(obj)
             obj_to_subobj_middle_wrap_diff = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
-            
-            if link:    
+
+            if link:
                 real_of_link = find_link_real_in_obj_parents(obj, link)
                 if real_of_link:
                     obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(real_of_link, obj, with_leaf_el = False)
@@ -128,7 +128,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     bound = createBound(collision_source_obj)
                     doc.removeObject(collision_source_obj.Name)
             else:
-                
+
                 collision_source_obj = copy_obj_gementry(obj, collision_source_obj)
                 collision_source_obj.Placement = collision_source_obj_pl_old
                 bound = createBound(collision_source_obj)
@@ -157,7 +157,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 # Makes wrapper with object placement because has made bound object in zero placement before
                 # This wrapper need to move primitive in correct placement
                 boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + bound.Label)
-                boundObj.Placement = obj_to_subobj_middle_wrap_diff * boundObj.Placement 
+                boundObj.Placement = obj_to_subobj_middle_wrap_diff * boundObj.Placement
                 boundObjWrapper.Group = [boundObj]
                 boundObjWrapper.Placement = real_of_link.Placement
         doc.commitTransaction()
