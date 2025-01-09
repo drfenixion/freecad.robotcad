@@ -871,17 +871,14 @@ def lcs_attachmentsupport_name():
         return 'AttachmentSupport'
 
 
-def adjustedGlobalPlacement(obj, locVector):
-    '''find global placement to make locVector the local origin with the correct orientation'''
-    # Gotten from BoundingBox_Tracing macro
+def adjustedShapePlacement(obj, boundBoxLocation: fc.Vector):
+    '''Adjust obj shape placement by it`s bounding box'''
     try:
         objectPlacement = obj.Shape.Placement
-        objectGlobalPlacement = obj.getGlobalPlacement()
-        locPlacement = fc.Placement(locVector, fc.Rotation(fc.Vector(1,0,0),0))
-        return objectGlobalPlacement.multiply(objectPlacement.inverse()).multiply(locPlacement)
+        boundBoxLocationPlacement = fc.Placement(boundBoxLocation, fc.Rotation(fc.Vector(1,0,0),0))
+        return objectPlacement.inverse().multiply(boundBoxLocationPlacement)
     except Exception:
-        locPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
-        return locPlacement
+        return fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
 
 
 def get_python_name() -> str:

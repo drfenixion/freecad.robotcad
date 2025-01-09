@@ -7,10 +7,11 @@ from pathlib import Path
 
 import FreeCADGui as fcgui
 import FreeCAD as fc
+import Part as part
 
 from PySide import QtGui  # FreeCAD's PySide!
 
-from .freecad_utils import warn
+from .freecad_utils import is_part, warn
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
 from .wb_utils import UI_PATH
@@ -82,7 +83,17 @@ def createBoundObjects(createBoundFunc = createBoundBox):
     selEx = fcgui.Selection.getSelectionEx()
     objs  = [selobj.Object for selobj in selEx]
     doc = fc.activeDocument()
+
+    def createBound(obj: fc.DocumentObject):
+        obj_placement_old = obj.Placement
+        obj.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+        # create bound object with zero placement
+        bound = createBoundFunc(obj)
+        obj.Placement = obj_placement_old
+        
+        return bound
     
+
     if len(objs) >= 1:
         doc.openTransaction(tr(createBoundFunc.__name__ + 'from bounding box'))
 
@@ -99,13 +110,21 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 else:
                     fc.Console.PrintWarning("Can`t create collision for link: " + obj.Label + ". Add Real element to link firstly !"+"\n")
                     continue
-
-            obj_placement_old = obj.Placement
-            obj.Placement = fc.Placement()
-            # create bound object with zero placement
-            bound = createBoundFunc(obj)
-            obj.Placement = obj_placement_old
-
+            
+            obj_global_placement = obj.getGlobalPlacement() #dont move below (obj will be deleted in is_part block)
+            if is_part(obj):
+                # get compound shape for all objects inside Part
+                part_shape = part.getShape(obj)
+                if hasattr(part_shape, 'BoundBox'):
+                    partWithCompoundShape = obj.Document.addObject("Part::Feature", "PartCompound_" + obj.Name)
+                    partWithCompoundShape.Shape = part_shape
+                    partWithCompoundShape.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+                    obj = partWithCompoundShape
+                    bound = createBound(obj)
+                    doc.removeObject(obj.Name)
+            else:
+                bound = createBound(obj)
+            
             boundObj = fc.ActiveDocument.getObject(bound.Name)
 
             # if link was selected do collision bind
@@ -115,10 +134,9 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
                     # Makes wrapper with robot link placement because has made bound object in zero placement before
                     # This wrapper need to move primitive in correct placement
-                    boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj_placement__" + robotLink.Label + '__' + bound.Label)
+                    boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + robotLink.Label + '__' + bound.Label)
                     boundObjWrapper.Group = [boundObj]
                     boundObjWrapper.Placement = robotLinkObj.Placement
-
 
                     robotLinkObj.Collision = boundObjWrapper
                     # refresh collision link
@@ -129,9 +147,9 @@ def createBoundObjects(createBoundFunc = createBoundBox):
             else:
                 # Makes wrapper with object placement because has made bound object in zero placement before
                 # This wrapper need to move primitive in correct placement
-                boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj_placement__" + bound.Label)
+                boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + bound.Label)
                 boundObjWrapper.Group = [boundObj]
-                boundObjWrapper.Placement = obj_placement_old
+                boundObjWrapper.Placement = obj_global_placement
         doc.commitTransaction()
     else:
         fc.Console.PrintMessage("Select an object !"+"\n")

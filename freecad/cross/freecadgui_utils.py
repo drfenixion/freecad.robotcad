@@ -11,9 +11,8 @@ try:
 except:
     from PySide2 import QtWidgets
 
-from .freecad_utils import get_subobjects_by_full_name
+from .freecad_utils import adjustedShapePlacement, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
-from .freecad_utils import adjustedGlobalPlacement
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import message
@@ -128,8 +127,7 @@ def createBoundAbstract(obj, createPrimitive = createBox):
         if (boundBoxLX > 0) and (boundBoxLY > 0) and (boundBoxLZ > 0):  # Create Volume
 
             boundObj, boundBoxLocation = createPrimitive(boundBox_, nameLabel)
-
-            boundObj.Placement = adjustedGlobalPlacement(obj, boundBoxLocation)
+            boundObj.Placement = adjustedShapePlacement(obj, boundBoxLocation)
 
             boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
             boundObjGui.LineColor  = (red, green, blue)
