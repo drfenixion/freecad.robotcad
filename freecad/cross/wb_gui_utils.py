@@ -88,14 +88,14 @@ def createBoundObjects(createBoundFunc = createBoundBox):
     def createBound(obj: fc.DocumentObject):
         bound = createBoundFunc(obj)
         return bound
-    
+
 
     def make_bound_obj_wrapper(
             boundObj: DO,
-            obj_to_subobj_middle_wrap_diff: fc.Placement, 
-            wrapperName: str, 
+            obj_to_subobj_middle_wrap_diff: fc.Placement,
+            wrapperName: str,
             wrapperPlacement: fc.Placement,
-        ) -> tuple[fc.DocumentObject, fc.DocumentObject]:
+    ) -> tuple[fc.DocumentObject, fc.DocumentObject]:
         """ Wrapper is needed for move bound object in correct placement.
         After bound obj is binded to link a collision link to this wrapper will be created with it`s own placement.
         in other words - wrapper placement will be changed but bound object placement not"""
@@ -133,7 +133,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(real_of_link, obj, with_leaf_el = False)
             else:
                 fc.Console.PrintWarning("Can`t find parent robot link of object: " + obj.Label + ". Add object to robot link Real element firstly !"+"\n")
-                continue                
+                continue
 
             collision_source_obj = obj.Document.addObject("Part::Feature", "col_" + obj.Name)
             collision_source_obj.Placement = obj.Placement
@@ -144,8 +144,8 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
             boundWrapper, bound = make_bound_obj_wrapper(
                 bound,
-                obj_to_subobj_middle_wrap_diff, 
-                wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label, 
+                obj_to_subobj_middle_wrap_diff,
+                wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label,
                 wrapperPlacement = robotLink.Placement,
             )
             robotLink.Collision = robotLink.Collision + [boundWrapper]
