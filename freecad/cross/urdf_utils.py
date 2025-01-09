@@ -13,7 +13,7 @@ import FreeCAD as fc
 import numpy as np
 from numpy.typing import ArrayLike
 
-from freecad.cross.placement_utils import get_absolute_placement
+from freecad.cross.placement_utils import get_obj_to_subobj_diff
 
 from .freecad_utils import get_leafs_and_subnames
 from .freecad_utils import is_box
@@ -720,11 +720,9 @@ def _urdf_generic_from_object(
             this_placement = placement_for_dae_export
         else:
             # subobj_to_obj_diff is needed in case of wrapper with non-zero placement between subobject and object (f.e. of Visual)
-            obj_ab_pl = get_absolute_placement(obj)
-            subobj_ab_pl = get_absolute_placement(subobj, with_leaf_el = False)
-            subobj_to_obj_diff = subobj_ab_pl * obj_ab_pl.inverse()
+            obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(obj, subobj, with_leaf_el = False)
 
-            this_placement = placement * subobj_to_obj_diff * placement_for_dae_export
+            this_placement = placement * obj_to_subobj_middle_wrap_diff * placement_for_dae_export
 
         filename = ''
         if subobj is obj:

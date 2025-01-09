@@ -127,7 +127,7 @@ def createBoundAbstract(obj, createPrimitive = createBox):
         if (boundBoxLX > 0) and (boundBoxLY > 0) and (boundBoxLZ > 0):  # Create Volume
 
             boundObj, boundBoxLocation = createPrimitive(boundBox_, nameLabel)
-            boundObj.Placement = adjustedShapePlacement(obj, boundBoxLocation)
+            boundObj.Placement = fc.Placement(boundBoxLocation, fc.Rotation(fc.Vector(1,0,0),0))
 
             boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
             boundObjGui.LineColor  = (red, green, blue)

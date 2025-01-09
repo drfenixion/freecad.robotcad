@@ -9,12 +9,13 @@ import FreeCADGui as fcgui
 import FreeCAD as fc
 import Part as part
 
-from PySide import QtGui  # FreeCAD's PySide!
+from PySide import QtGui
+from freecad.cross.placement_utils import get_obj_to_subobj_diff  # FreeCAD's PySide!
 
-from .freecad_utils import is_part, warn
+from .freecad_utils import get_leafs_and_subnames, is_part, warn
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
-from .wb_utils import UI_PATH
+from .wb_utils import UI_PATH, copy_obj_gementry, find_link_real_in_obj_parents, get_parent_link_of_obj
 from .wb_utils import get_workbench_param
 from .wb_utils import is_link, is_joint, is_robot
 from . import wb_globals
@@ -85,12 +86,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
     doc = fc.activeDocument()
 
     def createBound(obj: fc.DocumentObject):
-        obj_placement_old = obj.Placement
-        obj.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
-        # create bound object with zero placement
         bound = createBoundFunc(obj)
-        obj.Placement = obj_placement_old
-
         return bound
 
 
@@ -111,19 +107,32 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     fc.Console.PrintWarning("Can`t create collision for link: " + obj.Label + ". Add Real element to link firstly !"+"\n")
                     continue
 
-            obj_global_placement = obj.getGlobalPlacement() #dont move below (obj will be deleted in is_part block)
+            link = get_parent_link_of_obj(obj)
+            obj_to_subobj_middle_wrap_diff = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+            
+            if link:    
+                real_of_link = find_link_real_in_obj_parents(obj, link)
+                if real_of_link:
+                    obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(real_of_link, obj, with_leaf_el = False)
+
+            collision_source_obj = obj.Document.addObject("Part::Feature", "collision_source_" + obj.Name)
+            collision_source_obj.Placement = obj.Placement
+            collision_source_obj_pl_old = collision_source_obj.Placement
+
             if is_part(obj):
                 # get compound shape for all objects inside Part
                 part_shape = part.getShape(obj)
                 if hasattr(part_shape, 'BoundBox'):
-                    partWithCompoundShape = obj.Document.addObject("Part::Feature", "PartCompound_" + obj.Name)
-                    partWithCompoundShape.Shape = part_shape
-                    partWithCompoundShape.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
-                    obj = partWithCompoundShape
-                    bound = createBound(obj)
-                    doc.removeObject(obj.Name)
+                    collision_source_obj.Shape = part_shape
+                    collision_source_obj.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+                    bound = createBound(collision_source_obj)
+                    doc.removeObject(collision_source_obj.Name)
             else:
-                bound = createBound(obj)
+                
+                collision_source_obj = copy_obj_gementry(obj, collision_source_obj)
+                collision_source_obj.Placement = collision_source_obj_pl_old
+                bound = createBound(collision_source_obj)
+                doc.removeObject(collision_source_obj.Name)
 
             boundObj = fc.ActiveDocument.getObject(bound.Name)
 
@@ -136,7 +145,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     # This wrapper need to move primitive in correct placement
                     boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + robotLink.Label + '__' + bound.Label)
                     boundObjWrapper.Group = [boundObj]
-                    boundObjWrapper.Placement = robotLinkObj.Placement
+                    boundObjWrapper.Placement = robotLinkObj.Placement * obj_to_subobj_middle_wrap_diff.inverse() # subtruct middle wrappers diff
 
                     robotLinkObj.Collision = boundObjWrapper
                     # refresh collision link
@@ -148,8 +157,9 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 # Makes wrapper with object placement because has made bound object in zero placement before
                 # This wrapper need to move primitive in correct placement
                 boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + bound.Label)
+                boundObj.Placement = obj_to_subobj_middle_wrap_diff * boundObj.Placement 
                 boundObjWrapper.Group = [boundObj]
-                boundObjWrapper.Placement = obj_global_placement
+                boundObjWrapper.Placement = real_of_link.Placement
         doc.commitTransaction()
     else:
         fc.Console.PrintMessage("Select an object !"+"\n")

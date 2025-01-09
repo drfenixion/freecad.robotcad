@@ -13,7 +13,7 @@ import FreeCADGui as fcgui
 
 from . import wb_constants
 from . import wb_globals
-from .freecad_utils import get_param
+from .freecad_utils import get_param, get_parents_names
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
@@ -1046,3 +1046,27 @@ def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
         gitmodules_changed = False
 
     return gitmodules_changed
+
+
+def copy_obj_gementry(old_obj: DO, new_obj: DO) -> DO:
+    """ Copy geometry properties from old object to new one"""
+    if hasattr(old_obj, "Shape"):
+        new_obj.Shape = old_obj.Shape
+    elif hasattr(old_obj, "Mesh"):      # upgrade with wmayer thanks #http://forum.freecadweb.org/viewtopic.php?f=13&t=22331
+        new_obj.Shape = old_obj.Mesh
+    elif hasattr(old_obj, "Points"):
+        new_obj.Shape = old_obj.Points
+
+    return new_obj
+
+
+def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc.DocumentObject:
+    """Find real object (Real of link) presents in parents of object.
+    Usefull when need to know root parent of obj in Real of robot link
+    if object`s parent is present in robot Link as Real"""
+    parents_names = get_parents_names(obj)
+    for parents_name in parents_names:
+        for real in link.Real:
+            if parents_name == real.Name:
+                return real
+    return None

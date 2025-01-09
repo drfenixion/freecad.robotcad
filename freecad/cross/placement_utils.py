@@ -104,13 +104,28 @@ def get_absolute_placement(obj, with_obj_placement: bool = True):
     """
     obj = get_linked_obj(obj)
 
-    globalPlace = fc.Placement()
-    if with_obj_placement:
-        globalPlace = obj.Placement
-    # loop via non-link ancestors to get absolute placement
-    for ancestor in obj.InListRecursive:
-        if ancestor.TypeId != 'App::Part' or ancestor.TypeId != 'Assembly::AssemblyObject':
-            break
-        globalPlace = globalPlace.multiply(ancestor.Placement)
+    # globalPlace = fc.Placement()
+    # if with_obj_placement:
+    #     globalPlace = obj.Placement
 
-    return globalPlace
+    # # loop via non-link ancestors to get absolute placement
+    # for ancestor in obj.InListRecursive:
+    #     if ancestor.TypeId != 'App::Part' or ancestor.TypeId != 'Assembly::AssemblyObject':
+    #         break
+    #     globalPlace = globalPlace.multiply(ancestor.Placement)
+
+    # return globalPlace
+
+    if with_obj_placement:
+        return obj.getGlobalPlacement()
+    else:
+        return obj.getGlobalPlacement() * obj.Placement.inverse()
+
+
+def get_obj_to_subobj_diff(obj: fc.DocumentObject, subobj: fc.DocumentObject, with_leaf_el:bool = True) -> fc.Placement:
+    """Transform from object to subobject"""
+    obj_ab_pl = get_absolute_placement(obj)
+    subobj_ab_pl = get_absolute_placement(subobj, with_leaf_el)
+    obj_to_subobj_diff = subobj_ab_pl * obj_ab_pl.inverse()
+
+    return obj_to_subobj_diff

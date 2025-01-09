@@ -582,7 +582,9 @@ class LinkProxy(ProxyBase):
             for i in range(len(new_group)):
                 if new_group[i].FullName == '?':
                     try:
-                        link.Document.removeObject(new_group[i].Name)
+                        # there is case of obj.Name == None
+                        if new_group[i].Name is not None:
+                            link.Document.removeObject(new_group[i].Name)
                     except (RuntimeError, ReferenceError):
                         # object not a part of document (happens sometime with ctrl+z)
                         pass

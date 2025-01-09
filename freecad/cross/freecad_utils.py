@@ -871,15 +871,14 @@ def lcs_attachmentsupport_name():
         return 'AttachmentSupport'
 
 
-def adjustedShapePlacement(obj, boundBoxLocation: fc.Vector):
-    '''Adjust obj shape placement by it`s bounding box'''
-    try:
-        objectPlacement = obj.Shape.Placement
-        boundBoxLocationPlacement = fc.Placement(boundBoxLocation, fc.Rotation(fc.Vector(1,0,0),0))
-        return objectPlacement.inverse().multiply(boundBoxLocationPlacement)
-    except Exception:
-        return fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
-
-
 def get_python_name() -> str:
     return 'python' + str(sys.version_info.major) + '.' + str(sys.version_info.minor)
+
+
+def get_parents_names(obj: fc.DocumentObject) -> list[str]:
+    """Get object parents names"""
+    parents_names = []
+    for parent, path in obj.Parents:
+        parents_names = [parent.Name] + path.split('.')
+        break
+    return parents_names
