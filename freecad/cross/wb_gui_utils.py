@@ -124,11 +124,10 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 part_shape = part.getShape(obj)
                 if hasattr(part_shape, 'BoundBox'):
                     collision_source_obj.Shape = part_shape
-                    collision_source_obj.Placement = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+                    collision_source_obj.Placement = collision_source_obj_pl_old
                     bound = createBound(collision_source_obj)
                     doc.removeObject(collision_source_obj.Name)
             else:
-
                 collision_source_obj = copy_obj_gementry(obj, collision_source_obj)
                 collision_source_obj.Placement = collision_source_obj_pl_old
                 bound = createBound(collision_source_obj)
@@ -144,8 +143,9 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     # Makes wrapper with robot link placement because has made bound object in zero placement before
                     # This wrapper need to move primitive in correct placement
                     boundObjWrapper = fc.ActiveDocument.addObject("App::Part", "bound_obj__" + robotLink.Label + '__' + bound.Label)
+                    boundObj.Placement = obj_to_subobj_middle_wrap_diff * boundObj.Placement
                     boundObjWrapper.Group = [boundObj]
-                    boundObjWrapper.Placement = robotLinkObj.Placement * obj_to_subobj_middle_wrap_diff.inverse() # subtruct middle wrappers diff
+                    boundObjWrapper.Placement = robotLinkObj.Placement
 
                     robotLinkObj.Collision = boundObjWrapper
                     # refresh collision link
