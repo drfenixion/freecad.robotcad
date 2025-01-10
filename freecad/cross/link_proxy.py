@@ -522,7 +522,7 @@ class LinkProxy(ProxyBase):
 
         update_real = get_sorted_concated_names(self._fc_links_real) != get_sorted_concated_names(link.Real)
         update_visual = get_sorted_concated_names(self._fc_links_visual) != get_sorted_concated_names(link.Visual)
-        update_collision = get_sorted_concated_names(self._fc_links_collision) != get_sorted_concated_names(link.Collision)       
+        update_collision = get_sorted_concated_names(self._fc_links_collision) != get_sorted_concated_names(link.Collision)
 
         # Old objects that will be removed after having been excluded from
         # `Group`, to avoid recursive calls.
