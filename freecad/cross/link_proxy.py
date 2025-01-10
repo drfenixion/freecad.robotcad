@@ -512,28 +512,28 @@ class LinkProxy(ProxyBase):
 
         if not self.is_execute_ready():
             return
-        
+
         link = self.link
         doc = link.Document
         # deactivate update links in undo/redo
-        # updating links in undo/redo phase leads to errors 
+        # updating links in undo/redo phase leads to errors
         if doc.Transacting == True:
             return
-        
+
         if not hasattr(link, 'ViewObject'):
             # No need to change `Group` without GUI.
             return
         vlink = link.ViewObject
         if vlink is None:
             return
-        
+
         links_real = get_sorted_concated_names(self._fc_links_real)
         reals = get_sorted_concated_names(link.Real)
         links_visual = get_sorted_concated_names(self._fc_links_visual)
         visuals = get_sorted_concated_names(link.Visual)
         links_collision = get_sorted_concated_names(self._fc_links_collision)
         collision = get_sorted_concated_names(link.Collision)
-        
+
         # compare created links and their source objects
         update_real = links_real != reals
         update_visual = links_visual != visuals
