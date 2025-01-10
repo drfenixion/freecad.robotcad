@@ -150,12 +150,6 @@ def createBoundObjects(createBoundFunc = createBoundBox):
             )
             robotLink.Collision = robotLink.Collision + [boundWrapper]
 
-            # refresh collision link
-            fcgui.ActiveDocument.getObject(robotLink.Name).ShowCollision = False
-            fcgui.ActiveDocument.getObject(robotLink.Name).ShowCollision = True
-            # hide collision source object (will see it on link)
-            fcgui.ActiveDocument.getObject(boundWrapper.Name).hide()
-
         doc.commitTransaction()
     else:
         fc.Console.PrintMessage("Select an object !"+"\n")

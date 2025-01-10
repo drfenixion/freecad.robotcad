@@ -6,6 +6,7 @@ import xml.etree.ElementTree as et
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from freecad.cross.freecadgui_utils import get_sorted_concated_names
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -519,12 +520,9 @@ class LinkProxy(ProxyBase):
         if vlink is None:
             return
 
-        old_show_real = len(self._fc_links_real) != 0
-        old_show_visual = len(self._fc_links_visual) != 0
-        old_show_collision = len(self._fc_links_collision) != 0
-        update_real = old_show_real != vlink.ShowReal
-        update_visual = old_show_visual != vlink.ShowVisual
-        update_collision = old_show_collision != vlink.ShowCollision
+        update_real = get_sorted_concated_names(self._fc_links_real) != get_sorted_concated_names(link.Real)
+        update_visual = get_sorted_concated_names(self._fc_links_visual) != get_sorted_concated_names(link.Visual)
+        update_collision = get_sorted_concated_names(self._fc_links_collision) != get_sorted_concated_names(link.Collision)       
 
         # Old objects that will be removed after having been excluded from
         # `Group`, to avoid recursive calls.

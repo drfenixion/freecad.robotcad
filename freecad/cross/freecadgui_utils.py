@@ -234,3 +234,15 @@ def getSelectedPropertiesAndObjectsInTreeView() -> tuple[list, list]:
                 objects.append(el)
 
     return properties, objects
+
+
+def get_sorted_concated_names(objs: list[DO]) -> str:
+    """Get sorted concated names of objects as string.
+    Usefull for check equal objects groups"""
+    objs_names = []
+    for link_or_obj in objs:
+        obj = link_or_obj.getLinkedObject(True)
+        objs_names.append(obj.Name)
+    objs_names.sort()
+    objs_names_concated = '_'.join(objs_names)
+    return objs_names_concated
