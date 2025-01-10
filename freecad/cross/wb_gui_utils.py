@@ -103,6 +103,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
         boundObj.Placement = obj_to_subobj_middle_wrap_diff * boundObj.Placement
         boundObjWrapper.Group = [boundObj]
         boundObjWrapper.Placement = wrapperPlacement
+        boundObjWrapper.Visibility = False
         return boundObjWrapper, boundObj
 
 
