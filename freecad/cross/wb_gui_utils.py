@@ -108,7 +108,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
 
     if len(objs) >= 1:
-        doc.openTransaction(tr(createBoundFunc.__name__ + 'from bounding box'))
+        doc.openTransaction(tr(createBoundFunc.__name__ + ' from bounding box'))
 
         for obj in objs:
             if is_joint(obj) or is_robot(obj):
