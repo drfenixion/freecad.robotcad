@@ -120,7 +120,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                     # get deepest linked object
                     obj = obj.Real[0].getLinkedObject(True)
                 else:
-                    fc.Console.PrintWarning("Can`t create collision for link: " + obj.Label + ". Add Real element to link firstly !"+"\n")
+                    warn("Can`t create collision for link: " + obj.Label + ". Add Real element to link first!"+"\n", True)
                     continue
             else:
                 robotLink = get_parent_link_of_obj(obj)
@@ -132,7 +132,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 if real_of_link:
                     obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(real_of_link, obj, with_leaf_el = False)
             else:
-                fc.Console.PrintWarning("Can`t find parent robot link of object: " + obj.Label + ". Add object to robot link Real element firstly !"+"\n")
+                warn("Can`t find parent robot link of object: " + obj.Label + ". Add object to robot link as Real element first!"+"\n", True)
                 continue
 
             collision_source_obj = obj.Document.addObject("Part::Feature", "col_" + obj.Name)
