@@ -512,17 +512,32 @@ class LinkProxy(ProxyBase):
 
         if not self.is_execute_ready():
             return
+        
         link = self.link
+        doc = link.Document
+        # deactivate update links in undo/redo
+        # updating links in undo/redo phase leads to errors 
+        if doc.Transacting == True:
+            return
+        
         if not hasattr(link, 'ViewObject'):
             # No need to change `Group` without GUI.
             return
         vlink = link.ViewObject
         if vlink is None:
             return
-
-        update_real = get_sorted_concated_names(self._fc_links_real) != get_sorted_concated_names(link.Real)
-        update_visual = get_sorted_concated_names(self._fc_links_visual) != get_sorted_concated_names(link.Visual)
-        update_collision = get_sorted_concated_names(self._fc_links_collision) != get_sorted_concated_names(link.Collision)
+        
+        links_real = get_sorted_concated_names(self._fc_links_real)
+        reals = get_sorted_concated_names(link.Real)
+        links_visual = get_sorted_concated_names(self._fc_links_visual)
+        visuals = get_sorted_concated_names(link.Visual)
+        links_collision = get_sorted_concated_names(self._fc_links_collision)
+        collision = get_sorted_concated_names(link.Collision)
+        
+        # compare created links and their source objects
+        update_real = links_real != reals
+        update_visual = links_visual != visuals
+        update_collision = links_collision != collision
 
         # Old objects that will be removed after having been excluded from
         # `Group`, to avoid recursive calls.
@@ -538,11 +553,8 @@ class LinkProxy(ProxyBase):
         for o in old_fc_links:
             # Free the label.
             try:
-                # when do ShowReal=False and Ctrl+z after
-                # lead to empty DO appears in old_fc_links and throw errors
-                # Added try for this case
-                o.Label = 'to_be_removed'
-            except (AttributeError, ReferenceError):
+                o.Label = 'to_be_removed_______'
+            except ReferenceError:
                 pass
 
         # Clear the lists that are regenerated right after and create new
@@ -573,34 +585,12 @@ class LinkProxy(ProxyBase):
             + self._fc_links_collision
         )
         if new_group != link.Group:
-            # sometimes error appears with ctrl+z after ShowReal=False, ShowReal=True
-            # looks like problem with created back objects (it have FullName == '?')
-
-            # remove bad documents comebacked after Ctrl+z
-            for i in range(len(new_group)):
-                if new_group[i].FullName == '?':
-                    try:
-                        # there is case of obj.Name == None
-                        if new_group[i].Name is not None:
-                            link.Document.removeObject(new_group[i].Name)
-                    except (RuntimeError, ReferenceError):
-                        # object not a part of document (happens sometime with ctrl+z)
-                        pass
-                    new_group.remove(new_group[i])
-
-
             link.Group = new_group
 
-        # Remove old objects.
-        doc = link.Document
-        for o in old_fc_links:
-            try:
-                doc.removeObject(o.Name)
-            except (RuntimeError, ReferenceError):
-                # object not a part of document (happens sometime with ctrl+z)
-                pass
-
-        #TODO Remove sometimes appering objects in doc root after ctrl+z (with name "to_be_removed", "real_[Label]", etc)
+        objects = doc.RootObjects
+        filtered_objects = [obj for obj in objects if "to_be_removed_______" in obj.Label]
+        for obj in filtered_objects:
+            doc.removeObject(obj.Name)
 
 
     def export_urdf(

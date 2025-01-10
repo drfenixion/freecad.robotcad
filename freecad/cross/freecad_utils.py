@@ -879,6 +879,9 @@ def get_parents_names(obj: fc.DocumentObject) -> list[str]:
     """Get object parents names"""
     parents_names = []
     for parent, path in obj.Parents:
-        parents_names = [parent.Name] + path.split('.')
+        name = parent.Name
+        if name is None:
+            name = 'None'
+        parents_names = [name] + path.split('.')
         break
     return parents_names

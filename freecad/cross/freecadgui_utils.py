@@ -241,8 +241,14 @@ def get_sorted_concated_names(objs: list[DO]) -> str:
     Usefull for check equal objects groups"""
     objs_names = []
     for link_or_obj in objs:
-        obj = link_or_obj.getLinkedObject(True)
-        objs_names.append(obj.Name)
+        try:
+            obj = link_or_obj.getLinkedObject(True)
+            name = obj.Name
+            if obj.Name is None:
+                name = 'None'
+            objs_names.append(name)
+        except ReferenceError:
+            pass
     objs_names.sort()
     objs_names_concated = '_'.join(objs_names)
     return objs_names_concated
