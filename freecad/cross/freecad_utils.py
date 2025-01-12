@@ -907,8 +907,8 @@ def get_compound(
         objs: list[DO],
         compound_placement: fc.Placement,
         compound_name: str,
-        compound_el_name: str
-    ) -> Optional[DO]:
+        compound_el_name: str,
+) -> Optional[DO]:
     """Make compound of objects and it`s nested bodies"""
     try:
         doc = objs[0].Document
