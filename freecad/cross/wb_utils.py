@@ -1048,21 +1048,6 @@ def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
     return gitmodules_changed
 
 
-def copy_obj_gementry(old_obj: DO, new_obj: DO, copy_compound_shape_for_part: bool = True) -> DO:
-    """ Copy geometry properties from old object to new one"""
-    if hasattr(old_obj, "Shape"):
-        new_obj.Shape = old_obj.Shape
-    elif hasattr(old_obj, "Mesh"):      # upgrade with wmayer thanks #http://forum.freecadweb.org/viewtopic.php?f=13&t=22331
-        new_obj.Shape = old_obj.Mesh
-    elif hasattr(old_obj, "Points"):
-        new_obj.Shape = old_obj.Points
-    elif copy_compound_shape_for_part and is_part(old_obj):
-        # get compound shape for all objects inside Part
-        new_obj.Shape = old_obj.getShape(old_obj)
-
-    return new_obj
-
-
 def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc.DocumentObject:
     """Find real object (Real of link) presents in parents of object.
     Usefull when need to know root parent of obj in Real of robot link

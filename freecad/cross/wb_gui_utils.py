@@ -12,10 +12,10 @@ import Part as part
 from PySide import QtGui
 from freecad.cross.placement_utils import get_obj_to_subobj_diff  # FreeCAD's PySide!
 
-from .freecad_utils import DO, get_leafs_and_subnames, is_part, warn
+from .freecad_utils import DO, copy_obj_geometry, warn
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
-from .wb_utils import UI_PATH, copy_obj_gementry, find_link_real_in_obj_parents, get_parent_link_of_obj
+from .wb_utils import UI_PATH, find_link_real_in_obj_parents, get_parent_link_of_obj
 from .wb_utils import get_workbench_param
 from .wb_utils import is_link, is_joint, is_robot
 from . import wb_globals
@@ -139,7 +139,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
             collision_source_obj = obj.Document.addObject("Part::Feature", "col_" + obj.Name)
             collision_source_obj.Placement = obj.Placement
 
-            collision_source_obj = copy_obj_gementry(obj, collision_source_obj)
+            collision_source_obj = copy_obj_geometry(obj, collision_source_obj)
             bound = createBound(collision_source_obj)
             doc.removeObject(collision_source_obj.Name)
 

@@ -10,6 +10,7 @@ from typing import Any, Iterable, Optional
 import sys
 
 import FreeCAD as fc
+import Part
 import MaterialEditor
 
 from .utils import true_then_false
@@ -885,3 +886,48 @@ def get_parents_names(obj: fc.DocumentObject) -> list[str]:
         parents_names = [name] + path.split('.')
         break
     return parents_names
+
+
+def copy_obj_geometry(old_obj: DO, new_obj: DO, copy_compound_shape_for_part: bool = True) -> DO:
+    """ Copy geometry properties from old object to new one"""
+    if hasattr(old_obj, "Shape"):
+        new_obj.Shape = old_obj.Shape
+    elif hasattr(old_obj, "Mesh"):      # upgrade with wmayer thanks #http://forum.freecadweb.org/viewtopic.php?f=13&t=22331
+        new_obj.Shape = old_obj.Mesh
+    elif hasattr(old_obj, "Points"):
+        new_obj.Shape = old_obj.Points
+    elif copy_compound_shape_for_part and is_part(old_obj):
+        # get compound shape for all objects inside Part
+        new_obj.Shape = Part.getShape(old_obj)
+
+    return new_obj
+
+
+def get_compound(
+        objs: list[DO],
+        compound_placement: fc.Placement,
+        compound_name: str,
+        compound_el_name: str
+    ) -> Optional[DO]:
+    """Make compound of objects and it`s nested bodies"""
+    try:
+        doc = objs[0].Document
+    except:
+        error('Can`t get document for make compound of objects')
+        return None
+    part_tmp = doc.addObject("App::Part", 'tmp_' + compound_name)
+    part_tmp.Visibility = False
+    for obj in objs:
+        compound_el = doc.addObject("Part::Feature", compound_el_name)
+        part_tmp.Visibility = False
+        compound_el.Placement = obj.Placement
+        compound_el = copy_obj_geometry(obj, compound_el)
+        part_tmp.addObject(compound_el)
+    # make result compound of Part (inside it compounds of objs)
+    compound = doc.addObject("Part::Feature", compound_name)
+    compound.Visibility = False
+    compound = copy_obj_geometry(part_tmp, compound)
+    compound.Placement = compound_placement
+    part_tmp.removeObjectsFromDocument()
+    doc.removeObject(part_tmp.Name)
+    return compound

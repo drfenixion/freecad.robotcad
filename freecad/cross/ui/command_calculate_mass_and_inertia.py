@@ -1,17 +1,16 @@
+from typing import Optional
 import FreeCAD as fc
 import FreeCADGui as fcgui
-from ..freecad_utils import center_of_gravity_mm
+from ..freecad_utils import DO, center_of_gravity_mm, first_object_with_volume, get_compound
 from ..freecad_utils import correct_matrix_of_inertia
 from ..freecad_utils import error
-from ..freecad_utils import first_object_with_volume
-from ..freecad_utils import get_linked_obj
 from ..freecad_utils import material_from_material_editor
 from ..freecad_utils import matrix_of_inertia
 from ..freecad_utils import quantity_as
 from ..freecad_utils import volume_mm3
 from ..freecad_utils import warn
 from ..gui_utils import tr
-from ..wb_utils import is_link
+from ..wb_utils import is_link, ros_name
 from ..wb_utils import is_robot_selected
 
 
@@ -61,9 +60,14 @@ class _CalculateMassAndInertiaCommand:
             if not link.Real:
                 error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
                 continue
-
-            real = link.Real[0]
-            elem_with_volume = first_object_with_volume(real)
+                        
+            compound = get_compound(
+                link.Real,
+                link.Placement, 
+                compound_name = "inert_link_" + ros_name(link),
+                compound_el_name = "inert_el_" + ros_name(link),
+            )
+            elem_with_volume = first_object_with_volume(compound)
 
             if not elem_with_volume:
                 error(f'Link "{link.Label}" does not link to any child with volume.', gui=True)
@@ -72,6 +76,7 @@ class _CalculateMassAndInertiaCommand:
             center_of_gravity = center_of_gravity_mm(elem_with_volume)
             elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
             elem_volume_mm3 = volume_mm3(elem_with_volume)
+            doc.removeObject(elem_with_volume.Name)
             
             elem_material = material_from_material_editor(link.MaterialCardPath)
         
