@@ -663,18 +663,18 @@ def clean_and_unique_string(input_str: str, rando_str_len: int = 6) -> str:
     """Clean chars and add random string"""
     # Remove all characters that are not English letters, digits or a dot
     cleaned_str = re.sub(r'[^a-zA-Z0-9_\.]', '', input_str)
-    
+
     # Replace dots with underscores
     cleaned_str = cleaned_str.replace('.', '_')
-    
+
     # Generate random characters (English letters and digits)
     random_chars = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(rando_str_len))
-    
+
     # Append the random characters to the end of the string
     result_str = cleaned_str + '_' + random_chars
 
     result_str = result_str.lower()
-    
+
     return result_str
 
 
@@ -689,7 +689,7 @@ def _get_mesh_filename(obj: DO) -> str:
         doc_name = linked_obj.Document.Name
     else:
         doc_name = 'unsaved_doc'
-    
+
     name = f'{doc_name}_{label}'
     name = clean_and_unique_string(name)
     return get_valid_filename(f'{name}.dae')
