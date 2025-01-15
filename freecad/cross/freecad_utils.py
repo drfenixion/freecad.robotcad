@@ -9,6 +9,8 @@ import string
 from typing import Any, Iterable, Optional
 import sys
 
+import numpy as np
+
 import FreeCAD as fc
 import Part
 import MaterialEditor
@@ -790,6 +792,73 @@ def material_from_material_editor(
     return material
 
 
+def fc_matrix_to_numpy(matrix: fc.Matrix):
+    """
+    Converts a FreeCAD matrix to a numpy array
+
+    Args:
+        matrix (Base.Matrix): Matrix from FreeCAD
+
+    Returns:
+        np.ndarray: Matrix as a numpy array
+    """
+    # Extract the components of the inertia matrix
+    Ixx, Ixy, Ixz = matrix.A11, matrix.A12, matrix.A13
+    Iyx, Iyy, Iyz = matrix.A21, matrix.A22, matrix.A23
+    Izx, Izy, Izz = matrix.A31, matrix.A32, matrix.A33
+
+    # Create a numpy array from the inertia matrix components
+    inertia_matrix = np.array([[Ixx, Ixy, Ixz],
+                               [Iyx, Iyy, Iyz],
+                               [Izx, Izy, Izz]])
+
+    return inertia_matrix
+
+
+def numpy_to_fc_matrix(np_array):
+    """
+    Converts a numpy array to a FreeCAD matrix
+
+    Args:
+        np_array (np.ndarray): Matrix as a numpy array
+
+    Returns:
+        Base.Matrix: Matrix as a FreeCAD Base.Matrix object
+    """
+    # Check if the input is a 3x3 numpy array
+    if np_array.shape!= (3, 3):
+        raise ValueError("Input must be a 3x3 numpy array")
+
+    # Create a new Base.Matrix object
+    matrix = fc.Matrix()
+
+    # Set the components of the matrix
+    matrix.A11, matrix.A12, matrix.A13 = np_array[0, 0], np_array[0, 1], np_array[0, 2]
+    matrix.A21, matrix.A22, matrix.A23 = np_array[1, 0], np_array[1, 1], np_array[1, 2]
+    matrix.A31, matrix.A32, matrix.A33 = np_array[2, 0], np_array[2, 1], np_array[2, 2]
+
+    return matrix
+
+
+def parallel_axis_theorem(m, r, I):
+    """
+    Apply the parallel axis theorem to the inertia tensor.
+    
+    Parameters:
+    m (float): Mass of the body.
+    r (numpy.array): Radius vector from the new reference point to the old reference point.
+    I (numpy.array): Inertia tensor relative to the old reference point.
+    
+    Returns:
+    numpy.array: Inertia tensor relative to the new reference point.
+    """
+    E = np.eye(3)  # Identity matrix
+    r_outer = np.outer(r, r)  # Outer product of r with itself
+    I = fc_matrix_to_numpy(I)
+    I_new = I + m * (np.linalg.norm(r)**2 * E - r_outer)
+    return numpy_to_fc_matrix(I_new)
+
+
 def matrix_of_inertia(
         obj: Optional[fc.DocumentObject],
 ) -> Optional[fc.Matrix]:
@@ -799,10 +868,12 @@ def matrix_of_inertia(
     except (AttributeError, IndexError, RuntimeError):
         pass
     try:
+        check_solid_exist = obj.Shape.Solids[0]
         commonMatrixOfInertia = fc.Matrix()
         for solid in obj.Shape.Solids:
             if solid.Volume > 0.0:
-                commonMatrixOfInertia += solid.MatrixOfInertia
+                r = solid.CenterOfGravity - obj.Shape.CenterOfGravity
+                commonMatrixOfInertia += parallel_axis_theorem(solid.Volume, r, solid.MatrixOfInertia)
         return commonMatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
         pass
