@@ -799,7 +799,11 @@ def matrix_of_inertia(
     except (AttributeError, IndexError, RuntimeError):
         pass
     try:
-        return obj.Shape.Solids[0].MatrixOfInertia
+        commonMatrixOfInertia = fc.Matrix()
+        for solid in obj.Shape.Solids:
+            if solid.Volume > 0.0:
+                commonMatrixOfInertia += solid.MatrixOfInertia
+        return commonMatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
         pass
     return None
@@ -908,6 +912,7 @@ def get_compound(
         compound_placement: fc.Placement,
         compound_name: str,
         compound_el_name: str,
+        zeroing_real_objs_placement: bool = False,
 ) -> Optional[DO]:
     """Make compound of objects and it`s nested bodies"""
     try:
@@ -920,8 +925,9 @@ def get_compound(
     for obj in objs:
         compound_el = doc.addObject("Part::Feature", compound_el_name)
         part_tmp.Visibility = False
-        compound_el.Placement = obj.Placement
         compound_el = copy_obj_geometry(obj, compound_el)
+        if zeroing_real_objs_placement:
+            compound_el.Placement = fc.Placement()
         part_tmp.addObject(compound_el)
     # make result compound of Part (inside it compounds of objs)
     compound = doc.addObject("Part::Feature", compound_name)

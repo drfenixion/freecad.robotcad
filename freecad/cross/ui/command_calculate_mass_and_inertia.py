@@ -66,9 +66,10 @@ class _CalculateMassAndInertiaCommand:
 
             compound = get_compound(
                 link.Real,
-                link.Placement,
+                fc.Placement(),
                 compound_name = "inert_link_" + ros_name(link),
                 compound_el_name = "inert_el_" + ros_name(link),
+                zeroing_real_objs_placement = True,
             )
             elem_with_volume = first_object_with_volume(compound)
 
