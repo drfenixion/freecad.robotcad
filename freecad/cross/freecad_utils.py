@@ -808,9 +808,11 @@ def fc_matrix_to_numpy(matrix: fc.Matrix):
     Izx, Izy, Izz = matrix.A31, matrix.A32, matrix.A33
 
     # Create a numpy array from the inertia matrix components
-    inertia_matrix = np.array([[Ixx, Ixy, Ixz],
-                               [Iyx, Iyy, Iyz],
-                               [Izx, Izy, Izz]])
+    inertia_matrix = np.array([
+        [Ixx, Ixy, Ixz],
+        [Iyx, Iyy, Iyz],
+        [Izx, Izy, Izz],
+    ])
 
     return inertia_matrix
 
@@ -843,12 +845,12 @@ def numpy_to_fc_matrix(np_array):
 def parallel_axis_theorem(m, r, I):
     """
     Apply the parallel axis theorem to the inertia tensor.
-    
+
     Parameters:
     m (float): Mass of the body.
     r (numpy.array): Radius vector from the new reference point to the old reference point.
     I (numpy.array): Inertia tensor relative to the old reference point.
-    
+
     Returns:
     numpy.array: Inertia tensor relative to the new reference point.
     """
