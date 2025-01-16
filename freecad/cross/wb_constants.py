@@ -133,7 +133,54 @@ ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
         'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
         'default_value_replace': [],
     },
-
+    'front_left_wheel_command_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'front_right_wheel_command_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'rear_right_wheel_command_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'rear_left_wheel_command_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'front_left_wheel_state_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'front_right_wheel_state_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'rear_right_wheel_state_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
+    'rear_left_wheel_state_joint_name' : {
+        'replace': 'App::PropertyLinkGlobal',
+        'origin': 'App::PropertyString',
+        'check_functions': ['is_joint', 'is_controller', 'is_broadcaster'],
+        'default_value_replace': None,
+    },
 
     'base_frame_id' : {
         'replace': 'App::PropertyLinkGlobal',

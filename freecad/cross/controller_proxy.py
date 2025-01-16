@@ -623,7 +623,8 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 def filter_controllers_dirs(controllers: dict):
     """Filter controllers directories for that not coded parsing yet"""
 
-    filter_controllers_dirs = ['mecanum_drive_controller', 'parallel_gripper_controller', 'gpio_controllers']
+    # filted does not adapted controller (need some code to adapt)
+    filter_controllers_dirs = ['parallel_gripper_controller', 'gpio_controllers']
 
     for controller in list(controllers):
         if controller in filter_controllers_dirs:
