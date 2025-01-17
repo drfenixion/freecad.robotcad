@@ -750,9 +750,9 @@ def make_robot_joints_filled(
         for i in range(sel_len):
             if first_sel is None:
                 first_sel = i
-            else:
-                if i+1 < sel_len:
-                    joints.append(make_robot_joint_filled(selection[first_sel], selection[i+1], robot))
+            
+            if i+1 < sel_len:
+                joints.append(make_robot_joint_filled(selection[first_sel], selection[i+1], robot))
     else:
         raise TypeError('Joints group making connect_type (' + joints_group_connect_type + ') does not support.')
 
