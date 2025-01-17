@@ -11,7 +11,7 @@ try:
 except:
     from PySide2 import QtWidgets
 
-from .freecad_utils import get_subobjects_by_full_name
+from .freecad_utils import copy_obj_geometry, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
@@ -86,6 +86,17 @@ def createSphere(boundBox_, nameLabel):
     return boundObj, boundBoxLocation
 
 
+def createCollisionCopyObj(obj: DO) -> DO:
+    """Create copy of object for collision purpose"""
+    colObj = fc.ActiveDocument.addObject("Part::Feature", obj.Label + "_col_obj")
+    colObj = copy_obj_geometry(obj, colObj)
+    colObj.Placement = fc.Placement()
+
+    colObj = set_collision_appearance(colObj)
+
+    return colObj
+
+
 def createBoundAbstract(obj, createPrimitive = createBox):
 
     obj = first_object_with_volume(obj)
@@ -99,11 +110,6 @@ def createBoundAbstract(obj, createPrimitive = createBox):
 
     boundObj = False
     try:
-        # LineColor
-        red   = 1.0  # 1 = 255
-        green = 1.0  #
-        blue  = 0.4  #
-
         # boundBox
         boundBox_    = s.BoundBox
         boundBoxLX   = boundBox_.XLength
@@ -129,16 +135,25 @@ def createBoundAbstract(obj, createPrimitive = createBox):
             boundObj, boundBoxLocation = createPrimitive(boundBox_, nameLabel)
             boundObj.Placement = fc.Placement(boundBoxLocation, fc.Rotation(fc.Vector(1,0,0),0))
 
-            boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
-            boundObjGui.LineColor  = (red, green, blue)
-            boundObjGui.PointColor = (red, green, blue)
-            boundObjGui.ShapeColor = (red, green, blue)
-            boundObjGui.LineWidth = 1
-            boundObjGui.Transparency = 90
+            boundObj = set_collision_appearance(boundObj)
 
     except Exception:
         fc.Console.PrintError("Bad selection"+"\n")
 
+    return boundObj
+
+
+def set_collision_appearance(boundObj):
+    # LineColor
+    red   = 1.0  # 1 = 255
+    green = 1.0  #
+    blue  = 0.4  #
+    boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
+    boundObjGui.LineColor  = (red, green, blue)
+    boundObjGui.PointColor = (red, green, blue)
+    boundObjGui.ShapeColor = (red, green, blue)
+    boundObjGui.LineWidth = 1
+    boundObjGui.Transparency = 90
     return boundObj
 
 
