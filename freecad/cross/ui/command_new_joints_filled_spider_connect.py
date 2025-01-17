@@ -25,15 +25,18 @@ class _NewJointsFilledSpiderCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'links_to_joints_spider.svg',
-                'MenuText': tr('New joints by selected links with spider connection'),
-                'Accel': 'J, S',
-                'ToolTip': tr('New joints by selected links with spider connection.\n'
-                              '\n'
-                              'Select: robot links (minimum 2). Links must be in robot container.\n'
-                              '\n'
-                              'Joints will be created by selected links and all links will be connected to first link.\n'
-                              )}
+        return {
+            'Pixmap': 'links_to_joints_spider.svg',
+            'MenuText': tr('New joints by selected links with spider connection'),
+            'Accel': 'J, S',
+            'ToolTip': tr(
+                'New joints by selected links with spider connection.\n'
+                '\n'
+                'Select: robot links (minimum 2). Links must be in robot container.\n'
+                '\n'
+                'Joints will be created by selected links and all links will be connected to first link.\n',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection()) and is_link(fcgui.Selection.getSelection()[0])

@@ -28,16 +28,19 @@ class _NewJointsFilledCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'links_to_joints.svg',
-                'MenuText': tr('New joints by selected links with chain connection'),
-                'Accel': 'J, F',
-                'ToolTip': tr('New joints by selected links with chain connection.\n'
-                              '\n'
-                              'Select: robot links (minimum 2). Links must be in robot container.\n'
-                              '\n'
-                              'Joints will be created by selected links with chain connection.\n'
-                              'Order of links in selection is order of links in joints.\n'
-                              )}
+        return {
+            'Pixmap': 'links_to_joints.svg',
+            'MenuText': tr('New joints by selected links with chain connection'),
+            'Accel': 'J, F',
+            'ToolTip': tr(
+                'New joints by selected links with chain connection.\n'
+                '\n'
+                'Select: robot links (minimum 2). Links must be in robot container.\n'
+                '\n'
+                'Joints will be created by selected links with chain connection.\n'
+                'Order of links in selection is order of links in joints.\n',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection()) and is_link(fcgui.Selection.getSelection()[0])

@@ -723,7 +723,7 @@ def make_robot_joints_filled(
         links:list[CrossLink] = [],
         robot:CrossRobot | None = None,
         joints_group_connect_type:  Union['chain': str, 'spider': str] = 'chain',
-    ) -> list[CrossJoint] | False :
+) -> list[CrossJoint] | False :
     ''' Make robot joints and fill it with selected links (parent, child) '''
 
     if not len(links):
