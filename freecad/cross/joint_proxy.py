@@ -750,7 +750,7 @@ def make_robot_joints_filled(
         for i in range(sel_len):
             if first_sel is None:
                 first_sel = i
-            
+
             if i+1 < sel_len:
                 joints.append(make_robot_joint_filled(selection[first_sel], selection[i+1], robot))
     else:
