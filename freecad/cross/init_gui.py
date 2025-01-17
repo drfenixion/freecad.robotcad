@@ -8,6 +8,7 @@ from .ui import command_kk_edit
 from .ui import command_new_attached_collision_object  # noqa: F401
 from .ui import command_new_joint
 from .ui import command_new_joints_filled
+from .ui import command_new_joints_filled_spider_connect
 from .ui import command_new_link
 from .ui import command_new_links_filled
 from .ui import command_new_observer
@@ -68,6 +69,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewLinksFilled',  # Defined in ./ui/command_new_links_filled.py.
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
+            'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
@@ -111,6 +113,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewLinksFilled',  # Defined in ./ui/command_new_links_filled.py.
             'NewJoint',  # Defined in ./ui/command_new_joint.py.
             'NewJointsFilled',  # Defined in ./ui/command_new_joints_filled.py.
+            'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.

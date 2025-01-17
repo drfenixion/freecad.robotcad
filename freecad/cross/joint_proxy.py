@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import degrees, radians
-from typing import Optional, cast
+from typing import Optional, Union, cast
 import xml.etree.ElementTree as et
 from typing import NewType, List, Optional, cast
 
@@ -719,7 +719,11 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
     return False
 
 
-def make_robot_joints_filled(links:list[CrossLink] = [], robot:CrossRobot | None = None) -> list[CrossJoint] | False :
+def make_robot_joints_filled(
+        links:list[CrossLink] = [],
+        robot:CrossRobot | None = None,
+        joints_group_connect_type:  Union['chain': str, 'spider': str] = 'chain',
+    ) -> list[CrossJoint] | False :
     ''' Make robot joints and fill it with selected links (parent, child) '''
 
     if not len(links):
@@ -736,8 +740,20 @@ def make_robot_joints_filled(links:list[CrossLink] = [], robot:CrossRobot | None
         return False
 
     joints = [CrossJoint]
-    for i in range(sel_len):
-        if i+1 < sel_len:
-            joints.append(make_robot_joint_filled(selection[i], selection[i+1], robot))
+
+    if joints_group_connect_type == 'chain':
+        for i in range(sel_len):
+            if i+1 < sel_len:
+                joints.append(make_robot_joint_filled(selection[i], selection[i+1], robot))
+    elif joints_group_connect_type == 'spider':
+        first_sel = None
+        for i in range(sel_len):
+            if first_sel is None:
+                first_sel = i
+            else:
+                if i+1 < sel_len:
+                    joints.append(make_robot_joint_filled(selection[first_sel], selection[i+1], robot))
+    else:
+        raise TypeError('Joints group making connect_type (' + joints_group_connect_type + ') does not support.')
 
     return joints

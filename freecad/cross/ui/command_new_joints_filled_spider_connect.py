@@ -4,9 +4,6 @@ import FreeCAD as fc
 
 import FreeCADGui as fcgui
 
-from ..freecad_utils import message
-from ..freecad_utils import validate_types
-from ..freecad_utils import is_lcs
 from ..gui_utils import tr
 from ..joint_proxy import make_robot_joints_filled
 from ..wb_utils import is_link
@@ -21,22 +18,21 @@ CrossJoint = Joint
 LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
-class _NewJointsFilledCommand:
-    """Command to create new joints by selected links.
+class _NewJointsFilledSpiderCommand:
+    """Command to create new joints by selected links with spider connection.
 
         Links must be in robot container before
     """
 
     def GetResources(self):
-        return {'Pixmap': 'links_to_joints.svg',
-                'MenuText': tr('New joints by selected links with chain connection'),
-                'Accel': 'J, F',
-                'ToolTip': tr('New joints by selected links with chain connection.\n'
+        return {'Pixmap': 'links_to_joints_spider.svg',
+                'MenuText': tr('New joints by selected links with spider connection'),
+                'Accel': 'J, S',
+                'ToolTip': tr('New joints by selected links with spider connection.\n'
                               '\n'
                               'Select: robot links (minimum 2). Links must be in robot container.\n'
                               '\n'
-                              'Joints will be created by selected links with chain connection.\n'
-                              'Order of links in selection is order of links in joints.\n'
+                              'Joints will be created by selected links and all links will be connected to first link.\n'
                               )}
 
     def IsActive(self):
@@ -45,11 +41,11 @@ class _NewJointsFilledCommand:
     def Activated(self):
         doc = fc.activeDocument()
 
-        doc.openTransaction(tr("New filled joints by selected links"))
-        make_robot_joints_filled()
+        doc.openTransaction(tr("New filled joints by selected links with spider connection"))
+        make_robot_joints_filled(joints_group_connect_type = 'spider')
         doc.commitTransaction()
 
         doc.recompute()
 
 
-fcgui.addCommand('NewJointsFilled', _NewJointsFilledCommand())
+fcgui.addCommand('NewJointsFilledSpider', _NewJointsFilledSpiderCommand())
