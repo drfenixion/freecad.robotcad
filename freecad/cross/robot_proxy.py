@@ -1327,7 +1327,7 @@ def make_robot(name, doc: Optional[fc.Document] = None) -> CrossRobot:
         _ViewProviderRobot(robot.ViewObject)
         robot.ViewObject.ShowReal = True
         robot.ViewObject.ShowVisual = False
-        robot.ViewObject.ShowCollision = False
+        robot.ViewObject.ShowCollision = True
 
     doc.recompute()
     return robot
