@@ -33,7 +33,9 @@ from .ui import command_rotate_joint_y
 from .ui import command_rotate_joint_z
 from .ui import command_simplify_mesh
 from .ui import command_sphere_from_bounding_box
-from .ui import command_cylinder_from_bounding_box
+from .ui import command_cylinder_x_aligned_from_bounding_box
+from .ui import command_cylinder_y_aligned_from_bounding_box
+from .ui import command_cylinder_z_aligned_from_bounding_box
 from .ui import command_create_collision_copy_obj
 from .ui import command_update_planning_scene
 from .ui import command_urdf_export
@@ -84,7 +86,9 @@ class CrossWorkbench(fcgui.Workbench):
             'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
-            'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
+            'ZAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_z_aligned_from_bounding_box.py.
+            'XAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_x_aligned_from_bounding_box.py.
+            'YAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_y_aligned_from_bounding_box.py.
             'CreateCollisionCopyObj',  # Defined in ./ui/command_create_collision_copy_obj.py.
             # 'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
@@ -130,7 +134,9 @@ class CrossWorkbench(fcgui.Workbench):
             'Separator',
             'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
             'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
-            'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
+            'ZAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_z_aligned_from_bounding_box.py.
+            'XAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_x_aligned_from_bounding_box.py.
+            'YAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_y_aligned_from_bounding_box.py.
             'CreateCollisionCopyObj',  # Defined in ./ui/command_create_collision_copy_obj.py.
             'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'Separator',

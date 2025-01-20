@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="193 199 266 266" width="266px" height="266px">
+<g transform="matrix(7.418924, 0, 0, 4.677392, 200.828323, -922.547852)" style="">
+<ellipse style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff5555;fill-opacity:1;stroke:#000000;stroke-width:3.72281;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1" cx="16.933332" cy="280.06665" rx="13.791595" ry="14.257236"/>
+<path style="paint-order: fill markers; stroke-linecap: square; stroke-linejoin: bevel; fill: rgb(255, 85, 85);" d="M 4.777 267.177 L 29.063 267.492 L 28.883 281.101 C 28.001 298.069 4.195 294.406 4.867 281.493"/>
+</g>
+<g transform="matrix(7.418924, 0, 0, 4.677392, 200.828323, -1028.889648)" style="">
+<ellipse style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:#ff5555;fill-opacity:1;stroke:#000000;stroke-width:3.72281;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1" cx="16.933332" cy="280.06665" rx="13.791595" ry="14.257236"/>
+</g>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 27px;" x1="223.007" y1="283.417" x2="223.223" y2="387.916"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 27px;" x1="428.774" y1="283.031" x2="428.993" y2="387.531"/>
+<text style="white-space: pre; fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 110.8px;" x="287.886" y="323.031">Z</text>
+</svg>

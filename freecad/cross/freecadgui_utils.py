@@ -50,40 +50,100 @@ def createBoundBox(obj):
     return createBoundAbstract(obj, createPrimitive = createBox)
 
 
-def createBoundCylinder(obj):
-    return createBoundAbstract(obj, createPrimitive = createCylinder)
+def createBoundXAlignedCylinder(obj):
+    return createBoundAbstract(obj, createPrimitive = createXAlignedCylinder)
+
+
+def createBoundYAlignedCylinder(obj):
+    return createBoundAbstract(obj, createPrimitive = createYAlignedCylinder)
+
+
+def createBoundZAlignedCylinder(obj):
+    return createBoundAbstract(obj, createPrimitive = createZAlignedCylinder)
 
 
 def createBoundSphere(obj):
     return createBoundAbstract(obj, createPrimitive = createSphere)
 
 
-def createBox(boundBox_, nameLabel):
+def createBox(boundBox_: DO, nameLabel: str) -> DO:
     boundObj = fc.ActiveDocument.addObject("Part::Box", nameLabel + "_BoundBox")
     boundObj.Length.Value = boundBox_.XLength
     boundObj.Width.Value  = boundBox_.YLength
     boundObj.Height.Value = boundBox_.ZLength
 
-    boundBoxLocation = fc.Vector(boundBox_.XMin,boundBox_.YMin,boundBox_.ZMin)
+    boundObj.Placement.Base = fc.Vector(boundBox_.XMin,boundBox_.YMin,boundBox_.ZMin)
 
-    return boundObj, boundBoxLocation
-
-
-def createCylinder(boundBox_, nameLabel):
-    boundObj = fc.ActiveDocument.addObject('Part::Cylinder', nameLabel + "_BoundCylinder")
-    boundObj.Height = boundBox_.ZLength
-    boundObj.Radius = ((boundBox_.XLength ** 2 + boundBox_.YLength ** 2) ** 0.5) / 2.0
-    boundBoxLocation = fc.Vector(boundBox_.Center.x, boundBox_.Center.y, boundBox_.ZMin)
-
-    return boundObj, boundBoxLocation
+    return boundObj
 
 
-def createSphere(boundBox_, nameLabel):
+def createXAlignedCylinder(boundBox_: DO, nameLabel: str):
+    return createCylinder(boundBox_, nameLabel, alignAxis = 'x')
+
+
+def createYAlignedCylinder(boundBox_: DO, nameLabel: str):
+    return createCylinder(boundBox_, nameLabel, alignAxis = 'y')
+
+
+def createZAlignedCylinder(boundBox_: DO, nameLabel: str):
+    return createCylinder(boundBox_, nameLabel, alignAxis = 'z')
+
+
+def createCylinder(boundBox_: DO, nameLabel: str, alignAxis: str = 'x') -> DO:
+
+    def createAlignedCylinder(boundBox_: DO, nameLabel: str, alignAxis: str = 'z') -> DO:
+        "Create aligned cynlinder by selectable axis"
+        if alignAxis == 'z':
+            firstAxisLength = boundBox_.ZLength
+            secondAxisLength = boundBox_.XLength
+            thirdAxisLength = boundBox_.YLength
+            secondAxisCenter = boundBox_.Center.x
+            thirdAxisCenter = boundBox_.Center.y
+            firstAxisMin = boundBox_.ZMin
+        elif alignAxis == 'x':
+            firstAxisLength = boundBox_.XLength
+            secondAxisLength = boundBox_.YLength
+            thirdAxisLength = boundBox_.ZLength
+            secondAxisCenter = boundBox_.XMin
+            thirdAxisCenter = boundBox_.YMin - (boundBox_.YMin - boundBox_.Center.y)
+            firstAxisMin = boundBox_.ZMin - (boundBox_.ZMin - boundBox_.Center.z)
+        elif alignAxis == 'y':
+            firstAxisLength = boundBox_.YLength
+            secondAxisLength = boundBox_.ZLength
+            thirdAxisLength = boundBox_.XLength
+            secondAxisCenter = boundBox_.XMin - (boundBox_.XMin - boundBox_.Center.x)
+            thirdAxisCenter = boundBox_.YMin - (boundBox_.YMin - boundBox_.Center.y) * 2
+            firstAxisMin = boundBox_.ZMin - (boundBox_.ZMin - boundBox_.Center.z)
+        else:
+            raise RuntimeError('Wrong cynlinder alignAxis (' + alignAxis + ')')
+
+
+
+        boundObj = fc.ActiveDocument.addObject('Part::Cylinder', nameLabel + "_BoundCylinder")
+        boundObj.Height = firstAxisLength
+        boundObj.Radius = ((secondAxisLength ** 2 + thirdAxisLength ** 2) ** 0.5) / 2.0
+        boundObj.Placement.Base = fc.Vector(secondAxisCenter, thirdAxisCenter, firstAxisMin)
+        # z is default orientation
+        if alignAxis == 'x':
+            # rotate by y
+            boundObj.Placement.rotate(fc.Vector(0,0,0), fc.Vector(0,1,0), 90)
+        if alignAxis == 'y':
+            # rotate by x
+            boundObj.Placement.rotate(fc.Vector(0,0,0), fc.Vector(1,0,0), 90)
+
+        return boundObj
+
+    boundObj = createAlignedCylinder(boundBox_, nameLabel, alignAxis)
+
+    return boundObj
+
+
+def createSphere(boundBox_: DO, nameLabel: str) -> DO:
     boundObj = fc.ActiveDocument.addObject('Part::Sphere', nameLabel + "_BoundSphere")
     boundObj.Radius = boundBox_.DiagonalLength / 2.0
-    boundBoxLocation = boundBox_.Center
+    boundObj.Placement.Base = boundBox_.Center
 
-    return boundObj, boundBoxLocation
+    return boundObj
 
 
 def createCollisionCopyObj(obj: DO) -> DO:
@@ -132,8 +192,7 @@ def createBoundAbstract(obj, createPrimitive = createBox):
 
         if (boundBoxLX > 0) and (boundBoxLY > 0) and (boundBoxLZ > 0):  # Create Volume
 
-            boundObj, boundBoxLocation = createPrimitive(boundBox_, nameLabel)
-            boundObj.Placement = fc.Placement(boundBoxLocation, fc.Rotation(fc.Vector(1,0,0),0))
+            boundObj = createPrimitive(boundBox_, nameLabel)
 
             boundObj = set_collision_appearance(boundObj)
 

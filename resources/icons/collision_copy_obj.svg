@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500px" height="500px">
-<path d="M 254.131 43.466 L 470.693 201.109 L 387.974 456.181 L 120.288 456.181 L 37.569 201.109 Z" style="fill: rgb(255, 85, 85); stroke: rgb(0, 0, 0); stroke-width: 35px;"/>
-<polyline style="stroke: rgb(0, 0, 0); fill: rgb(255, 85, 85); stroke-width: 35px;" points="29.307 198.206 182.71 267.925 300.805 268.464 456.642 199.827"/>
-<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 35px;" x1="318.459" y1="276.184" x2="367.766" y2="451.636"/>
-<path style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 35px; transform-origin: 131.132px 372.404px;" d="M 173.086 272.504 L 115.019 456.535"/>
-<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 35px;" x1="250.28" y1="55.651" x2="320.893" y2="264.61"/>
-<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 35px;" x1="246.626" y1="65.4" x2="171.144" y2="256.691"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="193 199 266 266" width="266px" height="266px">
+<path d="M 326.455 224.609 L 439.059 306.579 L 396.047 439.208 L 256.86 439.208 L 213.848 306.579 L 326.455 224.609 Z" style="fill: rgb(255, 85, 85); stroke: rgb(0, 0, 0); stroke-width: 20px;"/>
+<path d="M 326.787 290.577 L 378.429 328.17 L 358.703 388.995 L 294.871 388.995 L 275.145 328.17 L 326.787 290.577 Z" style="fill: rgb(255, 85, 85); stroke: rgb(0, 0, 0); stroke-width: 20px;"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="326.123" y1="227.14" x2="326.123" y2="291.798"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="376.637" y1="330.188" x2="435.233" y2="306.952"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="276.62" y1="327.158" x2="217.013" y2="307.962"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="259.445" y1="435.257" x2="293.794" y2="388.785"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="357.442" y1="388.785" x2="395.832" y2="438.288"/>
 </svg>
