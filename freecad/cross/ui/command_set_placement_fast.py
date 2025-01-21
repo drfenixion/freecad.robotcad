@@ -50,7 +50,10 @@ class _SetCROSSPlacementFastCommand:
                 'It is posible to use other Placements tools with the LCS.\n'
                 'Also you can remove LCS, it only helpers for set placement.\n'
                 'By default LCS will use InertialCS MapMode \n'
-                'and Translate MapMode for vertex and Concentric for curve and circle.',
+                'and Translate MapMode for vertex and Concentric for curve and circle.\n'
+                '\n'
+                'Dont use this for moving chain of joints because it also set MountedPlacement\n'
+                'that is may not be desirable in this case.\n',
             ),
         }
 
@@ -144,15 +147,10 @@ class _SetCROSSPlacementFastCommand:
             message('Can not get joint between parent links of selected objects', gui=True)
             return
 
-        doc.openTransaction(tr("Set joint origin"))
+        doc.openTransaction(tr("Set placement - fast"))
         set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
-        doc.commitTransaction()
-        doc.recompute()
-        doc.openTransaction(tr("Set link's mounted placement"))
-        move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer, delete_created_objects=False)
-        doc.commitTransaction()
-
-        doc.recompute()
+        move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+        doc.commitTransaction()        
 
 
 fcgui.addCommand('SetCROSSPlacementFast', _SetCROSSPlacementFastCommand())

@@ -722,6 +722,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
 
     # Set Origin or Mounted placement
     setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
+    doc.recompute()
 
 
 def move_placement(
@@ -757,7 +758,7 @@ def move_placement(
     # in local frame every tool click will result Origin move because both orienteers moved and received new position
     new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
-
+    doc.recompute()
 
 
 def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
