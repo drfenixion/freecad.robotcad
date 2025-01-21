@@ -396,6 +396,8 @@ def _urdf_generic_from_sphere(
 
     if not ignore_obj_placement:
         placement = placement * sphere.Placement
+    center_placement = urdf_sphere_placement_from_object(sphere, placement)
+    parent.append(urdf_origin_from_placement(center_placement))
 
     parent.append(
         urdf_geometry_sphere(
