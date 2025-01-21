@@ -150,7 +150,7 @@ class _SetCROSSPlacementFastCommand:
         doc.openTransaction(tr("Set placement - fast"))
         set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
-        doc.commitTransaction()        
+        doc.commitTransaction()
 
 
 fcgui.addCommand('SetCROSSPlacementFast', _SetCROSSPlacementFastCommand())
