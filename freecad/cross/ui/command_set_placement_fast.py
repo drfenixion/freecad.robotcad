@@ -34,7 +34,7 @@ class _SetCROSSPlacementFastCommand:
             'MenuText': tr('Set placement - fast'),
             'Accel': 'P, F',
             'ToolTip': tr(
-                'Set the Origin of a joint and Mounted Placement of link and make LCS at reference places.\n'
+                'Set the Origin of a joint and Mounted Placement of link.\n'
                 '\n'
                 'Select (with Ctlr): \n'
                 '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
@@ -45,12 +45,7 @@ class _SetCROSSPlacementFastCommand:
                 'This will connect 2 links (child to parent) in reference places.\n'
                 'Joint Origin and link Mounted Placement will be moved to connection position.\n'
                 '\n'
-                'At both reference places will be created LCS (if selected subelement).\n'
-                'Be free to fix the default LCS orientation if it does not suit you.\n'
-                'It is posible to use other Placements tools with the LCS.\n'
-                'Also you can remove LCS, it only helpers for set placement.\n'
-                'By default LCS will use InertialCS MapMode \n'
-                'and Translate MapMode for vertex and Concentric for curve and circle.\n'
+                'If selected subelement (face, edge, vertex) will be used temporary LCS underhood.\n'
                 '\n'
                 'Dont use this for moving chain of joints because it also set MountedPlacement\n'
                 'that is may not be desirable in this case.\n',
