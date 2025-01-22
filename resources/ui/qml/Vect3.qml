@@ -9,9 +9,15 @@ Item {
     property string textbackgroundColor: "green"
     property string backgroundColor: "black"
     property alias label:lbl.text
+    property real default_x:0.0
+    property real default_y:0.0
+    property real default_z:0.0
     property int dp:3
     property int min: 0
     property int  max: 100
+    signal xvalChanged(real xval)
+    signal yvalChanged(real yval)
+    signal zvalChanged(real zval)
     property string suffix:""
     width: gb.implicitWidth+16
     height:gb.implicitHeight+16
@@ -61,6 +67,11 @@ Item {
                 min:root.min
                 max:root.max
                 decimalPlaces: root.dp
+                default_value:root.default_x
+                onSpinBoxvalueChanged:
+                {
+                    root.xvalChanged(val)
+                }
             }
             DoubleSpinBox
             {
@@ -72,6 +83,11 @@ Item {
                 max:root.max
                  suffix:root.suffix
                  decimalPlaces: root.dp
+                 default_value:root.default_y
+                 onSpinBoxvalueChanged:
+                 {
+                     root.yvalChanged(val)
+                 }
             }
             DoubleSpinBox
             {
@@ -83,6 +99,11 @@ Item {
                 max:root.max
                  suffix:root.suffix
                  decimalPlaces: root.dp
+                 default_value:root.default_z
+                 onSpinBoxvalueChanged:
+                 {
+                     root.zvalChanged(val)
+                 }
             }
         }
 

@@ -5,7 +5,8 @@ FocusScope {
     property string textColor: "green"
     property string backgroundColor: "blue"
     property alias label:label.text
-    property string text:ti.text
+    property alias text:ti.text
+    signal textvalChanged(string txt)
     id: root
     RowLayout
     {
@@ -23,16 +24,22 @@ FocusScope {
             height:30
             width: ti.implicitWidth < 70 ? 70 :ti.implicitWidth
             implicitWidth: ti.implicitWidth
-            border.color: "#404ec5"
+            border.color: "#515dd0"
             color:root.backgroundColor
             radius: 4
             smooth:true
             TextInput{
                 id:ti
-                text:"enter Text"
+                text:"none"
                 color: root.textColor
                 height: parent.height
                 font.pixelSize: 24
+                focus:true
+                onTextChanged:
+                {
+                    root.textvalChanged(text)
+                }
+                
             }
 
 

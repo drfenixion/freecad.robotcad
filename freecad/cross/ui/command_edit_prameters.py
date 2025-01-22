@@ -5,7 +5,7 @@ import os
 from PySide2.QtWidgets import QDialog, QVBoxLayout
 from PySide2.QtQuickWidgets import QQuickWidget
 from PySide2.QtCore import QUrl,QSize
-from ..SdfUtilities import Palette
+from ..SdfUtilities import Palette, WorldProperties
 
 class link():
     '''
@@ -35,7 +35,9 @@ class world(QDialog):
     def intialize_qwidget(self):
         view =QQuickWidget(self)
         plt=Palette(self)
+        wrld=WorldProperties(self.obj,parent=self)
         view.rootContext().setContextProperty("plt",plt)
+        view.rootContext().setContextProperty("world",wrld)
         view.setSource(QUrl(os.path.join(wb_utils.UI_PATH,"qml","main.qml")))
         view.setResizeMode(QQuickWidget.SizeRootObjectToView)
         

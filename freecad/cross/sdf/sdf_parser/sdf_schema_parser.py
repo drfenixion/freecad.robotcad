@@ -39,7 +39,8 @@ class Element_Attributes:
 
 #class to parse the sdf file and generate a dictioanary
 class sdf_schema_parser:
-    def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH):
+    def __init__(self,version='1.7',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
+                 ,includeMetaData:bool=True):
         #initialize directory with the root.sdf
         self.root_dir=os.path.join(sdf_templates_dir, version, file)
         self.version=version
@@ -49,7 +50,8 @@ class sdf_schema_parser:
         self.tree=self.parse_tree(self.root_dir)
         #get the root element
         self.root=self.tree.getroot()
-
+        self.recurse=recurse
+        self.metaData=includeMetaData
         #populate the dictionary with data
         # call the tree with the parent  root element
         self.Main_ElemDict=self.populate_structure(self.root)
@@ -85,7 +87,7 @@ class sdf_schema_parser:
         self._attr.append(e)
 
 
-    def populate_structure(self, Element:ET.Element):
+    def populate_structure( self, Element:ET.Element):
         #add elements to structure
         ElemDict={}
 
@@ -109,12 +111,12 @@ class sdf_schema_parser:
             e.name=result.attrib["name"]
             e.attr_value=result.attrib["default"]
             self._attr.append(e)
+        if self.metaData:
+            for technical_attr_name, technical_attr_value in Element.attrib.items():
+                self.add_technical_attr_as_attr_to_element(technical_attr_name, technical_attr_value)
 
-        for technical_attr_name, technical_attr_value in Element.attrib.items():
-            self.add_technical_attr_as_attr_to_element(technical_attr_name, technical_attr_value)
 
-
-        self.add_child_text_as_attr_to_element(Element, 'description')
+            self.add_child_text_as_attr_to_element(Element, 'description')
 
         #check to see that attributes are not empty
         if len(self._attr)==0:
@@ -137,8 +139,11 @@ class sdf_schema_parser:
         #data in the children field
         for child in Element:
             if child.tag =="include":
-                struct_class=sdf_schema_parser(file=child.attrib["filename"])
-                ElemDict["children"].append(struct_class.data_structure)
+                #  removed include to ensure only one item can be selected at a time 
+                if self.recurse:
+                    struct_class=sdf_schema_parser(file=child.attrib["filename"])
+                    ElemDict["children"].append(struct_class.data_structure)
+                pass
             elif child.tag =="element" \
             and 'name' in child.attrib \
             and child.attrib["name"] != "include":

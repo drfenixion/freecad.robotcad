@@ -3,15 +3,18 @@ import QtQuick.Controls 2.0
 import QtQuick.Layouts 1.0
 
 Rectangle{
+
     id: root
     property string textcolor:"white"
     property string backgroundColor: "black"
     property alias value: spinBox.realValue
+    property real default_value:0.0
     property real min: 0
     property real max: 100
     property alias decimalPlaces: spinBox.decimals
     property alias suffix: spinBox.suffix
     property alias label: name.text
+    signal spinBoxvalueChanged(real val)
     // Function to convert decimals to integers
     function decimalToInt(decimal) {
         return decimal * Math.pow(10, spinBox.decimals);
@@ -33,9 +36,10 @@ Rectangle{
         }
 
         SpinBox {
+
             id: spinBox
             from: root.decimalToInt(root.min)
-            value: root.decimalToInt(1.1)
+            value: root.decimalToInt(root.default_value)
             to: root.decimalToInt(root.max)
             stepSize: decimalFactor
             editable: true
@@ -86,6 +90,10 @@ Rectangle{
                 radius: 4
                 border.color: spinBox.activeFocus ? Qt.lighter("#404ec5"):"gray"
                 border.width: 2
+            }
+            onValueModified:
+            {
+                root.spinBoxvalueChanged(realValue)
             }
         }
     }

@@ -20,14 +20,33 @@ Rectangle{
         {   textColor: root.textColor
             backgroundColor: root.textbackgroundColor
             id:worldname
-            label:"Name"
+            label:"WorldName"
+            text:world.worldname
             Layout.margins:margin
+            onTextvalChanged:
+            {
+                world.worldname=txt
+            }
+        }
+        LineEdit
+        {   textColor: root.textColor
+            backgroundColor: root.textbackgroundColor
+            id:robotname
+            label:"RobotName"
+            text:world.robotname
+            Layout.margins:margin
+            onTextvalChanged:
+            {
+                world.robotname=txt
+            }
+
         }
         // Gravity groupbox
 
         // end of gravity groupbox
             Vect3
             {
+                
                 textcolor: root.textColor
                 backgroundColor: root.backgroundColor
                 textbackgroundColor:root.textbackgroundColor
@@ -36,7 +55,22 @@ Rectangle{
                 suffix: " m/s^2"
                 min:-20
                 max:20
+                default_x:world.gravity[0]
+                default_y:world.gravity[1]
+                default_z:world.gravity[2]
+                onXvalChanged:
+                {
+                    world.setGravity(xval,0)
+                }
+                onYvalChanged: {
+                    world.setGravity(yval,1)
+                }
+                onZvalChanged:
+                {
+                    world.setGravity(zval,2)
+                }
             }
+
 
         // magnetic Field
         Vect3
@@ -48,8 +82,23 @@ Rectangle{
             Layout.margins: margin
             suffix: "T"
             dp:6
-            min:0
+            min:-5
             max:4
+            default_x:world.magneticField[0]
+            default_y:world.magneticField[1]
+            default_z:world.magneticField[2]
+            onXvalChanged:
+            {
+                world.setMagneticField(xval,0)
+            }
+            onYvalChanged: {
+                world.setMagneticField(yval,1)
+            }
+            onZvalChanged:
+            {
+                world.setMagneticField(zval,2)
+            }
+
         }
 
         //wind
@@ -61,6 +110,21 @@ Rectangle{
             textbackgroundColor:root.textbackgroundColor
             Layout.margins: margin
             suffix: "m/s"
+            default_x:world.wind_velocity[0]
+            default_y:world.wind_velocity[1]
+            default_z:world.wind_velocity[2]
+            onXvalChanged:
+            {
+                world.setWind(xval,0)
+            }
+            onYvalChanged:
+            {
+                world.setWind(yval,1)
+            }
+            onZvalChanged:
+            {
+                world.setWind(zval,2)
+            }
         }
         Rectangle
         {
@@ -119,6 +183,11 @@ Rectangle{
                     decimalPlaces: 2
                     textcolor: root.textColor
                     backgroundColor: root.textbackgroundColor
+                    default_value:world.temperature
+                    onSpinBoxvalueChanged:
+                    {
+                        world.temperature=val
+                    }
                 }
                 DoubleSpinBox
                 {
@@ -129,6 +198,11 @@ Rectangle{
                     textcolor: root.textColor
                      backgroundColor: root.textbackgroundColor
                     decimalPlaces: 2
+                    default_value:world.pressure
+                    onSpinBoxvalueChanged:
+                    {
+                        world.pressure=val
+                    }
                 }
                 DoubleSpinBox
                 {
@@ -139,6 +213,11 @@ Rectangle{
                     max:10
                     min:-10
                     decimalPlaces: 6
+                    default_value:world.temperatureGrad
+                    onSpinBoxvalueChanged:
+                    {
+                        world.temperatureGrad=val
+                    }
                 }
             }
         }
