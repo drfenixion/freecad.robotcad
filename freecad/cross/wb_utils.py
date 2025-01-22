@@ -864,8 +864,8 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
 def rotate_placement(
         placement:fc.Placement,
         x:float | None = None, y:float | None = None, z:float | None = None,
-        rotation_center: fc.Vector = fc.Vector(0,0,0)
-    ) -> fc.Placement :
+        rotation_center: fc.Vector = fc.Vector(0,0,0),
+) -> fc.Placement :
     ''' Rotate (incremental) placement in frame of origin or set any axis to zero.
 
         This func let you rotate object how be you rotate it as it was at origin.
