@@ -785,11 +785,14 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     link = None
     # trying get link from subelement
     try:
-        orienteer_parents_reversed = reversed(orienteer.Object.Parents)
-        for parent in orienteer_parents_reversed:
-            parent = parent[0]
-            if is_fc_link(parent):
-                link = parent
+        if is_fc_link(orienteer.Object):
+            link = orienteer.Object
+        else:
+            orienteer_parents_reversed = reversed(orienteer.Object.Parents)
+            for parent in orienteer_parents_reversed:
+                parent = parent[0]
+                if is_fc_link(parent):
+                    link = parent
     except (AttributeError, IndexError, RuntimeError):
         pass
 
@@ -858,7 +861,11 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     return lcs, body_lcs_wrapper, placement
 
 
-def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | None = None, z:float | None = None) -> fc.Placement :
+def rotate_placement(
+        placement:fc.Placement,
+        x:float | None = None, y:float | None = None, z:float | None = None,
+        rotation_center: fc.Vector = fc.Vector(0,0,0)
+    ) -> fc.Placement :
     ''' Rotate (incremental) placement in frame of origin or set any axis to zero.
 
         This func let you rotate object how be you rotate it as it was at origin.
@@ -871,11 +878,14 @@ def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | No
 
     ## rotation
     if x is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(1,0,0), x)
+        rotAxis = fc.Vector(1,0,0)
+        placement.rotate(rotation_center, rotAxis, x)
     if y is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,1,0), y)
+        rotAxis = fc.Vector(0,1,0)
+        placement.rotate(rotation_center, rotAxis, y)
     if z is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,0,1), z)
+        rotAxis = fc.Vector(0,0,1)
+        placement.rotate(rotation_center, rotAxis, z)
 
     ## setting axis angle to zero
     if x == 0 or y == 0 or z == 0:
@@ -915,7 +925,7 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
 
     if not selection_ok:
         message(
-            'Select: subobject of robot link or link.'
+            'Select: joint or link or subelement of Real link or LCS of Real link.'
             , gui=True,
         )
         return
@@ -932,7 +942,16 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
         if link == None:
             message('Can not get parent robot link of selected object', gui=True)
             return
-        link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
+
+        orienteer1_sub_obj, = fcgui.Selection.getSelectionEx()
+        # for subobjects (face, edge, vertex) and lcs
+        if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
+        and not is_fc_link(orienteer1) and not is_link(orienteer1):
+            orienteer2_placement = get_placement_of_orienteer(orienteer1_sub_obj, lcs_concentric_reversed = True)
+            orienteer2_to_link_diff = link.Placement.inverse() * orienteer2_placement
+            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z, orienteer2_to_link_diff.Base)
+        else:
+            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
     else:
         joint.Origin = rotate_placement(joint.Origin, x, y, z)
 

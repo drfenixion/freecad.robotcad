@@ -32,8 +32,10 @@ class _RotateJointYCommand:
             'ToolTip': tr(
                 'Rotate joint or link by Y axis.\n'
                 '\n'
-                'Select: joint or link or subobject (body, part, etc) of link\n'
-                'It rotates joint Origin or Link MountedPlacement dependent on selection.\n',
+                'Select: joint or link or subelement (face, edge, vertex) of link Real or LCS of link Real.\n'
+                'It rotates joint Origin or Link MountedPlacement dependent on selection.\n'
+                'If selected subelement or LCS or body it rotate link around it center\n'
+                'or center of gravity or concentric for curve and circle.\n',
             ),
         }
 
