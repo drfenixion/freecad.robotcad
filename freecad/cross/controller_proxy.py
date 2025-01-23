@@ -604,6 +604,29 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 
         return controllers
 
+    
+    def add_custom_controllers_parameters(controllers_dirs: dict) -> dict:
+        '''Add custom parameters to controller. 
+        It needed for addition custom logics to controller on extended code generator side.'''
+        
+        try:
+            imitate_mecanum_by_friction = {
+                'type': 'bool',
+                'default_value': True,
+                'description': 'If option is "true" diagonal friction will be added to collisions of wheels in generated SDF code.\n \
+In that case wheel collisions should be spheres (radius same as wheel radius) and must be set base_frame_id.\n \
+base_frame_id must be first frame of mobile platform.\n \
+base_frame orientation must be directed: front to Y-positive, right side to X-positive.\n \
+You can check orientation by FreeCAD global axis.',
+                'read_only': False
+            }
+            controllers_dirs['mecanum_drive_controller']['parameters']['mecanum_drive_controller']['imitate_mecanum_by_friction'] = imitate_mecanum_by_friction
+        except KeyError:
+            pass
+
+        return controllers_dirs
+
+
     controllers = get_controllers_root_dirs(ROS2_CONTROLLERS_PATH)
     controllers['controllers_dirs'] = filter_controllers_dirs(controllers['controllers_dirs'])
 
@@ -611,6 +634,9 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
     controllers['broadcasters_dirs'] = collect_controllers_config_files(controllers['broadcasters_dirs'])
     controllers['controllers_dirs'] = collect_controllers_parameters(controllers['controllers_dirs'])
     controllers['broadcasters_dirs'] = collect_controllers_parameters(controllers['broadcasters_dirs'])
+    
+    controllers['controllers_dirs'] = add_custom_controllers_parameters(controllers['controllers_dirs'])
+
     controllers['controllers_dirs'] = collect_controllers_plugin_data(controllers['controllers_dirs'])
     controllers['broadcasters_dirs'] = collect_controllers_plugin_data(controllers['broadcasters_dirs'])
 
