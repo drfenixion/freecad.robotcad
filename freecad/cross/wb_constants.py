@@ -189,10 +189,10 @@ ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS = {
         'default_value_replace': None,
     },
     'odom_frame_id' : {
-        'replace': 'App::PropertyLinkGlobal',
+        'replace': 'App::PropertyString',
         'origin': 'App::PropertyString',
-        'check_functions': ['is_link'],
-        'default_value_replace': None,
+        'check_functions': ['return_true'],
+        'default_value_replace': 'odom',
     },
     'control__frame__id' : {
         'replace': 'App::PropertyLinkGlobal',
