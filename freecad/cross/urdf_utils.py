@@ -156,7 +156,7 @@ def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
     xyz = p.Rotation.toEulerAngles('XYZ')
     xyz_rad = (math.radians(xyz[0]), math.radians(xyz[1]), math.radians(xyz[2]))
 
-    # accuracy correction 
+    # accuracy correction
     # it need because the too low value near to zero do strange behaviour of friction options in Gazebo
     # (strange behaviour - varios periodic drift of mecanum drive based on wheels with diagonal friction)
     #rpy correction
