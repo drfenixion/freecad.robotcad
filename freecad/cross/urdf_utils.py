@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import math
 from pathlib import Path
@@ -154,8 +155,31 @@ def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
     # and correct in all tested rotation cases
     xyz = p.Rotation.toEulerAngles('XYZ')
     xyz_rad = (math.radians(xyz[0]), math.radians(xyz[1]), math.radians(xyz[2]))
+
+    # accuracy correction 
+    # it need because the too low value near to zero do strange behaviour of friction options in Gazebo
+    # (strange behaviour - varios periodic drift of mecanum drive based on wheels with diagonal friction)
+    #rpy correction
+    min_rpy_acc = 0.0000000001
+    xyz_rad_corrected = []
+    for i in range(len(xyz_rad)):
+        if abs(xyz_rad[i]) < min_rpy_acc:
+            xyz_rad_corrected.append(0)
+        else:
+            xyz_rad_corrected.append(xyz_rad[i])
+
+    #xyz position correction
+    min_xyz_acc = 0.01 # in mm
+    base_corrected = copy.deepcopy(p.Base)
+    if abs(base_corrected.x) < min_xyz_acc:
+        base_corrected.x = 0
+    if abs(base_corrected.y) < min_xyz_acc:
+        base_corrected.y = 0
+    if abs(base_corrected.z) < min_xyz_acc:
+        base_corrected.z = 0
+
     pattern = '<origin xyz="{v.x:.6} {v.y:.6} {v.z:.6}" rpy="{r[0]} {r[1]} {r[2]}" />'
-    return et.fromstring(pattern.format(v=p.Base * 1e-3, r=xyz_rad))
+    return et.fromstring(pattern.format(v=base_corrected * 1e-3, r=xyz_rad_corrected))
 
 
 def urdf_geometry_box(length_x: float, length_y: float, length_z: float) -> et.Element:
