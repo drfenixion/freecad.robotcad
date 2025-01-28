@@ -52,6 +52,9 @@ UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
 SDFORMAT_SDF_TEMPLATES_PATH=RESOURCES_PATH /"sdf"
+MODULES_PATH = MOD_PATH / 'modules'
+SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
+SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
 
 class SupportsStr(Protocol):
     def __str__(self) -> str:

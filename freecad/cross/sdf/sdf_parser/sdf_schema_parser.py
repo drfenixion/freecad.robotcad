@@ -39,7 +39,7 @@ class Element_Attributes:
 
 #class to parse the sdf file and generate a dictioanary
 class sdf_schema_parser:
-    def __init__(self,version='1.7',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
+    def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
                  ,includeMetaData:bool=True):
         #initialize directory with the root.sdf
         self.root_dir=os.path.join(sdf_templates_dir, version, file)

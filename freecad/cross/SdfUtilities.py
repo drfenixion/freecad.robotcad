@@ -155,8 +155,7 @@ def world_parameters(obj,version="1.7"):
     
 #theme
 
-    
-    
+       
 
 class Palette(QObject):
     textBackgroundChanged = Signal()
@@ -326,25 +325,175 @@ class WorldProperties(QObject):
     
     
 def PhysicsParameters(obj):
-    obj.addProperty("App::PropertyString","name","physics",'''
-                    name of this set of physics parameters''',hidden=True)
-    obj.addProperty("App::PropertyBool","default","physics","use default world Physics profile",hidden=True)
-    obj.addProperty("App::PropertyEnumeration","dynamicsEngine","physics",hidden=True)
-    obj.dynamicsEngine=["ode","bullet","dart"]
-    
-    obj.addProperty("App::PropertyFloat","max_step_size","physics",
+    # obj.addProperty("App::PropertyString","name","physics",'''
+    #                 name of this set of physics parameters''',hidden=True)
+    # obj.addProperty("App::PropertyBool","default","physics","use default world Physics profile",hidden=True)
+    obj.addProperty("App::PropertyEnumeration","dynamicsengine","physics",hidden=True)
+    obj.dynamicsengine=["ode","bullet","dart"]
+    for p in ["max_step_size","real_time_factor","real_time_update_rate"]:
+        obj.addProperty("App::PropertyFloat",p,"physics",
                     '''simulation for simulations in engine''',hidden=True)
-    
-    obj.addProperty("App::PropertyFloat","real_time_factor","physics",'''
-                    target simlation sppedup factor''', hidden=True)
-    obj.addProperty("App::PropertyFloat","real_time_update_rate","physics",
-                    '''rate at which to update Physics Engine''',hidden=True)
     
     obj.addProperty("App::PropertyInteger","max_contacts","physics",'''
                     maximum number of contacts between two entities''',hidden=True)
     
-    obj.addProperty("App::")
+    obj.addProperty("App::PropertyEnumeration","dartSolver_type","Dart",hidden=True)
+    obj.dartSolver_type=["pgs","dantzig"]
+    obj.addProperty("App::PropertyEnumeration","dartCollision_detector","Dart",hidden=True)
+    obj.dartCollision_detector=["dart","fcl","bullet","ode"]
     
+    # Simbody
+    obj.addProperty("App::PropertyFloat","simbodyMax_transient_velocity","Simbody",'''
+                    Roughly the relative error of the system.
+                    -LOG(accuracy) is roughly the number of significant digits''',hidden=True)
+    for pname in ["simbodyStiffness","simbodyDissipation","simbodyPlastic_coef_restitution","simbodyPlastic_impact_velocity",
+                  "simbodyStatic_friction","simbodyDynamic_friction","simbodyViscous_friction","simbodyOverride_impact_capture_velocity",
+                  "simbodyOverride_stiction_transition_velocity","simbodyMin_step_size","simbodyAccuracy"]:
+        obj.addProperty("App::PropertyFloat",pname,"Simbody",hidden=True)
     
+    # bullet
+    obj.addProperty("App::PropertyEnumeration","bulletSolver_type","bullet",hidden=True)
+    obj.bulletSolver_type=["sequential_impulse"]
+    obj.addProperty("App::PropertyFloat","bulletMin_step_size","bullet",hidden=True)
+    obj.addProperty("App::PropertyInteger","bulletIters","bullet",hidden=True)
+    obj.addProperty("App::PropertyFloat","bulletSor","bullet","set successive relaxation parameters",hidden=True)
+    #  bullet Constraints 
+    for pname in ["bulletCfm","bulletErp","bulletContact_surface_layer","bulletSplit_impulse_penetration_threshold"]:
+        obj.addProperty("App::PropertyFloat",pname,"bullet",hidden=True)
+        
+    obj.addProperty("App::PropertyBool","bulletSplit_impulse","bullet",hidden=True)
     
+    # ode
+        # float
+    for pname in ["odeMin_step_size","odeSor"]:
+        obj.addProperty("App::PropertyFloat",pname,"ode",hidden=True)
+        # int
+    for pint in ["odeIsland_threads","odeIters","odePrecon_iters"]:
+        obj.addProperty("App::PropertyInteger",pint,"ode",hidden=True)
+        # str
+    for pstr in ["odeType","odeFriction_model"]:
+        obj.addProperty("App::PropertyString",pstr,"ode",hidden=True)
+        # bool
+    for pbool in ["odeThread_position_correction","odeUse_dynamic_moi_rescaling"]:
+        obj.addProperty("App::PropertyBool",pbool,"ode",hidden=True)
+        
+        # constraints 
+    for pcon in ["odeCfm","odeErp","odeContact_max_correcting_vel","odeContact_surface_layer"]:
+        obj.addProperty("App::PropertyFloat",pcon,"ode",hidden=True)
+
+def create_property(inst, name, type_):
+    signal_name = f"{name}Changed"
+    signal = Signal()
+
+    def getter(self):
+        return getattr(self.obj, name)
+
+    def setter(self, value):
+        if getattr(self.obj, name) != value:
+            setattr(self.obj, name, value)
+            signal.emit()
+
+    setattr(inst.__class__, signal_name, signal)
+    prop = Property(type_, getter, setter, notify=signal)
+    setattr(inst.__class__, name, prop)
+
+
+class PhysicsProperties(QObject):
+   
+    def __init__(self, obj,parent =None):
+        super().__init__(parent)
+        self.obj=obj
     
+    # properties 
+        for prp in ["max_step_size","real_time_factor","real_time_update_rate"]:
+            create_property(self,prp,float)
+        #  dart 
+        for prp_str in ["dynamicsengine","dartSolver_type","dartCollision_detector"]:
+            create_property(self,prp_str,str)
+        create_property(self,"max_contacts",int)
+        # simbody 
+        create_property(self,"simbodyMax_transient_velocity",float)
+        for prp_float in ["simbodyStiffness","simbodyDissipation","simbodyPlastic_coef_restitution","simbodyPlastic_impact_velocity",
+                  "simbodyStatic_friction","simbodyDynamic_friction","simbodyViscous_friction","simbodyOverride_impact_capture_velocity",
+                  "simbodyOverride_stiction_transition_velocity","simbodyMin_step_size","simbodyAccuracy"]:
+            create_property(self,prp_float,float)
+            
+        # bullet 
+        for prp in ["bulletSolver_type","bulletMin_step_size","bulletSor"]:
+            create_property(self,prp,float)
+        create_property(self,"bulletIters",int)
+            #  bullet constraints 
+        for constr in  ["bulletCfm","bulletErp","bulletContact_surface_layer","bulletSplit_impulse_penetration_threshold"]:
+            create_property(self,constr,float)
+        
+        create_property(self,"bulletSplit_impulse",bool)
+        
+        #  ode 
+        for pname in ["odeMin_step_size","odeSor"]:
+            create_property(self,pname,float)
+        for pint in ["odeIsland_threads","odeIters","odePrecon_iters"]:
+            create_property(self,pint,int)
+            
+        for pstr in ["odeType","odeFriction_model"]:
+            create_property(self,pstr,str)
+            
+        for pbool in ["odeThread_position_correction","odeUse_dynamic_moi_rescaling"]:
+            create_property(self,pbool,bool)
+            #  ode constraints 
+        for pcon in ["odeCfm","odeErp","odeContact_max_correcting_vel","odeContact_surface_layer"]:
+            create_property(self,pcon,float)
+            
+def resetPhysicsattributes(obj):
+    sdf_etree=sdf_tree.sdf_tree("physics.sdf",metaData=False,recurse=False)
+    e=sdf_etree.get_element
+    for i in ["max_step_size","real_time_factor","real_time_update_rate","max_contacts"]:
+        result=get_xml_data(e,i,False)
+        setattr(obj,i,result)
+    engine=get_xml_data(e,["physics","type"],True)
+    obj.dynamicsengine=engine
+    # dart parameters 
+    el=e.find("dart")
+    for drt in ["dartSolver_type","dartCollision_detector"]:
+        s=drt.replace("dart","").lower()
+        result=get_xml_data(el,s,False)
+        setattr(obj,drt,result)
+    # simbody 
+    el=e.find("simbody")
+    for smb in ["simbodyStiffness","simbodyDissipation","simbodyPlastic_coef_restitution","simbodyPlastic_impact_velocity",
+                  "simbodyStatic_friction","simbodyDynamic_friction","simbodyViscous_friction","simbodyOverride_impact_capture_velocity",
+                  "simbodyOverride_stiction_transition_velocity","simbodyMin_step_size","simbodyAccuracy",
+                 "simbodyMax_transient_velocity" ]:
+        s=smb.removeprefix("simbody").lower()
+        result=get_xml_data(el,s,False)
+       
+        setattr(obj,smb,result)
+    
+    # bullet
+    el=e.find("bullet")
+    for blt in ["bulletMin_step_size","bulletSor"]+["bulletIters"]+\
+                ["bulletCfm","bulletErp","bulletContact_surface_layer","bulletSplit_impulse_penetration_threshold"]+\
+                    ["bulletSplit_impulse"]:
+        s=blt.removeprefix("bullet").lower()
+        result=get_xml_data(el,s,False)
+        #  convert strings to boolean if neccesary s
+        if result=="true":
+            result=True
+        if result=="false":
+            result=False
+        setattr(obj,blt,result)
+    setattr(obj,"bulletSolver_type",get_xml_data(el,"type",False))
+    
+    # ode 
+    el=e.find("ode")
+    for ode in ["odeMin_step_size","odeSor"]+ ["odeIsland_threads","odeIters","odePrecon_iters"]+\
+        ["odeType","odeFriction_model"]+["odeThread_position_correction","odeUse_dynamic_moi_rescaling"]+\
+            ["odeCfm","odeErp","odeContact_max_correcting_vel","odeContact_surface_layer"]:
+        s=ode.removeprefix("ode").lower()
+        result=get_xml_data(el,s,False)
+        #  convert strings to boolean if neccesary s
+        if result=="true":
+            result=True
+        if result=="false":
+            result=False
+        setattr(obj,ode,result)
+        

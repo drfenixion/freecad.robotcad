@@ -253,6 +253,9 @@ class RobotProxy(ProxyBase):
         SdfUtilities.world_parameters(self.robot)
         # reset world parameters 
         SdfUtilities.resetWorldParameters(self.robot)
+        #  physics parameters 
+        SdfUtilities.PhysicsParameters(self.robot)
+        SdfUtilities.resetPhysicsattributes(self.robot)
         
     @property
     def created_objects(self) -> DOList:
