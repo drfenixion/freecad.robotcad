@@ -6,11 +6,11 @@ Rectangle{
     id:root
     property string textColor: plt.textColor
     property string textbackgroundColor: plt.textBackground
-    property string backgroundColor:plt.background
+
     width: 700
     height:layout.height
     property int margin:16
-    color:root.textbackgroundColor
+    color:plt.background0
     ColumnLayout
     {
         id:layout
@@ -48,7 +48,7 @@ Rectangle{
             {
 
                 textcolor: root.textColor
-                backgroundColor: root.backgroundColor
+                backgroundColor: plt.background1
                 textbackgroundColor:root.textbackgroundColor
                 Layout.margins: margin
                 label: "gravity"
@@ -76,7 +76,7 @@ Rectangle{
         Vect3
         {
             textcolor: root.textColor
-            backgroundColor: root.backgroundColor
+            backgroundColor: plt.background1
             textbackgroundColor:root.textbackgroundColor
             label:"MagneticField"
             Layout.margins: margin
@@ -106,7 +106,7 @@ Rectangle{
         {
             label:"Wind"
             textcolor: root.textColor
-            backgroundColor: root.backgroundColor
+            backgroundColor: plt.background1
             textbackgroundColor:root.textbackgroundColor
             Layout.margins: margin
             suffix: "m/s"
@@ -131,7 +131,7 @@ Rectangle{
             id:atm
             Layout.margins: margin
             radius:7
-            color:root.backgroundColor
+            color:plt.background1
             width:glayout.implicitWidth+16
             height: glayout.implicitHeight+txt.implicitHeight+16
             Text{

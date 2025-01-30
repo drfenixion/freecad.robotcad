@@ -6,75 +6,101 @@ Rectangle {
     visible: true
     width: 800
     height: 600
-    color:plt.textBackground
+    color: plt.background0
+
     ColumnLayout {
         anchors.fill: parent
-        spacing: 10
-         Layout.leftMargin: 30
-         Layout.rightMargin: 12
-         Layout.topMargin: 10
-         Layout.bottomMargin: 12
-        // General Physics Settings (Outside StackView)
-        Rectangle{
-            color:plt.background
-            radius: 7
-            width:general_grid.implicitWidth+70
-            height:250
+        spacing: 20
+        anchors.margins: 20
+
+        // General Physics Settings
+        GroupBox {
+            title: "General Physics Settings"
+            Layout.fillWidth: true
+            background: Rectangle {
+                color: plt.background1
+                radius: 7
+            }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
+               }
 
             ColumnLayout {
-                id:general_grid
+                spacing: 15
                 anchors.fill: parent
-                spacing: 20
-                Layout.leftMargin: 30
-                Layout.rightMargin: 12
-                Layout.topMargin: 10
-                Layout.bottomMargin: 12
-                RowLayout{
-                    Label { text: "Type:" }
+
+                RowLayout {
+                    Label {
+                        text: "Type:"
+                        color: plt.textColor
+                        font.bold: true
+                    }
                     ComboBox {
                         id: physicsType
                         model: ["ode", "bullet", "simbody", "dart"]
                         currentIndex: 0
-                        width: 200
+                        Layout.preferredWidth: 200
                         onCurrentIndexChanged: updateSolverView()
                     }
                 }
-                DoubleSpinBox{
-                    label:"max step size"
-                    decimalPlaces:5
 
+                DoubleSpinBox {
+                    label: "Max Step Size"
+                    decimalPlaces: 5
+                    default_value: phy.getter("max_step_size")
+                    onSpinBoxvalueChanged: {
+                       phy.setter("max_step_size",val)
+                    }
                 }
-                DoubleSpinBox
+
+                DoubleSpinBox {
+                    label: "Real Time Factor"
+                    decimalPlaces: 2
+                    default_value: phy.getter("real_time_factor")
+                    onSpinBoxvalueChanged: {
+                        phy.setter("real_time_factor",val)
+                    }
+                }
+
+                RowLayout
                 {
-                    label:"Real Time Factor"
-                    decimalPlaces: 2
+                    Label{
+                        text: "Max Contacts"
+                        color: plt.textColor
 
+                    }
+                    SpinBox{
+                        value: phy.getter("max_contacts")
+                        onValueModified:
+                        {
+                            phy.setter("max_contacts",value)
+                        }
+                    }
                 }
 
                 DoubleSpinBox{
-                    label:"max Contacts"
+                    label:"real_time_update_rate"
                     decimalPlaces: 2
+                    default_value: phy.getter("real_time_update_rate")
+                    max:10000
+                    min:0
+                    onSpinBoxvalueChanged: {
+                        phy.setter("real_time_update_rate",val)
+                    }
                 }
-
             }
         }
 
-        // StackView to Hold Solver-Specific Settings
-
-
+        // Solver-Specific Settings
         StackView {
             id: stackView
-            //Layout.fillWidth: true
-           Layout.fillHeight: true
-            width:600
-
-
-            initialItem: odeSettings // Set ODE as the default solver
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            initialItem: odeSettings
         }
-
     }
-
-
 
     // Function to Update Solver View Based on ComboBox Selection
     function updateSolverView() {
@@ -99,85 +125,133 @@ Rectangle {
     // ODE Settings Component
     Component {
         id: odeSettings
-        Rectangle{
-            radius: 7
-            width: stackView.width
-            color: plt.background
-            ColumnLayout {
-                width: parent.width
-                spacing: 12
-                RowLayout
-                {
+        GroupBox {
+            title: "ODE Settings"
+            background: Rectangle {
+                color:plt.background1
+                radius: 7
 
-                    Label { text: "Solver Type:" }
+            }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
+               }
+            ColumnLayout {
+                spacing: 15
+                anchors.fill: parent
+
+                RowLayout {
+                    Label {
+                        text: "Solver Type:"
+                        color:plt.textColor
+                    }
                     ComboBox {
-                        id:stcb
+                        id: stcb
                         model: ["world", "quick"]
                         currentIndex: 0
-                        width: 200
+                        Layout.preferredWidth: 200
                     }
                 }
 
-                DoubleSpinBox{
-                    label:"min Step Size"
+                DoubleSpinBox {
+                    label: "Min Step Size"
                     decimalPlaces: 5
-                }
-                //int
-                RowLayout{
-                    Label { text: "Island Threads:" }
-                    SpinBox{
-                        value: 0
+                    default_value: phy.getter("odeMin_step_size")
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("odeMin_step_size",val)
                     }
                 }
 
-                //int
-                RowLayout{
-                    Label { text: "Iterations:" }
-                    SpinBox{
-                        value: 50
+                RowLayout {
+                    Label {
+                        text: "Island Threads:"
+                        color:plt.textColor
+                    }
+                    SpinBox {
+                        value: phy.getter("odeIsland_threads")
+                        onValueModified: {
+                            phy.setter("odeIsland_threads",value)
+                        }
                     }
                 }
 
-                DoubleSpinBox{
-                    label:"Sor"
-                    value:1.3
+                RowLayout {
+                    Label { text: "Iters:"
+                        color:plt.textColor
+                    }
+                    SpinBox {
+                        value: phy.getter("odeIters")
+                        onValueModified:
+                        {
+                            phy.setter("odeIters",value)
+                        }
+                    }
                 }
 
-                // Constraints Settings
-                Rectangle {
-                    //title: "Constraints"
-                    Layout.columnSpan: 2
+                DoubleSpinBox {
+                    label: "Sor"
+                    default_value:  phy.getter("odeSor")
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("odeSor",value)
+                    }
+                }
+
+                GroupBox {
+                    title: "Constraints"
                     Layout.fillWidth: true
-
-                    ColumnLayout {
-                        spacing:12
-                        width: parent.width
-                        //int
-                        DoubleSpinBox{
-                            label:"CFM"
-                            value:0.0
-                            decimalPlaces: 3
-                        }
-
-                        DoubleSpinBox{
-                            label:"ERP"
-                            value: 0.2
-                            decimalPlaces: 3
-                        }
-
-                        //
-                        DoubleSpinBox{
-                            label:"Contact Max Correcting Vel"
-                            decimalPlaces: 2
-
-                        }
-
-                       DoubleSpinBox{
-                           label:"Contact Surface Layer"
-                           decimalPlaces:4
+                    background: Rectangle {
+                        color: plt.background2
+                        radius: 7
+                    }
+                    label: Label {
+                           text: parent.title
+                           color: plt.textColor // Change this to the desired color
+                           font.bold: true // Optional: Customize font properties
                        }
+                    ColumnLayout {
+                        spacing: 10
+                        anchors.fill: parent
 
+                        DoubleSpinBox {
+                            label: "CFM"
+                            default_value: phy.getter("odeCfm")
+                            decimalPlaces: 3
+                            onSpinBoxvalueChanged: {
+                                phy.setter("odeCfm",value)
+                            }
+                        }
 
+                        DoubleSpinBox {
+                            label: "ERP"
+                            default_value: phy.getter("odeErp")
+                            decimalPlaces: 3
+                            onSpinBoxvalueChanged: {
+                                phy.setter("odeErp",value)
+                            }
+                        }
+
+                        DoubleSpinBox {
+                            label: "Contact Max Correcting Vel"
+                            decimalPlaces: 2
+                            max:500
+                            default_value: phy.getter("odeContact_max_correcting_vel")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("odeContact_max_correcting_vel",value)
+                            }
+                        }
+
+                        DoubleSpinBox {
+                            label: "Contact Surface Layer"
+                            decimalPlaces: 4
+                            default_value: phy.getter("odeContact_surface_layer")
+                            onSpinBoxvalueChanged: {
+                                phy.setter("odeContact_surface_layer",value)
+                            }
+                        }
                     }
                 }
             }
@@ -187,100 +261,129 @@ Rectangle {
     // Bullet Settings Component
     Component {
         id: bulletSettings
-        Rectangle {
-                 color: plt.background
-                 radius:7
-            width: stackView.width
-
+        GroupBox {
+            title: "Bullet Settings"
+            background: Rectangle {
+                color: plt.background1
+                radius: 7
+            }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
+               }
             ColumnLayout {
+                spacing: 15
+                anchors.fill: parent
 
-                width: parent.width
-
-                RowLayout
-                {
+                RowLayout {
                     Label { text: "Solver Type:" }
                     ComboBox {
                         model: ["sequential_impulse"]
                         currentIndex: 0
-                        width:400
+                        Layout.preferredWidth: 200
                     }
                 }
-                DoubleSpinBox
-                {
-                    label:"Min Step Size"
+
+                DoubleSpinBox {
+                    label: "Min Step Size"
                     decimalPlaces: 5
+                    default_value:phy.getter("bulletMin_step_size")
+                    onSpinBoxvalueChanged: {
+                        phy.setter("bulletMin_step_size",val)
+                    }
                 }
 
-
-
-               RowLayout{
-                   Label
-                   {
-                   text:"Iterations"
-                   }
-                   SpinBox
-                   {
-                       value:50
-                   }
-               }
-
-                DoubleSpinBox
-                {
-                    label:"Sor"
-                    decimalPlaces: 4
-                }
-
-                // Constraints Settings
-                Label{
-                    text:"Constraints"
-                }
-
-                Rectangle {
-
-                    color:plt.background
-                    Layout.fillWidth: true
-
-
-                    ColumnLayout {
-
-                        width: parent.width
-
-                        RowLayout
+                RowLayout {
+                    Label {
+                        text: "Iters:"
+                        color:plt.textColor
+                    }
+                    SpinBox {
+                        value: phy.getter("bulletIters")
+                        onValueModified:
                         {
-                            Label{
-                                text:"CFM"
-                            }
-                            SpinBox{
-                                value:0
-                            }
+                            phy.setter("bulletIters",value)
+                        }
+                    }
+                }
 
+                DoubleSpinBox {
+                    label: "Sor"
+                    decimalPlaces: 4
+                    default_value:phy.getter("bulletSor")
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("bulletSor",val)
+
+                    }
+                }
+
+                GroupBox {
+                    title: "Constraints"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: plt.background2
+                        radius: 7
+                    }
+                    label: Label {
+                           text: parent.title
+                           color: plt.textColor // Change this to the desired color
+                           font.bold: true // Optional: Customize font properties
+                       }
+                    ColumnLayout {
+                        spacing: 10
+                        anchors.fill: parent
+
+                        RowLayout {
+                            Label { text: "CFM:"
+                            color:plt.textColor}
+                            SpinBox {
+                                value: phy.getter("bulletCfm")
+                                onValueModified:
+                                {
+                                    phy.setter("bulletCfm",value)
+                                }
+                            }
                         }
 
-                       DoubleSpinBox{
-                           label: "ERP"
-                           decimalPlaces: 3
-                       }
-                    DoubleSpinBox{
-                        label:"Contact Surface Layer"
-                        decimalPlaces: 4
-                        value:0.001
-                    }
+                        DoubleSpinBox {
+                            label: "ERP"
+                            decimalPlaces: 3
+                            default_value: phy.getter("bulletErp")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("bulletErp",val)
+                            }
+                        }
 
+                        DoubleSpinBox {
+                            label: "Contact Surface Layer"
+                            decimalPlaces: 4
+                            default_value: phy.getter("bulletContact_surface_layer")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("bulletContact_surface_layer",val)
+                            }
+                        }
 
-                       RowLayout
-                       {
+                        RowLayout {
+                            Label { text: "Split Impulse:"
+                            color:plt.textColor
+                            }
+                            CheckBox { checked: true }
+                        }
 
-                           Label { text: "Split Impulse:" }
-                           CheckBox { checked: true }
-
-                       }
-                       DoubleSpinBox
-                       {
-                           label: "Split impulse Penetration Threshold"
-                           value:-0.1
-                           min: -1
-                           decimalPlaces: 3
-                       }
+                        DoubleSpinBox {
+                            label: "Split Impulse Penetration Threshold"
+                            default_value: phy.getter("bulletSplit_impulse_penetration_threshold")
+                            min: -1
+                            decimalPlaces: 3
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("bulletSplit_impulse_penetration_threshold",val)
+                            }
+                        }
                     }
                 }
             }
@@ -290,31 +393,36 @@ Rectangle {
     // DART Settings Component
     Component {
         id: dartSettings
-        Rectangle {
-            //title: "DART Physics Settings"
-            width: stackView.width
-            radius: 7
-            color:plt.background
+        GroupBox {
+            title: "DART Settings"
+            background: Rectangle {
+                color: plt.background1
+                radius: 7
+            }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
+               }
             ColumnLayout {
+                spacing: 7
+                anchors.fill: parent
 
-                width: parent.width
-
-                RowLayout{
+                RowLayout {
                     Label { text: "Solver Type:" }
                     ComboBox {
                         model: ["dantzig", "pgs"]
                         currentIndex: 0
-                        width:300
+                        Layout.preferredWidth: 200
                     }
                 }
 
-                RowLayout
-                {
+                RowLayout {
                     Label { text: "Collision Detector:" }
                     ComboBox {
                         model: ["fcl", "dart", "bullet", "ode"]
                         currentIndex: 0
-                        width:300
+                        Layout.preferredWidth: 200
                     }
                 }
             }
@@ -324,83 +432,135 @@ Rectangle {
     // Simbody Settings Component
     Component {
         id: simbodySettings
-        Rectangle {
-            //title: "Simbody Physics Settings"
-            width: stackView.width
-            color:plt.background
-            radius:7
-            ColumnLayout {
-
-                width: parent.width
-                spacing:10
-                DoubleSpinBox{
-                    label:"Min Step Size"
-                    value:0.0001
-                    decimalPlaces: 4
-                }
-                DoubleSpinBox
-                {
-                    label:"Accuracy"
-                    decimalPlaces: 4
-                    value:1e-3
-                }
-
-               DoubleSpinBox{
-                   label:"Max Transient Velocity"
-                   decimalPlaces: 3
-                   value:0.01
+        GroupBox {
+            title: "Simbody Settings"
+            background: Rectangle {
+                color: plt.background1
+                radius: 7
+            }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
                }
-                // Contact Settings
-                Rectangle {
-                    //title: "Contact Settings"
-                    color: plt.background
-                    Layout.fillWidth: true
+            ColumnLayout {
+                spacing: 15
+                anchors.fill: parent
 
+                DoubleSpinBox {
+                    label: "Min Step Size"
+                    default_value: phy.getter("simbodyMin_step_size")
+                    decimalPlaces: 4
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("simbodyMin_step_size",val)
+                    }
+                }
+
+                DoubleSpinBox {
+                    label: "Accuracy"
+                    decimalPlaces: 4
+                    default_value: phy.getter("simbodyAccuracy")
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("simbodyAccuracy",val)
+                    }
+                }
+
+                DoubleSpinBox {
+                    label: "Max Transient Velocity"
+                    decimalPlaces: 3
+                    default_value: phy.getter("simbodyMax_transient_velocity")
+                    onSpinBoxvalueChanged:
+                    {
+                        phy.setter("simbodyMax_transient_velocity",val)
+                    }
+                }
+
+                GroupBox {
+                    title: "Contact Settings"
+                    Layout.fillWidth: true
+                    background: Rectangle {
+                        color: plt.background2
+                        radius: 7
+                    }
+                    label: Label {
+                           text: parent.title
+                           color: plt.textColor // Change this to the desired color
+                           font.bold: true // Optional: Customize font properties
+                       }
                     ColumnLayout {
                         spacing: 10
-                        width: parent.width
-                        DoubleSpinBox{
-                            label:"Stiffnesss"
-                            value:1e8
+                        anchors.fill: parent
+
+                        DoubleSpinBox {
+                            label: "Stiffness"
+                            default_value: phy.getter("simbodyStiffness")
                             decimalPlaces: 7
-                        }
-
-
-
-                        RowLayout{
-                            Label { text: "Dissipation:" }
-                            SpinBox
+                            onSpinBoxvalueChanged:
                             {
-                                value:100
+                                phy.setter("simbodyStiffness",val)
                             }
                         }
-                        DoubleSpinBox{
-                            label:"Plastic Coef Restitution"
-                            decimalPlaces: 3
-                            value:0.5
-                        }
 
-                        DoubleSpinBox{
-                            label:"Plastic Impact Velocity"
-                            decimalPlaces: 2
+
+                            DoubleSpinBox {
+                                label: "Dissipation"
+                                default_value: phy.getter("simbodyDissipation")
+                                min:0
+                                max:500
+                                decimalPlaces: 4
+                                onSpinBoxvalueChanged:
+                                {
+                                    phy.setter("simbodyDissipation",value)
+                                }
+                            }
+
+
+                        DoubleSpinBox {
+                            label: "Plastic Coef Restitution"
+                            decimalPlaces: 3
                             value: 0.5
                         }
-                        DoubleSpinBox{
-                            label:"Static Friction"
+
+                        DoubleSpinBox {
+                            label: "Plastic Impact Velocity"
                             decimalPlaces: 2
-                            value:0.9
+                            default_value: phy.getter("simbodyPlastic_coef_restitution")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("simbodyPlastic_coef_restitution",val)
+                            }
                         }
 
-                        DoubleSpinBox{
-                            label:"Dynamic Friction"
+                        DoubleSpinBox {
+                            label: "Static Friction"
                             decimalPlaces: 2
-                            value: 0.9
+                            default_value: phy.getter("simbodyStatic_friction")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("simbodyStatic_friction",val)
+                            }
                         }
 
-                        DoubleSpinBox{
-                            label:"Viscous Friction"
+                        DoubleSpinBox {
+                            label: "Dynamic Friction"
                             decimalPlaces: 2
-                            value:0.0
+                            default_value: phy.getter("simbodyDynamic_friction")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("simbodyDynamic_friction",val)
+                            }
+                        }
+
+                        DoubleSpinBox {
+                            label: "Viscous Friction"
+                            decimalPlaces: 2
+                            default_value: phy.getter("simbodyViscous_friction")
+                            onSpinBoxvalueChanged:
+                            {
+                                phy.setter("simbodyViscous_friction",val)
+                            }
                         }
                     }
                 }

@@ -163,12 +163,17 @@ class Palette(QObject):
     backgroundChanged=Signal()
     def __init__(self, parent = ...):
         super().__init__(parent)
-        self.backgroundColor:str=""
         self.colors=self.GetHexColors()
         if self.isDarkTheme():
-            self.backgroundColor=self.lighter()
+            self.background_0:str="#1d1e23"
+            self.background_1:str="#33363f"
+            self.background_2:str="#656772"
+            self.textbackground:str="#2e2b26"
+        
         else:
-            self.backgroundColor=self.darker()
+            #light theme pallete
+            #to be done
+            pass
             
     def GetHexColors(self)->dict:
         mw=fcgui.getMainWindow()
@@ -182,37 +187,24 @@ class Palette(QObject):
     def isDarkTheme(self):
         return QColor(self.colors["background"]).lightness()<128
     
-    def darker(self):
-         return QColor(self.colors["background"]).darker().name()
-    def lighter(self):
-        return QColor(self.colors["background"]).lighter().name()
     def getTextBackground(self):
-        return QColor(self.colors["background"]).name()
-   
-    def setTextBackground(self,bgcolor):
-        if self.colors["background"]==bgcolor:
-            return
-        else:
-            self.colors["background"]=bgcolor
-    
-    def getBackground(self):
-        return self.backgroundColor
-    def setBackground(self,color):
-        if self.backgroundColor==color:
-            return
-        else:
-            self.backgroundColor=color
+        return self.textbackground
+
+    def getBackground0(self):
+        return self.background_0
+    def getBackground1(self):
+        return self.background_1
+    def getBackground2(self):
+        return self.background_2
             
     def getTextColor(self):
         return QColor(self.colors["textcolor"]).name()
-    def setTextColor(self,textcolor):
-        if self.colors["textcolor"]==textcolor:
-            return
-        else:
-            self.colors["textcolor"]=textcolor
-    textBackground=Property(str, getTextBackground, setTextBackground, notify=textBackgroundChanged)
-    textColor = Property(str, getTextColor,setTextColor, notify=textColorChanged)
-    background=Property(str,getBackground,setBackground,notify=backgroundChanged)
+    
+    textBackground=Property(str, getTextBackground,  notify=textBackgroundChanged)
+    textColor = Property(str, getTextColor, notify=textColorChanged)
+    background0=Property(str,getBackground0,notify=backgroundChanged)
+    background1=Property(str,getBackground1,notify=backgroundChanged)
+    background2=Property(str,getBackground2,notify=backgroundChanged)
             
 #end of theme
     
@@ -381,68 +373,25 @@ def PhysicsParameters(obj):
     for pcon in ["odeCfm","odeErp","odeContact_max_correcting_vel","odeContact_surface_layer"]:
         obj.addProperty("App::PropertyFloat",pcon,"ode",hidden=True)
 
-def create_property(inst, name, type_):
-    signal_name = f"{name}Changed"
-    signal = Signal()
-
-    def getter(self):
-        return getattr(self.obj, name)
-
-    def setter(self, value):
-        if getattr(self.obj, name) != value:
-            setattr(self.obj, name, value)
-            signal.emit()
-
-    setattr(inst.__class__, signal_name, signal)
-    prop = Property(type_, getter, setter, notify=signal)
-    setattr(inst.__class__, name, prop)
 
 
 class PhysicsProperties(QObject):
-   
     def __init__(self, obj,parent =None):
         super().__init__(parent)
         self.obj=obj
     
-    # properties 
-        for prp in ["max_step_size","real_time_factor","real_time_update_rate"]:
-            create_property(self,prp,float)
-        #  dart 
-        for prp_str in ["dynamicsengine","dartSolver_type","dartCollision_detector"]:
-            create_property(self,prp_str,str)
-        create_property(self,"max_contacts",int)
-        # simbody 
-        create_property(self,"simbodyMax_transient_velocity",float)
-        for prp_float in ["simbodyStiffness","simbodyDissipation","simbodyPlastic_coef_restitution","simbodyPlastic_impact_velocity",
-                  "simbodyStatic_friction","simbodyDynamic_friction","simbodyViscous_friction","simbodyOverride_impact_capture_velocity",
-                  "simbodyOverride_stiction_transition_velocity","simbodyMin_step_size","simbodyAccuracy"]:
-            create_property(self,prp_float,float)
-            
-        # bullet 
-        for prp in ["bulletSolver_type","bulletMin_step_size","bulletSor"]:
-            create_property(self,prp,float)
-        create_property(self,"bulletIters",int)
-            #  bullet constraints 
-        for constr in  ["bulletCfm","bulletErp","bulletContact_surface_layer","bulletSplit_impulse_penetration_threshold"]:
-            create_property(self,constr,float)
+    @Slot(str,result='QVariant')
+    def getter(self,prop_name):
+        return getattr(self.obj,prop_name)
         
-        create_property(self,"bulletSplit_impulse",bool)
+    @Slot(str,'QVariant')
+    def setter(self, name,value):
+        if getattr(self.obj, name) != value:
+            setattr(self.obj, name, value)
+           
         
-        #  ode 
-        for pname in ["odeMin_step_size","odeSor"]:
-            create_property(self,pname,float)
-        for pint in ["odeIsland_threads","odeIters","odePrecon_iters"]:
-            create_property(self,pint,int)
-            
-        for pstr in ["odeType","odeFriction_model"]:
-            create_property(self,pstr,str)
-            
-        for pbool in ["odeThread_position_correction","odeUse_dynamic_moi_rescaling"]:
-            create_property(self,pbool,bool)
-            #  ode constraints 
-        for pcon in ["odeCfm","odeErp","odeContact_max_correcting_vel","odeContact_surface_layer"]:
-            create_property(self,pcon,float)
-            
+        
+              
 def resetPhysicsattributes(obj):
     sdf_etree=sdf_tree.sdf_tree("physics.sdf",metaData=False,recurse=False)
     e=sdf_etree.get_element
