@@ -1,7 +1,6 @@
 Bugs
 ----
 
-- Port all proxies to fpo::Proxy.
 - Fix CROSS complaining about non-existing directory when exporting to URDF into a non-existing directory (the directory is created but CROSS complains though).
 - Fix "[Cross::Robot] still touched after recompute" when linking a planning scene to a robot.
 - Fix the placement of some parts in assembly_from_urdf.py (issue with `forearm_visual` when loading `robot_5r.urdf.xacro`).
@@ -22,6 +21,7 @@ Traceback (most recent call last):
     return float(q.getValueAs(to_))
 ValueError: Unit mismatch
 ```
+- Bug with `SetJoints` when first setting one robot then another one. The values are still linked to the first robot.
 
 Missing features
 ----------------
@@ -42,6 +42,7 @@ Missing features
 Nice to have
 ------------
 
+- Port all proxies to fpo::Proxy.
 - Set `JointAxisLength` to a value adapted to the robot size when importing URDF. (EASY)
 - Replace values such as 1.57 with ${pi / 2} in xacro exports. (EASY)
 - Visualize inertia. (MEDIUM)

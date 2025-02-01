@@ -8,7 +8,7 @@ use_default_stable_freecad=true # set false if you want to use some other FreeCA
 command=freecad
 force_run_new_container=false
 
-ros_distro=iron
+ros_distro=jazzy
 ros_distro_assemble=desktop
 ws_dir_name=ros2_ws_with_freecad
 ros_container_name=ros2_${ros_distro}_with_freecad
@@ -30,7 +30,7 @@ build_data_path=$ws_path/build_data
 # Usage info
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-dfh] 
+Usage: ${0##*/} [-dfh]
 Run RobotCAD in container and open it window at host.
 
     -h          display this help and exit
@@ -46,11 +46,11 @@ while getopts dfh opt; do
             show_help
             exit 0
             ;;
-        f)  
+        f)
             force_run_new_container=true
             echo 'Force run new container.'
             ;;
-        d)  
+        d)
             debug=true
             echo 'DEBUG is active.'
             ;;
@@ -127,7 +127,7 @@ else
     # [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installing-with-apt)
     # If dont need this set Prime integrated video (f.e. sudo prime-select intel). It usually is default.
     nvidia_options=''
-    if [ "$(prime-select query 2> /dev/null)" == 'nvidia' ]; then 
+    if [ "$(prime-select query 2> /dev/null)" == 'nvidia' ]; then
         nvidia_options='--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all'
     fi
 
@@ -179,4 +179,5 @@ echo -e "\nFreeCAD mods from host binded to container and will be accessible.\n"
 
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
-echo -e "\n\n\n${GREEN}FreeCAD was started inside container. Wait it window load to your host... (about 20 seconds)${NC}\n\n\n"
+echo -e "\n\n\n${GREEN}FreeCAD was started inside container. Wait it window load to your host... (about 20 seconds)\n
+The first time, dependencies will be downloaded and installed via pip, which will take longer.${NC}\n\n\n"

@@ -17,6 +17,7 @@ import yaml
 import collections.abc
 import re
 from copy import deepcopy
+import hashlib
 
 import xmltodict
 
@@ -282,12 +283,60 @@ def remove_key(dictionary: dict, key: str, recursively: bool = True):
     return dictionary
 
 
-def dict_to_xml(dict: dict, keys_to_remove_before_convert: list = [], remove_keys_recursively: bool = True):
+def dict_to_xml(
+        dict: dict, keys_to_remove_before_convert: list = [], remove_keys_recursively: bool = True,
+        full_document: bool = True, pretty: bool = False,
+):
     """Convert dictionary to xml"""
 
     dict = deepcopy(dict)
     for key_to_remove in keys_to_remove_before_convert:
         dict = remove_key(dict, key_to_remove, remove_keys_recursively)
 
-    xml_str = xmltodict.unparse(dict)
+    xml_str = xmltodict.unparse(dict, full_document = full_document, pretty = pretty)
     return xml_str
+
+
+def str_to_bool(s: str) -> bool:
+    return s.lower() == "true"
+
+
+def replace_substring_in_keys(dictionary, old_substring, new_substring):
+    """
+    Recursively replaces occurrences of a substring in dictionary keys.
+
+    :param dictionary: The dictionary in which to perform the replacement.
+    :param old_substring: The substring to be replaced.
+    :param new_substring: The new substring to replace with.
+    :return: A dictionary with replaced keys.
+    """
+    new_dict = {}
+    for key, value in dictionary.items():
+        # Replace the substring in the key
+        new_key = key.replace(old_substring, new_substring)
+
+        # If the value is a dictionary, recursively process it
+        if isinstance(value, dict):
+            new_dict[new_key] = replace_substring_in_keys(value, old_substring, new_substring)
+        else:
+            new_dict[new_key] = value
+
+    return new_dict
+
+
+def calc_md5(file_path: str) -> str:
+    """
+    Calculates the MD5 hash of a file's content.
+    param:
+        file_path: The path to the file.
+    Return:
+        The MD5 hash of the file's content.
+    Raises:
+        FileNotFoundError: If the file is not found.
+        IOError: If an error occurs while reading the file.
+    """
+    md5 = hashlib.md5()
+    with open(file_path, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            md5.update(chunk)
+    return md5.hexdigest()

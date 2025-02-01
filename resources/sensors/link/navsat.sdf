@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <link>
+            <sensor name="navsat_sensor" type="navsat">
+                <plugin
+                    filename="gz-sim-navsat-system"
+                    name="gz::sim::systems::NavSat">
+                </plugin>
+                <always_on>true</always_on>
+                <topic>navsat</topic>
+                <update_rate>30</update_rate>
+            </sensor>
+        </link>
+    </world>
+</sdf>

@@ -29,26 +29,30 @@ class _SetCROSSPlacementFastCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'set_cross_placement_fast.svg',
-                'MenuText': tr('Set placement - fast'),
-                'Accel': 'P, F',
-                'ToolTip': tr('Set the Origin of a joint and Mounted Placement of link and make LCSes at orienteers places.\n'
-                              '\n'
-                              'Select (with Ctlr): \n'
-                              '    1) subelement (face, edge, vertex) of body (subobject of Real) of robot link or LCS at any Real subobject (first orienteer), \n'
-                              '    2) subelement (face, edge, vertex) of body (subobject of Real) of robot link or LCS at any Real subobject (second orienteer). \n'
-                              '\n'
-                              'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
-                              '\n'
-                              'This will connect 2 links (child to parent) in orienteers places.\n'
-                              'Joint Origin and link Mounted Placement will be moved to connection position.\n'
-                              '\n'
-                              'At both orienteers places will be created LCS (if selected subelement).\n'
-                              'Be free to fix the default LCS orientation if it does not suit you.\n'
-                              'After the LCS orientation correction you can use LCS with other Placements tools.\n'
-                              'By default LCS will use InertialCS MapMode \n'
-                              'and Translate MapMode for vertex and Concentric for curve and circle.'
-                              )}
+        return {
+            'Pixmap': 'set_cross_placement_fast.svg',
+            'MenuText': tr('Set placement - fast'),
+            'Accel': 'P, F',
+            'ToolTip': tr(
+                'Set the Origin of a joint and Mounted Placement of link and make LCS at reference places.\n'
+                '\n'
+                'Select (with Ctlr): \n'
+                '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
+                '    2) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (second reference)\n'
+                '\n'
+                'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
+                '\n'
+                'This will connect 2 links (child to parent) in reference places.\n'
+                'Joint Origin and link Mounted Placement will be moved to connection position.\n'
+                '\n'
+                'At both reference places will be created LCS (if selected subelement).\n'
+                'Be free to fix the default LCS orientation if it does not suit you.\n'
+                'It is posible to use other Placements tools with the LCS.\n'
+                'Also you can remove LCS, it only helpers for set placement.\n'
+                'By default LCS will use InertialCS MapMode \n'
+                'and Translate MapMode for vertex and Concentric for curve and circle.',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection())
@@ -59,14 +63,17 @@ class _SetCROSSPlacementFastCommand:
         try:
             orienteer1, orienteer2 = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Any', 'Any'])
+                ['Any', 'Any'],
+            )
             selection_ok = True
         except RuntimeError:
             pass
 
         if not selection_ok:
-            message('Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
-                    'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True)
+            message(
+                'Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
+                'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True,
+            )
             return
 
         link1 = get_parent_link_of_obj(orienteer1)
@@ -74,12 +81,12 @@ class _SetCROSSPlacementFastCommand:
 
         if link1 == None:
             message('Can not get parent robot link of first selected object', gui=True)
-            return      
+            return
 
         if link2 == None:
             message('Can not get parent robot link of second selected object', gui=True)
-            return       
-        
+            return
+
         sel = fcgui.Selection.getSelectionEx()
         orienteer1_sub_obj = sel[0]
         orienteer2_sub_obj = sel[1]
@@ -123,18 +130,20 @@ class _SetCROSSPlacementFastCommand:
                 child_orienteer = orienteer2_sub_obj
         elif chain1_len == chain2_len == 1:
             message('Links must be connected by joints first.', gui=True)
-            return                
+            return
 
         if not parent_link:
-            message('Tool does not work with orienteers in same robot link.'
-                    ' Must be one orienteer in parent link and one in child link', gui=True)
-            return            
+            message(
+                'Tool does not work with orienteers in same robot link.'
+                ' Must be one orienteer in parent link and one in child link', gui=True,
+            )
+            return
 
         joint = chain[-2]
         if not is_joint(joint):
             message('Can not get joint between parent links of selected objects', gui=True)
             return
-        
+
         doc.openTransaction(tr("Set joint origin"))
         set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
         doc.commitTransaction()

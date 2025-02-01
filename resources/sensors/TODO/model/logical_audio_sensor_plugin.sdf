@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <world>
+        <model>
+            <plugin filename="gz-sim-logicalaudiosensorplugin-system" name="gz::sim::systems::LogicalAudioSensorPlugin">
+                <microphone>
+                    <id>1</id>
+                    <pose>0 0 0 0 0 0</pose>
+                    <volume_threshold>.1</volume_threshold>
+                </microphone>
+            </plugin>
+        </model>
+    </world>
+</sdf>

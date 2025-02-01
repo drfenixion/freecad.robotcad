@@ -23,23 +23,26 @@ from .urdf_utils import urdf_inertial
 from .urdf_utils import urdf_visual_from_object
 from .utils import attr_equals
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH
+from .wb_utils import ICON_PATH, get_link_sensors
 from .wb_utils import get_chain
 from .wb_utils import get_joints
 from .wb_utils import get_links
 from .wb_utils import get_valid_urdf_name
 from .wb_utils import is_joint
 from .wb_utils import is_link
+from .wb_utils import is_sensor_link
 from .wb_utils import is_name_used
 from .wb_utils import is_primitive
 from .wb_utils import is_robot
 from .wb_utils import ros_name
 from .wb_utils import get_parent_link_of_obj
+from . import wb_constants
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
 from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a DocumentObject with Proxy "SensorProxyJoint" or "SensorProxyJoint". # noqa: E501
 DO = fc.DocumentObject
 DOList = List[DO]
 VPDO = NewType('FreeCADGui.ViewProviderDocumentObject', DO)  # Don't want to import FreeCADGui here. # noqa: E501
@@ -128,6 +131,9 @@ def _get_xmls_and_export_meshes(
     )
     xmls: list[et.Element] = []
     for export_datum in export_data:
+        if wb_constants.lcs_wrapper_prefix in ros_name(export_datum.object):
+            # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
+            continue
         if not is_primitive(export_datum.object):
             mesh_path = (
                 package_parent / package_name
@@ -185,6 +191,8 @@ class LinkProxy(ProxyBase):
         # Save the parent joint to speed-up self.get_ref_joint().
         self._ref_joint: Optional[CrossJoint] = None
 
+        self._sensors: Optional[list[CrossSensor]] = None
+
         self.init_extensions(obj)
         self.init_properties(obj)
 
@@ -220,11 +228,15 @@ class LinkProxy(ProxyBase):
             'Mass of the link',
         )
         obj.Mass = fc.Units.Mass
-        add_property(obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
-                     'Center of mass of the link, with orientation determining the principal axes of inertia')
-        add_property(obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
-                     'Center of mass of the link, with orientation determining the principal axes of inertia \
-                        in global coordinates.')
+        add_property(
+            obj, 'App::PropertyPlacement', 'CenterOfMass', 'Inertial Parameters',
+            'Center of mass of the link, with orientation determining the principal axes of inertia',
+        )
+        add_property(
+            obj, 'App::PropertyPlacement', 'CenterOfMassGlobalCoords', 'Inertial Parameters',
+            'Center of mass of the link, with orientation determining the principal axes of inertia \
+                        in global coordinates.',
+        )
         # Implementation note: App.Units.MomentOfInertia is not a valid unit in
         # FC v0.21.
         add_property(
@@ -318,6 +330,7 @@ class LinkProxy(ProxyBase):
 
     def onChanged(self, obj: CrossLink, prop: str) -> None:
         if prop == 'Group':
+            self._sensors = None
             self._cleanup_children()
         if prop in ('Real', 'Visual', 'Collision'):
             self.update_fc_links()
@@ -378,7 +391,7 @@ class LinkProxy(ProxyBase):
         removed_objects: set[DO] = set()
         # Group is managed by us and the containing robot.
         for o in self.link.Group:
-            if is_freecad_link(o):
+            if is_freecad_link(o) or is_sensor_link(o):
                 # Supported, and managed by us.
                 continue
             warn_unsupported(o, by='CROSS::Link', gui=True)
@@ -565,7 +578,7 @@ class LinkProxy(ProxyBase):
             # sometimes error appears with ctrl+z after ShowReal=False, ShowReal=True
             # looks like problem with created back objects (it have FullName == '?')
 
-            # remove bad documents comebacked after Ctrl+z 
+            # remove bad documents comebacked after Ctrl+z
             for i in range(len(new_group)):
                 if new_group[i].FullName == '?':
                     try:
@@ -692,6 +705,17 @@ class LinkProxy(ProxyBase):
             self.link.setEditorMode('Placement', ['ReadOnly'])
         else:
             self.link.setEditorMode('Placement', [])
+
+    def get_sensors(self) -> list[CrossSensor]:
+        """Return the list of CROSS sensors in the order of creation."""
+        # TODO: as property.
+        if self._sensors is not None:
+            # self._sensors is updated in self.onChanged().
+            return list(self._sensors)  # A copy.
+        if not self.is_execute_ready():
+            return []
+        self._sensors = get_link_sensors(self.link.Group)
+        return list(self._sensors)  # A copy.
 
 
 class _ViewProviderLink(ProxyBase):
@@ -824,27 +848,27 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
 
 def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
     ''' Make robot link and fill Real and Visual of it by selected objects  '''
-    
+
     if not is_derived_from(obj, 'App::GeoFeature'):
         message(
             f'Not suited object ({ros_name(obj)}) to create robot link.',
             True,
-        )      
+        )
         return False
 
     if not is_part(obj):
         part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
-        
+
         parent_of_obj = None
         try:
             parent_of_obj = obj.Parents[0][0]
         except (KeyError, IndexError, AttributeError):
             pass
-        
+
         obj.adjustRelativeLinks(part)
         part.addObject(obj)
-        
-        #add created part-wrapper as child to parent of object 
+
+        #add created part-wrapper as child to parent of object
         if parent_of_obj:
             part.adjustRelativeLinks(parent_of_obj)
             parent_of_obj.addObject(part)

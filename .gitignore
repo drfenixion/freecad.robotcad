@@ -95,4 +95,9 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
 .vscode/settings.json
+
+# enternal gitmodules md5 backup
+.gitmodules_md5
+

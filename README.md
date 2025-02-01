@@ -15,6 +15,8 @@ Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=B62JW_0SFl0" target="_blank">Multicopter with manipulator and chassis</a> <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
+# RobotCAD future version
+[Early access to RobotCAD 6 - Reforged](https://github.com/drfenixion/freecad.robotcad/discussions/60)
 
 # Key features short list:
 1. Autoinstall and run by startup script
@@ -35,6 +37,8 @@ Video of creating controllable models: <br />
 1. Collisions automatic making tools (based on Real element of robot link)
 1. Controllers and sensor data broadcasters based on ros2_controllers (ros2_control)
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
+1. Sensors based on Gazebo sensors
+    1. Add the necessary sensors and use it in Gazebo.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF
@@ -147,7 +151,7 @@ The key features of RobotCAD are:
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2.
+Compatible with FreeCAD at least v0.21.2. FreeCAD AppImage build.
 Compatible with ROS2.
 
 ## Features

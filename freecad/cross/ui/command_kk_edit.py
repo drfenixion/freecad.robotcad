@@ -10,14 +10,13 @@ from __future__ import annotations
 import FreeCAD as fc
 import FreeCADGui as fcgui
 
-from ..freecad_utils import warn
 from ..gui_utils import tr
-from ..robot_proxy import make_robot
-from ..wb_utils import is_robot
-from .kk_dialog import KKDialog
 
 
 def _supported_object_selected():
+    # Import late to avoid slowing down workbench start-up.
+    from ..wb_utils import is_robot
+
     objs = fcgui.Selection.getSelection()
     if not objs:
         return True
@@ -37,6 +36,11 @@ class _KKEditCommand:
         }
 
     def Activated(self):
+        # Import late to avoid slowing down workbench start-up.
+        from ..freecad_utils import warn
+        from ..robot_proxy import make_robot
+        from .kk_dialog import KKDialog
+
         objs = fcgui.Selection.getSelection()
         if not objs:
             doc = fc.activeDocument()

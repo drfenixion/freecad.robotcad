@@ -31,19 +31,22 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
-                'MenuText': tr('Set placement - as system'),
-                'Accel': 'P, S',
-                'ToolTip': tr('Set the Mounted Placement of a link or the Origin of a joint.\n'
-                              '\n'
-                              'Select (with Ctlr) either:\n'
-                              '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
-                              '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n'
-                              '\n'
-                              'This will move first orienteer to position of second orienteer\n'
-                              'and binded system (first orienteer + Link or Joint) will moved respectively. \n'
-                              'LCS is convenient as orienteers because of configurable orientation.',
-                              )}
+        return {
+            'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
+            'MenuText': tr('Set placement - as system'),
+            'Accel': 'P, S',
+            'ToolTip': tr(
+                'Set the Mounted Placement of a link or the Origin of a joint.\n'
+                '\n'
+                'Select (with Ctlr) either:\n'
+                '  a) a CROSS::Link, any (first reference), any (second reference)\n'
+                '  b) a CROSS::Joint, any (first reference), any (second reference)\n'
+                '\n'
+                'This will move first reference to position of second reference\n'
+                'and binded system (first reference + Link or Joint) will moved respectively.\n'
+                'LCS is convenient as reference because of configurable orientation.',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection())
@@ -56,7 +59,8 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
         try:
             cross_link, orienteer1, orienteer2 = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Cross::Link', 'Any', 'Any'])
+                ['Cross::Link', 'Any', 'Any'],
+            )
             selection_ok = True
             selection_link = True
         except RuntimeError:
@@ -66,19 +70,22 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             try:
                 cross_joint, orienteer1, orienteer2 = validate_types(
                     fcgui.Selection.getSelection(),
-                    ['Cross::Joint', 'Any', 'Any'])
+                    ['Cross::Joint', 'Any', 'Any'],
+                )
                 selection_ok = True
                 selection_joint = True
             except RuntimeError:
                 pass
 
         if not selection_ok:
-            message('Select either\n'
-                    '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
-                    '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n',
-                    gui=True)
+            message(
+                'Select either\n'
+                '  a) a CROSS::Link, any (first orienteer), any (second orienteer) \n'
+                '  b) a CROSS::Joint, any (first orienteer), any (second orienteer).\n',
+                gui=True,
+            )
             return
-        
+
         # for work with subelement
         sel = fcgui.Selection.getSelectionEx()
         orienteer1_sub_element = sel[1]
@@ -87,7 +94,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
         if not is_lcs(orienteer1) and not is_joint(orienteer1) and not is_link(orienteer1):
             orienteer1 = orienteer1_sub_element
         if not is_lcs(orienteer2) and not is_joint(orienteer2) and not is_link(orienteer2):
-            orienteer2 = orienteer2_sub_element        
+            orienteer2 = orienteer2_sub_element
 
         if selection_link:
             doc.openTransaction(tr("Set link's mounted placement"))

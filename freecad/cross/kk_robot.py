@@ -29,8 +29,10 @@ try:
     from numpy.typing import ArrayLike
     from . import geometry_helpers as gh
 except ImportError as e:
-    warn(f'numpy not available, some functionalities will not work, error: {e}',
-         False)
+    warn(
+        f'numpy not available, some functionalities will not work, error: {e}',
+        False,
+    )
     ArrayLike = Any
 
 # Stubs and type hints.
@@ -70,7 +72,7 @@ class KKJoint:
     # perpendicular on Zi and Zj, where (i) is the antecedent of (j).
     # Among all possible directions for Xi, the one which is on the longest
     # branch is chosen. Other directions are denoted X'i, X''i, etc.
-    # Thus, some other auxiliar frames R'(O',X',Y',Z') will be defined fixed
+    # Thus, some other auxiliary frames R'(O',X',Y',Z') will be defined fixed
     # with respect to link(i).
 
     # γi: angle between Xi and X'i about Zi, in radians.
@@ -102,7 +104,8 @@ class KKJoint:
     ) -> None:
         """Set the joint parameters from a placement.
 
-        Set the joint parameters from the joint's Origin (in the RobotCAD workbench).
+        Set the joint parameters from the joint's Origin (in the
+        RobotCAD workbench).
         Joints in RobotCAD are along/about the z-axis, no need for the `axis`
         parameter as in `set_dh_from_matrix`.
 
@@ -124,6 +127,7 @@ class KKJoint:
         axis: Optional[ArrayLike] = None,
     ) -> None:
         """Set the joint parameters from a transformation matrix.
+
         Set the joint parameters from a transformation matrix between two
         joints.
 
@@ -163,7 +167,7 @@ class KKJoint:
         elif gh.are_parallel(z_axis, axis):
             # Parallel case.
             dh_params[:] = self._dh_params_parallel_case(origin_xyz)
-        elif gh.lines_intersect(np.zeros(3), z_axis, origin_xyz, axis)[0]:
+        elif gh.lines_intersect(origin, z_axis, origin_xyz, axis)[0]:
             # Intersect case.
             dh_params[:] = self._dh_params_intersection_case(origin_xyz, axis)
         else:
@@ -206,15 +210,17 @@ class KKJoint:
 
         dh_params: list[float] = [0.0] * 4
         dh_params[1] = gh.lines_intersect(
-                np.zeros(3), zaxis,
-                origin, axis,
+                np.zeros(3),
+                zaxis,
+                origin,
+                axis,
         )[1][0]  # r.
 
         # Round small values to 0.0.
-        axis[axis < 1.0e-5] = 0.0
+        axis[abs(axis) < 1.0e-5] = 0.0
 
         cn = np.cross(zaxis, axis)
-        cn[cn < 1.0e-6] = 0.0
+        cn[abs(cn) < 1.0e-5] = 0.0
         if cn[0] < 0.0:
             cn = -cn
 
@@ -319,7 +325,7 @@ class KKRobot:
       the antecedent of (j). Among all possible directions
       for Xi, the one which is on the longest branch is
       chosen. Other directions are denoted X'i, X''i, etc.
-      Thus, some other auxiliar frames R'(O',X',Y',Z') will be defined fixed
+      Thus, some other auxiliary frames R'(O',X',Y',Z') will be defined fixed
       with respect to link(i).
 
     """

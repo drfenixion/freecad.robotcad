@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-ARG ROS_DISTRO_ARG=iron
+ARG ROS_DISTRO_ARG=jazzy
 ARG ROS_DISTRO_ASSEMBLY_ARG=desktop
 FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
 
@@ -55,17 +55,23 @@ RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
 ### End Install FreeCAD
 
 
+### Delete user if present with same UID as local
+RUN deluser --remove-home $(id -un $UID); exit 0
+### End delete user if present with same UID as local
+
+
 ### Create user
 RUN echo "* enable custom user: $USER"
 RUN getent group $GROUP || groupadd --force -g $GID $GROUP
 RUN useradd --create-home --shell /bin/bash --groups adm,sudo --uid $UID --gid $GID $USER
-RUN echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# RUN sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD:ALL/g" /etc/sudoers ## make admin group no ask pass
+RUN echo "$USER  ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 ENV HOME=/home/$USER
 RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
 RUN export UBUNTU_USER_ID=$UID \
     && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
     && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
-    && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile 
+    && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile
 ### End create user
 
 
@@ -89,8 +95,8 @@ WORKDIR $PATH_TO_WS
 
 ### Install ROS deps
 RUN echo 'Install ROS dependencies...'
-RUN sudo -H apt-get update && rosdep update && \
-    rosdep install -y -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
+RUN sudo -H apt-get update -y && rosdep update && \
+    sudo rosdep install -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
     sudo apt-get autoclean -y && \
     sudo apt-get autoremove -y && \
     sudo rm -rf /var/lib/apt/lists/*
@@ -105,4 +111,4 @@ RUN echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
 ### Build ROS packages
 
 
-CMD ["bash", "-c", ". ./install/setup.bash && freecad"] 
+CMD ["bash", "-c", ". ./install/setup.bash && freecad"]
