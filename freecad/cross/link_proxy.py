@@ -553,8 +553,9 @@ class LinkProxy(ProxyBase):
         for o in old_fc_links:
             # Free the label.
             try:
-                o.Label = 'to_be_removed_______'
-            except ReferenceError:
+                o.Label = 'to_be_removed'
+                o.Visibility = False
+            except (ReferenceError, AttributeError):
                 pass
 
         # Clear the lists that are regenerated right after and create new
@@ -588,7 +589,7 @@ class LinkProxy(ProxyBase):
             link.Group = new_group
 
         objects = doc.RootObjects
-        filtered_objects = [obj for obj in objects if "to_be_removed_______" in obj.Label]
+        filtered_objects = [obj for obj in objects if "to_be_removed" in obj.Label]
         for obj in filtered_objects:
             doc.removeObject(obj.Name)
 
