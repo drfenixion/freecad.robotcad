@@ -422,7 +422,7 @@ def add_controller_properties_block(controller: CrossController, controller_data
     parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
     prop_name_value = getattr(controller, prop_name, [])
     parameters_flatten_full_names_new = list(np.unique(list(parameters_flatten_full_names) + prop_name_value))
-    
+
     # add meta property
     # there are only list of full names of controller parameters (gotten from controller YAML config)
     if hasattr(controller, prop_name):
