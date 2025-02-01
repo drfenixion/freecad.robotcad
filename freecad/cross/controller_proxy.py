@@ -11,6 +11,7 @@ from typing import Iterable
 from copy import deepcopy
 from pathlib import Path
 import os
+import numpy as np
 import yaml
 import xml.etree.ElementTree as ET
 import re
@@ -417,12 +418,15 @@ def add_controller_properties_block(controller: CrossController, controller_data
         **parameters_flatten,
         **adding_flatten_params,
     }
-    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
     prop_name = 'controller_parameters_fullnames_list'
+    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
+    prop_name_value = getattr(controller, prop_name, [])
+    parameters_flatten_full_names_new = list(np.unique(list(parameters_flatten_full_names) + prop_name_value))
+    
     # add meta property
     # there are only list of full names of controller parameters (gotten from controller YAML config)
     if hasattr(controller, prop_name):
-        setattr(controller, prop_name, parameters_flatten_full_names)
+        setattr(controller, prop_name, parameters_flatten_full_names_new)
     else:
         controller, used_property_name = add_property(
             controller,
@@ -430,7 +434,7 @@ def add_controller_properties_block(controller: CrossController, controller_data
             prop_name,
             'Internal',
             'List of full names of parameters',
-            parameters_flatten_full_names,
+            parameters_flatten_full_names_new,
         )
         controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
@@ -654,7 +658,7 @@ def filter_controllers_dirs(controllers: dict):
     """Filter controllers directories for that not coded parsing yet"""
 
     # filted does not adapted controller (need some code to adapt)
-    filter_controllers_dirs = ['parallel_gripper_controller', 'gpio_controllers']
+    filter_controllers_dirs = ['parallel_gripper_controller']
 
     for controller in list(controllers):
         if controller in filter_controllers_dirs:
@@ -837,7 +841,10 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                 # prepare controller parameters
                 parameters = {}
                 try:
-                    parameters = controller_dir['parameters'][plugin_data_name]
+                    try:
+                        parameters = controller_dir['parameters'][plugin_data_name]
+                    except KeyError:
+                        parameters = controller_dir['parameters'][plugin_data_name + '_parameters']
                 except KeyError:
                     # special cases for controllers that does not have their own params and uses params from other controllers
                     params_based_on_controller_dir = excluded_params[plugin_data_name]['params_based_on_controller_dir']
