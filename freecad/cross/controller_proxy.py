@@ -505,6 +505,9 @@ def add_controller_properties(
                     ] \
                     and param['full_name'] in ['base_frame_id', 'odom_frame_id']:
                         category = 'Root'
+                    elif parameter_name == 'parallel_gripper_action_controller' \
+                    and param['full_name'] in ['max_effort_interface', 'max_velocity_interface']:
+                        category = 'Root'
                 else:
                     category = 'Root'
 
@@ -575,13 +578,20 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
                     class_name = full_class_name.split('/')[-1]
 
                     # special cases for some of same controller names in xml
-                    if 'GripperActionController' in full_class_name:
+                    # parallel_gripper_action_controller is new separate controller
+                    # and should not be handle as gripper from gripper_action_controller lib
+                    if 'GripperActionController' in full_class_name and 'parallel_gripper_action_controller' not in full_class_name:
                         gripper_interface = re.search(r'(.+)_', full_class_name).group(1) # effor, position
                         class_name = class_name + gripper_interface.capitalize()
                         controller['parameters']['gripper_action_controller_' + gripper_interface] = deepcopy(controller['parameters']['gripper_action_controller'])
 
                     camelCaseToList = re.findall(r'[A-Za-z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
                     controller_name = '_'.join(camelCaseToList).lower()
+
+                    # special cases for parallel_gripper_action_controller
+                    if 'parallel_gripper_action_controller' in full_class_name:
+                        controller_name = 'parallel_gripper_action_controller'
+
                     plugin = {
                         full_class_name:
                           {
@@ -658,7 +668,7 @@ def filter_controllers_dirs(controllers: dict):
     """Filter controllers directories for that not coded parsing yet"""
 
     # filted does not adapted controller (need some code to adapt)
-    filter_controllers_dirs = ['parallel_gripper_controller']
+    filter_controllers_dirs = [] # no controllers to filter yet
 
     for controller in list(controllers):
         if controller in filter_controllers_dirs:
@@ -844,6 +854,7 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     try:
                         parameters = controller_dir['parameters'][plugin_data_name]
                     except KeyError:
+                        # gpio_command_controller_parameters case
                         parameters = controller_dir['parameters'][plugin_data_name + '_parameters']
                 except KeyError:
                     # special cases for controllers that does not have their own params and uses params from other controllers
