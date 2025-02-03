@@ -1079,7 +1079,7 @@ class RobotProxy(ProxyBase):
                         if param_full_name_yaml in ['max_effort_interface', 'max_velocity_interface'] \
                         and yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] == '':
                             del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
-                            
+
                     elif isinstance(param, DO):
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
                     else:
