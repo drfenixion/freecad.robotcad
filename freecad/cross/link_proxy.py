@@ -556,7 +556,7 @@ class LinkProxy(ProxyBase):
                 o.Label = 'to_be_removed'
                 o.Visibility = False
                 doc.removeObject(o.Name)
-            except (ReferenceError, AttributeError):
+            except (ReferenceError, AttributeError, TypeError):
                 pass
 
         # Clear the lists that are regenerated right after and create new
