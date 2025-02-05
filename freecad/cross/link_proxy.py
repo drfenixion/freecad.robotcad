@@ -542,29 +542,30 @@ class LinkProxy(ProxyBase):
         # Old objects that will be removed after having been excluded from
         # `Group`, to avoid recursive calls.
         old_fc_links: DOList = []
-        if update_real:
+        if update_real or not vlink.ShowReal:
             old_fc_links += self._fc_links_real
-        if update_visual:
+        if update_visual or not vlink.ShowVisual:
             old_fc_links += self._fc_links_visual
-        if update_collision:
+        if update_collision or not vlink.ShowCollision:
             old_fc_links += self._fc_links_collision
 
-        # Free the labels because of delayed removal.
+        # remove links
         for o in old_fc_links:
-            # Free the label.
             try:
+                # Free the labels in case something wrong with removal.
                 o.Label = 'to_be_removed'
                 o.Visibility = False
+                doc.removeObject(o.Name)
             except (ReferenceError, AttributeError):
                 pass
 
         # Clear the lists that are regenerated right after and create new
         # objects.
-        if update_real:
+        if update_real or not vlink.ShowReal:
             self._fc_links_real.clear()
-        if update_visual:
+        if update_visual or not vlink.ShowVisual:
             self._fc_links_visual.clear()
-        if update_collision:
+        if update_collision or not vlink.ShowCollision:
             self._fc_links_collision.clear()
 
         # Create new objects.
@@ -587,11 +588,6 @@ class LinkProxy(ProxyBase):
         )
         if new_group != link.Group:
             link.Group = new_group
-
-        objects = doc.RootObjects
-        filtered_objects = [obj for obj in objects if "to_be_removed" in obj.Label]
-        for obj in filtered_objects:
-            doc.removeObject(obj.Name)
 
 
     def export_urdf(
