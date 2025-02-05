@@ -12,7 +12,8 @@ import Part as part
 from PySide import QtGui
 from freecad.cross.placement_utils import get_obj_to_subobj_diff  # FreeCAD's PySide!
 
-from .freecad_utils import DO, copy_obj_geometry, warn
+from .freecad_utils import DO, copy_obj_geometry, is_part, warn
+from .freecad_utils import is_link as is_fclink
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
 from .wb_utils import UI_PATH, find_link_real_in_obj_parents, get_parent_link_of_obj
@@ -137,9 +138,12 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 continue
 
             collision_source_obj = obj.Document.addObject("Part::Feature", "col_" + obj.Name)
-            collision_source_obj.Placement = obj.Placement
 
             collision_source_obj = copy_obj_geometry(obj, collision_source_obj)
+            # zeroing placement if selected part or link as source of collision
+            # because collision will be wrapped by link to part with it own placement
+            if is_part(obj) or is_fclink(obj):
+                collision_source_obj.Placement = fc.Placement()
             bound = createBound(collision_source_obj)
             doc.removeObject(collision_source_obj.Name)
 
