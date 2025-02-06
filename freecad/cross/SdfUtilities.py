@@ -171,8 +171,10 @@ class Palette(QObject):
             self.textbackground:str="#2e2b26"
         
         else:
-            #light theme pallete
-            #to be done
+            self.background_0:str="#c3c5c4"
+            self.background_1:str="#e5ecf2"
+            self.background_2:str="#bad4d3"
+            self.textbackground:str="#f5efe3"
             pass
             
     def GetHexColors(self)->dict:
@@ -321,7 +323,7 @@ def PhysicsParameters(obj):
     #                 name of this set of physics parameters''',hidden=True)
     # obj.addProperty("App::PropertyBool","default","physics","use default world Physics profile",hidden=True)
     obj.addProperty("App::PropertyEnumeration","dynamicsengine","physics",hidden=True)
-    obj.dynamicsengine=["ode","bullet","dart"]
+    obj.dynamicsengine=["ode","bullet","simbody","dart"]
     for p in ["max_step_size","real_time_factor","real_time_update_rate"]:
         obj.addProperty("App::PropertyFloat",p,"physics",
                     '''simulation for simulations in engine''',hidden=True)
@@ -363,9 +365,11 @@ def PhysicsParameters(obj):
     for pint in ["odeIsland_threads","odeIters","odePrecon_iters"]:
         obj.addProperty("App::PropertyInteger",pint,"ode",hidden=True)
         # str
-    for pstr in ["odeType","odeFriction_model"]:
+    for pstr in ["odeFriction_model"]:
         obj.addProperty("App::PropertyString",pstr,"ode",hidden=True)
         # bool
+        obj.addProperty("App::PropertyEnumeration","odeType","ode",hidden=True)
+        obj.odeType=["world","quick"]
     for pbool in ["odeThread_position_correction","odeUse_dynamic_moi_rescaling"]:
         obj.addProperty("App::PropertyBool",pbool,"ode",hidden=True)
         
@@ -388,7 +392,7 @@ class PhysicsProperties(QObject):
     def setter(self, name,value):
         if getattr(self.obj, name) != value:
             setattr(self.obj, name, value)
-           
+    
         
         
               

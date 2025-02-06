@@ -40,9 +40,14 @@ Rectangle {
                     ComboBox {
                         id: physicsType
                         model: ["ode", "bullet", "simbody", "dart"]
-                        currentIndex: 0
+                        currentIndex: physicsType.model.indexOf(phy.getter("dynamicsengine"))
                         Layout.preferredWidth: 200
-                        onCurrentIndexChanged: updateSolverView()
+                        onCurrentIndexChanged:
+                        {
+                            var currentIt = physicsType.model[physicsType.currentIndex]
+                            updateSolverView()
+                            phy.setter("dynamicsengine",currentIt)
+                        }
                     }
                 }
 
@@ -98,10 +103,18 @@ Rectangle {
             id: stackView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            initialItem: odeSettings
+            initialItem: componentProvider(physicsType.currentIndex)
         }
     }
-
+    function componentProvider(index) {
+            switch (index) {
+                case 0: return odeComponent
+                case 1: return bulletComponent
+                case 2: return simbodyComponent
+                case 3: return dartComponent
+                default: return odeComponent // Fallback
+            }
+        }
     // Function to Update Solver View Based on ComboBox Selection
     function updateSolverView() {
         switch (physicsType.currentIndex) {
@@ -147,10 +160,15 @@ Rectangle {
                         color:plt.textColor
                     }
                     ComboBox {
-                        id: stcb
+                        id: odesolverType
                         model: ["world", "quick"]
-                        currentIndex: 0
+                        currentIndex: odesolverType.model.indexOf(phy.getter("odeType"))
                         Layout.preferredWidth: 200
+                        onCurrentIndexChanged:
+                        {
+                            var currentItem = odesolverType.model[odesolverType.currentIndex]
+                            phy.setter("odeType",currentItem)
+                        }
                     }
                 }
 
@@ -277,7 +295,10 @@ Rectangle {
                 anchors.fill: parent
 
                 RowLayout {
-                    Label { text: "Solver Type:" }
+                    Label {
+                        text: "Solver Type:"
+                        color:plt.textColor
+                    }
                     ComboBox {
                         model: ["sequential_impulse"]
                         currentIndex: 0
@@ -411,18 +432,31 @@ Rectangle {
                 RowLayout {
                     Label { text: "Solver Type:" }
                     ComboBox {
+                        id:dartSolver_type
                         model: ["dantzig", "pgs"]
-                        currentIndex: 0
+                        currentIndex: dartSolver_type.model.indexOf(phy.getter("dartSolver_type"))
                         Layout.preferredWidth: 200
+                        onCurrentIndexChanged:
+                        {
+                            var currentItem = dartSolver_type.model[dartSolver_type.currentIndex]
+                            phy.setter("dartSolver_type",currentItem)
+                        }
                     }
                 }
 
                 RowLayout {
                     Label { text: "Collision Detector:" }
                     ComboBox {
+                        id:dartCollision_detector
                         model: ["fcl", "dart", "bullet", "ode"]
-                        currentIndex: 0
+                        currentIndex: dartCollision_detector.model.indexOf(phy.getter("dartCollision_detector"))
                         Layout.preferredWidth: 200
+                        onCurrentIndexChanged:
+                        {
+                            var currentItem = dartCollision_detector.model[dartCollision_detector.currentIndex]
+                            phy.setter("dartCollision_detector",currentItem)
+                        }
+
                     }
                 }
             }

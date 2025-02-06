@@ -5,8 +5,8 @@ import QtQuick.Layouts 1.0
 Rectangle{
 
     id: root
-    property string textcolor:"white"
-    property string backgroundColor: "black"
+    property string textcolor:plt.textColor
+    property string backgroundColor: plt.textBackground
     property alias value: spinBox.realValue
     property real default_value:0.0
     property real min: 0
