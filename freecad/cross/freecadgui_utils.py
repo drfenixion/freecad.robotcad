@@ -150,7 +150,6 @@ def createCollisionCopyObj(obj: DO) -> DO:
     """Create copy of object for collision purpose"""
     colObj = fc.ActiveDocument.addObject("Part::Feature", obj.Label + "_col_obj")
     colObj = copy_obj_geometry(obj, colObj)
-    colObj.Placement = fc.Placement()
 
     colObj = set_collision_appearance(colObj)
 

@@ -116,34 +116,43 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 continue
 
             robotLink = False
+            is_selected_robot_link = False
             if is_link(obj):
                 if obj.Real:
                     robotLink = obj
                     # get deepest linked object
                     obj = obj.Real[0].getLinkedObject(True)
+                    is_selected_robot_link = True
                 else:
                     warn("Can`t create collision for link: " + obj.Label + ". Add Real element to link first!"+"\n", True)
                     continue
             else:
                 robotLink = get_parent_link_of_obj(obj)
 
-            obj_to_subobj_middle_wrap_diff = fc.Placement(fc.Vector(0, 0, 0), fc.Rotation())
+            obj_to_subobj_middle_wrap_diff = fc.Placement()
 
             if robotLink:
                 real_of_link = find_link_real_in_obj_parents(obj, robotLink)
+
                 if real_of_link:
                     obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(real_of_link, obj, with_leaf_el = False)
+                else:
+                    real_of_link = robotLink.Real[0].getLinkedObject(True)
             else:
                 warn("Can`t find parent robot link of object: " + obj.Label + ". Add object to robot link as Real element first!"+"\n", True)
                 continue
 
             collision_source_obj = obj.Document.addObject("Part::Feature", "col_" + obj.Name)
-
             collision_source_obj = copy_obj_geometry(obj, collision_source_obj)
-            # zeroing placement if selected part or link as source of collision
+
+            # zeroing placement if selected outer part or link (real, col, vis) or robot link as source of collision
             # because collision will be wrapped by link to part with it own placement
-            if is_part(obj) or is_fclink(obj):
+            if is_selected_robot_link \
+            or (is_part(obj) and real_of_link.Name == obj.Name) \
+            or (is_fclink(obj) and real_of_link.Name == obj.getLinkedObject(True).Name):
                 collision_source_obj.Placement = fc.Placement()
+                obj_to_subobj_middle_wrap_diff = fc.Placement()
+
             bound = createBound(collision_source_obj)
             doc.removeObject(collision_source_obj.Name)
 
