@@ -1174,4 +1174,3 @@ def set_placement_fast() -> bool |  tuple[DO, DO, DO]:
     doc.commitTransaction()
 
     return joint, child_link, parent_link
-    

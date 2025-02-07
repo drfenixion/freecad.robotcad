@@ -34,7 +34,7 @@ class _SetCROSSPlacementFastSensorCommand:
                 '    2) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (second reference)\n'
                 '\n'
                 'Works same way as "Set placement - fast", and after uses axis orietation correction for sensor\n'
-                '(front of sensor is positive x-oriented)\n'
+                '(front of sensor is positive x-oriented)\n',
             ),
         }
 
