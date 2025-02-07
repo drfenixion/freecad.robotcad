@@ -234,6 +234,15 @@ class _ViewProviderController(ProxyBase):
                             param_to_remove_name = mapped_params_template.replace(param_to_replace, mapped_param_to_remove)
                             obj.removeProperty(param_to_remove_name)
 
+                            # remove param from list
+                            if hasattr(obj, 'controller_parameters_fullnames_list'):
+                                controller_parameters_fullnames_list = getattr(obj, 'controller_parameters_fullnames_list')
+                                try:
+                                    controller_parameters_fullnames_list.remove(param_to_remove_name)
+                                    setattr(obj, 'controller_parameters_fullnames_list', controller_parameters_fullnames_list)
+                                except ValueError:
+                                    pass
+
                 # save mapped params to check diff in future
                 try:
                     attr = getattr(obj, mapped_params_prop_name)
