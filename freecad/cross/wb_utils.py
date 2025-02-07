@@ -14,6 +14,7 @@ import FreeCADGui as fcgui
 from . import wb_constants
 from . import wb_globals
 from .freecad_utils import get_param, get_parents_names
+from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
@@ -1078,3 +1079,99 @@ def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc
             if parents_name == real.Name:
                 return real
     return None
+
+
+def set_placement_fast() -> bool |  tuple[DO, DO, DO]:
+    doc = fc.activeDocument()
+    selection_ok = False
+    try:
+        orienteer1, orienteer2 = validate_types(
+            fcgui.Selection.getSelection(),
+            ['Any', 'Any'],
+        )
+        selection_ok = True
+    except RuntimeError:
+        pass
+
+    if not selection_ok:
+        message(
+            'Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
+            'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True,
+        )
+        return False
+
+    link1 = get_parent_link_of_obj(orienteer1)
+    link2 = get_parent_link_of_obj(orienteer2)
+
+    if link1 == None:
+        message('Can not get parent robot link of first selected object', gui=True)
+        return False
+
+    if link2 == None:
+        message('Can not get parent robot link of second selected object', gui=True)
+        return False
+
+    sel = fcgui.Selection.getSelectionEx()
+    orienteer1_sub_obj = sel[0]
+    orienteer2_sub_obj = sel[1]
+
+    chain1 = get_chain(link1)
+    chain2 = get_chain(link2)
+    chain1_len = len(chain1)
+    chain2_len = len(chain2)
+    parent_link = None # same link as parent in both orienteers
+
+    if chain1_len > chain2_len:
+        parent_link = link2
+        child_link = link1
+        chain = chain1
+
+        if is_lcs(orienteer2):
+            parent_orienteer = orienteer2
+        else:
+            parent_orienteer = orienteer2_sub_obj
+
+        if is_lcs(orienteer1):
+            child_orienteer = orienteer1
+        else:
+            child_orienteer = orienteer1_sub_obj
+
+    elif chain1_len < chain2_len:
+        parent_link = link1
+        child_link = link2
+        chain = chain2
+        parent_orienteer = orienteer1
+        child_orienteer = orienteer2
+
+        if is_lcs(orienteer1):
+            parent_orienteer = orienteer1
+        else:
+            parent_orienteer = orienteer1_sub_obj
+
+        if is_lcs(orienteer2):
+            child_orienteer = orienteer2
+        else:
+            child_orienteer = orienteer2_sub_obj
+    elif chain1_len == chain2_len == 1:
+        message('Links must be connected by joints first.', gui=True)
+        return False
+
+    if not parent_link:
+        message(
+            'Tool does not work with orienteers in same robot link.'
+            ' Must be one orienteer in parent link and one in child link', gui=True,
+        )
+        return False
+
+    joint = chain[-2]
+    if not is_joint(joint):
+        message('Can not get joint between parent links of selected objects', gui=True)
+        return False
+
+    doc.openTransaction(tr("Set placement - fast"))
+    set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
+    move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+    doc.commitTransaction()
+
+    return joint, child_link, parent_link
+    
