@@ -288,9 +288,9 @@ def get_properties_of_category(
     return properties
 
 
-def is_derived_from(obj: DO, typeid: str) -> bool:
+def is_derived_from(obj: DO, typeid: str, check_instance_doc_obj = True) -> bool:
     """Return True if the object is a object of the given type."""
-    if not isinstance(obj, DO):
+    if check_instance_doc_obj and not isinstance(obj, DO):
         return False
     return hasattr(obj, 'isDerivedFrom') and obj.isDerivedFrom(typeid)
 
@@ -367,6 +367,11 @@ def is_container(obj: DO) -> bool:
 def is_link(obj: DO) -> bool:
     """Return True if the object is a 'App::Link'."""
     return is_derived_from(obj, 'App::Link')
+
+
+def is_selection_object(obj: DO) -> bool:
+    """Return True if the object is a 'Gui::SelectionObject'."""
+    return is_derived_from(obj, 'Gui::SelectionObject', check_instance_doc_obj = False)
 
 
 def get_linked_obj(obj: DO, recursive=True) -> Optional[DO]:

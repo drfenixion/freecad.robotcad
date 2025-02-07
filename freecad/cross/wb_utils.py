@@ -13,7 +13,7 @@ import FreeCADGui as fcgui
 
 from . import wb_constants
 from . import wb_globals
-from .freecad_utils import get_param, get_parents_names
+from .freecad_utils import get_param, get_parents_names, is_selection_object
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -766,20 +766,28 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     -> fc.Placement :
     '''Return placement of orienteer.
     If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
+    
+    orienteer_object = orienteer
+    if is_selection_object(orienteer):
+        orienteer_object = orienteer.Object
 
     # TODO process Vertex
-    if is_lcs(orienteer) :
-        placement = get_placement(orienteer)
-    elif is_link(orienteer) or is_joint(orienteer):
-        placement = orienteer.Placement
+    if is_lcs(orienteer_object) :
+        placement = get_placement(orienteer_object)
+    elif is_link(orienteer_object) or is_joint(orienteer_object):
+        placement = orienteer_object.Placement
     else:
         lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
 
     return placement
 
 
-def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
-    -> list[fc.DO, fc.DO, fc.Placement] :
+def make_lcs_at_link_body(
+        orienteer, 
+        delete_created_objects:bool = True,
+        lcs_concentric_reversed:bool = False,
+        deactivate_after_map_mode:bool = True,
+    ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by part and be Real element of robot link'''
 
@@ -844,8 +852,9 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     else:
         lcs.MapMode = 'InertialCS'
 
-    # prevent automove back to InertialCS rotation
-    lcs.MapMode = 'Deactivated'
+    if deactivate_after_map_mode:
+        # prevent automove back to InertialCS rotation
+        lcs.MapMode = 'Deactivated'
 
     # fix Z rotation to 0 in frame of origin
     lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
