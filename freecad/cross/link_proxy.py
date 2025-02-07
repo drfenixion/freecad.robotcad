@@ -8,7 +8,7 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 from freecad.cross.freecadgui_utils import get_sorted_concated_names
 
-from .freecad_utils import ProxyBase
+from .freecad_utils import ProxyBase, is_body, volume_mm3
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import is_link as is_freecad_link
@@ -132,7 +132,7 @@ def _get_xmls_and_export_meshes(
     )
     xmls: list[et.Element] = []
     for export_datum in export_data:
-        if wb_constants.lcs_wrapper_prefix in ros_name(export_datum.object):
+        if is_body(export_datum.object) and volume_mm3(export_datum.object) <= 0.0:
             # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
             continue
         if not is_primitive(export_datum.object):
