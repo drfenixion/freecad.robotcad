@@ -766,7 +766,7 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     -> fc.Placement :
     '''Return placement of orienteer.
     If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
-    
+
     orienteer_object = orienteer
     if is_selection_object(orienteer):
         orienteer_object = orienteer.Object
@@ -783,11 +783,11 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
 
 
 def make_lcs_at_link_body(
-        orienteer, 
+        orienteer,
         delete_created_objects:bool = True,
         lcs_concentric_reversed:bool = False,
         deactivate_after_map_mode:bool = True,
-    ) -> list[fc.DO, fc.DO, fc.Placement] :
+) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by part and be Real element of robot link'''
 
