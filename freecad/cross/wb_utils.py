@@ -953,11 +953,15 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
             message('Can not get parent robot link of selected object', gui=True)
             return
 
-        orienteer1_sub_obj, = fcgui.Selection.getSelectionEx()
+        orienteer1_sub_obj, *_ = fcgui.Selection.getSelectionEx()
         # for subobjects (face, edge, vertex) and lcs
         if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
         and not is_fc_link(orienteer1) and not is_link(orienteer1):
-            orienteer2_placement = get_placement_of_orienteer(orienteer1_sub_obj, lcs_concentric_reversed = True)
+            orienteer2_placement = get_placement_of_orienteer(
+                orienteer1_sub_obj,
+                lcs_concentric_reversed = True,
+                delete_created_objects = True,
+            )
             orienteer2_to_link_diff = link.Placement.inverse() * orienteer2_placement
             link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z, orienteer2_to_link_diff.Base)
         else:
