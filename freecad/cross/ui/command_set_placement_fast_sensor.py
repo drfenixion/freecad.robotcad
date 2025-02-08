@@ -52,11 +52,11 @@ class _SetCROSSPlacementFastSensorCommand:
             doc.recompute()
         except TypeError:
             return
-        
+
         doc.openTransaction(tr("Rotate joint origin"))
         x = None
         y = 270
-        z = None  
+        z = None
         joint.Origin = rotate_placement(joint.Origin, x, y, z)
         doc.commitTransaction()
         doc.recompute()
@@ -64,7 +64,7 @@ class _SetCROSSPlacementFastSensorCommand:
         doc.openTransaction(tr("Rotate link MountedPlacement"))
         x = None
         y = None
-        z = 90  
+        z = 90
         rotate_origin(x, y, z)
         doc.commitTransaction()
         doc.recompute()
