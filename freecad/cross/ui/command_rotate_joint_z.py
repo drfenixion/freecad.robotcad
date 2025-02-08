@@ -27,7 +27,7 @@ class _RotateJointZCommand:
     def GetResources(self):
         return {
             'Pixmap': 'rotate_joint_z.svg',
-            'MenuText': tr('Rotate joint by Z axis'),
+            'MenuText': tr('Rotate joint/link by Z axis'),
             'Accel': 'R, Z',
             'ToolTip': tr(
                 'Rotate joint or link by Z axis.\n'

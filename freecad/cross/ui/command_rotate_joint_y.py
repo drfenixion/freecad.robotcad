@@ -27,7 +27,7 @@ class _RotateJointYCommand:
     def GetResources(self):
         return {
             'Pixmap': 'rotate_joint_y.svg',
-            'MenuText': tr('Rotate joint by Y axis'),
+            'MenuText': tr('Rotate joint/link by Y axis'),
             'Accel': 'R, Y',
             'ToolTip': tr(
                 'Rotate joint or link by Y axis.\n'
