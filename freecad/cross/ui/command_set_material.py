@@ -52,7 +52,7 @@ class _SetMaterialCommand:
 
         if not density:
             error('Material without density. Choose other material or fill density.', True)
-        elif fc.Units.Quantity(density,) <= 0.0:
+        elif fc.Units.Quantity(density) <= 0.0:
             error('Material density must be stringly positive. Correct material density or choose another material.', True)
 
         obj.MaterialCardName = card_name
