@@ -306,7 +306,16 @@ class _ViewProviderController(ProxyBase):
                             notice_not_suited_object_selected(attr, replacements, prop)
 
                 if attr != filtered_elements:
-                    setattr(obj, prop, filtered_elements)
+                    if prop == 'odom_frame_id':
+                        try:
+                            setattr(obj, prop, filtered_elements)
+                        except TypeError:
+                            # odom_frame_id type was changed in robotcad 6
+                            warn(
+                                'You use old version of controller (' + ros_name(obj) + '). Recreate it.'
+                            )
+                    else:
+                        setattr(obj, prop, filtered_elements)
 
             return obj
 
