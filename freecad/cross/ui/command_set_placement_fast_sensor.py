@@ -58,6 +58,11 @@ class _SetCROSSPlacementFastSensorCommand:
         y = 270
         z = None
         joint.Origin = rotate_placement(joint.Origin, x, y, z)
+        doc.recompute()
+        x = 270
+        y = None
+        z = None
+        joint.Origin = rotate_placement(joint.Origin, x, y, z)
         doc.commitTransaction()
         doc.recompute()
 
