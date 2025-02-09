@@ -312,7 +312,7 @@ class _ViewProviderController(ProxyBase):
                         except TypeError:
                             # odom_frame_id type was changed in robotcad 6
                             warn(
-                                'You use old version of controller (' + ros_name(obj) + '). Recreate it.'
+                                'You use old version of controller (' + ros_name(obj) + '). Recreate it.',
                             )
                     else:
                         setattr(obj, prop, filtered_elements)
