@@ -14,8 +14,6 @@ ExpressionEngine = List[LabelAndExpression]
 
 def add_asm4_properties(obj: DO):
     """Render `obj` compatible with Assembly4."""
-    # Adapted from Asm4_libs.makeAsmProperties.
-    # add_property(obj, 'App::PropertyString', 'AssemblyType', 'Assembly', '')
     add_property(obj, 'App::PropertyString', 'AttachedBy', 'Assembly', '')
     add_property(obj, 'App::PropertyString', 'AttachedTo', 'Assembly', '')
     add_property(
@@ -23,7 +21,6 @@ def add_asm4_properties(obj: DO):
         '',
     )
     add_property(obj, 'App::PropertyString', 'SolverId', 'Assembly', '')
-    # obj.AssemblyType = 'Part::Link'
     obj.SolverId = 'Asm4EE'
 
 
@@ -42,11 +39,6 @@ def new_variable_container(
     # There is no object "Variables", so we create it.
     variables = assembly.Document.addObject('App::FeaturePython', 'Variables')
     if hasattr(variables, 'ViewObject') and variables.ViewObject:
-        # TODO
-        # variables.ViewObject.Proxy = ViewProviderCustomIcon(obj,
-        #                                            path + "FreeCADIco.png")
-        # variables.ViewObject.Proxy = setCustomIcon(object,
-        #                                    'Asm4_Variables.svg')
         pass
     # Signature of a PropertyContainer.
     variables.addProperty('App::PropertyString', 'Type')
