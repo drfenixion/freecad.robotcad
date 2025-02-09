@@ -20,18 +20,20 @@ class _CalculateMassAndInertiaCommand:
             'Pixmap': 'calculate_mass_and_inertia.svg',
             'MenuText': tr('Calculate: mass, inertia, center of mass, placement of joints relative to total CoM'),
             'ToolTip': tr(
-                'Select robot and press this button.'
-                ' It will calculate mass, inertia, center of mass, placement of joints relative to total CoM'
-                ' based on density (from material) and fills links data. If link does not'
-                ' have material, default material will be taken'
-                ' from robot element. Link will skipped if'
-                ' property of link - "MaterialNotCalculate" is'
-                ' true (in that case you sould manually fill link inertia and mass).'
-                ' You can visually check inertia placement'
-                ' in Gazebo. Turn on display of inertia in Gazebo'
+                'Select robot and press this button.\n'
+                'Tool will calculate mass, inertia, center of mass, placement of joints relative to total CoM\n'
+                'based on density (from material) and fills links data.\n'
+                '\n'
+                'If link does not have own material, default material will be taken'
+                ' from robot element.\n'
+                'If property of link - "MaterialNotCalculate" is'
+                ' true link will skipped. In that case you should manually fill link inertia and mass.\n'
+                '\n'
+                'You can visually check inertia placement'
+                ' in Gazebo. \nTurn on display of inertia in Gazebo'
                 ' and check what generated inertia blocks'
-                ' approximately same size and same'
-                ' position/orientation as their links. Inertia'
+                ' approximately \nsame size and same'
+                ' position/orientation as their links. \nInertia'
                 ' block orientation tilt to towards the mass'
                 ' displacement is ok for unsymmetrical bodies.',
             ),

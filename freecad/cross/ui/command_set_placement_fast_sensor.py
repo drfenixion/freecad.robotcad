@@ -34,7 +34,7 @@ class _SetCROSSPlacementFastSensorCommand:
                 '    2) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (second reference)\n'
                 '\n'
                 'Works same way as "Set placement - fast", and after uses parent joint orietation correction for sensor link.\n'
-                'Front of sensor is positive x-oriented (red arrow) of parent joint.\n'
+                'Front of sensor is positive x-oriented (red arrow) of parent joint. Y-axis (green arrow) is horizontal.\n'
                 '\n'
                 'It may be necessary to ajust MountedPlacement after.\n'
                 'Use "Rotate joint/link" tool (select some face of sensor) or "Set placement - by orienteer" tool after that tool.\n',

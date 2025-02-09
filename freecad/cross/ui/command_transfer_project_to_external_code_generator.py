@@ -27,10 +27,10 @@ class _TransferProjectToExternalCodeGeneratorCommand:
         return {'Pixmap': 'urdf_export_external_generator.svg',
                 'MenuText': tr('Extended external code generator'),
                 'ToolTip': tr('Select Robot and press this tool.\n'
-                              'It will do needed mass/inertia calculation then locally generate ROS package files\n'
+                              'Tool will do mass/inertia calculation then locally generate ROS package files\n'
                               'and transfer it to external code generator service and save gotten result files locally.\n'
                               '\n'
-                              'Can generate:\n'
+                              'Tool can generate:\n'
                               '  - project structure (folders, git)\n'
                               '  - specific robot types code (PX4 multicopters)\n'
                               '  - ros2_controllers \n'
@@ -40,7 +40,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
                               '  - Required modification of basic ROS2 package:\n'
                               '     - URDF\n'
                               '     - ROS 2 package files\n'
-                              '     - etc\n'
+                              '     - etc.\n'
                               '\n'
                               'Provided by robotcad.ru'),
                 }

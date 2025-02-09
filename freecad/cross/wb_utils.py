@@ -1171,8 +1171,8 @@ def set_placement_fast() -> bool |  tuple[DO, DO, DO]:
 
     if not parent_link:
         message(
-            'Tool does not work with orienteers in same robot link.'
-            ' Must be one orienteer in parent link and one in child link', gui=True,
+            'Tool works only for parent and child link orienteers.\n'
+            'One orienteer must be in parent link and one in child link.', gui=True,
         )
         return False
 

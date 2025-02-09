@@ -15,7 +15,7 @@ class _SetMaterialCommand:
             'ToolTip': tr(
                 'Select a robot or a link and use this action to'
                 ' select a material. The material will be used to'
-                ' estimate the mass and moments of inertia',
+                ' calculate mass and moments of inertia of the links.',
             ),
         }
 
