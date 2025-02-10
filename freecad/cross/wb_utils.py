@@ -1094,7 +1094,7 @@ def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc
     return None
 
 
-def set_placement_fast() -> bool |  tuple[DO, DO, DO]:
+def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool = True) -> bool |  tuple[DO, DO, DO]:
     doc = fc.activeDocument()
     selection_ok = False
     try:
@@ -1182,8 +1182,10 @@ def set_placement_fast() -> bool |  tuple[DO, DO, DO]:
         return False
 
     doc.openTransaction(tr("Set placement - fast"))
-    set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
-    move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+    if joint_origin:
+        set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
+    if link_mounted_placement:
+        move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
     doc.commitTransaction()
 
     return joint, child_link, parent_link

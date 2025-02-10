@@ -47,32 +47,25 @@ class _SetCROSSPlacementFastSensorCommand:
     def Activated(self):
         doc = fc.activeDocument()
 
+        # set placement of sensor link
         try:
             joint, child_link, parent_link = set_placement_fast()
             doc.recompute()
         except TypeError:
             return
 
+        # make x-oriented sensor joint
         doc.openTransaction(tr("Rotate joint origin"))
         x = None
         y = 270
         z = None
         joint.Origin = rotate_placement(joint.Origin, x, y, z)
         doc.recompute()
-        x = 270
-        y = None
-        z = None
-        joint.Origin = rotate_placement(joint.Origin, x, y, z)
-        doc.commitTransaction()
-        doc.recompute()
 
-        doc.openTransaction(tr("Rotate link MountedPlacement"))
-        x = None
-        y = None
-        z = 90
-        rotate_origin(x, y, z)
-        doc.commitTransaction()
-        doc.recompute()
+        # correct mountedPlacement of sensor link
+        set_placement_fast(joint_origin = False)  
+        # after correction link can have x-positive or x-negative direction dependent of object form
+        # user should correct MountedPlacement if wrong directen set             
 
 
 fcgui.addCommand('SetCROSSPlacementFastSensor', _SetCROSSPlacementFastSensorCommand())
