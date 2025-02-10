@@ -65,7 +65,7 @@ class _SetCROSSPlacementFastSensorCommand:
         # correct mountedPlacement of sensor link
         set_placement_fast(joint_origin = False)
         # after correction link can have x-positive or x-negative direction dependent of object form
-        # user should correct MountedPlacement if wrong directen set
+        # user should corrects MountedPlacement if wrong direction is set
 
 
 fcgui.addCommand('SetCROSSPlacementFastSensor', _SetCROSSPlacementFastSensorCommand())
