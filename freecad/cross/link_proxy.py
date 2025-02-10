@@ -585,6 +585,7 @@ class LinkProxy(ProxyBase):
             self._fc_links_real
             + self._fc_links_visual
             + self._fc_links_collision
+            + self.get_sensors()
         )
         if new_group != link.Group:
             link.Group = new_group
