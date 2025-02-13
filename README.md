@@ -15,9 +15,6 @@ Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=B62JW_0SFl0" target="_blank">Multicopter with manipulator and chassis</a> <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
-# RobotCAD future version
-[Early access to RobotCAD 6 - Reforged](https://github.com/drfenixion/freecad.robotcad/discussions/60)
-
 # Key features short list:
 1. Autoinstall and run by startup script
 1. Modeling parts (in FreeCAD),
@@ -27,8 +24,8 @@ Video of creating controllable models: <br />
     1. Automatic creating joints by selected links
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
     1. Set placement just by selecting faces of links and it will automatically connected
-    1. Joint placement rotation tools
-    1. Tools for set placement of joints based on LCS or other orienteers.
+    1. Joint/link placement rotation tools
+    1. Tools for set placement of joints/links based on LCS or other references.
 1. Material setting (from library or custom) to link or whole robot
 1. Automatic calculation (based on material or custom mass):
     1. mass and inertia
@@ -151,7 +148,7 @@ The key features of RobotCAD are:
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2. FreeCAD AppImage build.
+Compatible with FreeCAD at least v0.21.2 - FreeCAD AppImage build (Python 3.10+ in FreeCAD).
 Compatible with ROS2.
 
 ## Features
