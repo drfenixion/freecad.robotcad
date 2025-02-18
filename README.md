@@ -9,6 +9,10 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 <a href="https://www.youtube.com/watch?v=26duvrKwHdU" target="_blank">RobotCAD 4.0.0 functionality demo</a>
 <a href="https://www.youtube.com/watch?v=26duvrKwHdU" target="_blank"><img src="https://github.com/user-attachments/assets/202f3a45-35ee-441d-b0e6-55c34616e701" alt="RobotCAD 4.0.0 functionality demo"/></a>
 
+<a href="https://vkvideo.ru/video-219386643_456239075" target="_blank">RobotCAD 6 - Reforged - some made models</a>
+<a href="https://vkvideo.ru/video-219386643_456239075" target="_blank">![robotcad_reforged_new](https://github.com/user-attachments/assets/fc0f731e-5840-4689-aa95-83769f879d48)</a>
+
+
 Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=NUw6PLPC4x4" target="_blank">Diff drive chassis</a> <br />
 <a href="https://www.youtube.com/watch?v=o8casCU7c7Q" target="_blank">Manipulator on chassis</a> <br />
