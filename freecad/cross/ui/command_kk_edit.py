@@ -39,6 +39,7 @@ class _KKEditCommand:
         # Import late to avoid slowing down workbench start-up.
         from ..freecad_utils import warn
         from ..robot_proxy import make_robot
+        from ..wb_utils import is_robot
         from .kk_dialog import KKDialog
 
         objs = fcgui.Selection.getSelection()
@@ -52,6 +53,10 @@ class _KKEditCommand:
             robot = make_robot('Robot')
         else:
             robot = objs[0]
+            if not is_robot(robot):
+                warn('Selected object is not a robot', True)
+                return
+            doc = robot.Document
         diag = KKDialog(robot)
         kk_robot = diag.exec_()
         diag.close()

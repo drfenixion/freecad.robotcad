@@ -658,7 +658,7 @@ def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None 
     JointProxy(joint)
     # Default to type "fixed".
     joint.Type = 'fixed'
-    joint.Label2 = joint.Label
+    joint.Label2 = name
 
     if robot:
         joint.adjustRelativeLinks(robot)

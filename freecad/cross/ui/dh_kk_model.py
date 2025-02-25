@@ -9,7 +9,7 @@ for Qt's Model/View architecture.
 
 from PySide import QtCore  # FreeCAD's PySide!
 
-from ..kk_robot import KKJoint
+from ..kk_robot import KKFrame
 from ..kk_robot import KKRobot
 
 
@@ -34,7 +34,7 @@ class DHKKModel(QtCore.QAbstractTableModel):
     def rowCount(self, index):
         # We add a row so that the user can add a joint.
         # The last row is not added to the robot until the row is complete.
-        return len(self.kk_robot.joints)
+        return len(self.kk_robot.kk_frames)
 
     def columnCount(self, index):
         return len(self.columns)
@@ -77,13 +77,13 @@ class DHKKModel(QtCore.QAbstractTableModel):
     def _get_edited_joint(
         self,
         index,
-    ) -> KKJoint:
+    ) -> KKFrame:
         """Return `self.kk_robot.joints[i]`."""
-        return self.kk_robot.joints[index.row()]
+        return self.kk_robot.kk_frames[index.row()]
 
     def _get_joint_value(
         self,
-        kk_joint: KKJoint,
+        kk_joint: KKFrame,
         index,
     ) -> str:
         """Return the appropriate field."""
@@ -93,7 +93,7 @@ class DHKKModel(QtCore.QAbstractTableModel):
 
     def _get_joint_data(
         self,
-        kk_joint: KKJoint,
+        kk_joint: KKFrame,
         index,
     ) -> str:
         """Return the appropriate field as string."""
@@ -101,7 +101,7 @@ class DHKKModel(QtCore.QAbstractTableModel):
 
     def _set_joint_data(
         self,
-        kk_joint: KKJoint,
+        kk_joint: KKFrame,
         index,
         value,
     ) -> bool:
@@ -152,4 +152,4 @@ class DHKKModel(QtCore.QAbstractTableModel):
 
     def add_joint(self) -> None:
         """Add a joint to the robot."""
-        self.kk_robot.joints.append(KKJoint(0.0, 0.0, 0.0, 0.0))
+        self.kk_robot.kk_frames.append(KKFrame(0.0, 0.0, 0.0, 0.0))

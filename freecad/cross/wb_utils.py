@@ -7,11 +7,18 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol, Union
 import os
 import subprocess
+import typing
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
 
 from . import wb_constants
+if typing.TYPE_CHECKING:
+    try:
+        from geometry_msgs.msg import Pose
+    except ImportError:
+        Pose = Any
+
 from . import wb_globals
 from .freecad_utils import get_param, get_parents_names, is_selection_object
 from .gui_utils import tr
@@ -627,6 +634,24 @@ def is_name_used(
                     and (ros_name(joint) == obj_name)):
                 return True
     return False
+
+
+def placement_from_geom_pose(pose: Pose) -> fc.Placement:
+    """Return a FreeCAD Placement from a ROS Pose."""
+    ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
+    return fc.Placement(
+        fc.Vector(
+            pose.position.x * ros_to_freecad_factor,
+            pose.position.y * ros_to_freecad_factor,
+            pose.position.z * ros_to_freecad_factor,
+        ),
+        fc.Rotation(
+            pose.orientation.w,
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+        ),
+    )
 
 
 def placement_from_pose_string(pose: str) -> fc.Placement:

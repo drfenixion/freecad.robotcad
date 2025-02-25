@@ -65,6 +65,6 @@ def lines_intersect(point1, vec1, point2, vec2):
             p2 = point2 + x[1] * vec2
 
             if all(np.less(np.abs(p1 - p2), epsilon * np.ones(3))):
-                return True, x
+                return True, x.flatten()
 
     return False, x
