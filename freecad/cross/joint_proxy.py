@@ -561,7 +561,7 @@ def make_joint(name, doc: Optional[fc.Document] = None) -> CrossJoint:
     JointProxy(joint)
     # Default to type "fixed".
     joint.Type = 'fixed'
-    joint.Label2 = joint.Label
+    joint.Label2 = name
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui

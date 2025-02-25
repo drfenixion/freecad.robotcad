@@ -13,6 +13,7 @@ from itertools import accumulate
 from itertools import pairwise
 import math
 from typing import Any, Optional
+from typing import TYPE_CHECKING
 
 import FreeCAD as fc
 
@@ -26,20 +27,55 @@ from .wb_utils import ros_name
 
 try:
     import numpy as np
-    from numpy.typing import ArrayLike
     from . import geometry_helpers as gh
 except ImportError as e:
     warn(f'numpy not available, some functionalities will not work, error: {e}',
          False)
-    ArrayLike = Any
 
 # Stubs and type hints.
-from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+if TYPE_CHECKING:
+    try:
+        from numpy.typing import ArrayLike
+    except ImportError:
+        ArrayLike = Any
+    from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 
 
 @dataclass
-class KKJoint:
-    """A joint of a robot."""
+class KKFrame:
+    """A frame of a robot.
+
+    The parameters of the Khalil-Kleinfinger notation correspond to the order
+    of the applied transforms and are:
+    - pre_rz (gamma): angle between Xi and X'i about Zi.
+    - pre_tz (epsilon): distance between Oi and O'i along Zi.
+    - rx (alpha): angle between Zi and Zj about X'i.
+    - tx (d): distance between O'i and Zj along X'i.
+    - rz (theta): angle between X'i and Xj about Zj.
+    - tz (r): distance between Oj and X'i along Zj.
+
+    The Denavit-Hartenberg convention from
+    [Wikipedia](https://en.wikipedia.org/wiki/Denavit–Hartenberg_parameters)
+    can be converted to the KK notation as follows:
+        KK  DH
+        Θ   γ
+        d   ε
+        α   α
+        r   d
+        0   Θ
+        0   r
+
+    The modified DH parameters (also from Wikipedia) can be converted to the
+    KK notation as follows:
+        modified-DH  KK
+        0            γ
+        0            ε
+        α            α
+        r            d
+        Θ            Θ
+        d            r
+
+    """
     # Notation:
     # The axis of joint (i) will be Zi.
     # The coordinate frame Ri (Oi,Xi,Yi,Zi) is fixed with respect to link (i).
@@ -48,16 +84,16 @@ class KKJoint:
     # TODO: Use FreeCAD's quantities instead of floats.
 
     # ɑi: angle between Z(i-1) and Zi about X(i-1), in radians.
-    alpha: float
+    rx: float
 
     # di: distance between O(i-1) and Zi, in meters.
-    d: float
-
-    # ri: distance between Oi and X(i-1), in meters.
-    r: float
+    tx: float
 
     # Θi: angle between X(i-1) and Xi about Zi, in radians.
-    theta: float
+    rz: float
+
+    # ri: distance between Oi and X(i-1), in meters.
+    tz: float
 
     # The variable of joint (i) denoted by qi is Θ if (i) is rotational and
     # ri if (i) is prismatic. Hence qi = Θ * (1 - σi) + ri * σi, where σi is
@@ -74,12 +110,12 @@ class KKJoint:
     # with respect to link(i).
 
     # γi: angle between Xi and X'i about Zi, in radians.
-    # Default to 0.0, i.e. pure DH convention.
-    gamma: float = 0.0
+    # Default to 0.0, i.e. pure modified DH convention.
+    pre_rz: float = 0.0
 
     # εi: distance between Oi and O'i, in meters.
-    # Default to 0.0, i.e. pure DH convention.
-    epsilon: float = 0.0
+    # Default to 0.0, i.e. pure modified DH convention.
+    pre_tz: float = 0.0
 
     @property
     def sigma(self) -> int:
@@ -94,7 +130,7 @@ class KKJoint:
         convention, i.e. not a tree structure.
 
         """
-        return (self.gamma == 0.0) and (self.epsilon == 0.0)
+        return (self.pre_rz == 0.0) and (self.pre_tz == 0.0)
 
     def set_dh_from_placement(
         self,
@@ -142,6 +178,8 @@ class KKJoint:
         set to 0.0.
 
         """
+        raise NotImplementedError('Not implemented yet.')
+
         matrix = np.atleast_2d(matrix)
 
         # Default to the z-axis.
@@ -150,8 +188,8 @@ class KKJoint:
             axis = (matrix @ z_axis)[:3]
 
         # Khalil-Kleinfinger parameters.
-        self.gamma = 0.0
-        self.epsilon = 0.0
+        self.pre_rz = 0.0
+        self.pre_tz = 0.0
 
         dh_params = np.zeros(4)
 
@@ -172,7 +210,90 @@ class KKJoint:
             # Skew case.
             dh_params[:] = self._dh_params_skew_case(origin_xyz, axis)
 
-        self.theta, self.r, self.d, self.alpha = dh_params
+        self.rz, self.tz, self.tx, self.rx = dh_params
+
+    def to_placement(self) -> fc.Placement:
+        """Return the origin of the joint as Placement.
+
+        Return the (URDF) origin of the joint as Placement, i.e. the
+        placement of the joint frame with respect to the parent link frame.
+
+        The transformation matrix of KK is
+        ⎡-sγ*sθ*cα + cγ*cθ, -sγ*cα*cθ - sθ*cγ,  sα*sγ, d*cγ + r*sα*sγ⎤
+        ⎢ sγ*cθ + sθ*cα*cγ, -sγ*sθ + cα*cγ*cθ, -sα*cγ, d*sγ - r*sα*cγ⎥
+        ⎢            sα*sθ,             sα*cθ,     cα,       ε + r*cα⎥
+        ⎣                0,                 0,      0,              1⎦
+
+        The transformation matrix of modified-DH is T(i-1)(i) =
+            | cos(Θ)         -sin(Θ)       0        d         |
+            | cos(ɑ)sin(Θ)   cos(ɑ)cos(Θ)  -sin(ɑ)  -r*sin(ɑ) |
+            | sin(ɑ)sin(Θ)   sin(ɑ)cos(Θ)  cos(ɑ)   r*cos(ɑ)  |
+            | 0              0             0        1         |
+
+        """
+        cθ = math.cos(self.rz)
+        sθ = math.sin(self.rz)
+        cα = math.cos(self.rx)
+        sα = math.sin(self.rx)
+        cγ = math.cos(self.pre_rz)
+        sγ = math.sin(self.pre_rz)
+        r = self.tz
+        d = self.tx
+        ε = self.pre_tz
+        placement = fc.Placement(
+            fc.Matrix(
+                  -sγ*sθ*cα + cγ*cθ, -sγ*cα*cθ - sθ*cγ,  sα*sγ, d*cγ + r*sα*sγ,
+                   sγ*cθ + sθ*cα*cγ, -sγ*sθ + cα*cγ*cθ, -sα*cγ, d*sγ - r*sα*cγ,
+                              sα*sθ,             sα*cθ,     cα,       ε + r*cα,
+                                  0,                 0,      0,              1,
+            ),
+        )
+        placement.Base *= 1000.0  # Convert to mm.
+        return placement
+
+    def to_placements(self) -> (fc.Placement, fc.Placement):
+        """Return the two transforms for the joint origin.
+
+        Return the (URDF) origin of the joint as Placement, i.e. the
+        placement of the joint frame with respect to the parent link frame.
+
+        The pre-transform matrix of KK is
+        ⎡cγ, -sγ, 0, 0⎤
+        ⎢sγ,  cγ, 0, 0⎥
+        ⎢ 0,   0, 1, ε⎥
+        ⎣ 0,   0, 0, 1⎦
+
+        The transformation matrix of modified-DH is T(i-1)(i) =
+            | cos(Θ)         -sin(Θ)       0        d         |
+            | cos(ɑ)sin(Θ)   cos(ɑ)cos(Θ)  -sin(ɑ)  -r*sin(ɑ) |
+            | sin(ɑ)sin(Θ)   sin(ɑ)cos(Θ)  cos(ɑ)   r*cos(ɑ)  |
+            | 0              0             0        1         |
+
+        """
+        cθ = math.cos(self.rz)
+        sθ = math.sin(self.rz)
+        cα = math.cos(self.rx)
+        sα = math.sin(self.rx)
+        cγ = math.cos(self.pre_rz)
+        sγ = math.sin(self.pre_rz)
+        r = self.tz
+        d = self.tx
+        ε = self.pre_tz
+        pre_placement = fc.Placement(fc.Matrix(
+            cγ, -sγ, 0, 0,
+            sγ,  cγ, 0, 0,
+             0,   0, 1, ε,
+             0,   0, 0, 1,
+        ))
+        pre_placement.Base *= 1000.0  # Convert to mm.
+        placement = fc.Placement(fc.Matrix(
+            cθ,   -sθ,   0,     d,
+         sθ*cα, cα*cθ, -sα, -r*sα,
+         sα*sθ, sα*cθ,  cα,  r*cα,
+             0,     0,   0,     1,
+        ))
+        placement.Base *= 1000.0  # Convert to mm.
+        return pre_placement, placement
 
     def _dh_params_collinear_case(self, origin) -> list[float]:
         """Return (theta, r, d, ɑ) = (r, 0, 0, 0) for collinear joints.
@@ -182,6 +303,7 @@ class KKJoint:
         """
         dh_params: list[float] = [0.0] * 4
         dh_params[1] = origin[2]  # r.
+        print(f'_dh_params_collinear_case, {dh_params}')  # DEBUG
         return dh_params
 
     def _dh_params_parallel_case(self, origin) -> list[float]:
@@ -195,6 +317,7 @@ class KKJoint:
         dh_params[1] = origin[2]  # r.
         dh_params[0] = math.atan2(origin[1], origin[0])  # θ.
         dh_params[2] = math.sqrt(origin[0]**2 + origin[1]**2)  # d.
+        print(f'_dh_params_parallel_case, {dh_params}')  # DEBUG
         return dh_params
 
     def _dh_params_intersection_case(self, origin, axis) -> list[float]:
@@ -207,6 +330,7 @@ class KKJoint:
         zaxis = np.array([0.0, 0.0, 1.0])
 
         dh_params: list[float] = [0.0] * 4
+        print(f'{gh.lines_intersect(np.zeros(3), zaxis, origin, axis,)=}')  # DEBUG
         dh_params[1] = gh.lines_intersect(
                 np.zeros(3),
                 zaxis,
@@ -231,6 +355,7 @@ class KKJoint:
             np.dot(zaxis, axis),
         )  # ɑ.
 
+        print(f'_dh_params_intersection_case, {dh_params}')  # DEBUG
         return dh_params
 
     def _dh_params_skew_case(self, origin, direction):
@@ -271,38 +396,53 @@ class KKJoint:
             np.dot(zaxis, direction),
         )  # ɑ.
 
+        print(f'_dh_params_skew_case, {dh_params}')  # DEBUG
         return dh_params
 
-    def to_placement(self) -> fc.Placement:
-        """Return the origin of the joint as Placement.
 
-        Return the (URDF) origin of the joint as Placement, i.e. the
-        placement of the joint frame with respect to the parent link frame.
+@dataclass
+class DHFrame:
+    """A Denavit-Hartenberg frame of a robot.
 
-        The transformation matrix is T(i-1)(i) =
-            | cos(Θ)         -sin(Θ)       0        d         |
-            | cos(ɑ)sin(Θ)   cos(ɑ)cos(Θ)  -sin(ɑ)  -r*sin(ɑ) |
-            | sin(ɑ)sin(Θ)   sin(ɑ)cos(Θ)  cos(ɑ)   r*cos(ɑ)  |
-            | 0              0             0        1         |
+    The parameters of the Denavit-Hartenberg notation correspond to the order
+    of the applied transforms and are:
+    - rz (theta): angle between X'i and Xj about Zj.
+    - tz (r): distance between Oj and X'i along Zj.
+    - rx (alpha): angle between Zi and Zj about X'i.
+    - tx (d): distance between O'i and Zj along X'i.
 
-        # TODO: Implement KK.
-        """
-        if not self.is_dh_compatible:
-            raise NotImplementedError('The joint is not DH compatible.')
-        cθ = math.cos(self.theta)
-        sθ = math.sin(self.theta)
-        cα = math.cos(self.alpha)
-        sα = math.sin(self.alpha)
-        placement = fc.Placement(
-            fc.Matrix(
-                cθ,      -sθ,     0.0,       self.d,
-                cα * sθ, cα * cθ, -sα, -self.r * sα,
-                sα * sθ, sα * cθ,  cα,  self.r * cα,
-                0.0,     0.0,     0.0,          1.0,
-            ),
-        )
-        placement.Base *= 1000.0  # Convert to mm.
-        return placement
+    The Denavit-Hartenberg convention from
+    [Wikipedia](https://en.wikipedia.org/wiki/Denavit–Hartenberg_parameters)
+    can be converted to the KK notation as follows:
+        KK  DH
+        Θ   γ
+        d   ε
+        α   α
+        r   d
+        0   Θ
+        0   r
+
+    """
+    # TODO: Use FreeCAD's quantities instead of floats.
+
+    # Θi: angle between X(i-1) and Xi about Zi, in radians.
+    rz: float
+
+    # ri: distance between Oi and X(i-1), in meters.
+    tz: float
+
+    # ɑi: angle between Z(i-1) and Zi about X(i-1), in radians.
+    rx: float
+
+    # di: distance between O(i-1) and Zi, in meters.
+    tx: float
+
+    # The variable of joint (i) denoted by qi is Θ if (i) is rotational and
+    # ri if (i) is prismatic. Hence qi = Θ * (1 - σi) + ri * σi, where σi is
+    # the joint type (0 for rotational and 1 for prismatic).
+    # We rather use a boolean to represent the joint type:
+    # False for rotational, True for prismatic.
+    prismatic: bool = False
 
 
 @dataclass
@@ -327,12 +467,12 @@ class KKRobot:
       with respect to link(i).
 
     """
-    joints: list[KKJoint] = field(default_factory=list)
+    kk_frames: list[KKFrame] = field(default_factory=list)
 
     @property
     def dof(self) -> int:
-        """Degree of freedom, i.e. number of joints."""
-        return len(self.joints)
+        """Degree of freedom, i.e. number of non-fixed joints."""
+        return len(self.kk_frames)
 
     @property
     def is_dh_compatible(self):
@@ -344,14 +484,14 @@ class KKRobot:
         Could have been called `is_open_chain`.
 
         """
-        return all(j.is_dh_compatible for j in self.joints)
+        return all(j.is_dh_compatible for j in self.kk_frames)
 
     def set_from_robot(
         self,
         robot: CrossRobot,
     ) -> bool:
         """Set all parameters from a CROSS::Robot."""
-        self.joints.clear()
+        self.kk_frames.clear()
 
         chains = robot.Proxy.get_chains()
         if len(chains) > 1:
@@ -364,10 +504,10 @@ class KKRobot:
 
         for joint in robot.Proxy.get_joints():
             prismatic = (joint.Type == 'prismatic')
-            kk_joint = KKJoint(0.0, 0.0, 0.0, 0.0)  # Irrelevant values.
+            kk_joint = KKFrame(0.0, 0.0, 0.0, 0.0)  # Irrelevant values.
             kk_joint.set_dh_from_placement(joint.Origin)
             kk_joint.prismatic = prismatic
-            self.joints.append(kk_joint)
+            self.kk_frames.append(kk_joint)
         return True
 
     def transfer_to_robot(
@@ -381,16 +521,17 @@ class KKRobot:
         """
         if not self.is_dh_compatible:
             warn(
-                f'Robot {robot.Label} is not compatible with the'
-                ' DH convention, not implemented yet', True,
+                f'Robot "{robot.Label}" is not compatible with the'
+                ' DH convention, not implemented yet',
+                True,
             )
             return False
         cross_joints = robot.Proxy.get_joints()
         cross_links = robot.Proxy.get_links()
 
-        if (not cross_joints) or (len(cross_joints) > len(self.joints)):
+        if len(cross_joints) > len(self.kk_frames):
             warn(
-                f'Robot {robot.Label} has a larger number of joints than'
+                f'Robot "{robot.Label}" has a larger number of joints than'
                 ' in the DH parameter table, not implemented yet',
                 True,
             )
@@ -401,7 +542,7 @@ class KKRobot:
             and (len(cross_joints) != (len(cross_links) - 1))
         ):
             warn(
-                f'Robot {robot.Label} has {len(cross_joints)} joints and'
+                f'Robot "{robot.Label}" has {len(cross_joints)} joints and'
                 f' {len(cross_links)} links, should have'
                 f' {len(cross_joints) + 1} links, not implemented yet',
                 True,
@@ -410,7 +551,7 @@ class KKRobot:
 
         if ((not cross_joints) and (len(cross_links) == 1)):
             warn(
-                f'Robot {robot.Label} has 1 link and no'
+                f'Robot "{robot.Label}" has 1 link and no'
                 ' joint, not implemented yet',
                 True,
             )
@@ -426,8 +567,8 @@ class KKRobot:
         cross_joints = [o for o in chain if is_joint(o)]
         cross_links = [o for o in chain if is_link(o)]
         link_pair_iterator = pairwise(cross_links)
-        for i in range(len(self.joints)):
-            kk_joint = self.joints[i]
+        for i in range(len(self.kk_frames)):
+            kk_joint = self.kk_frames[i]
             cross_joint = cross_joints[i]
             parent_link, child_link = next(link_pair_iterator)
             parent_name = ros_name(parent_link)
@@ -480,7 +621,7 @@ class KKRobot:
             # because n(links) = n(joints) + 1.
             parent_link = chains[0][-1]
 
-        for i in range(len(self.joints) - len(cross_joints)):
+        for i in range(len(self.kk_frames) - len(cross_joints)):
             n = i + len(cross_joints)
             cross_joint = make_joint(f'{robot.Label}_joint_{n + 1}', doc)
             cross_joint.adjustRelativeLinks(robot)
@@ -493,3 +634,80 @@ class KKRobot:
 
             cross_joint.Parent = ros_name(parent_link)
             cross_joint.Child = ros_name(child_link)
+
+
+def kk_from_dh(
+        dh_frames: list[DHFrame],
+) -> list[KKFrame]:
+    if not dh_frames:
+        return []
+
+    kk_frames: list[KKFrame] = []
+    # First joint.
+    kk_frames.append(KKFrame(
+            rx=0.0,
+            tx=0.0,
+            rz=dh_frames[0].rz,
+            tz=dh_frames[0].tz,
+            prismatic=dh_frames[0].prismatic,
+    ))
+
+    # Middle joints.
+    for i in range(1, len(dh_frames)):
+        kk_frames.append(KKFrame(
+                    tx=dh_frames[i-1].tx,
+                    rx=dh_frames[i-1].rx,
+                    tz=dh_frames[i].tz,
+                    rz=dh_frames[i].rz,
+                    prismatic=dh_frames[i].prismatic,
+        ))
+
+    # Last joint.
+    kk_frames.append(KKFrame(
+            tx=dh_frames[-1].tx,
+            rx=dh_frames[-1].rx,
+            tz=0.0,
+            rz=0.0,
+            prismatic=False,  # Fixed joint. Irrelevant value.
+    ))
+
+    return kk_frames
+
+
+def dh_from_kk(
+        kk_frames: list[KKFrame],
+) -> (list[DHFrame], fc.Placement):
+    if not kk_frames:
+        return []
+
+    dh_frames: list[DHFrame] = []
+
+    # Base transform.
+    kk_frame = KKFrame(
+                tx=kk_frames[0].tx,
+                rx=kk_frames[0].rx,
+                tz=0.0,
+                rz=0.0,
+                prismatic=True,  # Irrelevant value.
+    )
+    base = kk_frame.to_placement()
+
+    # middle joints
+    for i in range(len(kk_frames) - 1):
+        dh_frames.append(DHFrame(
+                tx=dh_frames[i + 1].tx,
+                rx=dh_frames[i + 1].rx,
+                tz=dh_frames[i].tz,
+                rz=dh_frames[i].rz,
+                prismatic=dh_frames[i].prismatic,
+        ))
+
+    # last joint
+    dh_frames.append(DHFrame(
+        rz=kk_frames[-1].rz,
+        tz=kk_frames[-1].tz,
+        rx=0.0,
+        tx=0.0,
+    ))
+
+    return dh_frames, base

@@ -319,7 +319,7 @@ class RobotProxy(ProxyBase):
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(obj)
         self._created_objects = obj.CreatedObjects
-        # Rebuilt self._joint_variables from the map {ros_name: joint_variable_name}.
+        # Rebuild self._joint_variables from the map {ros_name: joint_variable_name}.
         self._joint_variables = {
             self.get_joint(name): var
             for name, var in self._joint_variables_ros_map.items()

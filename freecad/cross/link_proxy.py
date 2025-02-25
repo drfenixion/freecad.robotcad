@@ -749,7 +749,7 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
         return
     cross_link: CrossLink = doc.addObject('App::FeaturePython', name)
     LinkProxy(cross_link)
-    cross_link.Label2 = cross_link.Label
+    cross_link.Label2 = name
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui

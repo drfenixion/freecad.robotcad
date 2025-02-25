@@ -1,31 +1,32 @@
 
 import FreeCADGui as fcgui
 
-from .ui import command_assembly_from_urdf
-from .ui import command_box_from_bounding_box
-from .ui import command_get_planning_scene
-from .ui import command_kk_edit
+from .ui import command_assembly_from_urdf  # noqa: F401
+from .ui import command_box_from_bounding_box  # noqa: F401
+from .ui import command_calculate_mass_and_inertia  # noqa: F401
+from .ui import command_cylinder_from_bounding_box  # noqa: F401
+from .ui import command_duplicate_robot # noqa: F401
+from .ui import command_get_planning_scene  # noqa: F401
+from .ui import command_kk_edit  # noqa: F401
 from .ui import command_new_attached_collision_object  # noqa: F401
-from .ui import command_new_joint
-from .ui import command_new_link
-from .ui import command_new_observer
-from .ui import command_new_pose
-from .ui import command_new_robot
-from .ui import command_new_trajectory
-from .ui import command_new_workcell
-from .ui import command_new_xacro_object
-from .ui import command_reload # Developer tool.
-from .ui import command_robot_from_urdf
-from .ui import command_set_joints
-from .ui import command_set_placement
-from .ui import command_simplify_mesh
-from .ui import command_sphere_from_bounding_box
-from .ui import command_cylinder_from_bounding_box
-from .ui import command_update_planning_scene
-from .ui import command_urdf_export
-from .ui import command_set_material
-from .ui import command_calculate_mass_and_inertia
-from .ui import command_wb_settings
+from .ui import command_new_joint  # noqa: F401
+from .ui import command_new_link  # noqa: F401
+from .ui import command_new_observer  # noqa: F401
+from .ui import command_new_pose  # noqa: F401
+from .ui import command_new_robot  # noqa: F401
+from .ui import command_new_trajectory  # noqa: F401
+from .ui import command_new_workcell  # noqa: F401
+from .ui import command_new_xacro_object  # noqa: F401
+from .ui import command_reload  # Developer tool.  # noqa: F401
+from .ui import command_robot_from_urdf  # noqa: F401
+from .ui import command_set_joints  # noqa: F401
+from .ui import command_set_material  # noqa: F401
+from .ui import command_set_placement  # noqa: F401
+from .ui import command_simplify_mesh  # noqa: F401
+from .ui import command_sphere_from_bounding_box  # noqa: F401
+from .ui import command_update_planning_scene  # noqa: F401
+from .ui import command_urdf_export  # noqa: F401
+from .ui import command_wb_settings  # noqa: F401
 from .wb_utils import ICON_PATH
 
 
@@ -87,6 +88,7 @@ class CrossWorkbench(fcgui.Workbench):
                 'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
                 'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
                 'KKEdit',  # Defined in ./ui/command_kk_edit.py.
+                'DuplicateRobot',  # Defined in ./ui/command_duplicate_robot.py.
                 'Separator',
                 # Mesh simplification.
                 'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
