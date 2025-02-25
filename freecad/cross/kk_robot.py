@@ -29,8 +29,10 @@ try:
     import numpy as np
     from . import geometry_helpers as gh
 except ImportError as e:
-    warn(f'numpy not available, some functionalities will not work, error: {e}',
-         False)
+    warn(
+        f'numpy not available, some functionalities will not work, error: {e}',
+        False,
+    )
 
 # Stubs and type hints.
 if TYPE_CHECKING:
@@ -279,19 +281,23 @@ class KKFrame:
         r = self.tz
         d = self.tx
         ε = self.pre_tz
-        pre_placement = fc.Placement(fc.Matrix(
-            cγ, -sγ, 0, 0,
-            sγ,  cγ, 0, 0,
-             0,   0, 1, ε,
-             0,   0, 0, 1,
-        ))
+        pre_placement = fc.Placement(
+            fc.Matrix(
+                cγ, -sγ, 0, 0,
+                sγ,  cγ, 0, 0,
+                 0,   0, 1, ε,
+                 0,   0, 0, 1,
+            ),
+        )
         pre_placement.Base *= 1000.0  # Convert to mm.
-        placement = fc.Placement(fc.Matrix(
-            cθ,   -sθ,   0,     d,
-         sθ*cα, cα*cθ, -sα, -r*sα,
-         sα*sθ, sα*cθ,  cα,  r*cα,
-             0,     0,   0,     1,
-        ))
+        placement = fc.Placement(
+            fc.Matrix(
+                cθ,   -sθ,   0,     d,
+             sθ*cα, cα*cθ, -sα, -r*sα,
+             sα*sθ, sα*cθ,  cα,  r*cα,
+                 0,     0,   0,     1,
+            ),
+        )
         placement.Base *= 1000.0  # Convert to mm.
         return pre_placement, placement
 
@@ -644,32 +650,38 @@ def kk_from_dh(
 
     kk_frames: list[KKFrame] = []
     # First joint.
-    kk_frames.append(KKFrame(
-            rx=0.0,
-            tx=0.0,
-            rz=dh_frames[0].rz,
-            tz=dh_frames[0].tz,
-            prismatic=dh_frames[0].prismatic,
-    ))
+    kk_frames.append(
+        KKFrame(
+                rx=0.0,
+                tx=0.0,
+                rz=dh_frames[0].rz,
+                tz=dh_frames[0].tz,
+                prismatic=dh_frames[0].prismatic,
+        ),
+    )
 
     # Middle joints.
     for i in range(1, len(dh_frames)):
-        kk_frames.append(KKFrame(
-                    tx=dh_frames[i-1].tx,
-                    rx=dh_frames[i-1].rx,
-                    tz=dh_frames[i].tz,
-                    rz=dh_frames[i].rz,
-                    prismatic=dh_frames[i].prismatic,
-        ))
+        kk_frames.append(
+            KKFrame(
+                        tx=dh_frames[i-1].tx,
+                        rx=dh_frames[i-1].rx,
+                        tz=dh_frames[i].tz,
+                        rz=dh_frames[i].rz,
+                        prismatic=dh_frames[i].prismatic,
+            ),
+        )
 
     # Last joint.
-    kk_frames.append(KKFrame(
-            tx=dh_frames[-1].tx,
-            rx=dh_frames[-1].rx,
-            tz=0.0,
-            rz=0.0,
-            prismatic=False,  # Fixed joint. Irrelevant value.
-    ))
+    kk_frames.append(
+        KKFrame(
+                tx=dh_frames[-1].tx,
+                rx=dh_frames[-1].rx,
+                tz=0.0,
+                rz=0.0,
+                prismatic=False,  # Fixed joint. Irrelevant value.
+        ),
+    )
 
     return kk_frames
 
@@ -694,20 +706,24 @@ def dh_from_kk(
 
     # middle joints
     for i in range(len(kk_frames) - 1):
-        dh_frames.append(DHFrame(
-                tx=dh_frames[i + 1].tx,
-                rx=dh_frames[i + 1].rx,
-                tz=dh_frames[i].tz,
-                rz=dh_frames[i].rz,
-                prismatic=dh_frames[i].prismatic,
-        ))
+        dh_frames.append(
+            DHFrame(
+                    tx=dh_frames[i + 1].tx,
+                    rx=dh_frames[i + 1].rx,
+                    tz=dh_frames[i].tz,
+                    rz=dh_frames[i].rz,
+                    prismatic=dh_frames[i].prismatic,
+            ),
+        )
 
     # last joint
-    dh_frames.append(DHFrame(
-        rz=kk_frames[-1].rz,
-        tz=kk_frames[-1].tz,
-        rx=0.0,
-        tx=0.0,
-    ))
+    dh_frames.append(
+        DHFrame(
+            rz=kk_frames[-1].rz,
+            tz=kk_frames[-1].tz,
+            rx=0.0,
+            tx=0.0,
+        ),
+    )
 
     return dh_frames, base
