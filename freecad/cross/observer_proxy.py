@@ -18,7 +18,7 @@ from .freecad_utils import warn
 from .wb_utils import ICON_PATH
 
 # Typing hints.
-from .observer import Observer as CrossObserver  # A Cross::Observer, i.e. a DocumentObject with Proxy "Observer". # noqa: E501
+from .observer import Observer as CrossObserver, ViewProviderObserver  # A Cross::Observer, i.e. a DocumentObject with Proxy "Observer". # noqa: E501
 
 if TYPE_CHECKING and hasattr(fc, 'GuiUp') and fc.GuiUp:
     from FreeCADGui import ViewProviderDocumentObject as VPDO
@@ -54,7 +54,7 @@ class ObserverViewProxy:
             ),
     )
 
-    def on_attach(self) -> None:
+    def on_attach(self, vp: ViewProviderObserver) -> None:
         # `self.position` is not yet initialized, use `self.ViewObject.Position`.
         (
             self.root_node,
@@ -63,10 +63,10 @@ class ObserverViewProxy:
             self.material_node,
         ) = text_2d(
                 '',
-                self.ViewObject.Position,
+                self.default_position,
         )
 
-    def on_object_change(self, prop_name: str) -> None:
+    def on_object_change(self, vp: ViewProviderObserver, prop_name: str) -> None:
         if not self.Object.ExpressionEngine:
             self.text_node.string = ''
         else:
@@ -75,7 +75,7 @@ class ObserverViewProxy:
         self._set_color(self.material_node)
 
     @dot_display_mode.builder
-    def dot_display_mode_builder(self):
+    def dot_display_mode_builder(self, vp: ViewProviderObserver):
         return self.root_node
 
     def _set_color(self, material_node: coin.SoMaterial) -> None:
@@ -87,6 +87,7 @@ class ObserverViewProxy:
     @position.observer
     def on_position_changed(
             self,
+            vp: ViewProviderObserver,
     ) -> None:
         self.matrix_transform_node.matrix = coin.SbMatrix(
                0.0097401002,             0.0,             0.0, 0.0,
