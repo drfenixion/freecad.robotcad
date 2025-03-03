@@ -60,7 +60,7 @@ class TrajectoryViewProxy:
     def on_context_menu(
             self,
             menu: QMenu,
-            ) -> None:
+    ) -> None:
         menu.addAction('Load Trajectory from YAML file...', self.load_yaml)
         menu.addAction('Replay...', self.replay)
 
@@ -86,7 +86,8 @@ class TrajectoryViewProxy:
         dialog = ChooseTrajectoryDialog(
                 display_trajs,
                 self.Object.Robot,
-                fcgui.getMainWindow())
+                fcgui.getMainWindow(),
+        )
         message_index, trajectory_index = dialog.exec()
         if message_index >= 0:
             self.Object.Proxy.load_yaml(filename, message_index)
@@ -127,8 +128,10 @@ class TrajectoryProxy:
     point_index = PropertyIntegerConstraint(
             name='PointIndex',
             section='Robot',
-            description=('The index of the current trajectory'
-                         ' point to assign to the robot'),
+            description=(
+                'The index of the current trajectory'
+                ' point to assign to the robot'
+            ),
             mode=PropertyEditorMode.Hidden,
     )
 
@@ -163,9 +166,11 @@ class TrajectoryProxy:
             return
         # We do not clear `self._joint_map` because we want to keep the
         # values for the joints that are still present in the new robot.
-        new_joint_names = [ros_name(j)
-                           for j in self.robot.Proxy.get_joints()
-                           if not j.Proxy.is_fixed()]
+        new_joint_names = [
+            ros_name(j)
+            for j in self.robot.Proxy.get_joints()
+            if not j.Proxy.is_fixed()
+        ]
         # Remove joints not present in the new robot.
         for name in self._joint_map.keys():
             if name not in new_joint_names:
@@ -183,7 +188,7 @@ class TrajectoryProxy:
             warn(
                 f'Invalid point index: {new}, must be within [0, {self.point_count})',
                 True,
-             )
+            )
             if 0 <= old < self.point_count:
                 self.point_index = old
             else:
@@ -205,10 +210,12 @@ class TrajectoryProxy:
             if robot_state is None:
                 start_state = {}
             else:
-                start_state = {j: p for j, p in zip(
-                        robot_state.joint_state.name,
-                        robot_state.joint_state.position,
-                )}
+                start_state = {
+                    j: p for j, p in zip(
+                            robot_state.joint_state.name,
+                            robot_state.joint_state.position,
+                    )
+                }
 
             traj: dict[str, list[float]] = {}
             for n in trajectory.joint_names:
@@ -244,11 +251,12 @@ class TrajectoryProxy:
         self.point_index = (0, 0, self.point_count - 1, 1)
         self._set_editor_mode()
 
-    def load_yaml(self,
-                  file: Union[Path, str],
-                  message_index: int = 0,
-                  trajectory_index: int = 0,
-                  ) -> None:
+    def load_yaml(
+        self,
+        file: Union[Path, str],
+        message_index: int = 0,
+        trajectory_index: int = 0,
+    ) -> None:
         """Load a trajectory from a multi-doc YAML file.
 
         Such files are generated with `ros2 topic echo`.
@@ -261,11 +269,13 @@ class TrajectoryProxy:
             display_traj = i_th_item(display_trajs, message_index)
         except StopIteration:
             warn(
-                 (f'Invalid document index {message_index}'
-                  ' (i.e. message index),'
-                  ' not enough trajectories in the multi-doc file'),
+                 (
+                     f'Invalid document index {message_index}'
+                     ' (i.e. message index),'
+                     ' not enough trajectories in the multi-doc file'
+                 ),
                  True,
-             )
+            )
             return
 
         self.load_display_trajectory_dict(display_traj, trajectory_index)
@@ -336,14 +346,14 @@ class TrajectoryProxy:
                 name,
                 'Trajectory',
                 f'The joint position for `{name}`',
-                )
+        )
         add_property(
                 self.Object,
                 'App::PropertyFloat',
                 self._start_state_property_name(prop_name),
                 'Start State',
                 f'The default position of `{name}`',
-                )
+        )
         self._joint_map[name] = prop_name
 
     def _update_robot_joint_values(self):
@@ -351,17 +361,21 @@ class TrajectoryProxy:
             return
         joint_names = self._joint_map.keys()
         # Get the current trajectory point.
-        positions = {self.robot.Proxy.get_joint(n): getattr(self.Object, self._joint_map[n])[self.point_index]
-                     for n in joint_names
-                     if len(getattr(self.Object, self._joint_map[n])) > self.point_index}
+        positions = {
+            self.robot.Proxy.get_joint(n): getattr(self.Object, self._joint_map[n])[self.point_index]
+            for n in joint_names
+            if len(getattr(self.Object, self._joint_map[n])) > self.point_index
+        }
         if not positions:
             return
         # Get defaults from the robot state.
-        start_state = {self.robot.Proxy.get_joint(n): getattr(
-                              self.Object,
-                              self._start_state_property_name(self._joint_map[n]),
-                          )
-                       for n in joint_names}
+        start_state = {
+            self.robot.Proxy.get_joint(n): getattr(
+                   self.Object,
+                   self._start_state_property_name(self._joint_map[n]),
+            )
+            for n in joint_names
+        }
         # Add missing joint values.
         state = start_state
         state.update(positions)
