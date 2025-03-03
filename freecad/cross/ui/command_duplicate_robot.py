@@ -65,7 +65,7 @@ def copy_scripted_obj_props(
     exclude_attrs_view_obj: list = ['Label', 'Proxy'],
 ) -> DO:
     """Copy properties of Freecad scripted object like CrossLink or CrossJoint to anothre one.
-    
+
     exlude_attrs - not copied root attributes
     exlude_attrs_addition - addition not copied root attributes
     exlude_attrs_view_obj - not copied view object root attributes
@@ -100,7 +100,7 @@ def copy_scripted_obj_props(
         except RuntimeError:
             pass
 
-    return     
+    return
 
 def duplicate(orig_robot: CrossRobot, base_name: str) -> CrossRobot:
     """Duplicate a Cross::Robot, its links and joints."""
@@ -123,7 +123,7 @@ def duplicate(orig_robot: CrossRobot, base_name: str) -> CrossRobot:
         link = make_link(orig_link.Label, doc)
         robot.addObject(link)
         copy_scripted_obj_props(orig_link, link)
-        
+
         # remove links to old link sensors
         new_group = []
         for v in link.Group:
@@ -168,15 +168,15 @@ def duplicate(orig_robot: CrossRobot, base_name: str) -> CrossRobot:
 
     # get data controllers and broadcasters
     controllers = get_controllers_data()
-    
+
     # cloning controllers
     for orig_controller in orig_proxy.get_controllers():
-        controller_data = None 
+        controller_data = None
         for key, value in controllers['controllers'].items():
             if value['controller_plugin_class_name'] == orig_controller.plugin_class_name:
                 controller_data = value
                 break
-        
+
         # fix a bug with old broadcasters that has controllers type
         if controller_data is None:
             for key, value in controllers['broadcasters'].items():
@@ -185,28 +185,32 @@ def duplicate(orig_robot: CrossRobot, base_name: str) -> CrossRobot:
                     break
 
             if controller_data is None:
-                raise ValueError("Cant get controller data for " + ros_name(orig_controller) + ' controller.\
- It can be too old verion. Recreate it before cloning.')
+                raise ValueError(
+                    "Cant get controller data for " + ros_name(orig_controller) + ' controller.\
+ It can be too old verion. Recreate it before cloning.',
+                )
 
             controller = make_broadcaster(controller_data, doc=doc)
         else:
             controller = make_controller(controller_data, doc=doc)
-        
+
         robot.addObject(controller)
         copy_scripted_obj_props(orig_controller, controller, exclude_attrs_addition = ['_Type'])
     doc.recompute()
 
     # cloning broadcasters
     for orig_broadcaster in orig_proxy.get_broadcasters():
-        broadcaster_data = None 
+        broadcaster_data = None
         for key, value in controllers['broadcasters'].items():
             if value['controller_plugin_class_name'] == orig_broadcaster.plugin_class_name:
                 broadcaster_data = value
                 break
-        
+
         if broadcaster_data is None:
-            raise ValueError("Cant get broadcaster data for " + ros_name(orig_broadcaster) + ' broadcaster.\
- It can be too old verion. Recreate it before cloning.')
+            raise ValueError(
+                "Cant get broadcaster data for " + ros_name(orig_broadcaster) + ' broadcaster.\
+ It can be too old verion. Recreate it before cloning.',
+            )
 
         broadcaster = make_broadcaster(broadcaster_data, doc=doc)
         robot.addObject(broadcaster)
