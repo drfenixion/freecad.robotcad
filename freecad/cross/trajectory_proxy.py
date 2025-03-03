@@ -140,10 +140,10 @@ class TrajectoryProxy:
         # property cannot be updated with indexing or `merge()`.
         self._joint_map: dict[str, str] = {}
 
-    def on_create(self):
+    def on_create(self, obj: CrossTrajectory):
         self._set_editor_mode()
 
-    def on_execute(self):
+    def on_execute(self, obj: CrossTrajectory):
         if is_robot(self.robot):
             self._update_robot_joint_values()
 
