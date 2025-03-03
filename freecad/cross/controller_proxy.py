@@ -85,7 +85,9 @@ class ControllerProxy(ProxyBase):
             'The type',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
-        obj._Type = self.Type
+        # it is also called after project load and therefore added condition
+        if obj._Type == '':
+            obj._Type = self.Type
 
 
     def execute(self, obj: CrossController) -> None:
