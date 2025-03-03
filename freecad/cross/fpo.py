@@ -2185,7 +2185,7 @@ def message_box(message: str, title: str = "Message", details: str = None):
             ## {message}
             {details}
             -----------------
-            """)
+            """),
         )
 
 

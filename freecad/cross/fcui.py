@@ -2126,7 +2126,7 @@ def ui_thread(delay: int = 0):
                     lambda: QTimer.singleShot(
                         delay,
                         lambda: f(*args, **kwargs),
-                    )
+                    ),
                 )
             else:
                 _ui_thread_hook_obj.send(lambda: f(*args, **kwargs))
