@@ -11,13 +11,6 @@ from typing import cast
 
 import FreeCAD as fc
 
-from .fpo import PropertyLink
-from .fpo import PropertyLinkList
-from .fpo import PropertyMode
-from .fpo import PropertyPlacement
-from .fpo import PropertyString
-from .fpo import proxy  # Cf. https://github.com/mnesarco/fcapi
-from .fpo import view_proxy
 from .freecad_utils import is_link as is_freecad_link
 from .freecad_utils import warn
 from .utils import warn_unsupported
@@ -25,6 +18,7 @@ from .wb_utils import ICON_PATH
 from .wb_utils import is_joint
 from .wb_utils import is_link
 from .wb_utils import is_robot
+from freecad.cross.vendor.fcapi import fpo  # Cf. https://github.com/mnesarco/fcapi
 
 # Typing hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "AttachedCollisionObject". # noqa: E501
@@ -90,19 +84,19 @@ def _skim_links_joints_from(group) -> tuple[DOList, DOList]:
 _OBJECT_TYPE = 'Cross::AttachedCollisionObject'
 
 
-@view_proxy(
+@fpo.view_proxy(
     icon=str(ICON_PATH / 'attached_collision_object.svg'),
     extensions=['Gui::ViewProviderGroupExtensionPython'],
 )
 class AttachedCollisionObjectViewProxy:
 
-    def on_changed(self, vobj: VPDO, prop: str):
-        if prop == 'Visibility':
-            for o in vobj.Object.Group:
-                o.ViewObject.Visibility = vobj.Visibility
+    def on_change(self, event: fpo.events.PropertyChangedEvent):
+        if event.property_name == 'Visibility':
+            for o in event.view_provider.Object.Group:
+                o.ViewObject.Visibility = event.view_provider.Visibility
 
 
-@proxy(
+@fpo.proxy(
     object_type='App::FeaturePython',
     extensions=['App::GroupExtensionPython'],
     subtype=_OBJECT_TYPE,
@@ -110,27 +104,27 @@ class AttachedCollisionObjectViewProxy:
 )
 class AttachedCollisionObjectProxy:
 
-    type = PropertyString(
+    type = fpo.PropertyString(
             name='_Type',
             default=_OBJECT_TYPE,
             section='Internal',
             description='The type of the object',
-            mode=PropertyMode.ReadOnly + PropertyMode.Hidden,
+            mode=fpo.PropertyMode.ReadOnly + fpo.PropertyMode.Hidden,
     )
 
-    link = PropertyLink(
+    link = fpo.PropertyLink(
             name='Link',
             section='Elements',
             description='The link to attach to',
     )
 
-    objects = PropertyLinkList(
+    objects = fpo.PropertyLinkList(
             name='Objects',
             section='Elements',
             description='The objects to attach',
     )
 
-    placement = PropertyPlacement(
+    placement = fpo.PropertyPlacement(
             name='Placement',
             section='Internal',
             description='Placement of elements in the robot frame',
@@ -144,49 +138,42 @@ class AttachedCollisionObjectProxy:
         # Save the robot to speed-up `self.robot`.
         self._robot: Optional[CrossRobot] = None
 
-    def on_create(self, obj: CrossAttachedCollisionObject):
+    def on_create(self):
         self._set_editor_modes()
 
-    def on_start(self, obj: CrossAttachedCollisionObject):
+    def on_start(self):
         self._fix_lost_fc_links()
         self._fill_fc_link_lists()
 
-    def on_serialize(self, state: dict[str, Any]) -> tuple[str]:
-        return self.Type,
+    def on_serialize(self, event: fpo.events.SerializeEvent) -> None:
+        event.state = self.Type,
 
-    def on_deserialize(self, state: tuple[str]) -> None:
-        # Implementation note: `self.__init__()` is not called
-        # on document restore, call it manually.
-        self.__init__()
-        if state:
-            self.Type, = state
+    def on_deserialize(self, event: fpo.events.DeserializeEvent) -> None:
+        if event.state:
+            self.Type, = event.state
 
-    def on_changed(self, obj: CrossAttachedCollisionObject, prop: str) -> None:
+    def on_change(self, event: fpo.events.PropertyChangedEvent) -> None:
         """Manage property changes for properties not defined by us."""
-        if prop == 'Group':
+        if event.property_name == 'Group':
             self._cleanup_children()
         self._set_editor_modes()
 
     @objects.observer
-    def on_objects_changed(self, obj: CrossAttachedCollisionObject) -> None:
+    def on_objects_changed(self) -> None:
         self._cleanup_children()
         self._update_fc_links()
 
     @placement.observer
-    def on_placement_changed(
-            self,
-            obj: CrossAttachedCollisionObject,
-            new_placement: fc.Placement,
-            old_placement: fc.Placement,
-    ) -> None:
-        if self.placement != new_placement:
-            self.placement = new_placement
+    def on_placement_changed(self, event: fpo.events.PropertyChangedEvent) -> None:
+        if not self.placement.isSame(event.new_value, tol=1e-6):
+            # Avoid recursion.
+            self.placement = event.new_value
         for fclink in self.Object.Group:
             if not is_freecad_link(fclink):
                 # Should not happen.
                 continue
-            link_placement = fclink.LinkedObject.Placement * new_placement
-            if fclink.LinkPlacement != link_placement:
+            link_placement = fclink.LinkedObject.Placement * self.placement
+            if not fclink.LinkPlacement.isSame(link_placement, tol=1e-6):
                 # Avoid recursion.
                 fclink.LinkPlacement = link_placement
 
