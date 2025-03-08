@@ -53,7 +53,7 @@ class TrajectoryViewProxy:
     def on_context_menu(
             self,
             event: fpo.events.ContextMenuEventmenu,
-            ) -> None:
+    ) -> None:
         event.menu.addAction('Load Trajectory from YAML file...', self.load_yaml)
         event.menu.addAction('Replay...', self.replay)
 
@@ -121,8 +121,10 @@ class TrajectoryProxy:
     point_index = fpo.PropertyIntegerConstraint(
             name='PointIndex',
             section='Robot',
-            description=('The index of the current trajectory'
-                         ' point to assign to the robot'),
+            description=(
+                'The index of the current trajectory'
+                ' point to assign to the robot'
+            ),
             mode=fpo.PropertyEditorMode.Hidden,
     )
 
@@ -179,7 +181,7 @@ class TrajectoryProxy:
             warn(
                 f'Invalid point index: {event.new_value}, must be within [0, {self.point_count})',
                 True,
-             )
+            )
             if 0 <= event.old_value < self.point_count:
                 self.point_index = event.old_value
             else:
