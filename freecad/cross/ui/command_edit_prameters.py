@@ -5,28 +5,77 @@ import os
 from PySide2.QtWidgets import QDialog, QVBoxLayout
 from PySide2.QtQuickWidgets import QQuickWidget
 from PySide2.QtCore import QUrl,QSize
-from ..SdfUtilities import Palette, WorldProperties,PhysicsProperties
+from ..SdfUtilities import Palette, WorldProperties,ObjectPropertyBridge
 
-class link():
+class link(QDialog):
     '''
     This will ba called when a link is selected  while command is activated 
     '''
-    def __init__(self):
-        pass
-class joint():
+    def __init__(self,obj):
+        super().__init__()
+        self.obj=obj
+        self.init_widget()
+        self.initialize_dialog()
+        
+    def init_widget(self):
+        view =QQuickWidget(self)
+        plt=Palette(self)
+        prop=ObjectPropertyBridge(self.obj,parent=self)
+        view.rootContext().setContextProperty("prop",prop)
+        view.rootContext().setContextProperty("plt",plt)
+        view.setSource(QUrl(os.path.join(wb_utils.UI_PATH,"qml","link.qml")))
+        view.setResizeMode(QQuickWidget.SizeRootObjectToView)
+        self.qquick=view
+    
+    def initialize_dialog(self):
+        self.setWindowTitle("link properties")
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.qquick)
+        self.setLayout(layout)
+    def sizeHint(self):
+        return QSize(700,600)
+        
+class joint(QDialog):
     '''
      called if selected object is a joint during command activation
     '''
-    def __init__(self):
-        pass
+    def __init__(self,obj):
+        super().__init__()
+        self.obj=obj
+        self.init_widget()
+        self.initialize_dialog()
+        
+    def init_widget(self):
+        view =QQuickWidget(self)
+        plt=Palette(self)
+        view.rootContext().setContextProperty("plt",plt)
+        view.setSource(QUrl(os.path.join(wb_utils.UI_PATH,"qml","joint.qml")))
+        view.setResizeMode(QQuickWidget.SizeRootObjectToView)
+        self.qquick=view
+    
+    def initialize_dialog(self):
+        self.setWindowTitle("joint properties")
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.qquick)
+        self.setLayout(layout)
+    def sizeHint(self):
+        return QSize(700,600)
 #  world
 
 
-class world(QDialog):
+class intitialize(QDialog):
     '''
-    instantiated if selected object is Robot during link activation 
+    instantiated if selected obj
+    parameter 1:dictionary of additional properties 
+    
+    initialy the qml file will be generated  stored the current FreeCAD instance temp dir 
+    its location stored as a string , 
+    
+    add neccesary properties and  set the properties initiated proprty to true to avoid 
+    repetition 
+    
     '''
-    def __init__(self,obj):
+    def __init__(self,obj,properties=dict,rootqml='',):
         super().__init__()
         self.obj=obj #  Robot object 
         self.intialize_qwidget()
@@ -36,10 +85,10 @@ class world(QDialog):
         view =QQuickWidget(self)
         plt=Palette(self)
         wrld=WorldProperties(self.obj,parent=self)
-        phy=PhysicsProperties(self.obj,parent=self)
+        prop=ObjectPropertyBridge(self.obj,parent=self)
         view.rootContext().setContextProperty("plt",plt)
         view.rootContext().setContextProperty("world",wrld)
-        view.rootContext().setContextProperty("phy",phy)
+        view.rootContext().setContextProperty("prop",prop)
         view.setSource(QUrl(os.path.join(wb_utils.UI_PATH,"qml","main.qml")))
         view.setResizeMode(QQuickWidget.SizeRootObjectToView)
         
@@ -61,7 +110,7 @@ class world(QDialog):
 #  Command class 
 
 class Editor():
-    """My new command"""
+    """Editor command"""
 
     def GetResources(self):
         return {"Pixmap"  :os.path.join(wb_utils.ICON_PATH,"EditParameters.svg"), # the name of a svg file available in the resources
@@ -72,10 +121,15 @@ class Editor():
     def Activated(self):
         obj=fcgui.Selection.getSelection()[0]
         if obj.Proxy.Type=='Cross::Robot':
-            wrld=world(obj)
+            wrld=intitialize(obj)
             wrld.show()
+        elif obj.Proxy.Type=='Cross::Link':
+            lnk=link(obj)
+            lnk.exec_()
         else:
-            pass
+            jnt=joint(obj)
+            jnt.exec_()
+            
         return
 
     def IsActive(self):

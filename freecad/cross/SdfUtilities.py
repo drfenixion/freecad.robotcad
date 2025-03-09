@@ -165,16 +165,20 @@ class Palette(QObject):
         super().__init__(parent)
         self.colors=self.GetHexColors()
         if self.isDarkTheme():
-            self.background_0:str="#1d1e23"
-            self.background_1:str="#33363f"
-            self.background_2:str="#656772"
-            self.textbackground:str="#2e2b26"
+            # this is base on the pahoehoe palette
+            self.background_0:str="#1d1e23" #Raisin black
+            self.background_1:str="#33363f" # onyx
+            self.background_2:str="#656772" # dim Gray
+            self.background_3:str="#57463a" #Umber
+            self.textbackground:str="#2e2b26"   #jet
         
         else:
-            self.background_0:str="#c3c5c4"
-            self.background_1:str="#e5ecf2"
-            self.background_2:str="#bad4d3"
-            self.textbackground:str="#f5efe3"
+            # this is based on the calor pallete blueSunshine
+            self.background_0:str="#c3c5c4" # silver 
+            self.background_1:str="#e5ecf2" # Alice Blue
+            self.background_2:str="#bad4d3" #light blue
+            self.background_3:str="#f5efe3" #old lace
+            self.textbackground:str="#f7e091" #flax
             pass
             
     def GetHexColors(self)->dict:
@@ -198,6 +202,8 @@ class Palette(QObject):
         return self.background_1
     def getBackground2(self):
         return self.background_2
+    def getBackground3(self):
+        return self.background_3
             
     def getTextColor(self):
         return QColor(self.colors["textcolor"]).name()
@@ -207,6 +213,7 @@ class Palette(QObject):
     background0=Property(str,getBackground0,notify=backgroundChanged)
     background1=Property(str,getBackground1,notify=backgroundChanged)
     background2=Property(str,getBackground2,notify=backgroundChanged)
+    background3=Property(str,getBackground3,notify=backgroundChanged)
             
 #end of theme
     
@@ -379,7 +386,7 @@ def PhysicsParameters(obj):
 
 
 
-class PhysicsProperties(QObject):
+class ObjectPropertyBridge(QObject):
     def __init__(self, obj,parent =None):
         super().__init__(parent)
         self.obj=obj
@@ -450,3 +457,142 @@ def resetPhysicsattributes(obj):
             result=False
         setattr(obj,ode,result)
         
+def linkParameters(obj):
+     
+    for i in ["gravity","enable_wind","self_collide","kinematic","must_be_base_link"]:
+        obj.addProperty("App::PropertyBool",i,"linkparameters",hidden=True)
+    
+    for v in ["velocity_decayLinear","velocity_decayAngular"]:
+        obj.addProperty("App::PropertyFloat",v,"linkparameters",hidden=True)
+        
+   
+    obj.addProperty("App::PropertyFloat","laser_retro","collision",hidden=True)
+    obj.addProperty("App::PropertyString","name","collision",hidden=True)
+#surface 
+    #bounce
+    for c in ["bounceRestitution_coefficient","bounceThreshold"]:
+        obj.addProperty("App::PropertyFloat",c,"surface",hidden=True)
+    
+    #friction
+    for f in ["torsionalCoefficient","torsionalPatch_radius",\
+              "torsionalSurface_radius","torsionalOdeSlip"]:
+        obj.addProperty("App::PropertyFloat",f,"friction",hidden=True)
+    obj.addProperty("App::PropertyBool","torsionalUse_patch_radius","friction",hidden=True)
+    
+    for f in ["odeMu","odeMu2","odeSlip1","odeSlip2"]:
+        obj.addProperty("App::PropertyFloat",f,"friction",hidden=True)
+    obj.addProperty("App::PropertyVector","odeFdir1","friction",hidden=True)
+    
+    for f in ["bulletFriction","bulletFriction2","bulletRolling_friction"]:
+        obj.addProperty("App::PropertyFloat",f,"friction",hidden=True)
+    obj.addProperty("App::PropertyVector","bulletFdir1","friction",hidden=True)
+    
+    # contact 
+    obj.addProperty("App::PropertyBool","contactCollide_without_contact",hidden=True)
+    for c in ["contactCollide_without_contact_bitmask","contactCollide_bitmask","contactCategory_bitmask"]:
+        obj.addProperty("App::PropertyInteger",c,"contact",hidden=True)
+    for d in ["contactPoissons_ratio","contactElastic_modulus"]:
+         obj.addProperty("App::PropertyFloat",d,"contact",hidden=True)
+    for c in ["odeSoft_cfm","odeSoft_erp","odeKp","odeKd","odeMax_vel","odeMin_depth"]:
+        obj.addProperty("App::PropertyFloat",c,"contact",hidden=True)
+        
+    for b in ["bulletSoft_cfm","bulletSoft_erp","bulletKp","bulletKd","bulletSplit_impulse_penetration_threshold"]:
+        obj.addProperty("App::PropertyFloat",b,"contact",hidden=True)
+        
+    obj.addProperty("App::PropertyBool","bulletSplit_Impulse","contact",hidden=True)
+    
+    for sc in ["dartBone_attachment","dartStiffness","dartDamping","dartFlesh_mass_fraction"]:
+        obj.addProperty("App::PropertyFloat",sc,"soft Contact",hidden=True)
+
+       
+def resetLinkParameters(obj):
+    sdf_etree=sdf_tree.sdf_tree("link.sdf",metaData=False,recurse=False)
+    # main attributes
+    e=sdf_etree.get_element 
+    for i in ["gravity","enable_wind","self_collide","kinematic","must_be_base_link"]:
+        result=True if get_xml_data(e,i,False) else False
+        setattr(obj,i,result)
+    # velocity decay
+    vel_decay=e.find("velocity_decay")
+    for v in ["velocity_decayLinear","velocity_decayAngular"]:
+        s=v.replace("velocity_decay","").lower()
+        r=get_xml_data(vel_decay,s,False)
+        setattr(obj,v,r)
+    # collision 
+    sdf_etree=sdf_tree.sdf_tree("collision.sdf",metaData=False,recurse=False)
+    # main attributes
+    e=sdf_etree.get_element   
+    r=get_xml_data(e,["collision","name"],True)
+    
+    setattr(obj,"name",r)
+    r2=get_xml_data(e,"laser_retro",False)
+    setattr(obj,"laser_retro",r2)
+    
+    # surface 
+    sdf_etree=sdf_tree.sdf_tree("surface.sdf",metaData=False,recurse=False)
+    # main attributes
+    e=sdf_etree.get_element  
+    for b in ["bounceRestitution_coefficient","bounceThreshold"]:
+        b2=b.replace("bounce","").lower()
+        bnc=e.find("bounce")
+        r=get_xml_data(bnc,b2,False)
+        setattr(obj,b,r)
+    # collision friction 
+    fr=e.find("friction")
+    for t in ["torsionalCoefficient","torsionalUse_patch_radius","torsionalPatch_radius",\
+              "torsionalSurface_radius","torsionalOdeSlip"]:
+        t2=t.replace("torsional","").replace("Ode","").lower()
+        trs=fr.find("torsional")
+        r=get_xml_data(trs,t2,False)
+        if r=='true':
+            r=True
+        elif r=='false':
+            r=False
+        setattr(obj,t,r)
+        
+    for o in ["odeMu","odeMu2","odeFdir1","odeSlip1","odeSlip2"]:
+        o2=o.replace("ode","").lower()
+        ode=fr.find("ode")
+        r=get_xml_data(ode,o2,False)
+        if isinstance(r,list):
+            r=tuple(r)
+        setattr(obj,o,r)
+    
+    
+    for f in ["bulletFriction","bulletFriction2","bulletRolling_friction"]:
+        f2=f.replace("bullet","").lower()
+        ode=fr.find("bullet")
+        r=get_xml_data(ode,f2,False)
+        if isinstance(r,list):
+            r=tuple(r)
+        setattr(obj,f,r)
+        
+    cnt=e.find("contact")
+    for c in ["contactCollide_without_contact_bitmask","contactCollide_bitmask","contactCategory_bitmask"]+\
+        ["contactPoissons_ratio","contactElastic_modulus"]:
+        c2=c.replace("contact","",1).lower()
+        r=get_xml_data(cnt,c2,False)
+        setattr(obj,c,r)
+        
+    for c in ["odeSoft_cfm","odeSoft_erp","odeKp","odeKd","odeMax_vel","odeMin_depth"]:
+        c2=c.replace("ode","").lower()
+        ode=cnt.find("ode")
+        r=get_xml_data(ode,c2,False)
+        setattr(obj,c,r)
+        
+    for b in ["bulletSoft_cfm","bulletSoft_erp","bulletKp","bulletKd",\
+              "bulletSplit_impulse_penetration_threshold","bulletSplit_Impulse"]:
+        b2=b.replace("bullet","").lower()
+        bullet=cnt.find("bullet")
+        r=get_xml_data(bullet,b2,False)
+        if r=="true":
+            r=True
+        elif r=='false':
+            r=False
+        setattr(obj,b,r)
+    
+    for sc in ["dartBone_attachment","dartStiffness","dartDamping","dartFlesh_mass_fraction"]:
+        sc2=sc.replace("dart","").lower()
+        softc=e.find("soft_contact")
+        r=get_xml_data(softc,sc2,False)
+        setattr(obj,sc,r)

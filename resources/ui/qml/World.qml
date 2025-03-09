@@ -15,10 +15,9 @@ Rectangle{
     {
         id:layout
         anchors.fill:parent
-        spacing:24
+        spacing:3
         LineEdit
-        {   textColor: root.textColor
-            backgroundColor: root.textbackgroundColor
+        {
             id:worldname
             label:"WorldName"
             text:world.worldname
@@ -29,8 +28,7 @@ Rectangle{
             }
         }
         LineEdit
-        {   textColor: root.textColor
-            backgroundColor: root.textbackgroundColor
+        {
             id:robotname
             label:"RobotName"
             text:world.robotname
@@ -126,36 +124,23 @@ Rectangle{
                 world.setWind(zval,2)
             }
         }
-        Rectangle
+        GroupBox
         {
             id:atm
-            Layout.margins: margin
-            radius:7
-            color:plt.background1
-            width:glayout.implicitWidth+16
-            height: glayout.implicitHeight+txt.implicitHeight+16
-            Text{
-                id:txt
-                text: "Atmosphere"
-                color: root.textColor
-                font.pixelSize: 16
-                anchors
-                {
-                    top:atm.top
-                    topMargin:4
-                    left:atm.left
-                    leftMargin:8
-                }
+            title: "Atmosphre"
+            background: Rectangle {
+                color: plt.background1
+                radius: 7
             }
+            label: Label {
+                   text: parent.title
+                   color: plt.textColor // Change this to the desired color
+                   font.bold: true // Optional: Customize font properties
+               }
 
             GridLayout
             {
-                anchors
-                {
-                    top:txt.bottom
-                    topMargin:4
-                    left:txt.left
-                }
+                anchors.fill: parent
 
                 id:glayout
                 columns:2

@@ -8,7 +8,7 @@ Item {
     property string textcolor:"white"
     property string textbackgroundColor: "green"
     property string backgroundColor: "black"
-    property alias label:lbl.text
+    property alias label:gb.title
     property real default_x:0.0
     property real default_y:0.0
     property real default_z:0.0
@@ -21,42 +21,26 @@ Item {
     property string suffix:""
     width: gb.implicitWidth+16
     height:gb.implicitHeight+16
-    Rectangle
-    {
-        radius: 7
-        id:gb
-        color:root.backgroundColor
-        width: layout.implicitWidth+16
-        height:layout.implicitHeight+lbl.implicitHeight+30
-        Layout.margins: 12
-        Text {
-            id: lbl
-            text: qsTr("text")
-            color:root.textcolor
-            font.pixelSize: 16
-            anchors{
-                margins: 12
-                leftMargin: 12
-                top:gb.top
-                topMargin: 2
-                left:gb.left
-
-            }
+    GroupBox
+    {   id:gb
+        title: "Default"
+        Layout.fillWidth: true
+        background: Rectangle {
+            color: plt.background1
+            radius: 7
         }
+        label: Label {
+               text: parent.title
+               color: plt.textColor // Change this to the desired color
+               font.bold: true // Optional: Customize font properties
+           }
 
 
         RowLayout
         {
             id:layout
             spacing: 10
-
-            anchors
-            {
-                left:lbl.left
-                top:lbl.bottom
-                topMargin:7
-            }
-
+            anchors.fill: parent
             DoubleSpinBox
             {
                 id:x

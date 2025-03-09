@@ -40,13 +40,13 @@ Rectangle {
                     ComboBox {
                         id: physicsType
                         model: ["ode", "bullet", "simbody", "dart"]
-                        currentIndex: physicsType.model.indexOf(phy.getter("dynamicsengine"))
+                        currentIndex: physicsType.model.indexOf(prop.getter("dynamicsengine"))
                         Layout.preferredWidth: 200
                         onCurrentIndexChanged:
                         {
                             var currentIt = physicsType.model[physicsType.currentIndex]
                             updateSolverView()
-                            phy.setter("dynamicsengine",currentIt)
+                            prop.setter("dynamicsengine",currentIt)
                         }
                     }
                 }
@@ -54,45 +54,35 @@ Rectangle {
                 DoubleSpinBox {
                     label: "Max Step Size"
                     decimalPlaces: 5
-                    default_value: phy.getter("max_step_size")
+                    default_value: prop.getter("max_step_size")
                     onSpinBoxvalueChanged: {
-                       phy.setter("max_step_size",val)
+                       prop.setter("max_step_size",val)
                     }
                 }
 
                 DoubleSpinBox {
                     label: "Real Time Factor"
                     decimalPlaces: 2
-                    default_value: phy.getter("real_time_factor")
+                    default_value: prop.getter("real_time_factor")
                     onSpinBoxvalueChanged: {
-                        phy.setter("real_time_factor",val)
+                        prop.setter("real_time_factor",val)
                     }
                 }
 
-                RowLayout
+                CustomSpinBox
                 {
-                    Label{
-                        text: "Max Contacts"
-                        color: plt.textColor
-
-                    }
-                    SpinBox{
-                        value: phy.getter("max_contacts")
-                        onValueModified:
-                        {
-                            phy.setter("max_contacts",value)
-                        }
-                    }
+                    label:"Max Contacts"
+                    objectpropertyName:"max_contacts"
                 }
 
                 DoubleSpinBox{
                     label:"real_time_update_rate"
                     decimalPlaces: 2
-                    default_value: phy.getter("real_time_update_rate")
+                    default_value: prop.getter("real_time_update_rate")
                     max:10000
                     min:0
                     onSpinBoxvalueChanged: {
-                        phy.setter("real_time_update_rate",val)
+                        prop.setter("real_time_update_rate",val)
                     }
                 }
             }
@@ -108,11 +98,11 @@ Rectangle {
     }
     function componentProvider(index) {
             switch (index) {
-                case 0: return odeComponent
-                case 1: return bulletComponent
-                case 2: return simbodyComponent
-                case 3: return dartComponent
-                default: return odeComponent // Fallback
+                case 0: return odeSettings
+                case 1: return bulletSettings
+                case 2: return simbodySettings
+                case 3: return dartSettings
+                default: return odeSettings // Fallback
             }
         }
     // Function to Update Solver View Based on ComboBox Selection
@@ -154,68 +144,58 @@ Rectangle {
                 spacing: 15
                 anchors.fill: parent
 
-                RowLayout {
-                    Label {
-                        text: "Solver Type:"
-                        color:plt.textColor
-                    }
-                    ComboBox {
-                        id: odesolverType
-                        model: ["world", "quick"]
-                        currentIndex: odesolverType.model.indexOf(phy.getter("odeType"))
-                        Layout.preferredWidth: 200
-                        onCurrentIndexChanged:
-                        {
-                            var currentItem = odesolverType.model[odesolverType.currentIndex]
-                            phy.setter("odeType",currentItem)
-                        }
-                    }
-                }
+               GridLayout{
+                   columns:2
+                    columnSpacing: 10
+                   RowLayout {
+                       Label {
+                           text: "Solver Type:"
+                           color:plt.textColor
+                       }
+                       ComboBox {
+                           id: odesolverType
+                           model: ["world", "quick"]
+                           currentIndex: odesolverType.model.indexOf(prop.getter("odeType"))
+                           Layout.preferredWidth: 200
+                           onCurrentIndexChanged:
+                           {
+                               var currentItem = odesolverType.model[odesolverType.currentIndex]
+                               prop.setter("odeType",currentItem)
+                           }
+                       }
+                   }
 
-                DoubleSpinBox {
-                    label: "Min Step Size"
-                    decimalPlaces: 5
-                    default_value: phy.getter("odeMin_step_size")
-                    onSpinBoxvalueChanged:
+                   DoubleSpinBox {
+                       label: "Min Step Size"
+                       decimalPlaces: 5
+                       default_value: prop.getter("odeMin_step_size")
+                       onSpinBoxvalueChanged:
+                       {
+                           prop.setter("odeMin_step_size",val)
+                       }
+                   }
+                    CustomSpinBox
                     {
-                        phy.setter("odeMin_step_size",val)
+                        label:"Island Threads: "
+                        objectpropertyName: "odeIsland_threads"
                     }
-                }
-
-                RowLayout {
-                    Label {
-                        text: "Island Threads:"
-                        color:plt.textColor
-                    }
-                    SpinBox {
-                        value: phy.getter("odeIsland_threads")
-                        onValueModified: {
-                            phy.setter("odeIsland_threads",value)
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Label { text: "Iters:"
-                        color:plt.textColor
-                    }
-                    SpinBox {
-                        value: phy.getter("odeIters")
-                        onValueModified:
-                        {
-                            phy.setter("odeIters",value)
-                        }
-                    }
-                }
-
-                DoubleSpinBox {
-                    label: "Sor"
-                    default_value:  phy.getter("odeSor")
-                    onSpinBoxvalueChanged:
+                    CustomSpinBox
                     {
-                        phy.setter("odeSor",value)
+                        label:"Iters:"
+                        objectpropertyName: "odeIters"
                     }
-                }
+
+
+                   DoubleSpinBox {
+                       label: "Sor"
+                       default_value:  prop.getter("odeSor")
+                       onSpinBoxvalueChanged:
+                       {
+                           prop.setter("odeSor",value)
+                       }
+                   }
+               }
+
 
                 GroupBox {
                     title: "Constraints"
@@ -235,19 +215,19 @@ Rectangle {
 
                         DoubleSpinBox {
                             label: "CFM"
-                            default_value: phy.getter("odeCfm")
+                            default_value: prop.getter("odeCfm")
                             decimalPlaces: 3
                             onSpinBoxvalueChanged: {
-                                phy.setter("odeCfm",value)
+                                prop.setter("odeCfm",value)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "ERP"
-                            default_value: phy.getter("odeErp")
+                            default_value: prop.getter("odeErp")
                             decimalPlaces: 3
                             onSpinBoxvalueChanged: {
-                                phy.setter("odeErp",value)
+                                prop.setter("odeErp",value)
                             }
                         }
 
@@ -255,19 +235,19 @@ Rectangle {
                             label: "Contact Max Correcting Vel"
                             decimalPlaces: 2
                             max:500
-                            default_value: phy.getter("odeContact_max_correcting_vel")
+                            default_value: prop.getter("odeContact_max_correcting_vel")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("odeContact_max_correcting_vel",value)
+                                prop.setter("odeContact_max_correcting_vel",value)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "Contact Surface Layer"
                             decimalPlaces: 4
-                            default_value: phy.getter("odeContact_surface_layer")
+                            default_value: prop.getter("odeContact_surface_layer")
                             onSpinBoxvalueChanged: {
-                                phy.setter("odeContact_surface_layer",value)
+                                prop.setter("odeContact_surface_layer",value)
                             }
                         }
                     }
@@ -309,33 +289,24 @@ Rectangle {
                 DoubleSpinBox {
                     label: "Min Step Size"
                     decimalPlaces: 5
-                    default_value:phy.getter("bulletMin_step_size")
+                    default_value:prop.getter("bulletMin_step_size")
                     onSpinBoxvalueChanged: {
-                        phy.setter("bulletMin_step_size",val)
+                        prop.setter("bulletMin_step_size",val)
                     }
+                }
+                CustomSpinBox{
+                    label:"Iters:"
+                    objectpropertyName: "bulletIters"
                 }
 
-                RowLayout {
-                    Label {
-                        text: "Iters:"
-                        color:plt.textColor
-                    }
-                    SpinBox {
-                        value: phy.getter("bulletIters")
-                        onValueModified:
-                        {
-                            phy.setter("bulletIters",value)
-                        }
-                    }
-                }
 
                 DoubleSpinBox {
                     label: "Sor"
                     decimalPlaces: 4
-                    default_value:phy.getter("bulletSor")
+                    default_value:prop.getter("bulletSor")
                     onSpinBoxvalueChanged:
                     {
-                        phy.setter("bulletSor",val)
+                        prop.setter("bulletSor",val)
 
                     }
                 }
@@ -356,35 +327,30 @@ Rectangle {
                         spacing: 10
                         anchors.fill: parent
 
-                        RowLayout {
-                            Label { text: "CFM:"
-                            color:plt.textColor}
-                            SpinBox {
-                                value: phy.getter("bulletCfm")
-                                onValueModified:
-                                {
-                                    phy.setter("bulletCfm",value)
-                                }
-                            }
+                        CustomSpinBox
+                        {
+                            label:"CFM:"
+                            objectpropertyName: "bulletCfm"
                         }
+
 
                         DoubleSpinBox {
                             label: "ERP"
                             decimalPlaces: 3
-                            default_value: phy.getter("bulletErp")
+                            default_value: prop.getter("bulletErp")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("bulletErp",val)
+                                prop.setter("bulletErp",val)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "Contact Surface Layer"
                             decimalPlaces: 4
-                            default_value: phy.getter("bulletContact_surface_layer")
+                            default_value: prop.getter("bulletContact_surface_layer")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("bulletContact_surface_layer",val)
+                                prop.setter("bulletContact_surface_layer",val)
                             }
                         }
 
@@ -397,12 +363,12 @@ Rectangle {
 
                         DoubleSpinBox {
                             label: "Split Impulse Penetration Threshold"
-                            default_value: phy.getter("bulletSplit_impulse_penetration_threshold")
+                            default_value: prop.getter("bulletSplit_impulse_penetration_threshold")
                             min: -1
                             decimalPlaces: 3
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("bulletSplit_impulse_penetration_threshold",val)
+                                prop.setter("bulletSplit_impulse_penetration_threshold",val)
                             }
                         }
                     }
@@ -434,12 +400,12 @@ Rectangle {
                     ComboBox {
                         id:dartSolver_type
                         model: ["dantzig", "pgs"]
-                        currentIndex: dartSolver_type.model.indexOf(phy.getter("dartSolver_type"))
+                        currentIndex: dartSolver_type.model.indexOf(prop.getter("dartSolver_type"))
                         Layout.preferredWidth: 200
                         onCurrentIndexChanged:
                         {
                             var currentItem = dartSolver_type.model[dartSolver_type.currentIndex]
-                            phy.setter("dartSolver_type",currentItem)
+                            prop.setter("dartSolver_type",currentItem)
                         }
                     }
                 }
@@ -449,12 +415,12 @@ Rectangle {
                     ComboBox {
                         id:dartCollision_detector
                         model: ["fcl", "dart", "bullet", "ode"]
-                        currentIndex: dartCollision_detector.model.indexOf(phy.getter("dartCollision_detector"))
+                        currentIndex: dartCollision_detector.model.indexOf(prop.getter("dartCollision_detector"))
                         Layout.preferredWidth: 200
                         onCurrentIndexChanged:
                         {
                             var currentItem = dartCollision_detector.model[dartCollision_detector.currentIndex]
-                            phy.setter("dartCollision_detector",currentItem)
+                            prop.setter("dartCollision_detector",currentItem)
                         }
 
                     }
@@ -483,31 +449,31 @@ Rectangle {
 
                 DoubleSpinBox {
                     label: "Min Step Size"
-                    default_value: phy.getter("simbodyMin_step_size")
+                    default_value: prop.getter("simbodyMin_step_size")
                     decimalPlaces: 4
                     onSpinBoxvalueChanged:
                     {
-                        phy.setter("simbodyMin_step_size",val)
+                        prop.setter("simbodyMin_step_size",val)
                     }
                 }
 
                 DoubleSpinBox {
                     label: "Accuracy"
                     decimalPlaces: 4
-                    default_value: phy.getter("simbodyAccuracy")
+                    default_value: prop.getter("simbodyAccuracy")
                     onSpinBoxvalueChanged:
                     {
-                        phy.setter("simbodyAccuracy",val)
+                        prop.setter("simbodyAccuracy",val)
                     }
                 }
 
                 DoubleSpinBox {
                     label: "Max Transient Velocity"
                     decimalPlaces: 3
-                    default_value: phy.getter("simbodyMax_transient_velocity")
+                    default_value: prop.getter("simbodyMax_transient_velocity")
                     onSpinBoxvalueChanged:
                     {
-                        phy.setter("simbodyMax_transient_velocity",val)
+                        prop.setter("simbodyMax_transient_velocity",val)
                     }
                 }
 
@@ -529,24 +495,24 @@ Rectangle {
 
                         DoubleSpinBox {
                             label: "Stiffness"
-                            default_value: phy.getter("simbodyStiffness")
+                            default_value: prop.getter("simbodyStiffness")
                             decimalPlaces: 7
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("simbodyStiffness",val)
+                                prop.setter("simbodyStiffness",val)
                             }
                         }
 
 
                             DoubleSpinBox {
                                 label: "Dissipation"
-                                default_value: phy.getter("simbodyDissipation")
+                                default_value: prop.getter("simbodyDissipation")
                                 min:0
                                 max:500
                                 decimalPlaces: 4
                                 onSpinBoxvalueChanged:
                                 {
-                                    phy.setter("simbodyDissipation",value)
+                                    prop.setter("simbodyDissipation",value)
                                 }
                             }
 
@@ -560,40 +526,40 @@ Rectangle {
                         DoubleSpinBox {
                             label: "Plastic Impact Velocity"
                             decimalPlaces: 2
-                            default_value: phy.getter("simbodyPlastic_coef_restitution")
+                            default_value: prop.getter("simbodyPlastic_coef_restitution")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("simbodyPlastic_coef_restitution",val)
+                                prop.setter("simbodyPlastic_coef_restitution",val)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "Static Friction"
                             decimalPlaces: 2
-                            default_value: phy.getter("simbodyStatic_friction")
+                            default_value: prop.getter("simbodyStatic_friction")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("simbodyStatic_friction",val)
+                                prop.setter("simbodyStatic_friction",val)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "Dynamic Friction"
                             decimalPlaces: 2
-                            default_value: phy.getter("simbodyDynamic_friction")
+                            default_value: prop.getter("simbodyDynamic_friction")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("simbodyDynamic_friction",val)
+                                prop.setter("simbodyDynamic_friction",val)
                             }
                         }
 
                         DoubleSpinBox {
                             label: "Viscous Friction"
                             decimalPlaces: 2
-                            default_value: phy.getter("simbodyViscous_friction")
+                            default_value: prop.getter("simbodyViscous_friction")
                             onSpinBoxvalueChanged:
                             {
-                                phy.setter("simbodyViscous_friction",val)
+                                prop.setter("simbodyViscous_friction",val)
                             }
                         }
                     }
