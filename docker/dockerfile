@@ -56,7 +56,7 @@ RUN add-apt-repository ppa:freecad-maintainers/freecad-daily && \
 ### End Install FreeCAD Daily
 
 
-# ### Install FreeCAD Stable (0.21.2 - at time of commit) 
+# ### Install FreeCAD Stable (0.21.2 - at time of commit)
 # RUN echo 'Install FreeCAD'
 # RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
 #     apt-get update && \
