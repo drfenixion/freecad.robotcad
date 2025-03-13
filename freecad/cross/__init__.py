@@ -4,11 +4,11 @@ from pathlib import Path
 import subprocess
 import os
 import sys
-import addonmanager_utilities as utils
+
 try:
     # For v0.21:
     from addonmanager_utilities import get_python_exe
-except (ModuleNotFoundError, ImportError):
+except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
@@ -17,9 +17,11 @@ def pip_install(pkg_name):
     '''Python package installer for AppImage builds. It installs python module inside AppImage'''
     # should be in __init__.py to eliminate cyrcle dependencies of installed modules
 
+    import site
+
     python_exe = get_python_exe()
     print('python_exe: ', python_exe)
-    vendor_path = utils.get_pip_target_directory()
+    vendor_path = site.getsitepackages()[0]
     if not os.path.exists(vendor_path):
         os.makedirs(vendor_path)
 
