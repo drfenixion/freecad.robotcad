@@ -156,6 +156,11 @@ def get_ros_workspace_from_env() -> Path:
     ws = os.environ.get('ROS_WORKSPACE', '')
     if ws:
         return Path(ws)
+    
+    # ros workspace from docker
+    ws = os.environ.get('PATH_TO_WS', '')
+    if ws:
+        return Path(ws)
 
     # Guess from COLCON_PREFIX_PATH that looks like /home/user/ros_ws/install.
     colcon_prefix_path = os.environ.get('COLCON_PREFIX_PATH', '')
