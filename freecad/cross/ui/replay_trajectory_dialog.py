@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import FreeCADGui as fcgui
 
-from PySide2 import QtGui  # FreeCAD's PySide!
+try:
+    from PySide import QtGui
+except:
+    from PySide2 import QtGui # FreeCAD's PySide!
 
 from ..freecad_utils import warn
 from ..wb_utils import ICON_PATH
