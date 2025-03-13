@@ -42,7 +42,7 @@ Run RobotCAD in container and open it window at host.
     -b          force build new image and container
     -c          clear old container logs (required sudo)
     -l          run last dev FreeCAD version (freecad-daily) instead of stable. Dont use if you dont know what is it.
-    if you will came back after to stable version add -f option.
+                If you will came back after to stable version add -f option.
     -d          debug
 EOF
 }
