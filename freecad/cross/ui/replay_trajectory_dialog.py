@@ -24,7 +24,7 @@ class ReplayTrajectoryDialog:
         self.form = fcgui.PySideUic.loadUi(
                 str(UI_PATH / 'replay_trajectory_dialog.ui'),
                 self,
-                )
+        )
         self.dialog_confirmed = False
 
         self._set_icons()
@@ -42,16 +42,20 @@ class ReplayTrajectoryDialog:
 
     def _set_icons(self) -> None:
         self.form.play_button.setIcon(
-                QtGui.QIcon(str(ICON_PATH / 'media-playback-start.svg')))
+                QtGui.QIcon(str(ICON_PATH / 'media-playback-start.svg')),
+        )
         self.form.play_button.setText('')
         self.form.pause_button.setIcon(
-                QtGui.QIcon(str(ICON_PATH / 'media-playback-pause.svg')))
+                QtGui.QIcon(str(ICON_PATH / 'media-playback-pause.svg')),
+        )
         self.form.pause_button.setText('')
         self.form.previous_button.setIcon(
-                QtGui.QIcon(str(ICON_PATH / 'media-skip-backward.svg')))
+                QtGui.QIcon(str(ICON_PATH / 'media-skip-backward.svg')),
+        )
         self.form.previous_button.setText('')
         self.form.next_button.setIcon(
-                QtGui.QIcon(str(ICON_PATH / 'media-skip-forward.svg')))
+                QtGui.QIcon(str(ICON_PATH / 'media-skip-forward.svg')),
+        )
         self.form.next_button.setText('')
 
     def _establish_connections(self) -> None:
