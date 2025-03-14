@@ -56,25 +56,25 @@ while getopts dfbclh opt; do
             ;;
         f)
             force_run_new_container=true
-            echo 'Force run new container.'
+            echo 'Force run new container is requested.'
             ;;
         d)
             debug=true
-            echo 'DEBUG is active.'
+            echo 'DEBUG is requested.'
             ;;
         b)
             force_build_new_image=true
             force_run_new_container=true
-            echo 'Force build new image and run new container.'
+            echo 'Force build new image and run new container are requested.'
             ;;
         c)
             clear_old_logs=true
-            echo 'Clear old logs is active.'
+            echo 'Clearing old logs is requested.'
             ;;
         l)
             force_run_new_container=true
             command=freecad-daily
-            echo 'Clear old logs is active.'
+            echo 'Run freecad-daily (last dev) is requested.'
             ;;
         *)
             show_help >&2
