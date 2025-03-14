@@ -103,8 +103,9 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     base = f'/opt/ros/{ros_distro}'
     for path in [
         Path(f'{base}/lib/{python_ver}/site-packages'),
-        # Humble and later.
-        Path(f'{base}/local/lib/{python_ver}/dist-packages'),
+        Path(f'{base}/local/lib/{python_ver}/dist-packages'), # Humble and later.
+        Path(f'/usr/lib/python{major}/dist-packages'),
+        Path(f'/usr/lib/{python_ver}/dist-packages'),
     ]:
         _add_python_path(path)
 
