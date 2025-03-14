@@ -89,7 +89,7 @@ add_ros_library_path(g_ros_distro)
 
 
 # pip installs
-# should be after add_ros_library_path because ros package must be initialized firstly 
+# should be after add_ros_library_path because ros package must be initialized firstly
 try:
     import urdf_parser_py
 except (ModuleNotFoundError, ImportError):
