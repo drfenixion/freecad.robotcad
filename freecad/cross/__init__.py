@@ -79,7 +79,17 @@ if os.environ.get('DEBUG'):
         attach_debugger()
 
 
+import FreeCAD as fc
+from .ros.utils import add_ros_library_path
+from .version import __version__  # noqa: F401
+from .wb_globals import g_ros_distro
+
+
+add_ros_library_path(g_ros_distro)
+
+
 # pip installs
+# should be after add_ros_library_path because ros package must be initialized firstly 
 try:
     import urdf_parser_py
 except (ModuleNotFoundError, ImportError):
@@ -95,14 +105,6 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('xmltodict')
 
-
-import FreeCAD as fc
-from .ros.utils import add_ros_library_path
-from .version import __version__  # noqa: F401
-from .wb_globals import g_ros_distro
-
-
-add_ros_library_path(g_ros_distro)
 
 # Must be imported after the call to `add_ros_library_path`.
 from .ros.utils import is_ros_found  # noqa: E402.
