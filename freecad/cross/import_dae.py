@@ -146,7 +146,7 @@ def read(filename):
     except Exception as e:
         error("Parse error: " + str(e) + '. File: ' + filename)
         return False
-    
+
     # Read the unitmeter info from dae file and compute unit to convert to mm
     unitmeter = col.assetInfo.unitmeter or 1
     unit = unitmeter / 0.001
