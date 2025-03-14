@@ -84,7 +84,7 @@ while getopts dfbclh opt; do
 done
 
 
-
+echo ''
 echo 'Paths: '
 echo '$script_dir: '$script_dir
 echo '$ws_path: '$ws_path
