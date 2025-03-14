@@ -178,7 +178,7 @@ else
     localhost_address=''
     if [ "$debug" = true ] ; then
         debug_port='-p 5678:5678'
-        debug_env='DEBUG=1'
+        debug_env='export DEBUG=1 &&'
         localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
     fi
 
