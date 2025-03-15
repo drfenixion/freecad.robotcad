@@ -87,6 +87,18 @@ In case of start issue (transfer from 3.0.0 to next version may need "-f") recre
 bash run.bash -f
 ```
 
+#### Rebuild image and run new container
+In case of migration to from any version to v7.0.0 rebuild docker image
+```
+bash run.bash -b
+```
+
+#### Clear old container logs
+You will see logs from current start
+```
+bash run.bash -c
+```
+
 # Screenshots
 ### Launched RViz and Gazebo using generated code:
 
