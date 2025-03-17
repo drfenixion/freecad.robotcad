@@ -88,7 +88,7 @@ bash run.bash -f
 ```
 
 #### Rebuild image and run new container
-In case of migration to from any version to v7.0.0 rebuild docker image
+In case of migration from any version to v7.0.0 rebuild docker image
 ```
 bash run.bash -b
 ```
@@ -97,6 +97,20 @@ bash run.bash -b
 You will see logs from current start
 ```
 bash run.bash -c
+```
+
+#### Fix "Segmentation fault" (if faced)
+In case of migration from < v7 to v7+ rebuild docker image.
+
+It will update RobotCAD and rebuild image and fix FreeCAD share dir owner.
+```
+git pull && cd docker && bash run.bash -bco
+```
+In case you already migrated to v7.
+
+It will update RobotCAD and recreate container and fix FreeCAD share dir owner.
+```
+git pull && cd docker && bash run.bash -fco
 ```
 
 # Screenshots
