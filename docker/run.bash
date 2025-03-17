@@ -97,6 +97,56 @@ echo '$cont_path_ws: '$cont_path_ws
 echo '$root_of_freecad_robotcad: '$root_of_freecad_robotcad
 echo ''
 
+
+## Docker install
+# Check if Docker is not installed
+if [ -z "$(command -v docker)" ]; then
+
+    echo ''
+    echo 'Docker is not installed.'
+    echo ''
+
+    # check script in Ubuntu OS
+    if [ "$(lsb_release -si 2> /dev/null)" == "Ubuntu" ]; then
+        echo 'Starting Docker installation... (required password for sudo).'
+
+        # Add Docker's official GPG key:
+        sudo apt-get update
+        sudo apt-get install ca-certificates curl -y
+        sudo install -m 0755 -d /etc/apt/keyrings
+        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+        # Add the repository to Apt sources:
+        echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+        $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        
+        # Install the Docker:
+        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+        # Add current user to Docker group
+        echo 'Adding current user to Docker group...'
+        sudo usermod -aG docker $USER
+
+        # Restart Docker service
+        echo 'Restarting Docker service...'
+        sudo systemctl restart docker
+        
+        echo ''
+        echo 'Docker installed successfully! In case of any problem with it reboot computer.'
+        echo ''
+    else
+        echo 'Installation does not proceed in Ubuntu. Installation is interupted.'
+        echo 'Install Docker manually for your Linux distribution and run this script again. https://docs.docker.com/engine/install/'
+        exit 1
+    fi    
+fi
+## END Docker install
+
+
 if [ "$use_custom_command" = true ] ; then
     command=$custom_command
 fi
@@ -131,6 +181,11 @@ fi
 # build if image not exists
 if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo 'Build docker container...'
+
+    echo ''
+    echo 'Docker image will take about 12Gb free space. Check you have more.'
+    echo ''
+
     # build ROS image
     docker buildx build -t $image --shm-size=512m \
         --build-arg USER=$USER \
@@ -148,7 +203,7 @@ fi
 if [ "$clear_old_logs" = true ] ; then
     log_path=$(docker inspect --format='{{.LogPath}}' $ros_container_name 2> /dev/null)
     if [ -n "$log_path" ]; then
-        echo "Clear old container logs. (required sudo)"
+        echo "Clear old container logs. (required password for sudo)"
         sudo truncate -s 0 "$log_path"
     else
         echo "Logs of '$ros_container_name' container are not exists. Nothing to clear."
@@ -201,7 +256,7 @@ else
 
 
     if [ "$fix_freecad_dirs_owner" = true ]; then
-        echo 'Change "~/.local/share/FreeCAD" directory owner to current user. (required sudo)'
+        echo 'Change "~/.local/share/FreeCAD" directory owner to current user. (required password for sudo)'
         # Set the ownership of the created directory to the current user
         sudo chown -R $USER:$USER "$host_freecad_share_path"
     fi
