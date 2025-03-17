@@ -34,7 +34,7 @@ build_data_path=$ws_path/build_data
 # Usage info
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-dfbclh]
+Usage: ${0##*/} [-dfbcloh]
 Run RobotCAD in container and open it window at host.
 
     -h          display this help and exit
@@ -43,12 +43,13 @@ Run RobotCAD in container and open it window at host.
     -c          clear old container logs (required sudo)
     -l          run last dev FreeCAD version (freecad-daily) instead of stable. Dont use if you dont know what is it.
                 If you will came back after to stable version add -f option.
+    -o          Change owner of FreeCAD share directory to current user (can fix "Segmentation fault" in some cases)
     -d          debug
 EOF
 }
 
 # process params of script
-while getopts dfbclh opt; do
+while getopts dfbcloh opt; do
     case $opt in
         h)
             show_help
@@ -75,6 +76,10 @@ while getopts dfbclh opt; do
             force_run_new_container=true
             command=freecad-daily
             echo 'Run freecad-daily (last dev) is requested.'
+            ;;
+        o)
+            fix_freecad_dirs_owner=true
+            echo 'Changing of FreeCAD ~/.local/share directory owner is requested.'
             ;;
         *)
             show_help >&2
@@ -182,6 +187,26 @@ else
         localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
     fi
 
+
+    host_freecad_mods_path=$HOME/.local/share/FreeCAD/Mod
+    host_freecad_share_path=$HOME/.local/share/FreeCAD
+    cont_freecad_mods_path=$cont_user_path/.local/share/FreeCAD/Mod
+    cont_freecad_share_path=$cont_user_path/.local/share/FreeCAD
+    
+    if [ ! -d "$host_freecad_mods_path" ]; then
+        # Create the directory and its parents if they don't exist
+        echo "Create host freecad mods directory."
+        mkdir -p "$host_freecad_mods_path"
+    fi
+
+
+    if [ "$fix_freecad_dirs_owner" = true ]; then
+        echo 'Change "~/.local/share/FreeCAD" directory owner to current user. (required sudo)'
+        # Set the ownership of the created directory to the current user
+        sudo chown -R $USER:$USER "$host_freecad_share_path"
+    fi
+
+
     xhost +local:
     mount_options=',type=volume,volume-driver=local,volume-opt=type=none,volume-opt=o=bind'
     docker run -t -d --name=$ros_container_name \
@@ -191,8 +216,8 @@ else
         --mount dst=$cont_path_ws/log,volume-opt=device=$build_data_path/log$mount_options \
         --mount dst=$cont_user_path/.ros/log,volume-opt=device=$build_data_path/ros2_system_logs$mount_options \
         --volume=$root_of_freecad_robotcad/docker/ros2_ws/src:$cont_path_ws/src \
-        --volume=$HOME/.local/share/FreeCAD:$cont_user_path/.local/share/FreeCAD \
-        --volume=$root_of_freecad_robotcad:$cont_user_path/.local/share/FreeCAD/Mod/freecad.robotcad \
+        --volume=$host_freecad_share_path:$cont_freecad_share_path \
+        --volume=$root_of_freecad_robotcad:$host_freecad_mods_path/freecad.robotcad \
         --volume=$root_of_freecad_robotcad/docker/freecad:$cont_path_ws/../freecad \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
         --privileged \
@@ -210,7 +235,7 @@ else
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
-
+    
     echo "Ran new container."
 
 fi
