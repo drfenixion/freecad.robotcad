@@ -58,13 +58,18 @@ Video of creating controllable models: <br />
 1. all features from CROSS workbench
 
 # Fast install and run
-If you have docker (buildx, compose plugins) installed just do
+If you have Docker (buildx, compose plugins) installed or have Ubuntu OS (Docker will be autoinstalled) just do:
 ```
+cd ~/
 git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
-bash run.bash
+bash run.bash -c
 ```
-Tested on Ubuntu 22.04 and Windows 10 via WSL2 (Ubuntu).
+Same in one line
+```
+cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd freecad.robotcad/docker && bash run.bash -c
+```
+Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu).
 
 If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
 
@@ -72,13 +77,14 @@ You also can install RobotCAD manually via FreeCAD Addon manager by [Installatio
 
 RobotCAD will not work with CROSS workbench (same namespace). Remove CROSS before install RobotCAD.
 
-#### Update RobotCAD
-
-use commands in RobotCAD directory
+#### Regular RobotCAD run
 ```
-git pull
-cd docker
-bash run.bash
+cd ~/freecad.robotcad/docker && bash run.bash -c
+```
+
+#### Update RobotCAD
+```
+cd ~/freecad.robotcad && git pull
 ```
 
 #### Recreate container
