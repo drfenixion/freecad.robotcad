@@ -73,7 +73,7 @@ Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu).
 
 If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
 
-You also can install RobotCAD manually via FreeCAD Addon manager by [Installation](#Installation) section
+**You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
 
 RobotCAD will not work with CROSS workbench (same namespace). Remove CROSS before install RobotCAD.
 
