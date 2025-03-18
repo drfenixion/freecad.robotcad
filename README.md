@@ -84,7 +84,7 @@ cd ~/freecad.robotcad/docker && bash run.bash -c
 
 #### Update RobotCAD
 ```
-cd ~/freecad.robotcad && git pull
+cd ~/freecad.robotcad && git pull && cd docker && bash run.bash -fc
 ```
 
 #### Recreate container
