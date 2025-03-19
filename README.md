@@ -120,7 +120,7 @@ git pull && cd docker && bash run.bash -fco
 ```
 
 #### Fix "failed to create drawable" (if faced)
-It will force add Nvidia container options (--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all) in case you have installed Nvidia container toolkit
+It will force add Nvidia container options (--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all) in case you have installed Nvidia container toolkit.
 ```
 git pull && cd docker && bash run.bash -fcn
 ```
