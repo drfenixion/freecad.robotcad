@@ -34,7 +34,7 @@ build_data_path=$ws_path/build_data
 # Usage info
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-dfbcloh]
+Usage: ${0##*/} [-dfbclonh]
 Run RobotCAD in container and open it window at host.
 
     -h          display this help and exit
@@ -44,12 +44,13 @@ Run RobotCAD in container and open it window at host.
     -l          run last dev FreeCAD version (freecad-daily) instead of stable. Dont use if you dont know what is it.
                 If you will came back after to stable version add -f option.
     -o          Change owner of FreeCAD share directory to current user (can fix "Segmentation fault" in some cases)
+    -n          Force add Nvidia container toolkit options (--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all) (can fix "failed to create drawable" in some cases)
     -d          debug
 EOF
 }
 
 # process params of script
-while getopts dfbcloh opt; do
+while getopts dfbclonh opt; do
     case $opt in
         h)
             show_help
@@ -80,6 +81,10 @@ while getopts dfbcloh opt; do
         o)
             fix_freecad_dirs_owner=true
             echo 'Changing of FreeCAD ~/.local/share directory owner is requested.'
+            ;;
+        n)
+            force_add_nvidia_options=true
+            echo 'Force add Nvidia container options is requested.'
             ;;
         *)
             show_help >&2
@@ -255,7 +260,7 @@ else
     # [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#installing-with-apt)
     # If dont need this set Prime integrated video (f.e. sudo prime-select intel). It usually is default.
     nvidia_options=''
-    if [ "$(prime-select query 2> /dev/null)" == 'nvidia' ]; then
+    if [ "$(prime-select query 2> /dev/null)" == 'nvidia' ] || [ "$force_add_nvidia_options" = true ]; then
         nvidia_options='--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all'
     fi
 
