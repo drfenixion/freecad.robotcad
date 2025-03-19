@@ -98,7 +98,7 @@ echo '$root_of_freecad_robotcad: '$root_of_freecad_robotcad
 echo ''
 
 
-## Docker install
+# Docker install
 # Check if Docker is not installed
 if [ -z "$(command -v docker)" ]; then
 
@@ -134,17 +134,33 @@ if [ -z "$(command -v docker)" ]; then
         # Restart Docker service
         echo 'Restarting Docker service...'
         sudo systemctl restart docker
-        
+
         echo ''
         echo 'Docker installed successfully! In case of any problem with it reboot computer.'
         echo ''
+              
+        docker_was_installed_and_host_not_rebooted=true
+
     else
         echo 'Installation does not proceed in Ubuntu. Installation is interupted.'
         echo 'Install Docker manually for your Linux distribution and run this script again. https://docs.docker.com/engine/install/'
         exit 1
     fi    
 fi
-## END Docker install
+# END Docker install
+
+
+# Temporary change user group
+# used only after docker install for non-rebooted usescase
+if [ $(id -gn) != "docker" ] && [ "$docker_was_installed_and_host_not_rebooted" = true ]; then
+    # script self-run with docker group of user
+    # used for run docker without reboot after intall
+    
+    # Construct an array which quotes all the command-line parameters.
+    arr=("${@/#/\"}")
+    arr=("${arr[*]/%/\"}")
+    exec sg docker "OLD_GID=$(id -g) OLD_GROUP=$(id -gn) bash $0 ${arr[@]}"
+fi
 
 
 if [ "$use_custom_command" = true ] ; then
@@ -186,12 +202,23 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo 'Docker image will take about 12Gb free space. Check you have more.'
     echo ''
 
+    UID=$(id -u $USER)
+    # Use old user group in case of group was changed after docker install
+    # or use current user group if installion without docker install
+    GID=${OLD_GID:-$(id -g $USER)}
+    GROUP=${OLD_GROUP:-$(groups | awk '{print $1}')}
+
+    echo "UID will be used for user inside image:  $UID"
+    echo "User name will be used for user inside image:  $USER"
+    echo "GID will be used for user inside image:  $GID"
+    echo "GROUP will be used for user inside image:  $GROUP"
+
     # build ROS image
     docker buildx build -t $image --shm-size=512m \
         --build-arg USER=$USER \
-        --build-arg UID=$(id -u $USER) \
-        --build-arg GROUP=$(groups | awk '{print $1}') \
-        --build-arg GID=$(id -g $USER) \
+        --build-arg UID=$UID \
+        --build-arg GROUP=$GROUP \
+        --build-arg GID=$GID \
         --build-arg ROS_DISTRO_ARG=$ros_distro \
         --build-arg ROS_DISTRO_ASSEMBLY_ARG=$ros_distro_assemble \
         --build-arg CONT_PATH_WS=$cont_path_ws \
