@@ -202,23 +202,23 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo 'Docker image will take about 12Gb free space. Check you have more.'
     echo ''
 
-    UID=$(id -u $USER)
+    uid=$(id -u $USER)
     # Use old user group in case of group was changed after docker install
     # or use current user group if installion without docker install
-    GID=${OLD_GID:-$(id -g $USER)}
-    GROUP=${OLD_GROUP:-$(groups | awk '{print $1}')}
+    gid=${OLD_GID:-$(id -g $USER)}
+    group=${OLD_GROUP:-$(groups | awk '{print $1}')}
 
-    echo "UID will be used for user inside image:  $UID"
+    echo "UID will be used for user inside image:  $uid"
     echo "User name will be used for user inside image:  $USER"
-    echo "GID will be used for user inside image:  $GID"
-    echo "GROUP will be used for user inside image:  $GROUP"
+    echo "GID will be used for user inside image:  $gid"
+    echo "GROUP will be used for user inside image:  $group"
 
     # build ROS image
     docker buildx build -t $image --shm-size=512m \
         --build-arg USER=$USER \
-        --build-arg UID=$UID \
-        --build-arg GROUP=$GROUP \
-        --build-arg GID=$GID \
+        --build-arg UID=$uid \
+        --build-arg GROUP=$group \
+        --build-arg GID=$gid \
         --build-arg ROS_DISTRO_ARG=$ros_distro \
         --build-arg ROS_DISTRO_ASSEMBLY_ARG=$ros_distro_assemble \
         --build-arg CONT_PATH_WS=$cont_path_ws \
