@@ -128,7 +128,7 @@ if [ -z "$(command -v docker)" ]; then
         $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
         sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
-        
+
         # Install the Docker:
         sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 
@@ -143,14 +143,14 @@ if [ -z "$(command -v docker)" ]; then
         echo ''
         echo 'Docker installed successfully! In case of any problem with it reboot computer.'
         echo ''
-              
+
         docker_was_installed_and_host_not_rebooted=true
 
     else
         echo 'Installation does not proceed in Ubuntu. Installation is interupted.'
         echo 'Install Docker manually for your Linux distribution and run this script again. https://docs.docker.com/engine/install/'
         exit 1
-    fi    
+    fi
 fi
 # END Docker install
 
@@ -160,7 +160,7 @@ fi
 if [ $(id -gn) != "docker" ] && [ "$docker_was_installed_and_host_not_rebooted" = true ]; then
     # script self-run with docker group of user
     # used for run docker without reboot after intall
-    
+
     # Construct an array which quotes all the command-line parameters.
     arr=("${@/#/\"}")
     arr=("${arr[*]/%/\"}")
@@ -279,7 +279,7 @@ else
     host_freecad_share_path=$HOME/.local/share/FreeCAD
     cont_freecad_mods_path=$cont_user_path/.local/share/FreeCAD/Mod
     cont_freecad_share_path=$cont_user_path/.local/share/FreeCAD
-    
+
     if [ ! -d "$host_freecad_mods_path" ]; then
         # Create the directory and its parents if they don't exist
         echo "Create host freecad mods directory."
@@ -322,7 +322,7 @@ else
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
-    
+
     echo "Ran new container."
 
 fi
