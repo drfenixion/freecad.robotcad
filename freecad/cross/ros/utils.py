@@ -224,7 +224,7 @@ def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
 
 def pkg_and_file_from_ros_path(
         path: str,
-        check_package_compiled: bool = True
+        check_package_compiled: bool = True,
 ) -> tuple[Optional[str], Optional[str]]:
     """Return the tuple (package_name, relative_file_path).
 
@@ -304,7 +304,7 @@ def abs_path_from_ros_path(
 
         if not pkg:
             return None
-        
+
         pkg_path = None
         try:
             pkg_path = get_package_share_directory(pkg)
@@ -319,7 +319,7 @@ def abs_path_from_ros_path(
                 pkg_path = match.group(0)
         if not pkg_path:
             return None
-        
+
         return Path(pkg_path) / rel_path
     elif path.startswith('file://'):
         if relative_to is not None:

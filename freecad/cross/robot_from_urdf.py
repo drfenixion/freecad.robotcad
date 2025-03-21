@@ -235,12 +235,12 @@ def _add_ros_link(
     visual_part = add_object(parts_group, 'App::Part', f'visual_{name}_')
     visual_part.Visibility = False
     robot.Proxy.created_objects.append(visual_part)
-    
+
 
     real_part = add_object(parts_group, 'App::Part', f'real_{name}_')
     real_part.Visibility = False
     robot.Proxy.created_objects.append(real_part)
-    
+
     collision_part = add_object(parts_group, 'App::Part', f'collision_{name}_')
     collision_part.Visibility = False
     robot.Proxy.created_objects.append(collision_part)
@@ -270,7 +270,7 @@ def _add_ros_link(
     robot.Proxy.created_objects.append(link_to_real_part)
     link_to_real_part.setLink(real_part)
     link_to_real_part.Visibility = False
-    ros_link.Real = [link_to_real_part]    
+    ros_link.Real = [link_to_real_part]
 
     link_to_collision_part = add_object(
         parts_group, 'App::Link',

@@ -185,8 +185,8 @@ def obj_from_mesh(
                 return obj, mesh_path
         elif convert_mesh_to_solid and is_part_feature(obj):
             if obj.Label2 == mesh_ros_path:
-                return obj, mesh_path            
-            
+                return obj, mesh_path
+
     if mesh_path.suffix.lower() == '.dae':
         raw_mesh = read_mesh_dae(mesh_path)
     else:
@@ -207,7 +207,7 @@ def obj_from_mesh(
 
     mesh_or_solid_obj = mesh_obj
 
-    if convert_mesh_to_solid:            
+    if convert_mesh_to_solid:
         import Part
         ### Begin command Part_ShapeFromMesh
         mesh_obj_shape = doc.addObject('Part::Feature', mesh_obj.Label2 + '_shape')
@@ -226,15 +226,15 @@ def obj_from_mesh(
         mesh_obj_solid.Label2=mesh_ros_path
         mesh_obj_solid.Shape=__s__
         mesh_obj_solid.purgeTouched()
-        mesh_or_solid_obj = mesh_obj_solid  
+        mesh_or_solid_obj = mesh_obj_solid
         del __s__, mesh_obj_solid
         ### End command Part_MakeSolid
         doc.removeObject(mesh_obj_shape.Name)
         doc.removeObject(mesh_obj.Name)
-        
+
     if group:
         group.addObject(mesh_or_solid_obj)
-         
+
     return mesh_or_solid_obj, mesh_path
 
 
