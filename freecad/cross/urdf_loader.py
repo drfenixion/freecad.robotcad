@@ -19,12 +19,14 @@ class UrdfLoader:
     def load_from_file(cls, filename: [str | Path]) -> Robot:
         """Load from a URDF file."""
         filename = Path(filename)
-        if filename.suffix == '.xacro':
-            robot = Robot.from_xml_string(
-                    process_file(filename.expanduser()).toxml(),
-            )
-        else:
-            robot = Robot.from_xml_file(filename)
+
+        # dont use - Robot.from_xml_file(filename), 
+        # it leads to error - "Unicode strings with encoding declaration are not supported"
+        # if URDF has encoding delaration - f.e. <?xml version="1.0" encoding="utf-8"?>
+        # process_file () works - ok
+        robot = Robot.from_xml_string(
+                process_file(filename.expanduser()).toxml(),
+        )        
         return robot
 
     @classmethod
