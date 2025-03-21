@@ -103,7 +103,7 @@ def robot_from_urdf(
     mw = fcgui.getMainWindow()
     mw.statusBar().setStyleSheet("QStatusBar::item { border: none; }")
     mw.statusBar().addWidget(progressBar, stretch=1)
-    
+
 
     progressBar.show()
 
@@ -117,7 +117,7 @@ def robot_from_urdf(
     QtGui.QApplication.processEvents()
     i += 1
 
-    colors = _get_colors(urdf_robot)   
+    colors = _get_colors(urdf_robot)
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
     i += 1
@@ -160,7 +160,7 @@ def robot_from_urdf(
     for urdf_joint in urdf_robot.joints:
         progressBar.setValue(i)
         QtGui.QApplication.processEvents()
-        i += 1        
+        i += 1
         ros_joint = _add_ros_joint(urdf_joint, robot)
         joint_map[urdf_joint.name] = ros_joint
     # Mimic joints must be handled after creating all joints because the
