@@ -17,7 +17,7 @@ from urdf_parser_py.urdf import Mesh
 from urdf_parser_py.urdf import Pose
 from urdf_parser_py.urdf import Sphere
 
-from .freecad_utils import add_object
+from .freecad_utils import add_object, is_part_feature
 from .freecad_utils import is_group
 from .freecad_utils import is_mesh
 from .freecad_utils import warn
@@ -37,6 +37,7 @@ Shape = [Box, Cylinder, Mesh, Sphere]
 def obj_from_geometry(
         geometry: Shape,
         doc_or_group: [Doc | DO],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[Optional[DO], Optional[Path]]:
     """Return a FreeCAD object for the URDF shape with the path for meshes."""
     if isinstance(geometry, Box):
@@ -44,7 +45,7 @@ def obj_from_geometry(
     if isinstance(geometry, Cylinder):
         return obj_from_cylinder(geometry, doc_or_group)
     if isinstance(geometry, Mesh):
-        return obj_from_mesh(geometry, doc_or_group)
+        return obj_from_mesh(geometry, doc_or_group, convert_mesh_to_solid)
     if isinstance(geometry, Sphere):
         return obj_from_sphere(geometry, doc_or_group)
     raise NotImplementedError('Primitive not implemented')
@@ -147,6 +148,7 @@ def obj_from_cylinder(
 def obj_from_mesh(
         geometry: Mesh,
         doc_or_group: [Doc | DO],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[Optional[DO], Optional[Path]]:
     """Return a `Mesh::Feature` object and the path to its file.
 
@@ -169,26 +171,30 @@ def obj_from_mesh(
     # different format than `package://...`.
     mesh_ros_path = ros_path_from_abs_path(mesh_path.expanduser())
 
-    # Look for an existing object with the same mesh.
     if is_group(doc_or_group):
         doc = doc_or_group.Document
         group = doc_or_group
     else:
         doc = doc_or_group
         group = None
+
+    # Look for an existing object with the same mesh.
     for obj in doc.Objects:
-        if is_mesh(obj):
+        if not convert_mesh_to_solid and is_mesh(obj):
             if obj.Label2 == mesh_ros_path:
                 return obj, mesh_path
+        elif convert_mesh_to_solid and is_part_feature(obj):
+            if obj.Label2 == mesh_ros_path:
+                return obj, mesh_path            
+            
     if mesh_path.suffix.lower() == '.dae':
         raw_mesh = read_mesh_dae(mesh_path)
     else:
         raw_mesh = fcmesh.read(str(mesh_path))
+
     mesh_obj = doc.addObject('Mesh::Feature', mesh_path.name)
     mesh_obj.Label = mesh_path.name
     mesh_obj.Label2 = mesh_ros_path
-    if group:
-        group.addObject(mesh_obj)
     mesh_obj.Mesh = raw_mesh
     if mesh_path.suffix.lower() in ['.stl', '.obj']:
         scale_mesh_object(mesh_obj, 1000.0)  # m to mm.
@@ -198,7 +204,38 @@ def obj_from_mesh(
                 or geometry.scale == [1.0, 1.0, 1.0]
             )):
         scale_mesh_object(mesh_obj, geometry.scale)
-    return mesh_obj, mesh_path
+
+    mesh_or_solid_obj = mesh_obj
+
+    if convert_mesh_to_solid:            
+        import Part
+        ### Begin command Part_ShapeFromMesh
+        mesh_obj_shape = doc.addObject('Part::Feature', mesh_obj.Label2 + '_shape')
+        __shape__ = Part.Shape()
+        __shape__.makeShapeFromMesh(mesh_obj.Mesh.Topology, 0.100000, False)
+        mesh_obj_shape.Shape = __shape__
+        mesh_obj_shape.purgeTouched()
+        del __shape__
+        ### End command Part_ShapeFromMesh
+
+        ### Begin command Part_MakeSolid
+        __s__=mesh_obj_shape.Shape.Faces
+        __s__=Part.Solid(Part.Shell(__s__))
+        mesh_obj_solid=doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
+        mesh_obj_solid.Label=mesh_path.name
+        mesh_obj_solid.Label2=mesh_ros_path
+        mesh_obj_solid.Shape=__s__
+        mesh_obj_solid.purgeTouched()
+        mesh_or_solid_obj = mesh_obj_solid  
+        del __s__, mesh_obj_solid
+        ### End command Part_MakeSolid
+        doc.removeObject(mesh_obj_shape.Name)
+        doc.removeObject(mesh_obj.Name)
+        
+    if group:
+        group.addObject(mesh_or_solid_obj)
+         
+    return mesh_or_solid_obj, mesh_path
 
 
 def obj_from_sphere(

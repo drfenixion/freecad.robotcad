@@ -344,6 +344,11 @@ def is_mesh(obj: DO) -> bool:
     return is_derived_from(obj, 'Mesh::Feature')
 
 
+def is_part_feature(obj: DO) -> bool:
+    """Return True if the object is a 'Part::Feature'."""
+    return is_derived_from(obj, 'Part::Feature')
+
+
 def is_part(obj: DO) -> bool:
     """Return True if the object is a 'App::Part'."""
     return is_derived_from(obj, 'App::Part')

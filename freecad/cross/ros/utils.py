@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import copy
 from pathlib import Path
+import re
 from typing import Optional
 import os
 import sys
@@ -223,6 +224,7 @@ def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
 
 def pkg_and_file_from_ros_path(
         path: str,
+        check_package_compiled: bool = True
 ) -> tuple[Optional[str], Optional[str]]:
     """Return the tuple (package_name, relative_file_path).
 
@@ -255,7 +257,8 @@ def pkg_and_file_from_ros_path(
         warn(f'Invalid ROS path `{path}`', False)
         return None, None
     try:
-        get_package_share_directory(pkg)
+        if check_package_compiled:
+            get_package_share_directory(pkg)
     except PackageNotFoundError as e:
         warn(f'Package {pkg} not found: {e}', False)
         return None, None
@@ -282,7 +285,7 @@ def abs_path_from_ros_path(
     """
     # Import here to be able to import the module without ROS.
     try:
-        from ament_index_python.packages import get_package_share_directory  # type: ignore
+        from ament_index_python.packages import get_package_share_directory, PackageNotFoundError  # type: ignore
     except ImportError:
         warn('Cannot import ament_index_python.packages', False)
         return None
@@ -297,10 +300,26 @@ def abs_path_from_ros_path(
     ):
         return None
     if path.startswith('package://'):
-        pkg, rel_path = pkg_and_file_from_ros_path(path)
+        pkg, rel_path = pkg_and_file_from_ros_path(path, check_package_compiled = False)
+
         if not pkg:
             return None
-        pkg_path = get_package_share_directory(pkg)
+        
+        pkg_path = None
+        try:
+            pkg_path = get_package_share_directory(pkg)
+        except PackageNotFoundError:
+            pass
+        if not pkg_path:
+            # trying get pkg_path for not compiled packages (based urdf path)
+            from .. import robot_from_urdf
+            pattern = f".*{re.escape(pkg)}"
+            match = re.search(pattern, robot_from_urdf.urdf_filename)
+            if match:
+                pkg_path = match.group(0)
+        if not pkg_path:
+            return None
+        
         return Path(pkg_path) / rel_path
     elif path.startswith('file://'):
         if relative_to is not None:

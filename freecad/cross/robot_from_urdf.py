@@ -8,6 +8,7 @@ from typing import Any, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 import FreeCAD as fc
+from freecad.cross.freecadgui_utils import set_collision_appearance
 
 from .freecad_utils import add_object
 from .freecad_utils import make_group
@@ -55,6 +56,9 @@ if TYPE_CHECKING:
     CollisionList = List[UrdfCollision]
 
 
+urdf_filename = ''
+
+
 @dataclass
 class Color:
     """An RGBA color with float values ∈ [0, 1]."""
@@ -92,7 +96,7 @@ def robot_from_urdf(
     # visual_map: dict[str, AppPart] = {}
     # collision_map: dict[str, AppPart] = {}
     for urdf_link in urdf_robot.links:
-        ros_link, visual_part, collision_part = _add_ros_link(
+        ros_link, visual_part, collision_part, real_part = _add_ros_link(
             urdf_link, robot, parts_group,
         )
         # visual_map[urdf_link.name] = visual_part
@@ -104,10 +108,20 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom)
         for fc_link in fc_links:
             robot.Proxy.created_objects.append(fc_link)
+
+        geoms, fc_links = _add_real(
+                urdf_link, parts_group, ros_link, real_part, colors,
+        )
+        for geom in geoms:
+            robot.Proxy.created_objects.append(geom)
+        for fc_link in fc_links:
+            robot.Proxy.created_objects.append(fc_link)
+
         geoms, fc_links = _add_collision(
                 urdf_link, parts_group, ros_link, collision_part, colors,
         )
         for geom in geoms:
+            set_collision_appearance(geom)
             robot.Proxy.created_objects.append(geom)
         for fc_link in fc_links:
             robot.Proxy.created_objects.append(fc_link)
@@ -125,7 +139,7 @@ def robot_from_urdf(
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         robot.ViewObject.ShowReal = False
         robot.ViewObject.ShowVisual = True
-        robot.ViewObject.ShowCollision = False
+        robot.ViewObject.ShowCollision = True
     return robot
 
 
@@ -206,7 +220,7 @@ def _add_ros_link(
     - Add an "App::Part for the collision of each link.
     - Add a "Cross::Link" with references to them.
 
-    Return (CROSS::Link, part for visual, part for collision).
+    Return (CROSS::Link, part for visual, part for collision, part for real).
 
     Parameters
     ----------
@@ -217,17 +231,26 @@ def _add_ros_link(
     """
     name = urdf_link.name
     doc = robot.Document
+
     visual_part = add_object(parts_group, 'App::Part', f'visual_{name}_')
-    robot.Proxy.created_objects.append(visual_part)
     visual_part.Visibility = False
+    robot.Proxy.created_objects.append(visual_part)
+    
+
+    real_part = add_object(parts_group, 'App::Part', f'real_{name}_')
+    real_part.Visibility = False
+    robot.Proxy.created_objects.append(real_part)
+    
     collision_part = add_object(parts_group, 'App::Part', f'collision_{name}_')
     collision_part.Visibility = False
     robot.Proxy.created_objects.append(collision_part)
+
     ros_link = make_link(name, doc)
     ros_link.Label2 = name
     ros_link.adjustRelativeLinks(robot)
     _set_link_inertial(ros_link, urdf_link)
     robot.addObject(ros_link)
+
     link_to_visual_part = add_object(
         parts_group, 'App::Link',
         f'visual_{name}',
@@ -240,6 +263,15 @@ def _add_ros_link(
     # ros_link.Visual is a new object on each evoking.
     ros_link.Visual = [link_to_visual_part]
 
+    link_to_real_part = add_object(
+        parts_group, 'App::Link',
+        f'real_{name}',
+    )
+    robot.Proxy.created_objects.append(link_to_real_part)
+    link_to_real_part.setLink(real_part)
+    link_to_real_part.Visibility = False
+    ros_link.Real = [link_to_real_part]    
+
     link_to_collision_part = add_object(
         parts_group, 'App::Link',
         f'collision_{name}',
@@ -248,7 +280,8 @@ def _add_ros_link(
     link_to_collision_part.setLink(collision_part)
     link_to_collision_part.Visibility = False
     ros_link.Collision = [link_to_collision_part]
-    return ros_link, visual_part, collision_part
+
+    return ros_link, visual_part, collision_part, real_part
 
 
 def _set_link_inertial(
@@ -416,6 +449,35 @@ def _add_visual(
     )
 
 
+def _add_real(
+        urdf_link: UrdfLink,
+        parts_group: DOG,
+        ros_link: CrossLink,
+        real_part: AppPart,
+        colors: dict[str, Color],
+) -> tuple[DOList, DOList]:
+    """Add the real geometries to a robot.
+
+    Return the list of objects representing the geometries and the list of
+    FreeCAD links.
+
+    Parameters
+    ==========
+
+    - All parameters of `_add_geometries` except `name_linked_geom`.
+
+    """
+    name_linked_geom = f'{urdf_link.name}_real'
+    return _add_geometries(
+        parts_group,
+        ros_link,
+        real_part,
+        urdf_link.visuals,
+        name_linked_geom,
+        colors,
+    )
+
+
 def _add_collision(
         urdf_link: UrdfLink,
         parts_group: DOG,
@@ -508,7 +570,7 @@ def _add_geometries(
     for geometry in geometries:
         # Make the FC object in the group.
         try:
-            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group)
+            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid = True)
         except NotImplementedError:
             continue
         if not geom_obj:
