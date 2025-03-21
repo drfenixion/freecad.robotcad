@@ -8,8 +8,13 @@ from typing import Any, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 import FreeCAD as fc
-from freecad.cross.freecadgui_utils import set_collision_appearance
+import FreeCADGui as fcgui
+try:
+    from PySide import QtGui, QtCore, QtWidgets
+except:
+    from PySide2 import QtGui, QtCore, QtWidgets
 
+from freecad.cross.freecadgui_utils import set_collision_appearance
 from .freecad_utils import add_object
 from .freecad_utils import make_group
 from .freecad_utils import warn
@@ -89,18 +94,43 @@ def robot_from_urdf(
 ) -> CrossRobot:
     """Creates a CROSS::Robot from URDF."""
 
+    # Create a progress bar
+    progressBar = QtGui.QProgressBar()
+    # progressBar.setGeometry(10, 10, 280, 30)
+    progressBar.setRange(0, len(urdf_robot.links) + len(urdf_robot.joints) + 3)
+    progressBar.setFormat("Creating model based on URDF/xacro (can be few minutes)... %p%")
+
+    mw = fcgui.getMainWindow()
+    mw.statusBar().setStyleSheet("QStatusBar::item { border: none; }")
+    mw.statusBar().addWidget(progressBar, stretch=1)
+    
+
+    progressBar.show()
+
+    i = 0
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 1
+
     robot, parts_group = _make_robot(doc, urdf_robot.name)
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 1
 
-    colors = _get_colors(urdf_robot)
+    colors = _get_colors(urdf_robot)   
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 1
 
-    # visual_map: dict[str, AppPart] = {}
-    # collision_map: dict[str, AppPart] = {}
+
     for urdf_link in urdf_robot.links:
+        progressBar.setValue(i)
+        QtGui.QApplication.processEvents()
+        i += 1
         ros_link, visual_part, collision_part, real_part = _add_ros_link(
             urdf_link, robot, parts_group,
         )
-        # visual_map[urdf_link.name] = visual_part
-        # collision_map[urdf_link.name] = collision_part
+
         geoms, fc_links = _add_visual(
                 urdf_link, parts_group, ros_link, visual_part, colors,
         )
@@ -128,6 +158,9 @@ def robot_from_urdf(
 
     joint_map: dict[str, CrossJoint] = {}
     for urdf_joint in urdf_robot.joints:
+        progressBar.setValue(i)
+        QtGui.QApplication.processEvents()
+        i += 1        
         ros_joint = _add_ros_joint(urdf_joint, robot)
         joint_map[urdf_joint.name] = ros_joint
     # Mimic joints must be handled after creating all joints because the
@@ -140,6 +173,8 @@ def robot_from_urdf(
         robot.ViewObject.ShowReal = False
         robot.ViewObject.ShowVisual = True
         robot.ViewObject.ShowCollision = True
+
+    progressBar.close()
     return robot
 
 
