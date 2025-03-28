@@ -352,7 +352,7 @@ def _add_ros_link(
     collision_part.Visibility = False
     robot.Proxy.created_objects.append(collision_part)
 
-    ros_link = make_link(name, doc)
+    ros_link = make_link(name, doc, recompute_after = False)
     ros_link.Label2 = name
     ros_link.adjustRelativeLinks(robot)
     _set_link_inertial(ros_link, urdf_link)
@@ -425,7 +425,7 @@ def _add_ros_joint(
         robot: CrossRobot,
 ) -> CrossJoint:
     doc = robot.Document
-    ros_joint = make_joint(urdf_joint.name, doc)
+    ros_joint = make_joint(urdf_joint.name, doc, recompute_after = False)
     ros_joint.Label2 = urdf_joint.name
     ros_joint.adjustRelativeLinks(robot)
     robot.addObject(ros_joint)

@@ -647,7 +647,7 @@ class _ViewProviderJoint(ProxyBase):
         pass
 
 
-def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None = None) -> CrossJoint:
+def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None = None, recompute_after: bool = True) -> CrossJoint:
     """Add a Cross::Joint to the current document."""
     if doc is None:
         doc = fc.activeDocument()
@@ -689,7 +689,8 @@ def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None 
                     joint.Parent = ros_name(candidate)
                     if robot.ViewObject:
                         joint.ViewObject.AxisLength = robot.ViewObject.JointAxisLength
-    doc.recompute()
+    if recompute_after:
+        doc.recompute()
     return joint
 
 

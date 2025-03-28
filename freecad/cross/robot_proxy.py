@@ -246,6 +246,7 @@ class RobotProxy(ProxyBase):
         self._attached_collision_objects: Optional[list[CrossAttachedCollisionObject]] = None
         self._links: Optional[list[CrossLink]] = None
         self._joints: Optional[list[CrossJoint]] = None
+        self._joints_old: Optional[list[CrossJoint]] = []
 
         self._controllers: Optional[list[CrossController]] = None
         self._broadcasters: Optional[list[CrossController]] = None
@@ -361,6 +362,7 @@ class RobotProxy(ProxyBase):
         if prop in ['Group']:
             # Reset _links and _joints to provoke a recompute.
             self._links = None
+            self._joints_old = self._joints
             self._joints = None
             self._controllers = None
             self._broadcasters = None
@@ -506,7 +508,8 @@ class RobotProxy(ProxyBase):
                     links.append(link_name)
             return links
 
-        for joint in self.get_joints():
+        sym_diff_joints = set(self.get_joints()).symmetric_difference(set(self.get_joints_old()))
+        for joint in sym_diff_joints:
             # We add the empty string to show that the child or parent
             # was not set yet.
             parent_links: list[str] = ['']
@@ -650,6 +653,9 @@ class RobotProxy(ProxyBase):
         self._joints = get_joints(self.robot.Group)
         return list(self._joints)  # A copy.
 
+    def get_joints_old(self) -> list[CrossJoint]:
+        """Return the list of CROSS old (before onChanged()) joints in the order of creation."""
+        return self._joints_old
 
     def get_controllers(self) -> list[CrossController]:
         """Return the list of CROSS controllers in the order of creation."""

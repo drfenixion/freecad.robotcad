@@ -793,7 +793,7 @@ class _ViewProviderLink(ProxyBase):
         pass
 
 
-def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
+def make_link(name, doc: Optional[fc.Document] = None, recompute_after: bool = True) -> CrossLink:
     """Add a Cross::Link to the current document."""
     if doc is None:
         doc = fc.activeDocument()
@@ -832,7 +832,8 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
                         cross_link.ViewObject.ShowReal = robot.ViewObject.ShowReal
                         cross_link.ViewObject.ShowVisual = robot.ViewObject.ShowVisual
                         cross_link.ViewObject.ShowCollision = robot.ViewObject.ShowCollision
-    doc.recompute()
+    if recompute_after:
+        doc.recompute()
     return cross_link
 
 
