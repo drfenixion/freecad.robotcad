@@ -105,6 +105,10 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('xmltodict')
 
+try:
+    import pycollada
+except (ModuleNotFoundError, ImportError):
+    pip_install('pycollada')
 
 # Must be imported after the call to `add_ros_library_path`.
 from .ros.utils import is_ros_found  # noqa: E402.
