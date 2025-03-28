@@ -4,17 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import degrees
+from pathlib import Path
 from typing import Any, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from freecad.cross.gui_utils import tr
+from freecad.cross.urdf_loader import UrdfLoader
 try:
     from PySide import QtGui, QtCore, QtWidgets
 except:
     from PySide2 import QtGui, QtCore, QtWidgets
 
-from freecad.cross.freecadgui_utils import set_collision_appearance
+from freecad.cross.freecadgui_utils import get_progress_bar, set_collision_appearance
 from .freecad_utils import add_object
 from .freecad_utils import make_group
 from .freecad_utils import warn
@@ -61,7 +64,11 @@ if TYPE_CHECKING:
     CollisionList = List[UrdfCollision]
 
 
-urdf_filename = ''
+from . import robot_from_urdf as current_file
+
+urdf_filename = None
+package_path = None
+repository_path = None
 
 
 @dataclass
@@ -87,24 +94,65 @@ class Color:
             Shininess=0.90,
         )
 
+def robot_from_urdf_path(
+        doc: fc.Document,
+        filename_path,
+        package_path = None,
+        repository_path = None,
+) -> CrossRobot:
+    current_file.urdf_filename = filename_path
+    current_file.package_path = package_path
+    current_file.repository_path = repository_path
+    urdf_robot = UrdfLoader.load_from_file(urdf_filename, current_file)
+    robot = robot_from_urdf(doc, urdf_robot)
+
+    return robot
+
+
+def get_real_pkg_path(
+        pkg_name: str,
+        default_pkg_path_from_desc_pkg_path:bool = False,
+) -> str | None:
+    """Get real package path based on package_path, repository_path and pkg_name.
+    Working with robot_descriptions module and useless if URDF is gotten not from it."""
+    pkg_path = None
+    # loaded from robot_descriptions
+    if not pkg_path and current_file.package_path:
+        last_path_segment = Path(current_file.package_path).name
+        if last_path_segment == pkg_name:
+            pkg_path = current_file.package_path
+
+    # In some cases package_path can not be not really package path
+    # and we check reposity path as package (f.e. Panda Gepetto)
+    if not pkg_path and current_file.repository_path:
+        last_path_segment = Path(current_file.repository_path).name
+        if last_path_segment == pkg_name:
+            pkg_path = current_file.repository_path
+
+    # if we dont have pkg_name
+    # just use package_path (in some cases can be not really package path)
+    # it is problem of description packages integrated in robot_descriptions
+    if default_pkg_path_from_desc_pkg_path and not pkg_path and current_file.package_path:
+        pkg_path = current_file.package_path
+    return pkg_path
+
+
 
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
 ) -> CrossRobot:
     """Creates a CROSS::Robot from URDF."""
+    doc.openTransaction(tr('Robot from URDF'))
 
-    # Create a progress bar
-    progressBar = QtGui.QProgressBar()
-    # progressBar.setGeometry(10, 10, 280, 30)
-    progressBar.setRange(0, len(urdf_robot.links) + len(urdf_robot.joints) + 3)
-    progressBar.setFormat("Creating model based on URDF/xacro (can be few minutes)... %p%")
-
-    mw = fcgui.getMainWindow()
-    mw.statusBar().setStyleSheet("QStatusBar::item { border: none; }")
-    mw.statusBar().addWidget(progressBar, stretch=1)
-
-
+    pkg_name = ''
+    if current_file.package_path:
+        pkg_name = 'of ' + Path(current_file.package_path).name
+    progressBar = get_progress_bar(
+        title = "Creating model based on URDF/xacro " + pkg_name + "...",
+        min = 0,
+        max = len(urdf_robot.links) + len(urdf_robot.joints) + 10,
+    )
     progressBar.show()
 
     i = 0
@@ -113,6 +161,14 @@ def robot_from_urdf(
     i += 1
 
     robot, parts_group = _make_robot(doc, urdf_robot.name)
+    # Change the Show properties before having added all links.
+    # Disable show of all for not creating any link to real, visial, collision
+    # in progress of creating robot links
+    if hasattr(fc, 'GuiUp') and fc.GuiUp:
+        robot.ViewObject.ShowReal = False
+        robot.ViewObject.ShowVisual = False
+        robot.ViewObject.ShowCollision = False
+
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
     i += 1
@@ -140,7 +196,7 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(fc_link)
 
         geoms, fc_links = _add_real(
-                urdf_link, parts_group, ros_link, real_part, colors,
+                urdf_link, parts_group, ros_link, real_part, colors, convert_mesh_to_solid = True,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
@@ -148,7 +204,7 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(fc_link)
 
         geoms, fc_links = _add_collision(
-                urdf_link, parts_group, ros_link, collision_part, colors,
+                urdf_link, parts_group, ros_link, collision_part, colors, convert_mesh_to_solid = True,
         )
         for geom in geoms:
             set_collision_appearance(geom)
@@ -166,15 +222,30 @@ def robot_from_urdf(
     # Mimic joints must be handled after creating all joints because the
     # mimicking joint can be defined before the mimicked joint in URDF.
     _define_mimic_joints(urdf_robot, joint_map)
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 2
+
     _compensate_joint_placement(robot, urdf_robot, joint_map)
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 3
 
     # Change the visual properties after having added all links.
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         robot.ViewObject.ShowReal = False
         robot.ViewObject.ShowVisual = True
-        robot.ViewObject.ShowCollision = True
+        robot.ViewObject.ShowCollision = False
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+    i += 2
+
+    doc.recompute()
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
 
     progressBar.close()
+    doc.commitTransaction()
     return robot
 
 
@@ -249,10 +320,11 @@ def _add_ros_link(
         robot: CrossRobot,
         parts_group: DOG,
 ) -> Tuple[CrossLink, AppPart, AppPart]:
-    """Add two App::Part to the group and links to them to the robot.
+    """Add three App::Part to the group and links to them to the robot.
 
     - Add an "App::Part" for the visual of each link.
     - Add an "App::Part for the collision of each link.
+    - Add an "App::Part for the real of each link.
     - Add a "Cross::Link" with references to them.
 
     Return (CROSS::Link, part for visual, part for collision, part for real).
@@ -461,6 +533,7 @@ def _add_visual(
         ros_link: CrossLink,
         visual_part: AppPart,
         colors: dict[str, Color],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the visual geometries to a robot.
 
@@ -481,6 +554,7 @@ def _add_visual(
         urdf_link.visuals,
         name_linked_geom,
         colors,
+        convert_mesh_to_solid,
     )
 
 
@@ -490,6 +564,7 @@ def _add_real(
         ros_link: CrossLink,
         real_part: AppPart,
         colors: dict[str, Color],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the real geometries to a robot.
 
@@ -510,6 +585,7 @@ def _add_real(
         urdf_link.visuals,
         name_linked_geom,
         colors,
+        convert_mesh_to_solid,
     )
 
 
@@ -519,6 +595,7 @@ def _add_collision(
         ros_link: CrossLink,
         collision_part: AppPart,
         colors: dict[str, Color],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the collision geometries to a robot.
 
@@ -539,6 +616,7 @@ def _add_collision(
         urdf_link.collisions,
         name_linked_geom,
         colors,
+        convert_mesh_to_solid,
     )
 
 
@@ -576,6 +654,7 @@ def _add_geometries(
         geometries: [VisualList | CollisionList],
         name_linked_geom: str,
         colors: dict[str, Color],
+        convert_mesh_to_solid: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the geometries from URDF into `group` and an App::Link to it into `link`.
 
@@ -605,7 +684,7 @@ def _add_geometries(
     for geometry in geometries:
         # Make the FC object in the group.
         try:
-            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid = True)
+            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid)
         except NotImplementedError:
             continue
         if not geom_obj:

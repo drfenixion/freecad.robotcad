@@ -32,7 +32,7 @@ from .freecad_utils import message
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
-from .freecadgui_utils import get_placement
+from .freecadgui_utils import get_placement, get_progress_bar, gui_process_events
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals, calc_md5
@@ -64,6 +64,8 @@ MODULES_PATH = MOD_PATH / 'modules'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
 SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
 SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
+ROBOT_DESCRIPTIONS_REPO_PATH = MOD_PATH / 'modules' / 'robot_descriptions'
+ROBOT_DESCRIPTIONS_MODULE_PATH = ROBOT_DESCRIPTIONS_REPO_PATH / 'robot_descriptions'
 SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors'
 LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
 JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
@@ -1033,8 +1035,25 @@ def git_change_submodule_branch(module_path: str, branch: str):
         git_init_submodules()
 
 
-def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
-    """ Do git submodule update --init if ros2_controllers module dir is empty """
+def git_init_submodules(
+        only_first_update: bool = True,
+        update_from_remote_branch: bool = True,
+        submodule_repo_path = ROS2_CONTROLLERS_PATH,
+        pip_deps_install_submodule_paths: list = [ROBOT_DESCRIPTIONS_REPO_PATH],
+):
+    """
+    Initializes and updates Git submodules.
+
+    Args:
+        only_first_update: Update submodules for the first time. Check first time by empty of submodule_repo_path dir.
+        update_from_remote_branch: Whether to update submodules from the remote branch.
+        submodule_repo_path: The path to the submodule repository.
+        pip_deps_install_module_paths: Modules paths where should be made pip install when updates Git submodules.
+
+    Description:
+    This function checks if the submodule_repo_path directory is empty and initializes and updates Git submodules if necessary.
+    Also does update when .gitmodules file changed.
+    """
 
     def git_deinit_submodules():
         message('Deinit git submodules.')
@@ -1059,14 +1078,40 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
         )
         print('process:', p)
 
+        for pip_deps_installmodule_path in pip_deps_install_submodule_paths:
+            pip_install_dependencies_of_module(pip_deps_installmodule_path)
+
+
+    def pip_install_dependencies_of_module(target_module_path: str):
+        message('Pip install dependencies of module.')
+        p = subprocess.run(
+            ["pip download ."],
+            shell=True,
+            capture_output=True,
+            cwd=target_module_path,
+            check=True,
+        )
+        print('process:', p)
+
+
+    progressBar = get_progress_bar(
+        title = "Git submodules download and update... Please wait.",
+        min = 0,
+        max = 100,
+        show_percents = False,
+    )
+    progressBar.show()
+    progressBar.setValue(0)
+    gui_process_events()
+
 
     update_from_remote_branch_param = ''
     if update_from_remote_branch:
         update_from_remote_branch_param = '--remote'
 
 
-    files_and_dirs = os.listdir(update_if_dir_is_empty)
-    # update if dir is empty
+    files_and_dirs = os.listdir(submodule_repo_path)
+    # update if dir is empty or .gitmodules file was changed
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
         if not len(files_and_dirs):
@@ -1076,6 +1121,9 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
             git_update_submodules(update_from_remote_branch_param)
     else:
         git_update_submodules(update_from_remote_branch_param)
+
+    progressBar.setValue(100)
+    progressBar.close()
 
 
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:

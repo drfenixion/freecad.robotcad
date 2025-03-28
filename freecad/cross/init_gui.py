@@ -20,6 +20,7 @@ from .ui import command_explode_links # noqa: F401
 from .ui import command_new_trajectory # noqa: F401
 from .ui import command_new_controller # noqa: F401
 from .ui import command_new_sensor # noqa: F401
+from .ui import command_open_models_library # noqa: F401
 from .ui import command_new_workcell # noqa: F401
 from .ui import command_new_xacro_object # noqa: F401
 from .ui import command_new_lcs_at_robot_link_body # noqa: F401
@@ -78,6 +79,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
@@ -126,6 +128,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.

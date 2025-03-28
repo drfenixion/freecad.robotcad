@@ -154,7 +154,7 @@ def i_th_item(generator: Generator, i: int):
 
 def get_parent_by_pattern(
         file_path: [Path | str],
-        pattern: str,
+        pattern: str | list,
         type: Optional[str] = None,
 ) -> tuple[Path, str]:
     """Return the parent directory of the given file containing pattern.
@@ -167,6 +167,18 @@ def get_parent_by_pattern(
 
     If the pattern was not found, return `(Path(), '')`.
 
+
+    Args:
+        file_path (Path | str): The path to the file for which to find the parent directory containing the specified pattern.
+        pattern (str | list): The pattern to search for in the parent directories of the file. Can be a single string or a list of strings.
+        type (Optional[str], optional): The type of the pattern to search for. Can be one of the following:
+            - 'f' or 'file': Search for a file with the specified pattern.
+            - 'd' or 'directory': Search for a directory with the specified pattern.
+            - None (default): Search for either a file or directory with the specified pattern.
+
+    Returns:
+        tuple[Path, str]: A tuple containing the parent directory that contains the pattern and the file path
+        relative to this parent path. If the pattern is not found, returns (Path(), '').
     """
     file_path = Path(file_path).expanduser()
     if not file_path.is_absolute():
@@ -182,15 +194,21 @@ def get_parent_by_pattern(
             return p.exists()
     relative_file_path = ''
     while True:
-        candidate_path_to_pattern = file_path / pattern
-        if is_correct_type(candidate_path_to_pattern):
-            return file_path, relative_file_path
+        if isinstance(pattern, list):
+            for p in pattern:
+                candidate_path_to_pattern = file_path / p
+                if is_correct_type(candidate_path_to_pattern):
+                    return file_path, relative_file_path
+        else:
+            candidate_path_to_pattern = file_path / pattern
+            if is_correct_type(candidate_path_to_pattern):
+                return file_path, relative_file_path
         relative_file_path = (
             f'{file_path.name}/{relative_file_path}'
             if relative_file_path else file_path.name
         )
         file_path = file_path.parent
-        if file_path.samefile(Path(file_path.root)):
+        if file_path.exists() and file_path.samefile(Path(file_path.root)):
             # We are at the root.
             return Path(), relative_file_path
 

@@ -6,8 +6,7 @@ from PySide import QtGui  # FreeCAD's PySide!
 
 from ..freecad_utils import warn
 from ..gui_utils import tr
-from ..robot_from_urdf import robot_from_urdf as robot_from_urdf_func
-from .. import robot_from_urdf
+from ..robot_from_urdf import robot_from_urdf_path
 from ..ros.utils import is_ros_found
 try:
     from ..urdf_loader import UrdfLoader
@@ -39,13 +38,12 @@ class _UrdfImportCommand:
             if not doc:
                 doc = fc.newDocument()
             urdf_filename = str(dialog.selectedFiles()[0])
-            robot_from_urdf.urdf_filename = urdf_filename
-            urdf_robot = UrdfLoader.load_from_file(urdf_filename)
-            doc.openTransaction(tr('Robot from URDF'))
-            robot_from_urdf_func(doc, urdf_robot)
-            doc.commitTransaction()
-            doc.recompute()
+            robot_from_urdf_path(
+                fc.activeDocument(),
+                urdf_filename,
+            )
             fcgui.SendMsgToActiveView('ViewFit')
+
 
     def IsActive(self):
         return is_ros_found() and imports_ok
