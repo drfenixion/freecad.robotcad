@@ -123,7 +123,7 @@ if [ -z "$(command -v docker)" ]; then
         $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
         sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
-        
+
         # Install the Docker:
         sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 
@@ -134,7 +134,7 @@ if [ -z "$(command -v docker)" ]; then
         # Restart Docker service
         echo 'Restarting Docker service...'
         sudo systemctl restart docker
-        
+
         echo ''
         echo 'Docker installed successfully! In case of any problem with it reboot computer.'
         echo ''
@@ -142,7 +142,7 @@ if [ -z "$(command -v docker)" ]; then
         echo 'Installation does not proceed in Ubuntu. Installation is interupted.'
         echo 'Install Docker manually for your Linux distribution and run this script again. https://docs.docker.com/engine/install/'
         exit 1
-    fi    
+    fi
 fi
 ## END Docker install
 
@@ -159,6 +159,7 @@ for dir in 'build' 'install' 'log' 'ros2_system_logs'
 do
     [ -d $build_data_path/$dir ] || mkdir -p $build_data_path/$dir
 done
+#'usr_lib_python-major-ver_dist-packages' 'usr_local_lib_python_ver_dist-packages'
 
 
 # remove current container if want to run new one
@@ -247,7 +248,7 @@ else
     host_freecad_share_path=$HOME/.local/share/FreeCAD
     cont_freecad_mods_path=$cont_user_path/.local/share/FreeCAD/Mod
     cont_freecad_share_path=$cont_user_path/.local/share/FreeCAD
-    
+
     if [ ! -d "$host_freecad_mods_path" ]; then
         # Create the directory and its parents if they don't exist
         echo "Create host freecad mods directory."
@@ -290,7 +291,9 @@ else
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
-    
+    # --mount dst=/usr/lib/python3/dist-packages,volume-opt=device=$build_data_path/usr_lib_python-major-ver_dist-packages$mount_options \
+    # --mount dst=/usr/local/lib/python3.12/dist-packages,volume-opt=device=$build_data_path/usr_local_lib_python_ver_dist-packages$mount_options \
+
     echo "Ran new container."
 
 fi
