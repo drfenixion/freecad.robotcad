@@ -343,7 +343,6 @@ def _add_ros_link(
     visual_part.Visibility = False
     robot.Proxy.created_objects.append(visual_part)
 
-
     real_part = add_object(parts_group, 'App::Part', f'real_{name}_')
     real_part.Visibility = False
     robot.Proxy.created_objects.append(real_part)
@@ -358,35 +357,9 @@ def _add_ros_link(
     _set_link_inertial(ros_link, urdf_link)
     robot.addObject(ros_link)
 
-    link_to_visual_part = add_object(
-        parts_group, 'App::Link',
-        f'visual_{name}',
-    )
-    robot.Proxy.created_objects.append(link_to_visual_part)
-    # TODO: make a function utils.make_link.
-    link_to_visual_part.setLink(visual_part)
-    link_to_visual_part.Visibility = False
-    # Implementation note: ros_link.Visual.append() doesn't work because
-    # ros_link.Visual is a new object on each evoking.
-    ros_link.Visual = [link_to_visual_part]
-
-    link_to_real_part = add_object(
-        parts_group, 'App::Link',
-        f'real_{name}',
-    )
-    robot.Proxy.created_objects.append(link_to_real_part)
-    link_to_real_part.setLink(real_part)
-    link_to_real_part.Visibility = False
-    ros_link.Real = [link_to_real_part]
-
-    link_to_collision_part = add_object(
-        parts_group, 'App::Link',
-        f'collision_{name}',
-    )
-    robot.Proxy.created_objects.append(link_to_collision_part)
-    link_to_collision_part.setLink(collision_part)
-    link_to_collision_part.Visibility = False
-    ros_link.Collision = [link_to_collision_part]
+    ros_link.Visual = [visual_part]
+    ros_link.Real = [real_part]
+    ros_link.Collision = [collision_part]
 
     return ros_link, visual_part, collision_part, real_part
 
@@ -701,6 +674,7 @@ def _add_geometries(
 
         geom_obj.Visibility = False
         geom_objs.append(geom_obj)
+
         # Add a reference to geom_obj to `ros_link.Visual` or
         # `ros_link.Collision`.
         link_to_geom = add_object(part, 'App::Link', name_linked_geom)
