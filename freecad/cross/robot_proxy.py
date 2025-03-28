@@ -15,7 +15,7 @@ from copy import deepcopy
 import FreeCAD as fc
 
 from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide.QtWidgets import QMenu # FreeCAD's PySide
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -137,9 +137,11 @@ def _add_joint_variable(
         else:
             min_, max_ = joint.LowerLimit, joint.UpperLimit
             if value > max_:
-                error('Joint (' + var_name + ') value can not be more Upper limit')
+                warn('Joint (' + var_name + ') value can not be more Upper limit. Value set as Upper limit.')
+                value = max_
             if value < min_:
-                error('Joint (' + var_name + ') value can not be less LowerLimit limit')
+                warn('Joint (' + var_name + ') value can not be less Lower limit. Value set as Lower limit.')
+                value = min_
             if max_ < min_:
                 error('Joint (' + var_name + ') Upper limit can not be less LowerLimit limit')
         # Deactivate callback on change.
@@ -237,7 +239,7 @@ class RobotProxy(ProxyBase):
         # Used to restore the joint variables from the dumped state because
         # DocumentObject instances cannot be saved.
         # Defined in onDocumentRestored().
-        # TODO: Maybe save as two lists (App::PropertyLinkList and App::PropertyStringList).
+        # TODO: Maybe save as two lists (App::PropertyLinkListGlobal and App::PropertyStringList).
         self._joint_variables_ros_map: dict[str, str]
 
         # Save the children to speed-up get_links() and get_joints().
@@ -269,7 +271,7 @@ class RobotProxy(ProxyBase):
         obj._Type = self.Type
 
         add_property(
-            obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
+            obj, 'App::PropertyLinkListGlobal', 'CreatedObjects', 'Internal',
             'Objects created for the robot',
         )
 
