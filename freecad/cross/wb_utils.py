@@ -816,7 +816,7 @@ def make_lcs_at_link_body(
         deactivate_after_map_mode:bool = True,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
-    orienteer body must be wrapper by part and be Real element of robot link'''
+    orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
 
     # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
     #     orienteer_parents_reversed = reversed(obj.Parents)
