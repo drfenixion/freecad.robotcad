@@ -818,31 +818,66 @@ def make_lcs_at_link_body(
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by part and be Real element of robot link'''
 
-    link = None
-    # trying get link from subelement
+    # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
+    #     orienteer_parents_reversed = reversed(obj.Parents)
+    #     parent_obj = None
+    #     for parent in orienteer_parents_reversed:
+    #         parent_splited = parent[1].split('.')
+    #         if len(parent_splited) > 2:
+    #             parent_obj = fc.ActiveDocument.getObject(parent_splited[0])
+    #         break
+
+    #     if parent_obj:
+    #         placement = placement * parent_obj.Placement
+    #         return getParentsPlacementRecursively(parent_obj, placement)
+    #     else:
+    #         return obj, placement
+
+
+    link_to_obj = None
+    dynamic_link_of_robot_link = None
+    original_obj = None
+    dynamic_link_of_robot_link = None
+    original_obj_wrapper = None
     try:
         if is_fc_link(orienteer.Object):
-            link = orienteer.Object
+            link_to_obj = orienteer.Object
+            original_obj = link_to_obj.getLinkedObject(True)
+            link_to_obj_placement = link_to_obj.Placement
+
+            parents_reversed = reversed(link_to_obj.Parents)
+            for p in parents_reversed:
+                p = p[0]
+                if is_fc_link(p):
+                    dynamic_link_of_robot_link = p
+                else:
+                    original_obj_wrapper = p
         else:
-            orienteer_parents_reversed = reversed(orienteer.Object.Parents)
-            for parent in orienteer_parents_reversed:
-                parent = parent[0]
-                if is_fc_link(parent):
-                    link = parent
+            original_obj = orienteer.Object
+            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+
+            parents_reversed = reversed(original_obj.Parents)
+            for p in parents_reversed:
+                p = p[0]
+                if is_fc_link(p):
+                    dynamic_link_of_robot_link = p
+                else:
+                    original_obj_wrapper = p
+
     except (AttributeError, IndexError, RuntimeError):
         pass
 
-    # orienteer not a subelement (face, edge, etc)
-    if not link:
-        link = orienteer
+    if not original_obj_wrapper:
+        message('Can find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
+        raise RuntimeError()
 
-    obj = link.getLinkedObject(True)
-    obj_placement = obj.Placement
-    link_to_obj_placement = link.Placement
+    if not original_obj:
+        message('Can find original object for getting reference.', gui=True)
+        raise RuntimeError()
 
-    if not is_part(obj):
-        message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
-        raise NoPartWrapperOfObject()
+    if not dynamic_link_of_robot_link:
+        message('Can find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
+        raise RuntimeError()
 
     sub_element_name = ''
     sub_element_type = ''
@@ -858,12 +893,12 @@ def make_lcs_at_link_body(
 
     body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
 
-    obj.addObject(body_lcs_wrapper)
+    original_obj_wrapper.addObject(body_lcs_wrapper)
 
     lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS')
     body_lcs_wrapper.addObject(lcs)
 
-    setattr(lcs, lcs_attachmentsupport_name(), [(orienteer.Object, sub_element_name)])   # The X axis.
+    setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
 
     if sub_element_type == 'Vertex':
         lcs.MapMode = 'Translate'
@@ -883,11 +918,15 @@ def make_lcs_at_link_body(
         # prevent automove back to InertialCS rotation
         lcs.MapMode = 'Deactivated'
 
+    # remove placement of origin obj (mean in zero point of original obj)
+    lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+    # add placement of link of origin obj (mean in same place at face of link as at original obj)
+    lcs.Placement = link_to_obj_placement * lcs.Placement
     # fix Z rotation to 0 in frame of origin
     lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # find placement of lcs at link of obj. lcs.Placement is placement at support obj
-    placement = link_to_obj_placement * lcs.Placement
+    # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+    placement = dynamic_link_of_robot_link.Placement * lcs.Placement
 
     if delete_created_objects:
         fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
