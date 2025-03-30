@@ -187,30 +187,30 @@ def robot_from_urdf(
             urdf_link, robot, parts_group,
         )
 
-        geoms, fc_links = _add_visual(
+        geoms, geom_containers = _add_visual(
                 urdf_link, parts_group, ros_link, visual_part, colors,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
-        for fc_link in fc_links:
-            robot.Proxy.created_objects.append(fc_link)
+        for geom_container in geom_containers:
+            robot.Proxy.created_objects.append(geom_container)
 
-        geoms, fc_links = _add_real(
+        geoms, geom_containers = _add_real(
                 urdf_link, parts_group, ros_link, real_part, colors, convert_mesh_to_solid = True,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
-        for fc_link in fc_links:
-            robot.Proxy.created_objects.append(fc_link)
+        for geom_container in geom_containers:
+            robot.Proxy.created_objects.append(geom_container)
 
-        geoms, fc_links = _add_collision(
+        geoms, geom_containers = _add_collision(
                 urdf_link, parts_group, ros_link, collision_part, colors, convert_mesh_to_solid = True,
         )
         for geom in geoms:
             set_collision_appearance(geom)
             robot.Proxy.created_objects.append(geom)
-        for fc_link in fc_links:
-            robot.Proxy.created_objects.append(fc_link)
+        for geom_container in geom_containers:
+            robot.Proxy.created_objects.append(geom_container)
 
     joint_map: dict[str, CrossJoint] = {}
     for urdf_joint in urdf_robot.joints:
@@ -653,7 +653,7 @@ def _add_geometries(
 
     """
     geom_objs: DOList = []
-    links: DOList = []
+    geom_containers: DOList = []
     for geometry in geometries:
         # Make the FC object in the group.
         try:
@@ -678,8 +678,8 @@ def _add_geometries(
         # Add a reference to geom_obj to `ros_link.Visual` or
         # `ros_link.Collision`.
         link_to_geom = add_object(part, 'App::Link', name_linked_geom)
-
         link_to_geom.setLink(geom_obj)
+
         if hasattr(geometry, 'origin'):
             placement = (
                 placement_from_origin(geometry.origin)
@@ -687,6 +687,7 @@ def _add_geometries(
             )
         else:
             placement = geom_obj.Placement
+        # geom_obj.Placement = fc.Placement()
         link_to_geom.Placement = placement
-        links.append(link_to_geom)
-    return geom_objs, links
+        geom_containers.append(link_to_geom)
+    return geom_objs, geom_containers
