@@ -226,7 +226,7 @@ def obj_from_mesh(
 
             ### Begin command Part_MakeSolid
             __s__=mesh_obj_shape.Shape.Faces
-            __s__=Part.Solid(Part.Shell(__s__))
+            __s__=Part.Solid(Part.Shell(__s__).removeSplitter())
             mesh_obj_solid=doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
             mesh_obj_solid.Label=mesh_path.name
             mesh_obj_solid.Label2=mesh_ros_path
