@@ -67,7 +67,10 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                             vendor = match.group(1)
 
                 #QtWidgets.QLabel()
-                radio_button = QtWidgets.QRadioButton(name.replace('_description', '').capitalize() + ' ' + vendor.capitalize())
+                vendor = re.sub(r"face\Sook", '', vendor, flags=re.IGNORECASE)
+                radio_button = QtWidgets.QRadioButton(
+                    name.replace('_description', '').capitalize() + ' ' + vendor.capitalize(),
+                )
                 self.radio_buttons.append(radio_button)
                 self.button_group.addButton(radio_button)
                 layout.addWidget(radio_button, row_val, column_val)
