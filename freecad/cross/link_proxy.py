@@ -135,6 +135,14 @@ def _get_xmls_and_export_meshes(
         if is_body(export_datum.object) and volume_mm3(export_datum.object) <= 0.0:
             # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
             continue
+        if is_part(export_datum.object):
+            any_with_volume_inside = False
+            for el in export_datum.object.OutListRecursive:
+                if el.TypeId not in ['App::Line', 'App::Plane', 'App::Origin']:
+                    any_with_volume_inside = True
+            # dont create visuals and meshes for empty App::Part
+            if not any_with_volume_inside:
+                continue
         if not is_primitive(export_datum.object):
             mesh_path = (
                 package_parent / package_name
