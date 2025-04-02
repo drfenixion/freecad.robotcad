@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 from typing import Optional
 
@@ -222,21 +223,18 @@ def obj_from_mesh(
             mesh_obj_shape.Shape = __shape__
             mesh_obj_shape.purgeTouched()
             del __shape__
-            ### End command Part_ShapeFromMesh
-
             ### Begin command Part_MakeSolid
-            __s__=mesh_obj_shape.Shape.Faces
-            __s__=Part.Solid(Part.Shell(__s__).removeSplitter())
-            mesh_obj_solid=doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
-            mesh_obj_solid.Label=mesh_path.name
-            mesh_obj_solid.Label2=mesh_ros_path
-            mesh_obj_solid.Shape=__s__
+            mesh_obj_solid = doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
+            mesh_obj_solid.Label = mesh_path.name
+            mesh_obj_solid.Label2 = mesh_ros_path
+            mesh_obj_solid.Shape = Part.Solid(Part.Shell(mesh_obj_shape.Shape.Faces).removeSplitter())
             mesh_obj_solid.purgeTouched()
             mesh_or_solid_obj = mesh_obj_solid
-            del __s__, mesh_obj_solid
-            ### End command Part_MakeSolid
+            del mesh_obj_solid
+            # Remove intermediate objects
             doc.removeObject(mesh_obj_shape.Name)
             doc.removeObject(mesh_obj.Name)
+            gc.collect()
         except Exception as e:
             warn(f'Can`t create solid for mesh. Skip creating solid. ' + str(e))
             return None, None
