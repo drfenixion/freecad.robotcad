@@ -149,7 +149,7 @@ def robot_from_urdf(
     if current_file.package_path:
         pkg_name = 'of ' + Path(current_file.package_path).name
     progressBar = get_progress_bar(
-        title = "Creating model based on URDF/xacro " + pkg_name + "...",
+        title = "Creating model based on URDF/xacro " + pkg_name + ". May take a few minutes...",
         min = 0,
         max = len(urdf_robot.links) + len(urdf_robot.joints) + 10,
     )
