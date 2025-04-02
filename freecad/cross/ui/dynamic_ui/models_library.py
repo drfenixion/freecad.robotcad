@@ -24,20 +24,12 @@ class ModelsLibraryModalClass(QtGui.QDialog):
     def initUI(self):
         self.resize(400, 350)
         self.setWindowTitle("Models library")
+        self.main_layout = QtWidgets.QVBoxLayout()
 
-        main_layout = QtWidgets.QVBoxLayout()
-        layout = {}
-        formGroupBox = {}
-
-        # block
-        formGroupBox = QtWidgets.QGroupBox('Models description packages')
-        layout = QtWidgets.QGridLayout()
-        self.radio_buttons = []
-        self.button_group = QtWidgets.QButtonGroup()
-        row_val = 0
-        column_val = 0
+        # prepare data
         from modules.robot_descriptions.robot_descriptions._descriptions import DESCRIPTIONS
         from modules.robot_descriptions.robot_descriptions._repositories import REPOSITORIES
+        self.packages_grouped_by_tags = {}
         for name in sorted(list(DESCRIPTIONS)):
             desc = DESCRIPTIONS[name]
             if desc.has_urdf:
@@ -68,29 +60,22 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
                 #QtWidgets.QLabel()
                 vendor = re.sub(r"face\Sook", '', vendor, flags=re.IGNORECASE)
-                radio_button = QtWidgets.QRadioButton(
-                    name.replace('_description', '').capitalize() + ' ' + vendor.capitalize(),
-                )
-                self.radio_buttons.append(radio_button)
-                self.button_group.addButton(radio_button)
-                layout.addWidget(radio_button, row_val, column_val)
-                column_val += 1
-                if column_val > 3:
-                    column_val = 0
-                    row_val += 1
+                package_label = name.replace('_description', '').capitalize() + ' ' + vendor.capitalize()
+                setattr(desc, 'package_label', package_label)
+                setattr(desc, 'show', True)
+                for tag in desc.tags:
+                    if tag in self.packages_grouped_by_tags:
+                        self.packages_grouped_by_tags[tag]['packages'].append(desc)
+                    else:
+                        self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[desc]}
 
-        for i in range(layout.columnCount()):
-            layout.setColumnStretch(i, 1)
 
-        for i in range(layout.rowCount()):
-            layout.setRowStretch(i, 1)
-
-        formGroupBox.setLayout(layout)
-        main_layout.addWidget(formGroupBox)
+        self.display_filter_block()
+        self.display_packages_block()
 
         self.button = QtWidgets.QPushButton('Create model based on selection')
         self.button.clicked.connect(self.get_selected_value)
-        main_layout.addWidget(self.button)
+        self.main_layout.addWidget(self.button)
 
         # link to docks
         weblink = QtWidgets.QLabel()
@@ -98,14 +83,97 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         weblink.setTextFormat(QtCore.Qt.RichText)
         weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
         weblink.setOpenExternalLinks(True)
-        main_layout.addWidget(QtWidgets.QLabel())
-        main_layout.addWidget(QtWidgets.QLabel())
-        main_layout.addWidget(weblink)
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        self.main_layout.addWidget(weblink)
 
         # adding widgets to main layout
-        self.setLayout(main_layout)
-
+        self.setLayout(self.main_layout)
         self.show()
+
+
+    def display_filter_block(self):
+
+        def add_tag_button(layout, tag_name):
+            radio_button = QtWidgets.QRadioButton(
+                tag_name,
+            )
+            radio_button.clicked.connect(self.filter_by_tag)
+            self.tags_radio_buttons.append(radio_button)
+            self.tags_button_group.addButton(radio_button)
+            layout.addWidget(radio_button, row_val, column_val)
+
+
+        formGroupBox = QtWidgets.QGroupBox('Filter by tag')
+        row_val = 0
+        column_val = 0
+        self.tags_radio_buttons = []
+        self.tags_button_group = QtWidgets.QButtonGroup()
+        layout = QtWidgets.QGridLayout()
+        for tag_name, packages in self.packages_grouped_by_tags.items():
+            add_tag_button(layout, tag_name)
+            column_val += 1
+            if column_val > 3:
+                column_val = 0
+                row_val += 1
+        add_tag_button(layout, 'all')
+        column_val += 1
+        if column_val > 3:
+            column_val = 0
+            row_val += 1
+
+        for i in range(layout.columnCount()):
+            layout.setColumnStretch(i, 1)
+        # for i in range(layout.rowCount()):
+        #     layout.setRowStretch(i, 1)
+        formGroupBox.setLayout(layout)
+        self.main_layout.addWidget(formGroupBox)
+
+
+    def display_packages_block(self):
+        if hasattr(self, 'packagesFormGroupBox'):
+            self.main_layout.removeWidget(self.packagesFormGroupBox)
+            self.packagesFormGroupBox.deleteLater()
+        self.packagesFormGroupBox = QtWidgets.QGroupBox('Models description packages')
+        row_val = 0
+        column_val = 0
+        self.radio_buttons = []
+        self.button_group = QtWidgets.QButtonGroup()
+        layout = QtWidgets.QGridLayout()
+        for tag_name, tag in self.packages_grouped_by_tags.items():
+            for package in tag['packages']:
+                if tag['show']:
+                    radio_button = QtWidgets.QRadioButton(
+                        package.package_label,
+                    )
+                    self.radio_buttons.append(radio_button)
+                    self.button_group.addButton(radio_button)
+                    layout.addWidget(radio_button, row_val, column_val)
+                    column_val += 1
+                    if column_val > 3:
+                        column_val = 0
+                        row_val += 1
+        for i in range(layout.columnCount()):
+            layout.setColumnStretch(i, 1)
+        for i in range(layout.rowCount()):
+            layout.setRowStretch(i, 1)
+        self.packagesFormGroupBox.setLayout(layout)
+        self.main_layout.insertWidget(1, self.packagesFormGroupBox)
+
+
+    def filter_by_tag(self):
+        for radio_button in self.tags_radio_buttons:
+            if radio_button.isChecked():
+                filter_tag_name = radio_button.text()
+                for tag_name, tag in self.packages_grouped_by_tags.items():
+                    if filter_tag_name == 'all':
+                        self.packages_grouped_by_tags[tag_name]['show'] = True
+                    else:
+                        if filter_tag_name != tag_name:
+                            self.packages_grouped_by_tags[tag_name]['show'] = False
+                        else:
+                            self.packages_grouped_by_tags[tag_name]['show'] = True
+        self.display_packages_block()
 
 
     def get_selected_value(self):
