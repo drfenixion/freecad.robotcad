@@ -614,7 +614,7 @@ def _material(
         return None
 
     if visual.material.name not in colors:
-        warn(f'Material "{visual.material.name}" not found in URDF description.', gui=True)
+        warn(f'Material "{visual.material.name}" not found in URDF description.', gui=False)
         return None
 
     return colors[visual.material.name].to_material()
