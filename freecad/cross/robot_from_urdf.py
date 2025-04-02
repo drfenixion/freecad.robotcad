@@ -416,8 +416,8 @@ def _add_ros_joint(
         # All attributes of `limit` are compulsory.
         ros_joint.LowerLimit = factor * urdf_joint.limit.lower
         ros_joint.UpperLimit = factor * urdf_joint.limit.upper
-        ros_joint.Effort = factor * urdf_joint.limit.effort
-        ros_joint.Velocity = factor * urdf_joint.limit.velocity
+        ros_joint.Effort = urdf_joint.limit.effort
+        ros_joint.Velocity = urdf_joint.limit.velocity
     return ros_joint
 
 
@@ -434,7 +434,7 @@ def _define_mimic_joints(
             warn(
                 f'Mimicking joint "{urdf_joint.name}" has type '
                 f'{urdf_joint.type} but only prismatic, revolute,'
-                ' and continuous types are supported, ignoring "mimic"', True,
+                ' and continuous types are supported, ignoring "mimic"', False,
             )
             continue
         ros_joint.Mimic = True
