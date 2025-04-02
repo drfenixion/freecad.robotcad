@@ -1,5 +1,6 @@
 import importlib
 import os
+from pathlib import Path
 import re
 import sys
 from PySide import QtGui, QtCore, QtWidgets
@@ -73,7 +74,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.display_filter_block()
         self.display_packages_block()
 
-        self.button = QtWidgets.QPushButton('Create model based on selection')
+        self.button = QtWidgets.QPushButton('Open model variants')
         self.button.clicked.connect(self.get_selected_value)
         self.main_layout.addWidget(self.button)
 
@@ -180,10 +181,6 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         for radio_button in self.radio_buttons:
             if radio_button.isChecked():
 
-                self.button.setEnabled(False)
-                for rb in self.radio_buttons:
-                    rb.setEnabled(False)
-
                 radio_button_text_first_fragment = radio_button.text().split()[0].lower()
                 description_name = radio_button_text_first_fragment + '_description'
                 description_name_alternative = radio_button_text_first_fragment
@@ -231,16 +228,90 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 progressBar.setValue(i)
                 QtGui.QApplication.processEvents()
                 progressBar.close()
-                robot_from_urdf_path(
-                    fc.activeDocument(),
-                    module.URDF_PATH,
-                    module.PACKAGE_PATH,
-                    module.REPOSITORY_PATH,
-                )
 
-                for rb in self.radio_buttons:
-                    rb.setEnabled(True)
-                self.button.setEnabled(True)
+                # get urdf variants
+                variants = {}
+                for attr_name in dir(module):
+                    if attr_name.startswith("URDF_PATH"):
+                        attr_value = getattr(module, attr_name)
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = attr_value
+
+                dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
+                dialog.setModal(True)
+                dialog.exec_()
 
                 return
         QtWidgets.QMessageBox.warning(self, "Nothing selected", "Please select model to create.")
+
+
+class LoadURDFDialog(QtWidgets.QDialog):
+    def __init__(self, module, variants, parrent_window, package_name, parent=None):
+        super(LoadURDFDialog, self).__init__(parent)
+        self.module = module
+        self.variants = variants
+        self.parrent_window = parrent_window
+        self.package_name = package_name
+        self.initUI()
+
+
+    def initUI(self):
+        self.resize(400, 350)
+        self.setWindowTitle("Variants of " + self.package_name)
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.setContentsMargins(10, 10, 10, 10)
+        self.setLayout(self.layout)
+
+        self.radio_button_group = QtWidgets.QButtonGroup()
+        self.radio_button_group.setExclusive(True)
+
+        first = True
+        for name, path in self.variants.items():
+            radio_button = QtWidgets.QRadioButton(name)
+            if first:
+                radio_button.setChecked(True)
+                first = False
+            self.radio_button_group.addButton(radio_button)
+            self.layout.addWidget(radio_button)
+
+        self.layout.addSpacing(10)
+
+        self.load_button = QtWidgets.QPushButton("Create model based on selection")
+        self.load_button.clicked.connect(self.load_urdf)
+        self.layout.addWidget(self.load_button)
+
+        # Add a vertical spacer to push widgets up
+        self.layout.addStretch()
+        # Set the window to resize to fit its content
+        self.adjustSize()
+
+
+    def load_urdf(self):
+        # get choosed variant
+        selected_variant = None
+        for radio_button in self.radio_button_group.buttons():
+            if radio_button.isChecked():
+                selected_variant = self.variants[radio_button.text()]
+                break
+
+        # disable buttons
+        self.load_button.setEnabled(False)
+        for rb in self.radio_button_group.buttons():
+            rb.setEnabled(False)
+
+        # Create model
+        if selected_variant:
+            robot_from_urdf_path(
+                fc.activeDocument(),
+                selected_variant,
+                self.module.PACKAGE_PATH,
+                self.module.REPOSITORY_PATH,
+            )
+            # enable buttons
+            self.load_button.setEnabled(True)
+            for rb in self.radio_button_group.buttons():
+                rb.setEnabled(True)
+        else:
+            print("Model variant not selected")
+
+        self.close()
