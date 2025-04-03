@@ -211,7 +211,7 @@ class JointProxy(ProxyBase):
                     'Mimicked joint must have the same type'
                     f' but "{obj.Label}"\'s type is {obj.Type} and'
                     f' "{obj.MimickedJoint}"\'s is {obj.MimickedJoint.Type}',
-                    True,
+                    False,
                 )
                 obj.MimickedJoint = None
         if prop in ('Label', 'Label2'):
