@@ -210,7 +210,7 @@ class JointProxy(ProxyBase):
                 warn(
                     'Mimicked joint must have the same type'
                     f' but "{obj.Label}"\'s type is {obj.Type} and'
-                    f' "{obj.MimickedJoint}"\'s is {obj.MimickedJoint.Type}',
+                    f' "{obj.MimickedJoint.Label}"\'s is {obj.MimickedJoint.Type}',
                     False,
                 )
                 obj.MimickedJoint = None
