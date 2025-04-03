@@ -204,12 +204,12 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom_container)
 
         geoms, geom_containers = _add_collision(
-                urdf_link, parts_group, ros_link, collision_part, colors, convert_mesh_to_solid = True,
+                urdf_link, parts_group, ros_link, collision_part, colors,
         )
         for geom in geoms:
-            set_collision_appearance(geom)
             robot.Proxy.created_objects.append(geom)
         for geom_container in geom_containers:
+            set_collision_appearance(geom_container)
             robot.Proxy.created_objects.append(geom_container)
 
     joint_map: dict[str, CrossJoint] = {}

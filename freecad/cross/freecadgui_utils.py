@@ -6,6 +6,7 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 from copy import deepcopy
 import re
+
 try:
     from PySide import QtWidgets, QtGui
 except:
@@ -16,6 +17,7 @@ from .freecad_utils import first_object_with_volume
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import message
+from .freecad_utils import is_link as is_fc_link
 from .placement_utils import get_global_placement
 
 # Typing hints.
@@ -202,16 +204,28 @@ def createBoundAbstract(obj, createPrimitive = createBox):
 
 
 def set_collision_appearance(boundObj):
-    # LineColor
-    red   = 1.0  # 1 = 255
-    green = 1.0  #
-    blue  = 0.4  #
     boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
-    boundObjGui.LineColor  = (red, green, blue)
-    boundObjGui.PointColor = (red, green, blue)
-    boundObjGui.ShapeColor = (red, green, blue)
-    boundObjGui.LineWidth = 1
-    boundObjGui.Transparency = 90
+    if is_fc_link(boundObj):
+        boundObjGui.ShapeMaterial = fc.Material(
+            DiffuseColor=(1.00,1.00,0.4),
+            AmbientColor=(1.00,1.00,0.4),
+            SpecularColor=(1.00,1.00,0.4),
+            EmissiveColor=(1.00,1.00,0.4),
+            Shininess=(0.90),
+            Transparency=(0.70),
+        )
+        boundObjGui.OverrideMaterial = True
+    else:
+        # LineColor
+        red   = 1.0  # 1 = 255
+        green = 1.0  #
+        blue  = 0.4  #
+
+        boundObjGui.LineColor  = (red, green, blue)
+        boundObjGui.PointColor = (red, green, blue)
+        boundObjGui.ShapeColor = (red, green, blue)
+        boundObjGui.LineWidth = 1
+        boundObjGui.Transparency = 90
     return boundObj
 
 
