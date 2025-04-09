@@ -228,6 +228,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 progressBar.setValue(i)
                 QtGui.QApplication.processEvents()
                 progressBar.close()
+                QtGui.QApplication.processEvents()
 
                 # get urdf variants
                 variants = {}

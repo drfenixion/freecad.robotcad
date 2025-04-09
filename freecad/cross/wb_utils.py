@@ -1163,6 +1163,7 @@ def git_init_submodules(
 
     progressBar.setValue(100)
     progressBar.close()
+    gui_process_events()
 
 
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:

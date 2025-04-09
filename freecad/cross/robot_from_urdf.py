@@ -245,6 +245,7 @@ def robot_from_urdf(
     QtGui.QApplication.processEvents()
 
     progressBar.close()
+    QtGui.QApplication.processEvents()
     doc.commitTransaction()
     return robot
 
