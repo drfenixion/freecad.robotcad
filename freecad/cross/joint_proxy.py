@@ -213,7 +213,8 @@ class JointProxy(ProxyBase):
                     f' "{obj.MimickedJoint.Label}"\'s is {obj.MimickedJoint.Type}',
                     False,
                 )
-                obj.MimickedJoint = None
+                # obj.MimickedJoint = None
+            pass
         if prop in ('Label', 'Label2'):
             robot = self.get_robot()
             if robot and hasattr(robot, 'Proxy'):
