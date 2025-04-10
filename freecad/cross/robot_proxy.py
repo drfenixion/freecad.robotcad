@@ -69,7 +69,7 @@ from .wb_utils import get_sensors_file_name
 from .wb_utils import get_controllers_config_file_name
 from .sdf.sdf_parser.sdf_tree import sdf_dict_to_xml
 
-from . import SdfUtilities
+
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -255,12 +255,6 @@ class RobotProxy(ProxyBase):
         self._init_properties(obj)
 #  initialize sdf world properties 
 #   sdf parameters
-        SdfUtilities.world_parameters(self.robot)
-        # reset world parameters 
-        SdfUtilities.resetWorldParameters(self.robot)
-        #  physics parameters 
-        SdfUtilities.PhysicsParameters(self.robot)
-        SdfUtilities.resetPhysicsattributes(self.robot)
         
     @property
     def created_objects(self) -> DOList:

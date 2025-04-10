@@ -10,6 +10,7 @@ class Element_Attributes:
     def __init__(self):
         self._name=""
         self._default=""
+        self._data_type=""
 
     #name property
     @property
@@ -26,14 +27,25 @@ class Element_Attributes:
     @attr_value.setter
     def attr_value(self,value):
         self._default=value
-
+    @property
+    def type(self):
+        return self._data_type
+    @type.setter
+    def type(self,value):
+        self._data_type=value
     #description property
-
+    def __str__(self):
+        return '{name:%s,value:%s,type:%s}'%(self.name,self._default,self._data_type)
+    
+    def __repr__(self):
+        return '{name:%s,value:%s,type:%s}'%(self.name,self._default,self._data_type)
     #get a dictionary of all elements
 
     #get only the name and default value
     def get_all(self):
         return {"name":self._name,"default":self._default}
+    def get_complete(self)->dict:
+        return {"name":self._name,"default":self._default,"type":self._data_type}
 
 
 
@@ -110,6 +122,7 @@ class sdf_schema_parser:
             e=Element_Attributes()
             e.name=result.attrib["name"]
             e.attr_value=result.attrib["default"]
+            e.type=result.attrib["type"]
             self._attr.append(e)
         if self.metaData:
             for technical_attr_name, technical_attr_value in Element.attrib.items():
@@ -117,6 +130,8 @@ class sdf_schema_parser:
 
 
             self.add_child_text_as_attr_to_element(Element, 'description')
+        else:
+            pass
 
         #check to see that attributes are not empty
         if len(self._attr)==0:
@@ -130,6 +145,7 @@ class sdf_schema_parser:
         #check for default
         if "default" in dict(Element.attrib):
                 ElemDict["value"]=Element.attrib["default"]
+                ElemDict["data_type"]=Element.attrib["type"]
         else:
              ElemDict["value"]=None
 
