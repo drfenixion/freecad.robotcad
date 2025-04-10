@@ -178,6 +178,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
 
     def get_selected_value(self):
+        self.setEnabled(False)
         for radio_button in self.radio_buttons:
             if radio_button.isChecked():
 
@@ -239,6 +240,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
                 dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
                 dialog.setModal(True)
+                self.setEnabled(True)
                 dialog.exec_()
 
                 return
