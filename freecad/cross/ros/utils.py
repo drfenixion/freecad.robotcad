@@ -103,6 +103,16 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     _add_python_path(f'{ros_workspace}/install/lib/{python_ver}/site-packages')
     _add_python_path(f'{ros_workspace}/install/local/lib/{python_ver}/dist-packages')
 
+    # Get the path of the current Python executable
+    python_path = sys.executable
+    # The site-packages directory is usually in lib/pythonX.Y/site-packages
+    # relative to the executable path
+    site_packages_path = os.path.join(
+        os.path.dirname(os.path.dirname(python_path)),
+        'lib',
+        'python{}.{}/site-packages'.format(sys.version_info.major, sys.version_info.minor),
+    )
+
     # On some systems (e.g. FreeCAD 0.21 on Ubuntu 20), $PYTHONPATH is not
     # taken into account in FreeCAD, add them manually.
     base = f'/opt/ros/{ros_distro}'
@@ -112,6 +122,7 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
         Path(f'/usr/lib/python{major}/dist-packages'), # system apt python packages
         Path(f'/usr/lib/{python_ver}/dist-packages'), # system apt python packages
         Path(f'/usr/local/lib/{python_ver}/dist-packages'), # system pip packages
+        Path(site_packages_path), # conda packages if used conda python
     ]:
         _add_python_path(path)
 
