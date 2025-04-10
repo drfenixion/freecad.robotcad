@@ -106,7 +106,7 @@ except (ModuleNotFoundError, ImportError):
     pip_install('xmltodict')
 
 try:
-    import pycollada
+    import collada
 except (ModuleNotFoundError, ImportError):
     pip_install('pycollada')
 
