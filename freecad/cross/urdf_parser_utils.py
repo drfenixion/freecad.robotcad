@@ -39,16 +39,17 @@ def obj_from_geometry(
         geometry: Shape,
         doc_or_group: [Doc | DO],
         convert_mesh_to_solid: bool = False,
+        min_vol_instead_zero: bool = False,
 ) -> tuple[Optional[DO], Optional[Path]]:
     """Return a FreeCAD object for the URDF shape with the path for meshes."""
     if isinstance(geometry, Box):
-        return obj_from_box(geometry, doc_or_group)
+        return obj_from_box(geometry, doc_or_group, min_vol_instead_zero)
     if isinstance(geometry, Cylinder):
-        return obj_from_cylinder(geometry, doc_or_group)
+        return obj_from_cylinder(geometry, doc_or_group, min_vol_instead_zero)
     if isinstance(geometry, Mesh):
         return obj_from_mesh(geometry, doc_or_group, convert_mesh_to_solid)
     if isinstance(geometry, Sphere):
-        return obj_from_sphere(geometry, doc_or_group)
+        return obj_from_sphere(geometry, doc_or_group, min_vol_instead_zero)
     raise NotImplementedError('Primitive not implemented')
 
 
@@ -114,6 +115,7 @@ def placement_along_z_from_joint(
 def obj_from_box(
         geometry: Box,
         doc_or_group: [Doc | DO],
+        min_vol_instead_zero: bool = False,
 ) -> tuple[Optional[DO], None]:
     """Return a `Part::Box` object and None.
 
@@ -121,6 +123,14 @@ def obj_from_box(
     The second element of the tuple is None for API consistency.
 
     """
+    if min_vol_instead_zero:
+        if geometry.size[0] <= 0:
+            geometry.size[0] = 0.000001
+        if geometry.size[1] <= 0:
+            geometry.size[1] = 0.000001
+        if geometry.size[2] <= 0:
+            geometry.size[2] = 0.000001
+
     obj = add_object(doc_or_group, 'Part::Box', 'box')
     obj.Length = geometry.size[0] * 1000.0  # m to mm.
     obj.Width = geometry.size[1] * 1000.0
@@ -132,6 +142,7 @@ def obj_from_box(
 def obj_from_cylinder(
         geometry: Cylinder,
         doc_or_group: [Doc | DO],
+        min_vol_instead_zero: bool = False,
 ) -> tuple[Optional[DO], None]:
     """Return a `Part::Cylinder` object and None.
 
@@ -139,6 +150,12 @@ def obj_from_cylinder(
     The second element of the tuple is None for API consistency.
 
     """
+    if min_vol_instead_zero:
+        if geometry.radius <= 0:
+            geometry.radius = 0.000001
+        if geometry.length <= 0:
+            geometry.length = 0.000001
+
     obj = add_object(doc_or_group, 'Part::Cylinder', 'cylinder')
     obj.Radius = geometry.radius * 1000.0  # m to mm.
     obj.Height = geometry.length * 1000.0  # m to mm.
@@ -227,10 +244,16 @@ def obj_from_mesh(
             mesh_obj_solid = doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
             mesh_obj_solid.Label = mesh_path.name
             mesh_obj_solid.Label2 = mesh_ros_path
-            mesh_obj_solid.Shape = Part.Solid(Part.Shell(mesh_obj_shape.Shape.Faces).removeSplitter())
+            shell = Part.Shell(mesh_obj_shape.Shape.Faces)
+            # try:
+            #     shell.removeSplitter()
+            # except:
+            #     warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
+            #     pass
+            mesh_obj_solid.Shape = Part.Solid(shell)
             mesh_obj_solid.purgeTouched()
             mesh_or_solid_obj = mesh_obj_solid
-            del mesh_obj_solid
+            del mesh_obj_solid, shell
             # Remove intermediate objects
             doc.removeObject(mesh_obj_shape.Name)
             doc.removeObject(mesh_obj.Name)
@@ -247,7 +270,13 @@ def obj_from_mesh(
 def obj_from_sphere(
         geometry: Sphere,
         doc_or_group: [Doc | DO],
+        min_vol_instead_zero: bool = False,
 ) -> tuple[Optional[DO], None]:
+
+    if min_vol_instead_zero:
+        if geometry.radius <= 0:
+            geometry.radius = 0.000001
+
     obj = add_object(doc_or_group, 'Part::Sphere', 'sphere')
     obj.Radius = geometry.radius * 1000.0  # m to mm.
     return obj, None

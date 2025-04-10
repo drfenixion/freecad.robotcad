@@ -658,7 +658,7 @@ def _add_geometries(
     for geometry in geometries:
         # Make the FC object in the group.
         try:
-            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid)
+            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid, min_vol_instead_zero = True)
         except NotImplementedError:
             continue
         if not geom_obj:
