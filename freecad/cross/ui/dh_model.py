@@ -15,25 +15,25 @@ from .dh_kk_model import DHKKModel
 class DHModel(DHKKModel):
 
     columns = (
-            'theta',
-            'r',
-            'd',
-            'alpha',
+            'rz',
+            'tz',
+            'rx',
+            'tx',
             'prismatic',
     )
     column_headers = (
             'θ (rad)',
             'r (m)',
-            'd (m)',
             'α (rad)',
+            'd (m)',
             'Prismatic?',
     )
 
     column_tooltips = (
             'Θi: angle between X(i-1) and Xi about Z(i-1), in radians.',
             'ri: distance between Oi and X(i-1), in meters.',
-            'di: distance between O(i-1) and Zi, in meters.',
             'ɑi: angle between Z(i-1) and Zi about X(i-1), in radians.',
+            'di: distance between O(i-1) and Zi, in meters.',
             'True if the joint is prismatic, False if revolute.',
     )
 

@@ -9,16 +9,12 @@ import FreeCAD as fc
 from pivy import coin
 
 from .coin_utils import text_2d
-from .fpo import DisplayMode
-from .fpo import PropertyInteger
-from .fpo import PropertyVector
-from .fpo import proxy  # Cf. https://github.com/mnesarco/fcapi
-from .fpo import view_proxy
 from .freecad_utils import warn
 from .wb_utils import ICON_PATH
+from freecad.cross.vendor.fcapi import fpo  # Cf. https://github.com/mnesarco/fcapi
 
 # Typing hints.
-from .observer import Observer as CrossObserver  # A Cross::Observer, i.e. a DocumentObject with Proxy "Observer". # noqa: E501
+from .observer import Observer as CrossObserver, ViewProviderObserver  # A Cross::Observer, i.e. a DocumentObject with Proxy "Observer". # noqa: E501
 
 if TYPE_CHECKING and hasattr(fc, 'GuiUp') and fc.GuiUp:
     from FreeCADGui import ViewProviderDocumentObject as VPDO
@@ -26,11 +22,11 @@ else:
     VPDO = NewType('VPDO', object)
 
 
-@view_proxy(
+@fpo.view_proxy(
         icon=str(ICON_PATH / 'observer.svg'),
 )
 class ObserverViewProxy:
-    dot_display_mode = DisplayMode(name='Dot', is_default=True)
+    dot_display_mode = fpo.DisplayMode(name='Dot', is_default=True)
 
     # Unknown units.
     # Tune depending on `dot_character`.
@@ -43,7 +39,7 @@ class ObserverViewProxy:
     # ⬤: Big black circle, U+2B24
     dot_character = '●'  # Black circle, U+25CF
 
-    position = PropertyVector(
+    position = fpo.PropertyVector(
             name='Position',
             section='Display Options',
             default=default_position,
@@ -55,7 +51,8 @@ class ObserverViewProxy:
     )
 
     def on_attach(self) -> None:
-        # `self.position` is not yet initialized, use `self.ViewObject.Position`.
+        # `self.position` is not yet initialized, use `self.default_position`
+        # for now. The view object will be updated in `on_start`.
         (
             self.root_node,
             self.text_node,
@@ -63,19 +60,23 @@ class ObserverViewProxy:
             self.material_node,
         ) = text_2d(
                 '',
-                self.ViewObject.Position,
+                self.default_position,
         )
 
-    def on_object_change(self, prop_name: str) -> None:
+    def on_start(self) -> None:
+        self.on_position_changed()
+
+    def on_object_change(self) -> None:
+        """Callback when the data object changes."""
         if not self.Object.ExpressionEngine:
             self.text_node.string = ''
         else:
-            # TODO: check  that 'Formula' has an expression engine, no other property.
+            # TODO: check that 'Formula' has an expression engine, no other property.
             self.text_node.string = self.dot_character
         self._set_color(self.material_node)
 
     @dot_display_mode.builder
-    def dot_display_mode_builder(self):
+    def dot_display_mode_builder(self, obj):
         return self.root_node
 
     def _set_color(self, material_node: coin.SoMaterial) -> None:
@@ -88,6 +89,7 @@ class ObserverViewProxy:
     def on_position_changed(
             self,
     ) -> None:
+        """Callback when the `Position` property changes."""
         self.matrix_transform_node.matrix = coin.SbMatrix(
                0.0097401002,             0.0,             0.0, 0.0,
                         0.0,      0.00974009,     1.16877e-05, 0.0,
@@ -96,15 +98,16 @@ class ObserverViewProxy:
         )
 
 
-@proxy(
+@fpo.proxy(
     object_type='App::FeaturePython',
+    subtype='Cross::Observer',
     view_proxy=ObserverViewProxy,
 )
 class ObserverProxy:
 
     # The formula is defined as integer because FreeCAD
     # doesn't support expression engine for booleans.
-    formula = PropertyInteger(
+    formula = fpo.PropertyInteger(
             name='Formula',
             description='Use (x ? 1 : 0)',
     )

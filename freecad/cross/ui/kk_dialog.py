@@ -29,7 +29,10 @@ class KKDialog:
         self.kk_robot = KKRobot()
         self.kk_robot.set_from_robot(robot)
 
-        self.form = fcgui.PySideUic.loadUi(str(UI_PATH / 'kk_dialog.ui'), self)
+        self.form = fcgui.PySideUic.loadUi(
+                str(UI_PATH / 'kk_dialog.ui'),
+                fcgui.getMainWindow(),
+        )
         self.dialog_confirmed = False
 
         # Disable the KK tab until supported.

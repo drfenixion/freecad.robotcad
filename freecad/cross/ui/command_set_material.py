@@ -15,7 +15,7 @@ class _SetMaterialCommand:
             'ToolTip': tr(
                 'Select a robot or a link and use this action to'
                 ' select a material. The material will be used to'
-                ' estimate the mass and moments of inertia',
+                ' calculate mass and moments of inertia of the links.',
             ),
         }
 
@@ -52,7 +52,7 @@ class _SetMaterialCommand:
 
         if not density:
             error('Material without density. Choose other material or fill density.', True)
-        elif fc.Units.Quantity(density,) <= 0.0:
+        elif fc.Units.Quantity(density) <= 0.0:
             error('Material density must be stringly positive. Correct material density or choose another material.', True)
 
         obj.MaterialCardName = card_name

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import math
 from pathlib import Path
+import random
+import re
+import string
 from typing import Iterable, Tuple, Optional
 import xml.etree.ElementTree as et
 
@@ -12,6 +16,8 @@ import FreeCAD as fc
 
 import numpy as np
 from numpy.typing import ArrayLike
+
+from freecad.cross.placement_utils import get_obj_to_subobj_diff
 
 from .freecad_utils import get_leafs_and_subnames
 from .freecad_utils import is_box
@@ -138,19 +144,42 @@ def xml_comment_element(obj_label: str) -> et.Element:
 
 
 def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
-    """Return an xml element 'origin'.""" 
-    
-    # previous implementation had a precision bug. 
+    """Return an xml element 'origin'."""
+
+    # previous implementation had a precision bug.
     # rpy = rpy_from_quaternion(p.Rotation.Q)
     # In some cases of joint rotation this gave incorrect URDF rpy radians,
     # resulting in some apparent tilt of the orientation.
-    
+
     # new implementation have less float operation
     # and correct in all tested rotation cases
     xyz = p.Rotation.toEulerAngles('XYZ')
     xyz_rad = (math.radians(xyz[0]), math.radians(xyz[1]), math.radians(xyz[2]))
+
+    # accuracy correction
+    # it need because the too low value near to zero do strange behaviour of friction options in Gazebo
+    # (strange behaviour - varios periodic drift of mecanum drive based on wheels with diagonal friction)
+    #rpy correction
+    min_rpy_acc = 0.0000000001
+    xyz_rad_corrected = []
+    for i in range(len(xyz_rad)):
+        if abs(xyz_rad[i]) < min_rpy_acc:
+            xyz_rad_corrected.append(0)
+        else:
+            xyz_rad_corrected.append(xyz_rad[i])
+
+    #xyz position correction
+    min_xyz_acc = 0.01 # in mm
+    base_corrected = copy.deepcopy(p.Base)
+    if abs(base_corrected.x) < min_xyz_acc:
+        base_corrected.x = 0
+    if abs(base_corrected.y) < min_xyz_acc:
+        base_corrected.y = 0
+    if abs(base_corrected.z) < min_xyz_acc:
+        base_corrected.z = 0
+
     pattern = '<origin xyz="{v.x:.6} {v.y:.6} {v.z:.6}" rpy="{r[0]} {r[1]} {r[2]}" />'
-    return et.fromstring(pattern.format(v=p.Base * 1e-3, r=xyz_rad))
+    return et.fromstring(pattern.format(v=base_corrected * 1e-3, r=xyz_rad_corrected))
 
 
 def urdf_geometry_box(length_x: float, length_y: float, length_z: float) -> et.Element:
@@ -391,6 +420,8 @@ def _urdf_generic_from_sphere(
 
     if not ignore_obj_placement:
         placement = placement * sphere.Placement
+    center_placement = urdf_sphere_placement_from_object(sphere, placement)
+    parent.append(urdf_origin_from_placement(center_placement))
 
     parent.append(
         urdf_geometry_sphere(
@@ -654,6 +685,25 @@ def urdf_collision_mesh(
     return _urdf_generic_mesh(obj_label, mesh_name, package_name, 'collision', placement)
 
 
+def clean_and_unique_string(input_str: str, rando_str_len: int = 6) -> str:
+    """Clean chars and add random string"""
+    # Remove all characters that are not English letters, digits or a dot
+    cleaned_str = re.sub(r'[^a-zA-Z0-9_\.]', '', input_str)
+
+    # Replace dots with underscores
+    cleaned_str = cleaned_str.replace('.', '_')
+
+    # Generate random characters (English letters and digits)
+    random_chars = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(rando_str_len))
+
+    # Append the random characters to the end of the string
+    result_str = cleaned_str + '_' + random_chars
+
+    result_str = result_str.lower()
+
+    return result_str
+
+
 def _get_mesh_filename(obj: DO) -> str:
     """Return the mesh filename for a FreeCAD object."""
     if hasattr(obj, 'LinkedObject'):
@@ -665,7 +715,10 @@ def _get_mesh_filename(obj: DO) -> str:
         doc_name = linked_obj.Document.Name
     else:
         doc_name = 'unsaved_doc'
-    return get_valid_filename(f'{doc_name}_{label}.dae')
+
+    name = f'{doc_name}_{label}'
+    name = clean_and_unique_string(name)
+    return get_valid_filename(f'{name}.dae')
 
 
 def _urdf_generic_from_object(
@@ -717,7 +770,11 @@ def _urdf_generic_from_object(
         if not placement:
             this_placement = placement_for_dae_export
         else:
-            this_placement = placement * placement_for_dae_export
+            # subobj_to_obj_diff is needed in case of wrapper with non-zero placement between subobject and object (f.e. of Visual)
+            obj_to_subobj_middle_wrap_diff = get_obj_to_subobj_diff(obj, subobj, with_leaf_el = False)
+
+            this_placement = placement * obj_to_subobj_middle_wrap_diff * placement_for_dae_export
+
         filename = ''
         if subobj is obj:
             # No FreeCAD link.

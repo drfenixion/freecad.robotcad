@@ -2,6 +2,7 @@
 
 - [RobotCAD](https://github.com/drfenixion/freecad.overcross/), fork of CROSS.
 - [RobotDescriptor](https://github.com/maidenone/RobotDescriptor)
+- [freecad_to_gazebo](https://github.com/Dave-Elec/freecad_to_gazebo)
 
 # Fusion add-ins
 
@@ -75,6 +76,10 @@
 - `ros2 launch urdf_tutorial display.launch.py`
 - [Jupyterlab-urdf](https://jupyterlab-urdf.readthedocs.io/en/latest/)
 
+# Converting URDF files
+
+- [urdf_to_dh](https://github.com/mcevoyandy/urdf_to_dh/)
+
 # Python programming in FreeCAD
 
 - [Origin Group Extension](https://github.com/gbroques/freecad-origin-group-extension-python-example)
@@ -94,12 +99,14 @@
 - [sdfopt from FusionSDF](https://github.com/andreasBihlmaier/FusionSDF/blob/main/sdfopt/README.md)
 - [mmoerdijk/generate_convex_hulls.py](https://gist.github.com/mmoerdijk/cbffdf69635adb62f6c73dbde22f8dd1)
 
-# Phobos add-on for Blender
+# Add-ons for Blender
 
 - [Phobos](https://github.com/dfki-ric/phobos) allows to make kinematic, inertia, collision, etc for your robot model and export as URDF, SDF, SMURF and other formats.
+- [SDFGen](https://github.com/cole-bsmr/SDFGen)
 
 # Other links
 
+- [List of tools from official documentation](https://docs.ros.org/en/rolling/Tutorials/Intermediate/URDF/Exporting-an-URDF-File.html)
 - [Discuss: Tools and Best Practices for 3D Robot Assets (URDF, SDFormat, CAD, etc)](https://discourse.ros.org/t/discuss-tools-and-best-practices-for-3d-robot-assets-urdf-sdformat-cad-etc/36997/1)
 
 <!-- https://rocksi.net/ -->

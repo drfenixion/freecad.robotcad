@@ -369,7 +369,7 @@ class RobotProxy(ProxyBase):
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(obj)
         self._created_objects = obj.CreatedObjects
-        # Rebuilt self._joint_variables from the map {ros_name: joint_variable_name}.
+        # Rebuild self._joint_variables from the map {ros_name: joint_variable_name}.
         self._joint_variables = {
             self.get_joint(name): var
             for name, var in self._joint_variables_ros_map.items()
@@ -1063,6 +1063,13 @@ class RobotProxy(ProxyBase):
 
                     if isinstance(param, (float, int, str, type(None))):
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = param
+
+                        # case of parallel_gripper_action_controller
+                        # clear empty interfaces for use some default value for interface if posible (don`t sure there is any default)
+                        if param_full_name_yaml in ['max_effort_interface', 'max_velocity_interface'] \
+                        and yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] == '':
+                            del yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml]
+
                     elif isinstance(param, DO):
                         yaml_data[get_valid_urdf_name(ros_name(controller))]['ros__parameters'][param_full_name_yaml] = get_valid_urdf_name(ros_name(param))
                     else:
@@ -1317,7 +1324,7 @@ def make_robot(name, doc: Optional[fc.Document] = None) -> CrossRobot:
         _ViewProviderRobot(robot.ViewObject)
         robot.ViewObject.ShowReal = True
         robot.ViewObject.ShowVisual = False
-        robot.ViewObject.ShowCollision = False
+        robot.ViewObject.ShowCollision = True
 
     doc.recompute()
     return robot

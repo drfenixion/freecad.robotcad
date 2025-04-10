@@ -4,11 +4,11 @@ from pathlib import Path
 import subprocess
 import os
 import sys
-import addonmanager_utilities as utils
+
 try:
     # For v0.21:
     from addonmanager_utilities import get_python_exe
-except (ModuleNotFoundError, ImportError):
+except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
@@ -17,9 +17,11 @@ def pip_install(pkg_name):
     '''Python package installer for AppImage builds. It installs python module inside AppImage'''
     # should be in __init__.py to eliminate cyrcle dependencies of installed modules
 
+    import site
+
     python_exe = get_python_exe()
     print('python_exe: ', python_exe)
-    vendor_path = utils.get_pip_target_directory()
+    vendor_path = site.getsitepackages()[0]
     if not os.path.exists(vendor_path):
         os.makedirs(vendor_path)
 
@@ -77,7 +79,17 @@ if os.environ.get('DEBUG'):
         attach_debugger()
 
 
+import FreeCAD as fc
+from .ros.utils import add_ros_library_path
+from .version import __version__  # noqa: F401
+from .wb_globals import g_ros_distro
+
+
+add_ros_library_path(g_ros_distro)
+
+
 # pip installs
+# should be after add_ros_library_path because ros package must be initialized firstly
 try:
     import urdf_parser_py
 except (ModuleNotFoundError, ImportError):
@@ -94,16 +106,9 @@ except (ModuleNotFoundError, ImportError):
     pip_install('xmltodict')
 
 
-import FreeCAD as fc
-from .ros.utils import add_ros_library_path
-from .version import __version__
-from .wb_globals import g_ros_distro
-
-
-add_ros_library_path(g_ros_distro)
-
 # Must be imported after the call to `add_ros_library_path`.
 from .ros.utils import is_ros_found  # noqa: E402.
+
 
 if is_ros_found():
     fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')

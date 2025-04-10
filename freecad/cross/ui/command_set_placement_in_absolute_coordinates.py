@@ -33,8 +33,8 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
     def GetResources(self):
         return {
             'Pixmap': 'set_cross_placement_in_absolute_coordinates.svg',
-            'MenuText': tr('Set placement - as system'),
-            'Accel': 'P, S',
+            'MenuText': tr('Set placement - as group'),
+            'Accel': 'P, G',
             'ToolTip': tr(
                 'Set the Mounted Placement of a link or the Origin of a joint.\n'
                 '\n'

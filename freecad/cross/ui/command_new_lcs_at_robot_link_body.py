@@ -31,17 +31,20 @@ class _NewLCSAtRobotLinkBodyCommand:
     """
 
     def GetResources(self):
-        return {'Pixmap': 'set_new_lcs_at_robot_link_body.svg',
-                'MenuText': tr('New LCS at robot link body'),
-                'Accel': 'L, B',
-                'ToolTip': tr('Make LCS at robot link body (Real) subelement (face, edge, vertex).\n'
-                              '\n'
-                              'Select: face or edge or vertex of body of robot link \n'
-                              '\n'
-                              'LCS can be used with Set Placement tools. Be free with LCS params correction.\n'
-                              'By default LCS will use InertialCS MapMode \n'
-                              'and Translate MapMode for vertex and Concentric for curve and circle.'
-                              )}
+        return {
+            'Pixmap': 'set_new_lcs_at_robot_link_body.svg',
+            'MenuText': tr('New LCS at robot link body'),
+            'Accel': 'L, B',
+            'ToolTip': tr(
+                'Make LCS at robot link body (Real) subelement (face, edge, vertex).\n'
+                '\n'
+                'Select: face or edge or vertex of body of robot link \n'
+                '\n'
+                'LCS can be used with Set Placement tools. Be free with LCS params correction.\n'
+                'By default LCS will use InertialCS MapMode \n'
+                'and Translate MapMode for vertex and Concentric for curve and circle.',
+            ),
+        }
 
     def IsActive(self):
         return bool(fcgui.Selection.getSelection())
@@ -52,7 +55,8 @@ class _NewLCSAtRobotLinkBodyCommand:
         try:
             orienteer1, = validate_types(
                 fcgui.Selection.getSelection(),
-                ['Any'])
+                ['Any'],
+            )
             selection_ok = True
         except RuntimeError:
             pass
@@ -61,20 +65,24 @@ class _NewLCSAtRobotLinkBodyCommand:
             message('Select: face or edge or vertex of body of robot link.\n', gui=True)
             return
 
-        
+
         link1 = get_parent_link_of_obj(orienteer1)
 
         if link1 == None:
             message('Can not get parent robot link of first selected object', gui=True)
-            return      
-        
+            return
+
         sel = fcgui.Selection.getSelectionEx()
         orienteer1_sub_obj = sel[0]
         if not is_link(orienteer1) and not is_joint(orienteer1):
             orienteer1 = orienteer1_sub_obj
 
         doc.openTransaction(tr("Make LCS at link body"))
-        lcs, body_lcs_wrapper, lcs_placement = make_lcs_at_link_body(orienteer1, delete_created_objects = False)
+        lcs, body_lcs_wrapper, lcs_placement = make_lcs_at_link_body(
+            orienteer1,
+            delete_created_objects = False,
+            deactivate_after_map_mode = False,
+        )
         doc.commitTransaction()
 
         doc.recompute()

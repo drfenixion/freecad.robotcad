@@ -6,8 +6,9 @@ import xml.etree.ElementTree as et
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from freecad.cross.freecadgui_utils import get_sorted_concated_names
 
-from .freecad_utils import ProxyBase
+from .freecad_utils import ProxyBase, is_body, volume_mm3
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import is_link as is_freecad_link
@@ -134,7 +135,7 @@ def _get_xmls_and_export_meshes(
     )
     xmls: list[et.Element] = []
     for export_datum in export_data:
-        if wb_constants.lcs_wrapper_prefix in ros_name(export_datum.object):
+        if is_body(export_datum.object) and volume_mm3(export_datum.object) <= 0.0:
             # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
             continue
         if not is_primitive(export_datum.object):
@@ -516,7 +517,14 @@ class LinkProxy(ProxyBase):
 
         if not self.is_execute_ready():
             return
+
         link = self.link
+        doc = link.Document
+        # deactivate update links in undo/redo
+        # updating links in undo/redo phase leads to errors
+        if doc.Transacting == True:
+            return
+
         if not hasattr(link, 'ViewObject'):
             # No need to change `Group` without GUI.
             return
@@ -524,41 +532,45 @@ class LinkProxy(ProxyBase):
         if vlink is None:
             return
 
-        old_show_real = len(self._fc_links_real) != 0
-        old_show_visual = len(self._fc_links_visual) != 0
-        old_show_collision = len(self._fc_links_collision) != 0
-        update_real = old_show_real != vlink.ShowReal
-        update_visual = old_show_visual != vlink.ShowVisual
-        update_collision = old_show_collision != vlink.ShowCollision
+        links_real = get_sorted_concated_names(self._fc_links_real)
+        reals = get_sorted_concated_names(link.Real)
+        links_visual = get_sorted_concated_names(self._fc_links_visual)
+        visuals = get_sorted_concated_names(link.Visual)
+        links_collision = get_sorted_concated_names(self._fc_links_collision)
+        collision = get_sorted_concated_names(link.Collision)
+
+        # compare created links and their source objects
+        update_real = links_real != reals
+        update_visual = links_visual != visuals
+        update_collision = links_collision != collision
 
         # Old objects that will be removed after having been excluded from
         # `Group`, to avoid recursive calls.
         old_fc_links: DOList = []
-        if update_real:
+        if update_real or not vlink.ShowReal:
             old_fc_links += self._fc_links_real
-        if update_visual:
+        if update_visual or not vlink.ShowVisual:
             old_fc_links += self._fc_links_visual
-        if update_collision:
+        if update_collision or not vlink.ShowCollision:
             old_fc_links += self._fc_links_collision
 
-        # Free the labels because of delayed removal.
+        # remove links
         for o in old_fc_links:
-            # Free the label.
             try:
-                # when do ShowReal=False and Ctrl+z after
-                # lead to empty DO appears in old_fc_links and throw errors
-                # Added try for this case
+                # Free the labels in case something wrong with removal.
                 o.Label = 'to_be_removed'
-            except (AttributeError, ReferenceError):
+                o.Visibility = False
+                doc.removeObject(o.Name)
+            except (ReferenceError, AttributeError, TypeError):
                 pass
 
         # Clear the lists that are regenerated right after and create new
         # objects.
-        if update_real:
+        if update_real or not vlink.ShowReal:
             self._fc_links_real.clear()
-        if update_visual:
+        if update_visual or not vlink.ShowVisual:
             self._fc_links_visual.clear()
-        if update_collision:
+        if update_collision or not vlink.ShowCollision:
             self._fc_links_collision.clear()
 
         # Create new objects.
@@ -578,34 +590,10 @@ class LinkProxy(ProxyBase):
             self._fc_links_real
             + self._fc_links_visual
             + self._fc_links_collision
+            + self.get_sensors()
         )
         if new_group != link.Group:
-            # sometimes error appears with ctrl+z after ShowReal=False, ShowReal=True
-            # looks like problem with created back objects (it have FullName == '?')
-
-            # remove bad documents comebacked after Ctrl+z
-            for i in range(len(new_group)):
-                if new_group[i].FullName == '?':
-                    try:
-                        link.Document.removeObject(new_group[i].Name)
-                    except (RuntimeError, ReferenceError):
-                        # object not a part of document (happens sometime with ctrl+z)
-                        pass
-                    new_group.remove(new_group[i])
-
-
             link.Group = new_group
-
-        # Remove old objects.
-        doc = link.Document
-        for o in old_fc_links:
-            try:
-                doc.removeObject(o.Name)
-            except (RuntimeError, ReferenceError):
-                # object not a part of document (happens sometime with ctrl+z)
-                pass
-
-        #TODO Remove sometimes appering objects in doc root after ctrl+z (with name "to_be_removed", "real_[Label]", etc)
 
 
     def export_urdf(
@@ -771,6 +759,8 @@ class _ViewProviderLink(ProxyBase):
             'Whether to show the parts for URDF collision',
         )
 
+        vobj.ShowCollision = True
+
         self._old_show_real = vobj.ShowReal
         self._old_show_visual = vobj.ShowVisual
         self._old_show_collision = vobj.ShowCollision
@@ -817,7 +807,7 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
         return
     cross_link: CrossLink = doc.addObject('App::FeaturePython', name)
     LinkProxy(cross_link)
-    cross_link.Label2 = cross_link.Label
+    cross_link.Label2 = name
 
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
         import FreeCADGui as fcgui

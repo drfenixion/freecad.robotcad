@@ -217,6 +217,8 @@ class XacroObjectProxy(ProxyBase):
             self._root_link = ''
             return
         input_path = abs_path_from_ros_path(xo.InputFile)
+        if not input_path:
+            return
         self.xacro = XacroLoader.load_from_file(input_path)
         macro_names = self.xacro.get_macro_names()
         if xo.getEnumerationsOfProperty('MainMacro') != macro_names:

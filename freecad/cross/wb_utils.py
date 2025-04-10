@@ -7,13 +7,21 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Protocol, Union
 import os
 import subprocess
+import typing
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
 
 from . import wb_constants
+if typing.TYPE_CHECKING:
+    try:
+        from geometry_msgs.msg import Pose
+    except ImportError:
+        Pose = Any
+
 from . import wb_globals
-from .freecad_utils import get_param
+from .freecad_utils import get_param, get_parents_names, is_selection_object
+from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
@@ -630,6 +638,24 @@ def is_name_used(
     return False
 
 
+def placement_from_geom_pose(pose: Pose) -> fc.Placement:
+    """Return a FreeCAD Placement from a ROS Pose."""
+    ros_to_freecad_factor = 1000.0  # ROS uses meters, FreeCAD uses mm.
+    return fc.Placement(
+        fc.Vector(
+            pose.position.x * ros_to_freecad_factor,
+            pose.position.y * ros_to_freecad_factor,
+            pose.position.z * ros_to_freecad_factor,
+        ),
+        fc.Rotation(
+            pose.orientation.w,
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+        ),
+    )
+
+
 def placement_from_pose_string(pose: str) -> fc.Placement:
     """Return a FreeCAD Placement from a string pose `x, y, z; qw, qx, qy, qz`.
 
@@ -724,6 +750,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
 
     # Set Origin or Mounted placement
     setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
+    doc.recompute()
 
 
 def move_placement(
@@ -759,7 +786,7 @@ def move_placement(
     # in local frame every tool click will result Origin move because both orienteers moved and received new position
     new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
-
+    doc.recompute()
 
 
 def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
@@ -767,30 +794,41 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     '''Return placement of orienteer.
     If orienteer is not certain types it will make LCS with InertialCS map mode and use it'''
 
+    orienteer_object = orienteer
+    if is_selection_object(orienteer):
+        orienteer_object = orienteer.Object
+
     # TODO process Vertex
-    if is_lcs(orienteer) :
-        placement = get_placement(orienteer)
-    elif is_link(orienteer) or is_joint(orienteer):
-        placement = orienteer.Placement
+    if is_lcs(orienteer_object) :
+        placement = get_placement(orienteer_object)
+    elif is_link(orienteer_object) or is_joint(orienteer_object):
+        placement = orienteer_object.Placement
     else:
         lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
 
     return placement
 
 
-def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_concentric_reversed:bool = False) \
-    -> list[fc.DO, fc.DO, fc.Placement] :
+def make_lcs_at_link_body(
+        orienteer,
+        delete_created_objects:bool = True,
+        lcs_concentric_reversed:bool = False,
+        deactivate_after_map_mode:bool = True,
+) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by part and be Real element of robot link'''
 
     link = None
     # trying get link from subelement
     try:
-        orienteer_parents_reversed = reversed(orienteer.Object.Parents)
-        for parent in orienteer_parents_reversed:
-            parent = parent[0]
-            if is_fc_link(parent):
-                link = parent
+        if is_fc_link(orienteer.Object):
+            link = orienteer.Object
+        else:
+            orienteer_parents_reversed = reversed(orienteer.Object.Parents)
+            for parent in orienteer_parents_reversed:
+                parent = parent[0]
+                if is_fc_link(parent):
+                    link = parent
     except (AttributeError, IndexError, RuntimeError):
         pass
 
@@ -841,8 +879,9 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     else:
         lcs.MapMode = 'InertialCS'
 
-    # prevent automove back to InertialCS rotation
-    lcs.MapMode = 'Deactivated'
+    if deactivate_after_map_mode:
+        # prevent automove back to InertialCS rotation
+        lcs.MapMode = 'Deactivated'
 
     # fix Z rotation to 0 in frame of origin
     lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
@@ -859,7 +898,11 @@ def make_lcs_at_link_body(orienteer, delete_created_objects:bool = True, lcs_con
     return lcs, body_lcs_wrapper, placement
 
 
-def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | None = None, z:float | None = None) -> fc.Placement :
+def rotate_placement(
+        placement:fc.Placement,
+        x:float | None = None, y:float | None = None, z:float | None = None,
+        rotation_center: fc.Vector = fc.Vector(0,0,0),
+) -> fc.Placement :
     ''' Rotate (incremental) placement in frame of origin or set any axis to zero.
 
         This func let you rotate object how be you rotate it as it was at origin.
@@ -872,29 +915,33 @@ def rotate_placement(placement:fc.Placement, x:float | None = None, y:float | No
 
     ## rotation
     if x is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(1,0,0), x)
+        rotAxis = fc.Vector(1,0,0)
+        placement.rotate(rotation_center, rotAxis, x)
     if y is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,1,0), y)
+        rotAxis = fc.Vector(0,1,0)
+        placement.rotate(rotation_center, rotAxis, y)
     if z is not None:
-        placement.rotate(fc.Vector(0,0,0), fc.Vector(0,0,1), z)
+        rotAxis = fc.Vector(0,0,1)
+        placement.rotate(rotation_center, rotAxis, z)
 
     ## setting axis angle to zero
-    # go to default frame by inverse
-    placement_inversed = placement.inverse()
-    rotXYZ = placement_inversed.Rotation.toEulerAngles('XYZ')
-    rotXYZ = list(rotXYZ)
+    if x == 0 or y == 0 or z == 0:
+        # go to default frame by inverse
+        placement_inversed = placement.inverse()
+        rotXYZ = placement_inversed.Rotation.toEulerAngles('XYZ')
+        rotXYZ = list(rotXYZ)
 
-    if x == 0:
-        rotXYZ[0] = 0
-    if y == 0:
-        rotXYZ[1] = 0
-    if z == 0:
-        rotXYZ[2] = 0
+        if x == 0:
+            rotXYZ[0] = 0
+        if y == 0:
+            rotXYZ[1] = 0
+        if z == 0:
+            rotXYZ[2] = 0
 
-    # set to zero position by axis in default frame
-    placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], rotXYZ[2])
-    # inverse back and get modificated rotation
-    placement.Rotation = placement_inversed.inverse().Rotation
+        # set to zero position by axis in default frame
+        placement_inversed.Rotation.setEulerAngles('XYZ', rotXYZ[0], rotXYZ[1], rotXYZ[2])
+        # inverse back and get modificated rotation
+        placement.Rotation = placement_inversed.inverse().Rotation
 
     return placement
 
@@ -915,7 +962,7 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
 
     if not selection_ok:
         message(
-            'Select: subobject of robot link or link.'
+            'Select: joint or link or subelement of Real link or LCS of Real link.'
             , gui=True,
         )
         return
@@ -928,25 +975,26 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
     else:
         link = get_parent_link_of_obj(orienteer1)
 
-    # get parent joint from link
     if not joint:
         if link == None:
             message('Can not get parent robot link of selected object', gui=True)
             return
 
-        chain = get_chain(link)
-
-        if len(chain) < 2:
-            message('Link must be in chain (joint to link).', gui=True)
-            return
-
-
-        joint = chain[-2]
-        if not is_joint(joint):
-            message('Can not get parent joint of link', gui=True)
-            return
-
-    joint.Origin = rotate_placement(joint.Origin, x, y, z)
+        orienteer1_sub_obj, *_ = fcgui.Selection.getSelectionEx()
+        # for subobjects (face, edge, vertex) and lcs
+        if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
+        and not is_fc_link(orienteer1) and not is_link(orienteer1):
+            orienteer2_placement = get_placement_of_orienteer(
+                orienteer1_sub_obj,
+                lcs_concentric_reversed = True,
+                delete_created_objects = True,
+            )
+            orienteer2_to_link_diff = link.Placement.inverse() * orienteer2_placement
+            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z, orienteer2_to_link_diff.Base)
+        else:
+            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
+    else:
+        joint.Origin = rotate_placement(joint.Origin, x, y, z)
 
     doc.recompute()
 
@@ -1059,3 +1107,112 @@ def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
         gitmodules_changed = False
 
     return gitmodules_changed
+
+
+def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc.DocumentObject:
+    """Find real object (Real of link) presents in parents of object.
+    Usefull when need to know root parent of obj in Real of robot link
+    if object`s parent is present in robot Link as Real"""
+    parents_names = get_parents_names(obj)
+    for parents_name in parents_names:
+        for real in link.Real:
+            if parents_name == real.Name:
+                return real
+    return None
+
+
+def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool = True) -> bool |  tuple[DO, DO, DO]:
+    doc = fc.activeDocument()
+    selection_ok = False
+    try:
+        orienteer1, orienteer2 = validate_types(
+            fcgui.Selection.getSelection(),
+            ['Any', 'Any'],
+        )
+        selection_ok = True
+    except RuntimeError:
+        pass
+
+    if not selection_ok:
+        message(
+            'Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
+            'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True,
+        )
+        return False
+
+    link1 = get_parent_link_of_obj(orienteer1)
+    link2 = get_parent_link_of_obj(orienteer2)
+
+    if link1 == None:
+        message('Can not get parent robot link of first selected object', gui=True)
+        return False
+
+    if link2 == None:
+        message('Can not get parent robot link of second selected object', gui=True)
+        return False
+
+    sel = fcgui.Selection.getSelectionEx()
+    orienteer1_sub_obj = sel[0]
+    orienteer2_sub_obj = sel[1]
+
+    chain1 = get_chain(link1)
+    chain2 = get_chain(link2)
+    chain1_len = len(chain1)
+    chain2_len = len(chain2)
+    parent_link = None # same link as parent in both orienteers
+
+    if chain1_len > chain2_len:
+        parent_link = link2
+        child_link = link1
+        chain = chain1
+
+        if is_lcs(orienteer2):
+            parent_orienteer = orienteer2
+        else:
+            parent_orienteer = orienteer2_sub_obj
+
+        if is_lcs(orienteer1):
+            child_orienteer = orienteer1
+        else:
+            child_orienteer = orienteer1_sub_obj
+
+    elif chain1_len < chain2_len:
+        parent_link = link1
+        child_link = link2
+        chain = chain2
+        parent_orienteer = orienteer1
+        child_orienteer = orienteer2
+
+        if is_lcs(orienteer1):
+            parent_orienteer = orienteer1
+        else:
+            parent_orienteer = orienteer1_sub_obj
+
+        if is_lcs(orienteer2):
+            child_orienteer = orienteer2
+        else:
+            child_orienteer = orienteer2_sub_obj
+    elif chain1_len == chain2_len == 1:
+        message('Links must be connected by joints first.', gui=True)
+        return False
+
+    if not parent_link:
+        message(
+            'Tool works only for parent and child link orienteers.\n'
+            'One orienteer must be in parent link and one in child link.', gui=True,
+        )
+        return False
+
+    joint = chain[-2]
+    if not is_joint(joint):
+        message('Can not get joint between parent links of selected objects', gui=True)
+        return False
+
+    doc.openTransaction(tr("Set placement - fast"))
+    if joint_origin:
+        set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
+    if link_mounted_placement:
+        move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+    doc.commitTransaction()
+
+    return joint, child_link, parent_link

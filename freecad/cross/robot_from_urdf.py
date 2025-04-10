@@ -5,28 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import degrees
 from typing import Any, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import FreeCAD as fc
-
-try:
-    from urdf_parser_py.urdf import Collision as UrdfCollision
-    from urdf_parser_py.urdf import Joint as UrdfJoint
-    from urdf_parser_py.urdf import Link as UrdfLink
-    from urdf_parser_py.urdf import Material as UrdfMaterial
-    from urdf_parser_py.urdf import Robot as UrdfRobot
-    from urdf_parser_py.urdf import Visual as UrdfVisual
-
-    from .urdf_parser_utils import axis_to_z
-    from .urdf_parser_utils import obj_from_geometry
-    from .urdf_parser_utils import placement_along_z_from_joint
-    from .urdf_parser_utils import placement_from_origin
-except ModuleNotFoundError:
-    UrdfCollision = Any
-    UrdfJoint = Any
-    UrdfLink = Any
-    UrdfMaterial = Any
-    UrdfRobot = Any
-    UrdfVisual = Any
 
 from .freecad_utils import add_object
 from .freecad_utils import make_group
@@ -36,18 +17,42 @@ from .link_proxy import make_link
 from .robot_proxy import make_robot
 from .wb_utils import get_joints
 
-# Stubs and typing hints.
-from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
-from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
-from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
-DO = fc.DocumentObject
-DOList = List[DO]
-DOG = fc.DocumentObjectGroup
-AppLink = DO  # TypeId == 'App::Link'
-AppPart = DO  # TypeId == 'App::Part'
-# List of UrdfVisual or List of UrdfCollision.
-VisualList = List[UrdfVisual]
-CollisionList = List[UrdfCollision]
+try:
+    from .urdf_parser_utils import axis_to_z
+    from .urdf_parser_utils import obj_from_geometry
+    from .urdf_parser_utils import placement_along_z_from_joint
+    from .urdf_parser_utils import placement_from_origin
+except ModuleNotFoundError:
+    pass
+
+if TYPE_CHECKING:
+    try:
+        from urdf_parser_py.urdf import Collision as UrdfCollision
+        from urdf_parser_py.urdf import Joint as UrdfJoint
+        from urdf_parser_py.urdf import Link as UrdfLink
+        from urdf_parser_py.urdf import Material as UrdfMaterial
+        from urdf_parser_py.urdf import Robot as UrdfRobot
+        from urdf_parser_py.urdf import Visual as UrdfVisual
+    except ModuleNotFoundError:
+        UrdfCollision = Any
+        UrdfJoint = Any
+        UrdfLink = Any
+        UrdfMaterial = Any
+        UrdfRobot = Any
+        UrdfVisual = Any
+
+    # Stubs and typing hints.
+    from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
+    from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
+    from .robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
+    DO = fc.DocumentObject
+    DOList = List[DO]
+    DOG = fc.DocumentObjectGroup
+    AppLink = DO  # TypeId == 'App::Link'
+    AppPart = DO  # TypeId == 'App::Part'
+    # List of UrdfVisual or List of UrdfCollision.
+    VisualList = List[UrdfVisual]
+    CollisionList = List[UrdfCollision]
 
 
 @dataclass
@@ -132,8 +137,8 @@ def _make_robot(
 
     Return (robot object, parts group).
 
-    The group called 'Parts' is potentially created and returned. If the object
-    'Parts' is not a group, a different name will be given.
+    The group called 'URDF Parts' is potentially created and returned. If the object
+    'URDF Parts' is not a group, a different name will be given.
 
     """
 

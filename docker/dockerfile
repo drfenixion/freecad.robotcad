@@ -35,7 +35,8 @@ RUN apt-get update && \
         software-properties-common \
         mesa-utils \
         nano \
-        pip && \
+        pip \
+        wget && \
     pip install debugpy && \
     apt-get autoclean && \
     apt-get autoremove && \
@@ -43,16 +44,50 @@ RUN apt-get update && \
 ### End Install system packages
 
 
-### Install FreeCAD
-RUN echo 'Install FreeCAD'
-RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
+### Install FreeCAD Daily
+RUN echo 'Install FreeCAD Daily'
+RUN add-apt-repository ppa:freecad-maintainers/freecad-daily && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        freecad && \
-    apt-get autoclean && \
-    apt-get autoremove && \
+        freecad-daily -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
-### End Install FreeCAD
+### End Install FreeCAD Daily
+
+
+# ### Install FreeCAD Stable (0.21.2 - at time of commit)
+# RUN echo 'Install FreeCAD'
+# RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
+#     apt-get update && \
+#     DEBIAN_FRONTEND=noninteractive apt-get install -y \
+#         freecad && \
+#     apt-get autoclean -y && \
+#     apt-get autoremove -y && \
+#     rm -rf /var/lib/apt/lists/*
+# ### End Install FreeCAD
+
+
+# Does not work yet
+# ### Install FreeCAD 1.0 from downloaded deb package
+# RUN echo 'Install FreeCAD 1.0 from downloaded deb package'
+# RUN wget http://ftp.de.debian.org/debian/pool/main/f/freecad/freecad_1.0.0+dfsg-5_all.deb && \
+#     # add-apt-repository ppa:freecad-maintainers/freecad-stable && \
+#     # add-apt-repository ppa:freecad-maintainers/freecad-daily && \
+#     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 && \
+#     echo "deb http://ftp.de.debian.org/debian sid main" >> /etc/apt/sources.list && \
+#     apt-get update && \
+#     DEBIAN_FRONTEND=noninteractive apt-get install -y \
+#         # freecad-daily \
+#         freecad-python3 \
+#         # occt-misc=7.6.3+dfsg1-7.1build1 \
+#         # freecad-python3 \
+#         ./freecad_1.0.0+dfsg-5_all.deb && \
+#     rm -f ./freecad_1.0.0+dfsg-5_all.deb \
+#     apt-get autoclean -y && \
+#     apt-get autoremove -y && \
+#     rm -rf /var/lib/apt/lists/*
+# ### End Install FreeCAD 1.0 from downloaded deb package
 
 
 ### Delete user if present with same UID as local
@@ -75,13 +110,57 @@ RUN export UBUNTU_USER_ID=$UID \
 ### End create user
 
 
+### Change owner of pip and apt packages dir for install packages without sudo
+RUN chown -R $USER:$USER /usr/local/lib/python3.12/dist-packages
+RUN chown -R $USER:$USER /var/cache/apt/archives/
+RUN chown -R $USER:$USER /var/lib/dpkg/
+### END Change owner of pip and apt packages dir for install packages without sudo
+
+
 USER $USER
+
+
+# should be after user activation
+### Install FreeCAD from conda py3.12
+RUN echo 'Install FreeCAD conda py3.12'
+RUN mkdir -p /home/$USER/miniconda3 && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
+    bash /home/$USER/miniconda3/miniconda.sh -b -u -p /home/$USER/miniconda3 && \
+    rm /home/$USER/miniconda3/miniconda.sh && \
+    . /home/$USER/miniconda3/bin/activate && \
+    conda init --all && \
+    conda config --add channels conda-forge && \
+    conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
+    conda activate freecad_1_0_312 && \
+    conda install numpy pandas matplotlib requests qt6-wayland && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+### End Install FreeCAD conda py3.12
+
+
+# # Should be after user activation
+# ### Install FreeCAD from conda default
+# RUN echo 'Install FreeCAD conda default'
+# RUN mkdir -p /home/$USER/miniconda3 && \
+#     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
+#     bash /home/$USER/miniconda3/miniconda.sh -b -u -p /home/$USER/miniconda3 && \
+#     rm /home/$USER/miniconda3/miniconda.sh && \
+#     . /home/$USER/miniconda3/bin/activate && \
+#     conda init --all && \
+#     conda install conda-forge::freecad && \
+#     conda install conda-forge::qt6-wayland && \
+#     apt-get autoclean -y && \
+#     apt-get autoremove -y && \
+#     rm -rf /var/lib/apt/lists/*
+# ### End Install FreeCAD conda default
 
 
 ### Copy project to image
 RUN mkdir -p $PATH_TO_WS/src
 WORKDIR $PATH_TO_WS/src
-COPY --link --chown=$USER:$USER ros2_ws/src .
+RUN mkdir -p ./freecad_cross_rosdep
+COPY --link --chown=$USER:$USER ros2_ws/src/freecad_cross_rosdep ./freecad_cross_rosdep
 ### END copy project to image
 
 
@@ -96,7 +175,7 @@ WORKDIR $PATH_TO_WS
 ### Install ROS deps
 RUN echo 'Install ROS dependencies...'
 RUN sudo -H apt-get update -y && rosdep update && \
-    sudo rosdep install -r -q --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} && \
+    sudo rosdep install -r -q --from-paths `colcon list --packages-up-to freecad_cross_rosdep -p` --ignore-src --rosdistro ${ROS_DISTRO} && \
     sudo apt-get autoclean -y && \
     sudo apt-get autoremove -y && \
     sudo rm -rf /var/lib/apt/lists/*

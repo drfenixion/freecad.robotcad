@@ -57,6 +57,7 @@ Nice to have
 - Implement [yourdf_py](https://github.com/clemense/yourdfpy) as main URDF parsing library. Cf. [rerun_urdf.py](https://github.com/rerun-io/rerun/blob/main/examples/python/ros_node/rerun_urdf.py) for an example.
 - Implement [urdf_py](https://github.com/mmatl/urdfpy) as alternative URDF parsing library.
 - Implement [xacro2urdf](https://github.com/doctorsrn/xacro2urdf) as a xacro alternative if ROS is not available.
+- Fix recompute on changement of joint position in a robot when the `Label2` of a joint is changed.
 
 Lower priority
 --------------
@@ -66,6 +67,7 @@ Lower priority
 - URDF editor integrated in Robot
 - Fix CROSS complaining that V-HACD is not found on the first time it is set.
 - Do not create an extra FreeCAD link when importing a URDF since the part can be directly added to the ROS links (i.e. instead of creating a FreeCAD link and adding the FreeCAD link to the ROS link). FreeCAD links are only necessary if the parts are in a different file.
+- Add a temporary switch to allow to add a joint without Parent to a robot while avoiding the warning "Joint [...] has no parent".
 
 Implementation
 --------------

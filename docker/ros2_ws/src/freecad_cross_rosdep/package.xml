@@ -4,7 +4,7 @@
   <name>freecad_cross_rosdep</name>
   <version>1.0.0</version>
   <description>Package to store freecad.cross workbench dependencies</description>
-  <maintainer email="no_maintainer@no.maintainer">no</maintainer>
+  <maintainer email="it.project.devel@gmail.com">Vasily S</maintainer>
   <license>LGPL-2.1</license>
 
   <depend>geometry_msgs</depend>
@@ -14,6 +14,7 @@
   <depend>xacro</depend>
   <depend>python3-requests</depend>
   <depend>python3-collada</depend>
+  <depend>ament_index_python</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

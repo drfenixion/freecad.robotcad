@@ -7,6 +7,7 @@ from __future__ import annotations
 from math import copysign, hypot
 
 import FreeCAD as fc
+from freecad.cross.freecad_utils import get_linked_obj
 
 
 def get_global_placement_and_scale(
@@ -93,3 +94,38 @@ def get_global_placement(
     if p_and_s is None:
         return
     return p_and_s[0]
+
+
+def get_absolute_placement(obj, with_obj_placement: bool = True):
+    """ Get absolute placement of obj or first non-link object in link chain.
+    Considers only Part and Assembly ancestors for calculation of placement.
+
+    param: with_obj_placement - with object placement
+    """
+    obj = get_linked_obj(obj)
+
+    # globalPlace = fc.Placement()
+    # if with_obj_placement:
+    #     globalPlace = obj.Placement
+
+    # # loop via non-link ancestors to get absolute placement
+    # for ancestor in obj.InListRecursive:
+    #     if ancestor.TypeId != 'App::Part' or ancestor.TypeId != 'Assembly::AssemblyObject':
+    #         break
+    #     globalPlace = globalPlace.multiply(ancestor.Placement)
+
+    # return globalPlace
+
+    if with_obj_placement:
+        return obj.getGlobalPlacement()
+    else:
+        return obj.getGlobalPlacement() * obj.Placement.inverse()
+
+
+def get_obj_to_subobj_diff(obj: fc.DocumentObject, subobj: fc.DocumentObject, with_leaf_el:bool = True) -> fc.Placement:
+    """Transform from object to subobject"""
+    obj_ab_pl = get_absolute_placement(obj)
+    subobj_ab_pl = get_absolute_placement(subobj, with_leaf_el)
+    obj_to_subobj_diff = subobj_ab_pl * obj_ab_pl.inverse()
+
+    return obj_to_subobj_diff

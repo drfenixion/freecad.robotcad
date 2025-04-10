@@ -59,7 +59,7 @@ def generate_launch_description():
     return launch.LaunchDescription([
         launch.actions.DeclareLaunchArgument(
             name='use_sim_time',
-            default_value='true',
+            default_value='false',
             description='Flag to enable usage of simulation time',
         ),
         launch.actions.DeclareLaunchArgument(

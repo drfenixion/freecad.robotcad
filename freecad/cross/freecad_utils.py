@@ -9,7 +9,10 @@ import string
 from typing import Any, Iterable, Optional
 import sys
 
+import numpy as np
+
 import FreeCAD as fc
+import Part
 import MaterialEditor
 
 from .utils import true_then_false
@@ -285,9 +288,9 @@ def get_properties_of_category(
     return properties
 
 
-def is_derived_from(obj: DO, typeid: str) -> bool:
+def is_derived_from(obj: DO, typeid: str, check_instance_doc_obj = True) -> bool:
     """Return True if the object is a object of the given type."""
-    if not isinstance(obj, DO):
+    if check_instance_doc_obj and not isinstance(obj, DO):
         return False
     return hasattr(obj, 'isDerivedFrom') and obj.isDerivedFrom(typeid)
 
@@ -364,6 +367,11 @@ def is_container(obj: DO) -> bool:
 def is_link(obj: DO) -> bool:
     """Return True if the object is a 'App::Link'."""
     return is_derived_from(obj, 'App::Link')
+
+
+def is_selection_object(obj: DO) -> bool:
+    """Return True if the object is a 'Gui::SelectionObject'."""
+    return is_derived_from(obj, 'Gui::SelectionObject', check_instance_doc_obj = False)
 
 
 def get_linked_obj(obj: DO, recursive=True) -> Optional[DO]:
@@ -789,6 +797,75 @@ def material_from_material_editor(
     return material
 
 
+def fc_matrix_to_numpy(matrix: fc.Matrix):
+    """
+    Converts a FreeCAD matrix to a numpy array
+
+    Args:
+        matrix (Base.Matrix): Matrix from FreeCAD
+
+    Returns:
+        np.ndarray: Matrix as a numpy array
+    """
+    # Extract the components of the inertia matrix
+    Ixx, Ixy, Ixz = matrix.A11, matrix.A12, matrix.A13
+    Iyx, Iyy, Iyz = matrix.A21, matrix.A22, matrix.A23
+    Izx, Izy, Izz = matrix.A31, matrix.A32, matrix.A33
+
+    # Create a numpy array from the inertia matrix components
+    inertia_matrix = np.array([
+        [Ixx, Ixy, Ixz],
+        [Iyx, Iyy, Iyz],
+        [Izx, Izy, Izz],
+    ])
+
+    return inertia_matrix
+
+
+def numpy_to_fc_matrix(np_array):
+    """
+    Converts a numpy array to a FreeCAD matrix
+
+    Args:
+        np_array (np.ndarray): Matrix as a numpy array
+
+    Returns:
+        Base.Matrix: Matrix as a FreeCAD Base.Matrix object
+    """
+    # Check if the input is a 3x3 numpy array
+    if np_array.shape!= (3, 3):
+        raise ValueError("Input must be a 3x3 numpy array")
+
+    # Create a new Base.Matrix object
+    matrix = fc.Matrix()
+
+    # Set the components of the matrix
+    matrix.A11, matrix.A12, matrix.A13 = np_array[0, 0], np_array[0, 1], np_array[0, 2]
+    matrix.A21, matrix.A22, matrix.A23 = np_array[1, 0], np_array[1, 1], np_array[1, 2]
+    matrix.A31, matrix.A32, matrix.A33 = np_array[2, 0], np_array[2, 1], np_array[2, 2]
+
+    return matrix
+
+
+def parallel_axis_theorem(m, r, I):
+    """
+    Apply the parallel axis theorem to the inertia tensor.
+
+    Parameters:
+    m (float): Mass of the body.
+    r (numpy.array): Radius vector from the new reference point to the old reference point.
+    I (numpy.array): Inertia tensor relative to the old reference point.
+
+    Returns:
+    numpy.array: Inertia tensor relative to the new reference point.
+    """
+    E = np.eye(3)  # Identity matrix
+    r_outer = np.outer(r, r)  # Outer product of r with itself
+    I = fc_matrix_to_numpy(I)
+    I_new = I + m * (np.linalg.norm(r)**2 * E - r_outer)
+    return numpy_to_fc_matrix(I_new)
+
+
 def matrix_of_inertia(
         obj: Optional[fc.DocumentObject],
 ) -> Optional[fc.Matrix]:
@@ -798,7 +875,13 @@ def matrix_of_inertia(
     except (AttributeError, IndexError, RuntimeError):
         pass
     try:
-        return obj.Shape.Solids[0].MatrixOfInertia
+        check_solid_exist = obj.Shape.Solids[0]
+        commonMatrixOfInertia = fc.Matrix()
+        for solid in obj.Shape.Solids:
+            if solid.Volume > 0.0:
+                r = solid.CenterOfGravity - obj.Shape.CenterOfGravity
+                commonMatrixOfInertia += parallel_axis_theorem(solid.Volume, r, solid.MatrixOfInertia)
+        return commonMatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
         pass
     return None
@@ -871,18 +954,64 @@ def lcs_attachmentsupport_name():
         return 'AttachmentSupport'
 
 
-def adjustedGlobalPlacement(obj, locVector):
-    '''find global placement to make locVector the local origin with the correct orientation'''
-    # Gotten from BoundingBox_Tracing macro
-    try:
-        objectPlacement = obj.Shape.Placement
-        objectGlobalPlacement = obj.getGlobalPlacement()
-        locPlacement = fc.Placement(locVector, fc.Rotation(fc.Vector(1,0,0),0))
-        return objectGlobalPlacement.multiply(objectPlacement.inverse()).multiply(locPlacement)
-    except Exception:
-        locPlacement = fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0))
-        return locPlacement
-
-
 def get_python_name() -> str:
     return 'python' + str(sys.version_info.major) + '.' + str(sys.version_info.minor)
+
+
+def get_parents_names(obj: fc.DocumentObject) -> list[str]:
+    """Get object parents names"""
+    parents_names = []
+    for parent, path in obj.Parents:
+        name = parent.Name
+        if name is None:
+            name = 'None'
+        parents_names = [name] + path.split('.')
+        break
+    return parents_names
+
+
+def copy_obj_geometry(old_obj: DO, new_obj: DO, copy_compound_shape_for_part: bool = True) -> DO:
+    """ Copy geometry properties from old object to new one"""
+    if hasattr(old_obj, "Shape"):
+        new_obj.Shape = old_obj.Shape
+    elif hasattr(old_obj, "Mesh"):      # upgrade with wmayer thanks #http://forum.freecadweb.org/viewtopic.php?f=13&t=22331
+        new_obj.Shape = old_obj.Mesh
+    elif hasattr(old_obj, "Points"):
+        new_obj.Shape = old_obj.Points
+    elif copy_compound_shape_for_part and is_part(old_obj):
+        # get compound shape for all objects inside Part
+        new_obj.Shape = Part.getShape(old_obj)
+
+    return new_obj
+
+
+def get_compound(
+        objs: list[DO],
+        compound_placement: fc.Placement,
+        compound_name: str,
+        compound_el_name: str,
+        zeroing_real_objs_placement: bool = False,
+) -> Optional[DO]:
+    """Make compound of objects and it`s nested bodies"""
+    try:
+        doc = objs[0].Document
+    except:
+        error('Can`t get document for make compound of objects')
+        return None
+    part_tmp = doc.addObject("App::Part", 'tmp_' + compound_name)
+    part_tmp.Visibility = False
+    for obj in objs:
+        compound_el = doc.addObject("Part::Feature", compound_el_name)
+        part_tmp.Visibility = False
+        compound_el = copy_obj_geometry(obj, compound_el)
+        if zeroing_real_objs_placement:
+            compound_el.Placement = fc.Placement()
+        part_tmp.addObject(compound_el)
+    # make result compound of Part (inside it compounds of objs)
+    compound = doc.addObject("Part::Feature", compound_name)
+    compound.Visibility = False
+    compound = copy_obj_geometry(part_tmp, compound)
+    compound.Placement = compound_placement
+    part_tmp.removeObjectsFromDocument()
+    doc.removeObject(part_tmp.Name)
+    return compound

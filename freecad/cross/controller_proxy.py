@@ -11,6 +11,7 @@ from typing import Iterable
 from copy import deepcopy
 from pathlib import Path
 import os
+import numpy as np
 import yaml
 import xml.etree.ElementTree as ET
 import re
@@ -84,7 +85,9 @@ class ControllerProxy(ProxyBase):
             'The type',
         )
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
-        obj._Type = self.Type
+        # it is also called after project load and therefore added condition
+        if obj._Type == '':
+            obj._Type = self.Type
 
 
     def execute(self, obj: CrossController) -> None:
@@ -233,6 +236,15 @@ class _ViewProviderController(ProxyBase):
                             param_to_remove_name = mapped_params_template.replace(param_to_replace, mapped_param_to_remove)
                             obj.removeProperty(param_to_remove_name)
 
+                            # remove param from list
+                            if hasattr(obj, 'controller_parameters_fullnames_list'):
+                                controller_parameters_fullnames_list = getattr(obj, 'controller_parameters_fullnames_list')
+                                try:
+                                    controller_parameters_fullnames_list.remove(param_to_remove_name)
+                                    setattr(obj, 'controller_parameters_fullnames_list', controller_parameters_fullnames_list)
+                                except ValueError:
+                                    pass
+
                 # save mapped params to check diff in future
                 try:
                     attr = getattr(obj, mapped_params_prop_name)
@@ -296,7 +308,16 @@ class _ViewProviderController(ProxyBase):
                             notice_not_suited_object_selected(attr, replacements, prop)
 
                 if attr != filtered_elements:
-                    setattr(obj, prop, filtered_elements)
+                    if prop == 'odom_frame_id':
+                        try:
+                            setattr(obj, prop, filtered_elements)
+                        except TypeError:
+                            # odom_frame_id type was changed in robotcad 6
+                            warn(
+                                'You use old version of controller (' + ros_name(obj) + '). Recreate it.',
+                            )
+                    else:
+                        setattr(obj, prop, filtered_elements)
 
             return obj
 
@@ -417,12 +438,15 @@ def add_controller_properties_block(controller: CrossController, controller_data
         **parameters_flatten,
         **adding_flatten_params,
     }
-    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
     prop_name = 'controller_parameters_fullnames_list'
+    parameters_flatten_full_names = controller_data['parameters_flatten'].keys()
+    prop_name_value = getattr(controller, prop_name, [])
+    parameters_flatten_full_names_new = list(np.unique(list(parameters_flatten_full_names) + prop_name_value))
+
     # add meta property
     # there are only list of full names of controller parameters (gotten from controller YAML config)
     if hasattr(controller, prop_name):
-        setattr(controller, prop_name, parameters_flatten_full_names)
+        setattr(controller, prop_name, parameters_flatten_full_names_new)
     else:
         controller, used_property_name = add_property(
             controller,
@@ -430,7 +454,7 @@ def add_controller_properties_block(controller: CrossController, controller_data
             prop_name,
             'Internal',
             'List of full names of parameters',
-            parameters_flatten_full_names,
+            parameters_flatten_full_names_new,
         )
         controller.setPropertyStatus(prop_name, ['Hidden', 'ReadOnly'])
 
@@ -500,6 +524,9 @@ def add_controller_properties(
                         'tricycle_controller',
                     ] \
                     and param['full_name'] in ['base_frame_id', 'odom_frame_id']:
+                        category = 'Root'
+                    elif parameter_name == 'parallel_gripper_action_controller' \
+                    and param['full_name'] in ['max_effort_interface', 'max_velocity_interface']:
                         category = 'Root'
                 else:
                     category = 'Root'
@@ -571,13 +598,20 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
                     class_name = full_class_name.split('/')[-1]
 
                     # special cases for some of same controller names in xml
-                    if 'GripperActionController' in full_class_name:
+                    # parallel_gripper_action_controller is new separate controller
+                    # and should not be handle as gripper from gripper_action_controller lib
+                    if 'GripperActionController' in full_class_name and 'parallel_gripper_action_controller' not in full_class_name:
                         gripper_interface = re.search(r'(.+)_', full_class_name).group(1) # effor, position
                         class_name = class_name + gripper_interface.capitalize()
                         controller['parameters']['gripper_action_controller_' + gripper_interface] = deepcopy(controller['parameters']['gripper_action_controller'])
 
                     camelCaseToList = re.findall(r'[A-Za-z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', class_name)
                     controller_name = '_'.join(camelCaseToList).lower()
+
+                    # special cases for parallel_gripper_action_controller
+                    if 'parallel_gripper_action_controller' in full_class_name:
+                        controller_name = 'parallel_gripper_action_controller'
+
                     plugin = {
                         full_class_name:
                           {
@@ -604,6 +638,33 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 
         return controllers
 
+
+    def add_custom_controllers_parameters(controllers_dirs: dict) -> dict:
+        '''Add custom parameters to controller.
+        It needed for addition custom logics to controller on extended code generator side.'''
+
+        try:
+            imitate_mecanum_by_friction = {
+                'type': 'bool',
+                'default_value': True,
+                'description': 'If option is "true" diagonal friction will be added to collisions of wheels in generated SDF code.\n\
+In that case wheel collisions should be spheres (radius same as wheel radius) and must be set base_frame_id.\n\
+base_frame_id should be parent of wheels or if not joint between the base_frame_id and parent of wheel must be fixed.\n\
+base_frame orientation must be on XY-plane:\n\
+tested on cases:\n\
+1) front to Y-positive, right side to X-positive.\n\
+2) front to X-positive, left side to Y-positive.\n\
+You can check orientation by FreeCAD global axis.\n\
+If base_frame_id is the direct parent of wheels the base_frame_id should not have parent or that parent joint type must be revolute.',
+                'read_only': False,
+            }
+            controllers_dirs['mecanum_drive_controller']['parameters']['mecanum_drive_controller']['imitate_mecanum_by_friction'] = imitate_mecanum_by_friction
+        except KeyError:
+            pass
+
+        return controllers_dirs
+
+
     controllers = get_controllers_root_dirs(ROS2_CONTROLLERS_PATH)
     controllers['controllers_dirs'] = filter_controllers_dirs(controllers['controllers_dirs'])
 
@@ -611,6 +672,9 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
     controllers['broadcasters_dirs'] = collect_controllers_config_files(controllers['broadcasters_dirs'])
     controllers['controllers_dirs'] = collect_controllers_parameters(controllers['controllers_dirs'])
     controllers['broadcasters_dirs'] = collect_controllers_parameters(controllers['broadcasters_dirs'])
+
+    controllers['controllers_dirs'] = add_custom_controllers_parameters(controllers['controllers_dirs'])
+
     controllers['controllers_dirs'] = collect_controllers_plugin_data(controllers['controllers_dirs'])
     controllers['broadcasters_dirs'] = collect_controllers_plugin_data(controllers['broadcasters_dirs'])
 
@@ -623,7 +687,8 @@ def get_controllers_data(ROS2_CONTROLLERS_PATH: Path = ROS2_CONTROLLERS_PATH) ->
 def filter_controllers_dirs(controllers: dict):
     """Filter controllers directories for that not coded parsing yet"""
 
-    filter_controllers_dirs = ['mecanum_drive_controller', 'parallel_gripper_controller', 'gpio_controllers']
+    # filted does not adapted controller (need some code to adapt)
+    filter_controllers_dirs = [] # no controllers to filter yet
 
     for controller in list(controllers):
         if controller in filter_controllers_dirs:
@@ -806,7 +871,11 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                 # prepare controller parameters
                 parameters = {}
                 try:
-                    parameters = controller_dir['parameters'][plugin_data_name]
+                    try:
+                        parameters = controller_dir['parameters'][plugin_data_name]
+                    except KeyError:
+                        # gpio_command_controller_parameters case
+                        parameters = controller_dir['parameters'][plugin_data_name + '_parameters']
                 except KeyError:
                     # special cases for controllers that does not have their own params and uses params from other controllers
                     params_based_on_controller_dir = excluded_params[plugin_data_name]['params_based_on_controller_dir']

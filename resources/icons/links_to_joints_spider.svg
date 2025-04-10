@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="30.371 26.648 265.9999 265.9999" width="266px" height="266px">
+<g transform="matrix(0.605565071105957, 0, 0, 0.5954710245132446, 11.979384422302253, 10.779877662658699)">
+<rect x="228.81" width="42.742" height="194.387" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" y="53.54"/>
+<rect x="227.357" width="42.742" height="194.387" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" y="267.99"/>
+<rect y="240.575" width="226.679" height="38.178" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" x="30.371"/>
+<ellipse style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" cx="250.748" cy="260.01" rx="50.182" ry="46.41"/>
+<rect x="428.463" y="26.648" width="41.167" height="196.004" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"/>
+<path d="M 333.894 233.175 H 373.515 L 373.515 214.377 L 409.412 239.441 L 373.515 264.506 L 373.515 245.708 H 333.894 V 233.175 Z" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(-0.746136, -0.665794, 0.729833, -0.688992, 450.512665, 805.356689)"/>
+<rect x="427.329" y="277.349" width="41.167" height="196.004" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"/>
+<rect x="367.511" y="152.961" width="41.167" height="196.004" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"/>
+<path d="M 393.703 101.081 H 433.497 L 433.497 85.43 L 476.057 106.298 L 433.497 127.167 L 433.497 111.515 H 393.703 V 101.081 Z" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);" transform="matrix(-0.81909, 0.573665, -0.622486, -0.784897, 768.468933, -43.355705)"/>
+</g>
+</svg>

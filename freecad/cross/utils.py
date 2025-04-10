@@ -19,7 +19,6 @@ import re
 from copy import deepcopy
 import hashlib
 
-import xmltodict
 
 import FreeCAD as fc
 
@@ -288,6 +287,7 @@ def dict_to_xml(
         full_document: bool = True, pretty: bool = False,
 ):
     """Convert dictionary to xml"""
+    import xmltodict # should be here because of later pip install in __init__
 
     dict = deepcopy(dict)
     for key_to_remove in keys_to_remove_before_convert:

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="193 199 266 266" width="266px" height="266px">
+<path d="M 326.455 224.609 L 439.059 306.579 L 396.047 439.208 L 256.86 439.208 L 213.848 306.579 L 326.455 224.609 Z" style="fill: rgb(255, 85, 85); stroke: rgb(0, 0, 0); stroke-width: 20px;"/>
+<path d="M 326.787 290.577 L 378.429 328.17 L 358.703 388.995 L 294.871 388.995 L 275.145 328.17 L 326.787 290.577 Z" style="fill: rgb(255, 85, 85); stroke: rgb(0, 0, 0); stroke-width: 20px;"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="326.123" y1="227.14" x2="326.123" y2="291.798"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="376.637" y1="330.188" x2="435.233" y2="306.952"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="276.62" y1="327.158" x2="217.013" y2="307.962"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="259.445" y1="435.257" x2="293.794" y2="388.785"/>
+<line style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0); stroke-width: 20px;" x1="357.442" y1="388.785" x2="395.832" y2="438.288"/>
+</svg>
