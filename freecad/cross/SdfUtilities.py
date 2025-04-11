@@ -271,6 +271,14 @@ class CollapsibleSection(QWidget):
         
         # Arrow label (using Unicode characters)
         self.arrow_label = QLabel("▶")  # Right arrow when collapsed
+        self.arrow_label.setStyleSheet("""
+            QLabel {
+                color: #8c92ac;
+                font-size: 12px;
+                width: 15px;
+                padding-left: 3px;
+            }
+        """)
         self.arrow_label.setFixedWidth(20)
         
         # Title button
@@ -342,10 +350,14 @@ ignore_list = [
     "audio",
     "include",
     "pose",
-    "inertia"
 ]
 
-
+# this dictionary holds all names  that are already defined in FreeCAD
+# this can be stored as a .json file but for now a dictionary will work 
+defined_names:dict={}
+defined_names["link"]={"name":["Label","Label2"]}
+defined_names["inertia"]={"ixx":"Ixx","ixy":"Ixy","ixz":"Ixz","iyy":"Iyy","iyz":"Iyz","izz":"Izz",}
+defined_names["inertial"]={"mass":"Mass"}
 # {name:str,{parents:list,alias,default value, type}}
 # algorithm
 # i. add parameters to object
@@ -361,7 +373,11 @@ class link_data:
     def __init__(self):
         # __class__.ui= fcgui.PySideUic.loadUi(os.path.join(UI_PATH,"linkEditor.ui"))
         pass
-
+class joint_data:
+    ui=None
+    params=None
+    def __init__(self):
+        pass
 
 class initialize:
     ui = None
@@ -433,6 +449,8 @@ class initialize:
         default,
         data_type: str,
         parent_tag: str = None,
+        min:float|int=0.0 , max:float|int=1000.0,decimals:int=3,
+        defined:bool=False
     ):
         if parent_tag is None:
             parent_tag = "root"
@@ -440,28 +458,25 @@ class initialize:
             # pick from here April 9 ,2025 14:30
             # Todo
             #   1.add property to object
-            print("issue:",alias)
-            self.obj.addProperty(
+            if defined is False:
+                self.obj.addProperty(
                 "App::PropertyString", alias, parent_tag, hidden=True
             )  # Todo
             widget.add_widget(
                 self.create_labeled_lineedit(name, alias, default_text=default)
             )
         elif data_type == "bool":
-            self.obj.addProperty(
+            if defined is False:
+                self.obj.addProperty(
                 "App::PropertyBool", alias, parent_tag, hidden=True
             )  # Todo
-            if debug:
-                pdb.set_trace()
             wd = self.create_labeled_checkbox(
                 name, alias, default_state=True if default == "true" else False
             )
             widget.add_widget(wd)
         elif data_type == "double":
-            if debug:
-                pdb.set_trace()
-            print(default)
-            self.obj.addProperty(
+            if defined is False:
+                self.obj.addProperty(
                 "App::PropertyFloat", alias, parent_tag, hidden=True
             )  # Todo
             # Todo
@@ -473,14 +488,16 @@ class initialize:
                 self.create_labeled_double_spinbox(name, alias, default_val=default)
             )
         elif data_type == "unsigned int":
-            self.obj.addProperty(
+            if defined is False:
+                self.obj.addProperty(
                 "App::PropertyInteger", alias, parent_tag, hidden=True
             )  # Todo
             widget.add_widget(
                 self.create_labeled_spinbox(name, alias, default_val=default)
             )
         elif data_type == "vector3":
-            self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
+            if defined is False:
+                self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
             default_list = extract_vector_n(default)
             widget.add_widget(
                 self.create_vector3_group(
@@ -491,6 +508,9 @@ class initialize:
             )
         elif data_type == "pose":
             pass
+        elif data_type=="color":
+            pass  
+        # Todo
         else:
             pass
 
@@ -514,38 +534,57 @@ class initialize:
         # check all attribute and add a cresponding widget based
         # on the data type
         tag: str = dc["tag"]
-        if debug:
-            print(tag)
-            pdb.set_trace()
+        defined:bool=False
 
         if dc["attributes"] is not None:
             for attribute in dc["attributes"]:
                 # attributes are of type Element_Attributes see sdf_schema_parser
                 name, default, data_type = attribute.get_complete().values()
-                alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
+                if defined_names.get(tag,None) is not None and name in defined_names[tag].keys():
+                    alias=defined_names[tag][name]
+                    if isinstance(alias,list):
+                        alias=alias[0]
+                    defined=True
+                else:
+                    alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
                 self.linkd.params.append(
                     {"name": name, "alias": alias, "parent": tag, "default": default}
                 )
+                
                 self.property_n_widget_setup(
-                    widget, name, alias, default, data_type, parent_tag=parent_tag
+                    widget, name, alias, default, data_type, parent_tag=parent_tag,defined=defined
                 )
-
+        
         if dc["value"] is not None:
             if parent_tag is not None:
-                alias = generate_parameter_name(tag, parent_names=parent_tag,reserved_names=reserved_names)
+                if defined_names.get(parent_tag,None) is not None and tag in defined_names[parent_tag].keys():
+                    alias=defined_names[parent_tag][tag]
+                    if isinstance(alias,list):
+                        alias=alias[0]
+                    defined=True
+                else:  
+                    alias = generate_parameter_name(tag, parent_names=parent_tag,reserved_names=reserved_names)
+        
                 
             else:
+                # probably unreachable
+                if defined_names.get(tag,None) is not None and tag in defined_names[tag].keys():
+                    alias=defined_names[tag][name]
+                    if isinstance(alias,list):
+                        alias=alias[0]
+                    defined=True
+                # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
                 
-            if debug:
-                pdb.set_trace()
+            
+           
             self.property_n_widget_setup(
                 widget,
                 tag,
                 alias,
                 default=dc["value"],
                 data_type=dc["data_type"],
-                parent_tag=parent_tag,
+                parent_tag=parent_tag,defined=defined
             )
         # loop through allchildren , and perform neccesary steps
         # recursion might be requiered
@@ -556,14 +595,7 @@ class initialize:
             else:
                 c = widget
             for child in children:
-                # how to determine when to add a collpsible section
-                #  option 1 check if the dictionaries children has a length greater than 0
-                #  if so then add a collapsible section
-                # else dont
-
-                # Todo
-                # checking the data type and data widgets to a collapsible section should be done
-                #  in a d function
+                
                 if child["tag"] not in ignore_list:
                     self.add_dynamic_widgets(c, child, child["children"], tag)
 
@@ -608,9 +640,6 @@ class initialize:
         # Create spinbox
         spinbox = QDoubleSpinBox()
         spinbox.setRange(min_val, max_val)
-        if debug:
-            pdb.set_trace()
-        print("defautlval=", default_val)
         spinbox.setValue(float(default_val))
         spinbox.setSingleStep(step)
         spinbox.setDecimals(decimals)
@@ -667,9 +696,13 @@ class initialize:
         line_edit.setText(default_text)
         line_edit.setPlaceholderText(placeholder)
         line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        line_edit.textChanged.connect(
-            lambda txt, obj=self.obj: setattr(obj, alias, txt)
-        )
+        # only a line edit has 2 names defined for asingle item e.g link had Label1 and Label2
+        if isinstance(alias,list):
+            line_edit.textChanged.connect(
+            lambda txt, obj=self.obj: setattr(obj, alias[0], txt) and setattr(obj,alias[1],txt))
+        else:
+             line_edit.textChanged.connect(
+            lambda txt, obj=self.obj: setattr(obj, alias, txt))
         if lineedit_width:
             line_edit.setFixedWidth(lineedit_width)
 
@@ -881,7 +914,3 @@ class initialize:
 
         return group
 
-    def open(self, dir):
-        with open(dir) as f:
-            et = ET.parse(f)
-        return et

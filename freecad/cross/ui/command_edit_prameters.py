@@ -10,7 +10,8 @@ from ..wb_utils import UI_PATH
 from ..sdf.sdf_parser import sdf_schema_parser
 from ..SdfUtilities import link_data
 #  Command class 
-
+def show(main_window,ui):
+    main_window.addDockWidget(PySide2.QtCore.Qt.RightDockWidgetArea,ui)
 class Editor():
     """Editor command"""
 
@@ -27,7 +28,7 @@ class Editor():
         if obj.Proxy.Type=='Cross::Link':
             lnk=link_data()
             # dock= fcgui.PySideUic.loadUi(os.path.join(UI_PATH,"linkEditor.ui"))
-            mw.addDockWidget(PySide2.QtCore.Qt.RightDockWidgetArea,lnk.ui)
+            show(mw,lnk.ui)
            
         else:
             pass
