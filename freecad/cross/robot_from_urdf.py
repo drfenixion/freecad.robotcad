@@ -160,7 +160,7 @@ def robot_from_urdf(
     QtGui.QApplication.processEvents()
     i += 1
 
-    robot, parts_group = _make_robot(doc, urdf_robot.name)
+    robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, urdf_robot.name)
     # Change the Show properties before having added all links.
     # Disable show of all for not creating any link to real, visial, collision
     # in progress of creating robot links
@@ -184,11 +184,11 @@ def robot_from_urdf(
         QtGui.QApplication.processEvents()
         i += 1
         ros_link, visual_part, collision_part, real_part = _add_ros_link(
-            urdf_link, robot, parts_group,
+            urdf_link, robot, collision_group, real_group, visual_group,
         )
 
         geoms, geom_containers = _add_visual(
-                urdf_link, parts_group, ros_link, visual_part, colors,
+                urdf_link, solids_meshes_group, ros_link, visual_part, colors,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
@@ -196,7 +196,7 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom_container)
 
         geoms, geom_containers = _add_real(
-                urdf_link, parts_group, ros_link, real_part, colors, convert_mesh_to_solid = True,
+                urdf_link, solids_meshes_group, ros_link, real_part, colors, convert_mesh_to_solid = False,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
@@ -204,7 +204,7 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom_container)
 
         geoms, geom_containers = _add_collision(
-                urdf_link, parts_group, ros_link, collision_part, colors,
+                urdf_link, solids_meshes_group, ros_link, collision_part, colors,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
@@ -266,9 +266,23 @@ def _make_robot(
     robot: CrossRobot = make_robot(name, doc)
     # Create a group 'Parts' to hold all parts in the assembly document.
     parts_group = make_group(doc, 'URDF Parts', visible=False)
-    robot.Proxy.created_objects.append(parts_group)
+    solids_meshes_group = make_group(doc, 'Solids and meshes', visible=False)
+    collision_group = make_group(doc, 'Collisions', visible=False)
+    real_group = make_group(doc, 'Reals', visible=False)
+    visual_group = make_group(doc, 'Visuals', visible=False)
 
-    return robot, parts_group
+    robot.Proxy.created_objects.append(parts_group)
+    robot.Proxy.created_objects.append(solids_meshes_group)
+    robot.Proxy.created_objects.append(collision_group)
+    robot.Proxy.created_objects.append(real_group)
+    robot.Proxy.created_objects.append(visual_group)
+
+    parts_group.addObject(solids_meshes_group)
+    parts_group.addObject(collision_group)
+    parts_group.addObject(real_group)
+    parts_group.addObject(visual_group)
+
+    return robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group
 
 
 def _get_colors(
@@ -319,7 +333,9 @@ def _material_color(material: UrdfMaterial) -> Optional[Color]:
 def _add_ros_link(
         urdf_link: UrdfLink,
         robot: CrossRobot,
-        parts_group: DOG,
+        collision_group: DOG,
+        real_group: DOG,
+        visual_group: DOG,
 ) -> Tuple[CrossLink, AppPart, AppPart]:
     """Add three App::Part to the group and links to them to the robot.
 
@@ -340,15 +356,15 @@ def _add_ros_link(
     name = urdf_link.name
     doc = robot.Document
 
-    visual_part = add_object(parts_group, 'App::Part', f'visual_{name}_')
+    visual_part = add_object(visual_group, 'App::Part', f'visual_{name}_')
     visual_part.Visibility = False
     robot.Proxy.created_objects.append(visual_part)
 
-    real_part = add_object(parts_group, 'App::Part', f'real_{name}_')
+    real_part = add_object(real_group, 'App::Part', f'real_{name}_')
     real_part.Visibility = False
     robot.Proxy.created_objects.append(real_part)
 
-    collision_part = add_object(parts_group, 'App::Part', f'collision_{name}_')
+    collision_part = add_object(collision_group, 'App::Part', f'collision_{name}_')
     collision_part.Visibility = False
     robot.Proxy.created_objects.append(collision_part)
 
