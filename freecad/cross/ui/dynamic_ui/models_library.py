@@ -254,7 +254,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.variants = variants
         self.parrent_window = parrent_window
         self.package_name = package_name
-        self.without_solids = False
+        self.create_without_solids = False
         self.initUI()
 
 
