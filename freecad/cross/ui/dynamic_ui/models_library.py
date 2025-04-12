@@ -78,15 +78,15 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.button.clicked.connect(self.get_selected_value)
         self.main_layout.addWidget(self.button)
 
-        # link to docks
-        weblink = QtWidgets.QLabel()
-        weblink.setText("<a href='https://github.com/drfenixion/robot_descriptions.py#descriptions'>https://github.com/drfenixion/robot_descriptions.py#descriptions</a>")
-        weblink.setTextFormat(QtCore.Qt.RichText)
-        weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-        weblink.setOpenExternalLinks(True)
-        self.main_layout.addWidget(QtWidgets.QLabel())
-        self.main_layout.addWidget(QtWidgets.QLabel())
-        self.main_layout.addWidget(weblink)
+        # # link to docks
+        # weblink = QtWidgets.QLabel()
+        # weblink.setText("<a href='https://github.com/drfenixion/robot_descriptions.py#descriptions'>https://github.com/drfenixion/robot_descriptions.py#descriptions</a>")
+        # weblink.setTextFormat(QtCore.Qt.RichText)
+        # weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        # weblink.setOpenExternalLinks(True)
+        # self.main_layout.addWidget(QtWidgets.QLabel())
+        # self.main_layout.addWidget(QtWidgets.QLabel())
+        # self.main_layout.addWidget(weblink)
 
         # adding widgets to main layout
         self.setLayout(self.main_layout)
@@ -254,6 +254,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.variants = variants
         self.parrent_window = parrent_window
         self.package_name = package_name
+        self.without_solids = False
         self.initUI()
 
 
@@ -277,6 +278,10 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.radio_button_group.addButton(radio_button)
             self.layout.addWidget(radio_button)
 
+        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Create without solids (fast but just for view)")
+        self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
+        self.layout.addWidget(self.create_without_solids_checkbox)
+
         self.layout.addSpacing(10)
 
         self.load_button = QtWidgets.QPushButton("Create model based on selection")
@@ -287,6 +292,13 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.layout.addStretch()
         # Set the window to resize to fit its content
         self.adjustSize()
+
+
+    def update_create_without_solids(self, state):
+        if state == QtCore.Qt.Checked.value:
+            self.create_without_solids = True
+        else:
+            self.create_without_solids = False
 
 
     def load_urdf(self):
@@ -309,6 +321,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
                 selected_variant,
                 self.module.PACKAGE_PATH,
                 self.module.REPOSITORY_PATH,
+                create_without_solids=self.create_without_solids,
             )
             # enable buttons
             self.load_button.setEnabled(True)
