@@ -271,8 +271,11 @@ class RobotProxy(ProxyBase):
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
+        # store created objects to PropertyLinkListGlobal leads to error - 'Object can only be in a single Group'
+        # looks like PropertyLinkListGlobal perceived as the group and brokes other object`s group
+        # used PropertyLinkListHidden instead
         add_property(
-            obj, 'App::PropertyLinkListGlobal', 'CreatedObjects', 'Internal',
+            obj, 'App::PropertyLinkListHidden', 'CreatedObjects', 'Internal',
             'Objects created for the robot',
         )
 
