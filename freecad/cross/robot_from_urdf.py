@@ -99,12 +99,13 @@ def robot_from_urdf_path(
         filename_path,
         package_path = None,
         repository_path = None,
+        create_without_solids: bool = False,
 ) -> CrossRobot:
     current_file.urdf_filename = filename_path
     current_file.package_path = package_path
     current_file.repository_path = repository_path
     urdf_robot = UrdfLoader.load_from_file(urdf_filename, current_file)
-    robot = robot_from_urdf(doc, urdf_robot)
+    robot = robot_from_urdf(doc, urdf_robot, create_without_solids)
 
     return robot
 
@@ -141,6 +142,7 @@ def get_real_pkg_path(
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
+        create_without_solids: bool = False,
 ) -> CrossRobot:
     """Creates a CROSS::Robot from URDF."""
     doc.openTransaction(tr('Robot from URDF'))
@@ -178,6 +180,9 @@ def robot_from_urdf(
     QtGui.QApplication.processEvents()
     i += 1
 
+    convert_mesh_to_solid = True
+    if create_without_solids:
+        convert_mesh_to_solid = False
 
     for urdf_link in urdf_robot.links:
         progressBar.setValue(i)
@@ -196,7 +201,7 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom_container)
 
         geoms, geom_containers = _add_real(
-                urdf_link, solids_meshes_group, ros_link, real_part, colors, convert_mesh_to_solid = False,
+                urdf_link, solids_meshes_group, ros_link, real_part, colors, convert_mesh_to_solid = convert_mesh_to_solid,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
