@@ -187,7 +187,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 description_name_alternative = radio_button_text_first_fragment
 
                 progressBar = get_progress_bar(
-                    title = "Cloning repository of " + description_name + "... Please wait.",
+                    title = "Cloning repository of " + description_name + "...",
                     min = 0,
                     max = 100,
                     show_percents = False,

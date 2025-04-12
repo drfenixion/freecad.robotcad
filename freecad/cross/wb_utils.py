@@ -1134,7 +1134,7 @@ def git_init_submodules(
 
 
     progressBar = get_progress_bar(
-        title = "Git submodules download and update... Please wait.",
+        title = "Git submodules download and update...",
         min = 0,
         max = 100,
         show_percents = False,
