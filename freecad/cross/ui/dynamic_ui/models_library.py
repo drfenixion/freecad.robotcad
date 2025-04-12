@@ -310,9 +310,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
                 break
 
         # disable buttons
-        self.load_button.setEnabled(False)
-        for rb in self.radio_button_group.buttons():
-            rb.setEnabled(False)
+        self.setEnabled(False)
 
         # Create model
         if selected_variant:
@@ -324,9 +322,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
                 create_without_solids=self.create_without_solids,
             )
             # enable buttons
-            self.load_button.setEnabled(True)
-            for rb in self.radio_button_group.buttons():
-                rb.setEnabled(True)
+            self.setEnabled(True)
         else:
             print("Model variant not selected")
 
