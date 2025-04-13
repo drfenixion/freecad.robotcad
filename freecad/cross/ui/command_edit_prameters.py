@@ -8,7 +8,7 @@ from PySide2.QtCore import QUrl,QSize
 import PySide2
 from ..wb_utils import UI_PATH
 from ..sdf.sdf_parser import sdf_schema_parser
-from ..SdfUtilities import link_properties
+from ..SdfUtilities import link_properties,joint_properties
 #  Command class 
 def show(main_window,dockwidget):
     if dockwidget.__class__.active is False:
@@ -32,7 +32,9 @@ class Editor():
             lnk=link_properties(obj,"link",False,mw)
             # dock= fcgui.PySideUic.loadUi(os.path.join(UI_PATH,"linkEditor.ui"))
             show(mw,lnk)
-           
+        if obj.Proxy.Type=='Cross::Joint':
+            jnt=joint_properties(obj,"joint",False,mw)
+            show(mw,jnt)
         else:
             pass
         

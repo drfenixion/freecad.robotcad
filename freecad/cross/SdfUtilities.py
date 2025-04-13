@@ -205,30 +205,8 @@ def generate_parameter_name(element_name, parent_names=None, reserved_names=None
 
 
 def _abbreviate_name(name):
-    # """
-    # Shortens a name by using abbreviations or acronyms.
-    # Example: "rotation" → "rot", "acceleration" → "accel".
-    # """
-    # abbreviations = {
-    #     "position": "pos",
-    #     "rotation": "rot",
-    #     "velocity": "vel",
-    #     "acceleration": "accel",
-    #     "translation": "trans",
-    #     "orientation": "orient",
-    #     "parameter": "param",
-    #     "attribute": "attr",
-    #     "element": "elem",
-    #     "coordinate": "coord",
-    #     "matrix": "mat",
-    #     "vector": "vec",
-    #     "axis": "ax",
-    #     "property": "prop",
-    # }
-    # # Use abbreviation if available, otherwise take the first 4 letters
-    # return abbreviations.get(name.lower(), name[:4].lower())
+    # do nothing for now 
     return name
-
 
 
 def _ensure_unique_name(name, reserved_names=None):
@@ -355,6 +333,14 @@ ignore_list = [
     "meta",
     "visibility_flags",
     "transparency"
+    ,"type",
+    "axis",
+    "axis2",
+    "pose",
+    "sensor",
+    "parent",
+    "child"
+    
 ]
 
 # this dictionary holds all names  that are already defined in FreeCAD
@@ -374,53 +360,11 @@ defined_names["inertial"]={"mass":"Mass"}
 # initialization will take place in the link_proxy , the ui file will be a class  parameter
 # that will be accessed by the edit command and populated in the link_proxy
 # edit Parameters will only display the dock widget
-
-class link_properties(QDockWidget):
-    properties:list=[]#{name:str,{parents:list,alias,default value, type}}
-    active=False
-    def __init__(self,obj,type,property_only,parent=None):
-        if self.__class__.active is True:
-            return
+class properties_base(QDockWidget):
+    def __init__(self,parent):
         super().__init__(parent)
-        self.setObjectName("linkEditor")
-        self.obj=obj
-        self.type=type
-        # Main container widget and layout
-        self.container = QWidget()
-        self.contents = QVBoxLayout(self.container)
-        self.contents.setContentsMargins(5, 5, 5, 5)
-        self.contents.setSpacing(5)
-        self.setWidget(self.container)
-        
-        self.initializeTabs()
-        self.initializeButtons()
-        
-        # Connect OK button signal
-        self.connectButtonSignals()
-        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
-    def initializeTabs(self):
-        self.tab = QTabWidget()
-        self.tab.setObjectName("linkTabs")
-        self.tab.setTabsClosable(False)
-        self.tab.setMovable(False)
-        self.tab.setTabBarAutoHide(False)
-        
-        self.link_tab = QWidget()
-        self.link_tab.setObjectName("link")
-        self.tab.addTab(self.link_tab, "Link")
-        
-        self.visual_tab = QWidget()
-        self.visual_tab.setObjectName("visual")
-        self.tab.addTab(self.visual_tab, "Visual")
-        
-        self.collision_tab = QWidget()
-        self.collision_tab.setObjectName("collision")
-        self.tab.addTab(self.collision_tab, "Collision")
-        
-        self.tab.setCurrentIndex(0)
-        self.contents.addWidget(self.tab)
-        
-    def initializeButtons(self):
+    
+    def initializeButtons(self,layout:QHBoxLayout|QVBoxLayout):
         self.buttons = QDialogButtonBox()
         self.buttons.setObjectName("buttonbox")
         self.buttons.setStandardButtons(
@@ -432,7 +376,7 @@ class link_properties(QDockWidget):
             QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         )
         self.buttonsLayout.addWidget(self.buttons)
-        self.contents.addLayout(self.buttonsLayout)
+        layout.addLayout(self.buttonsLayout)
         
     def connectButtonSignals(self):
         """Connect button signals to their respective slots"""
@@ -463,23 +407,81 @@ class link_properties(QDockWidget):
         # if not self.shouldClose():
         #     event.ignore()
         #     return
-        print("closed")
         self.__class__.active=False
         super().closeEvent(event)  # Call parent class implementation
         
     def sizeHint(self):
         return QSize(732, 876)
+    
+class link_properties(properties_base):
+    properties:list=[]#{name:str,{parents:list,alias,default value, type}}
+    active=False
+    def __init__(self,obj,type,property_only,parent=None):
+        if self.__class__.active is True:
+            return
+        super().__init__(parent)
+        self.setObjectName("linkEditor")
+        self.obj=obj
+        self.type=type
+        # Main container widget and layout
+        self.container = QWidget()
+        self.contents = QVBoxLayout(self.container)
+        self.contents.setContentsMargins(5, 5, 5, 5)
+        self.contents.setSpacing(5)
+        self.setWidget(self.container)
         
-class joint_properties(QDockWidget):
+        self.initializeTabs()
+        super().initializeButtons(layout=self.contents)
+        
+        # Connect OK button signal
+        super().connectButtonSignals()
+        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
+    def initializeTabs(self):
+        self.tab = QTabWidget()
+        self.tab.setObjectName("linkTabs")
+        self.tab.setTabsClosable(False)
+        self.tab.setMovable(False)
+        self.tab.setTabBarAutoHide(False)
+        
+        self.link_tab = QWidget()
+        self.link_tab.setObjectName("link")
+        self.tab.addTab(self.link_tab, "Link")
+        
+        self.visual_tab = QWidget()
+        self.visual_tab.setObjectName("visual")
+        self.tab.addTab(self.visual_tab, "Visual")
+        
+        self.collision_tab = QWidget()
+        self.collision_tab.setObjectName("collision")
+        self.tab.addTab(self.collision_tab, "Collision")
+        
+        self.tab.setCurrentIndex(0)
+        self.contents.addWidget(self.tab)
+        
+    
+    
+        
+class joint_properties(properties_base):
     properties:list=[]
     active=False
     def __init__(self,obj,type,property_only,parent=None):
         if self.__class__.active is True:
             return
         super().__init__(parent)
-        
-    def sizeHint(self):
-        return QSize(732,876)
+        self.obj=obj
+        self.type=type
+        self.jointWidget=QWidget()
+        self.container = QWidget()
+        self.contents = QVBoxLayout(self.container)
+        self.contents.setContentsMargins(5, 5, 5, 5)
+        self.contents.setSpacing(5)
+        self.setWidget(self.container)
+        self.contents.addWidget(self.jointWidget)
+        super().initializeButtons(layout=self.contents)
+        super().connectButtonSignals()
+        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
+    
+    
 
 class initialize:
     def __init__(self,parent, object, type,property_only=True):
@@ -541,7 +543,9 @@ class initialize:
             reserved_names.clear()
             # visual_tab=self.linkd.__class__.ui.visual
         elif self.type == "joint":
-            pass  # Todo
+            jointwidget=self.parent.jointWidget
+            self.generate_tab_ui(jointwidget,"joint.sdf",[])
+            reserved_names.clear()
         else:
             pass
 
@@ -564,10 +568,14 @@ class initialize:
             #   1.add property to object
             if self.property_only:
                 if defined is False:
-                    self.obj.addProperty(
+                    if isinstance(alias,list):
+                        self.obj.addProperty(
+                    "App::PropertyString", alias[0], parent_tag, hidden=True
+                )  # Todo
+                    else:
+                        self.obj.addProperty(
                     "App::PropertyString", alias, parent_tag, hidden=True
                 )  # Todo
-                setattr(self.obj,alias,default)
             else:
                 widget.add_widget(
                     self.create_labeled_lineedit(name, alias, default_text=default)
@@ -664,14 +672,18 @@ class initialize:
                 if defined_names.get(tag,None) is not None and name in defined_names[tag].keys():
                     # take alias as the property name in FreeCAD
                     alias=defined_names[tag][name]
-                    if isinstance(alias,list):
-                        alias=alias[0]
+                    # if isinstance(alias,list):
+                    #     alias=alias[0]
                     defined=True
                     # if the name is not available generate its alias 
                 else:
                     alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
-                
-                self.parent.__class__.properties.append(
+                if isinstance(alias,list):
+                    self.parent.__class__.properties.append(
+                    {"name": name, "alias": alias[0], "parent": tag, "default": default}
+                )
+                else:
+                     self.parent.__class__.properties.append(
                     {"name": name, "alias": alias, "parent": tag, "default": default}
                 )
                 
@@ -684,8 +696,8 @@ class initialize:
             if parent_tag is not None:
                 if defined_names.get(parent_tag,None) is not None and tag in defined_names[parent_tag].keys():
                     alias=defined_names[parent_tag][tag]
-                    if isinstance(alias,list):
-                        alias=alias[0]
+                    # if isinstance(alias,list):
+                    #     alias=alias[0]
                     defined=True
                 else:  
                     alias = generate_parameter_name(tag, parent_names=parent_tag,reserved_names=reserved_names)
@@ -694,14 +706,18 @@ class initialize:
                 # probably unreachable
                 if defined_names.get(tag,None) is not None and tag in defined_names[tag].keys():
                     alias=defined_names[tag][name]
-                    if isinstance(alias,list):
-                        alias=alias[0]
+                    # if isinstance(alias,list):
+                    #     alias=alias[0]
                     defined=True
                 # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
-            
-            self.parent.__class__.properties.append(
-                    {"name": tag, "alias": alias, "parent": parent_tag, "default": dc["value"]}
+            if isinstance(alias,list):
+                self.parent.__class__.properties.append(
+                    {"name": tag, "alias": alias[0], "parent": parent_tag, "default": dc["value"]}
+                )
+            else:
+                self.parent.__class__.properties.append(
+                    {"name": tag, "alias": alias[0], "parent": parent_tag, "default": dc["value"]}
                 )
             self.property_n_widget_setup(
                 widget,
@@ -818,13 +834,16 @@ class initialize:
 
         # Create line edit
         line_edit = QLineEdit()
-        line_edit.setText(getattr(self.obj,alias))
+        if isinstance(alias,list):
+            line_edit.setText(getattr(self.obj,alias[0]))
+        else:
+            line_edit.setText(getattr(self.obj,alias))
         line_edit.setPlaceholderText(placeholder)
         line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         # only a line edit has 2 names defined for asingle item e.g link had Label1 and Label2
         if isinstance(alias,list):
             line_edit.textChanged.connect(
-            lambda txt, obj=self.obj: setattr(obj, alias[0], txt) and setattr(obj,alias[1],txt))
+            lambda txt, obj=self.obj: (setattr(obj, alias[0], txt), setattr(obj,alias[1],txt)))
         else:
              line_edit.textChanged.connect(
             lambda txt, obj=self.obj: setattr(obj, alias, txt))
