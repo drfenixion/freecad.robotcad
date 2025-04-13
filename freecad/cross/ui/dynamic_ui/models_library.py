@@ -215,16 +215,23 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                     os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'__init__.py'),
                 )
                 module_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name}.py')
+                module_path_alternative = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name_alternative}.py')
                 try:
                     module = import_robot_desc_module_by_path(
                         f"robot_descriptions.{description_name}",
                         module_path,
                     )
                 except FileNotFoundError:
-                    module = import_robot_desc_module_by_path(
-                        f"robot_descriptions.{description_name_alternative}",
-                        module_path,
-                    )
+                    try:
+                        module = import_robot_desc_module_by_path(
+                            f"robot_descriptions.{description_name_alternative}",
+                            module_path,
+                        )
+                    except FileNotFoundError:
+                        module = import_robot_desc_module_by_path(
+                            f"robot_descriptions.{description_name_alternative}",
+                            module_path_alternative,
+                        )
                 i = 100
                 progressBar.setValue(i)
                 QtGui.QApplication.processEvents()
