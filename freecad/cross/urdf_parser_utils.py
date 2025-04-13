@@ -245,11 +245,11 @@ def obj_from_mesh(
             mesh_obj_solid.Label = mesh_path.name
             mesh_obj_solid.Label2 = mesh_ros_path
             shell = Part.Shell(mesh_obj_shape.Shape.Faces)
-            # try:
-            #     shell.removeSplitter()
-            # except:
-            #     warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
-            #     pass
+            try:
+                shell.removeSplitter()
+            except:
+                warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
+                pass
             mesh_obj_solid.Shape = Part.Solid(shell)
             mesh_obj_solid.purgeTouched()
             mesh_or_solid_obj = mesh_obj_solid
