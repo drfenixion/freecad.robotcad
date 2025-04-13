@@ -39,7 +39,7 @@ from .wb_utils import ros_name
 from .wb_utils import get_parent_link_of_obj
 from . import wb_constants
 
-from .SdfUtilities import initialize
+from .SdfUtilities import link_properties
 
 
 # Stubs and typing hints.
@@ -200,7 +200,7 @@ class LinkProxy(ProxyBase):
         self.init_extensions(obj)
         self.init_properties(obj)
         #  add function to add link related data 
-        initialize(self.link,"link",)
+        link_properties(self.link,"link",True,fcgui.getMainWindow())
 
     def init_extensions(self, obj: CrossLink) -> None:
         # Need a group to put the generated FreeCAD links in.

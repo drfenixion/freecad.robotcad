@@ -1,4 +1,4 @@
-from PySide2.QtCore import QObject, Qt, QPropertyAnimation, QEasingCurve
+from PySide2.QtCore import QObject, Qt, QPropertyAnimation, QEasingCurve,QSize
 import FreeCADGui as fcgui
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import (
@@ -13,7 +13,9 @@ from PySide2.QtWidgets import (
     QSpinBox,
     QCheckBox,
     QGroupBox,
-    QScrollArea
+    QScrollArea,
+    QDockWidget,
+    QTabWidget,QDialogButtonBox,QSpacerItem
 )
 import xml.etree.ElementTree as ET
 from typing import Union
@@ -350,10 +352,16 @@ ignore_list = [
     "audio",
     "include",
     "pose",
+    "meta",
+    "visibility_flags",
+    "transparency"
 ]
 
 # this dictionary holds all names  that are already defined in FreeCAD
 # this can be stored as a .json file but for now a dictionary will work 
+# items are stored in the format 
+# {parent_element:{name_in_sdf_template:name_in_freecad}}
+# where parent element id the element where the item is defined in the sdf hierachy
 defined_names:dict={}
 defined_names["link"]={"name":["Label","Label2"]}
 defined_names["inertia"]={"ixx":"Ixx","ixy":"Ixy","ixz":"Ixz","iyy":"Iyy","iyz":"Iyz","izz":"Izz",}
@@ -366,29 +374,122 @@ defined_names["inertial"]={"mass":"Mass"}
 # initialization will take place in the link_proxy , the ui file will be a class  parameter
 # that will be accessed by the edit command and populated in the link_proxy
 # edit Parameters will only display the dock widget
-class link_data:
-    ui = fcgui.PySideUic.loadUi(os.path.join(UI_PATH, "linkEditor.ui"))
-    params: list = []
 
-    def __init__(self):
-        # __class__.ui= fcgui.PySideUic.loadUi(os.path.join(UI_PATH,"linkEditor.ui"))
-        pass
-class joint_data:
-    ui=None
-    params=None
-    def __init__(self):
-        pass
+class link_properties(QDockWidget):
+    properties:list=[]#{name:str,{parents:list,alias,default value, type}}
+    active=False
+    def __init__(self,obj,type,property_only,parent=None):
+        if self.__class__.active is True:
+            return
+        super().__init__(parent)
+        self.setObjectName("linkEditor")
+        self.obj=obj
+        self.type=type
+        # Main container widget and layout
+        self.container = QWidget()
+        self.contents = QVBoxLayout(self.container)
+        self.contents.setContentsMargins(5, 5, 5, 5)
+        self.contents.setSpacing(5)
+        self.setWidget(self.container)
+        
+        self.initializeTabs()
+        self.initializeButtons()
+        
+        # Connect OK button signal
+        self.connectButtonSignals()
+        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
+    def initializeTabs(self):
+        self.tab = QTabWidget()
+        self.tab.setObjectName("linkTabs")
+        self.tab.setTabsClosable(False)
+        self.tab.setMovable(False)
+        self.tab.setTabBarAutoHide(False)
+        
+        self.link_tab = QWidget()
+        self.link_tab.setObjectName("link")
+        self.tab.addTab(self.link_tab, "Link")
+        
+        self.visual_tab = QWidget()
+        self.visual_tab.setObjectName("visual")
+        self.tab.addTab(self.visual_tab, "Visual")
+        
+        self.collision_tab = QWidget()
+        self.collision_tab.setObjectName("collision")
+        self.tab.addTab(self.collision_tab, "Collision")
+        
+        self.tab.setCurrentIndex(0)
+        self.contents.addWidget(self.tab)
+        
+    def initializeButtons(self):
+        self.buttons = QDialogButtonBox()
+        self.buttons.setObjectName("buttonbox")
+        self.buttons.setStandardButtons(
+            QDialogButtonBox.Ok | QDialogButtonBox.RestoreDefaults
+        )
+        
+        self.buttonsLayout = QHBoxLayout()
+        self.buttonsLayout.addItem(
+            QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        )
+        self.buttonsLayout.addWidget(self.buttons)
+        self.contents.addLayout(self.buttonsLayout)
+        
+    def connectButtonSignals(self):
+        """Connect button signals to their respective slots"""
+        self.buttons.accepted.connect(self.onOkClicked)  # OK button
+        self.buttons.rejected.connect(self.onRestoreDefaults)  # Note: RestoreDefaults is actually a 'reject' role
+        
+    def onOkClicked(self):
+        """Handler for OK button click - closes the dock widget"""
+        self.close()
+        self.__class__.active=False
+        
+    def onRestoreDefaults(self):
+        """Placeholder for RestoreDefaults functionality"""
+        print("Restore Defaults clicked")  # Add your restore logic here
+        # all properties in properties class variable will be called , and the alias will have its
+        # and default values will be used to reset values using setattr 
+        # the dockwidget will be closed
+        # link_properties will be called with property_only set to false
+        # the link_properties dockwidget will then be displayed again using ...
+        #  main_window.addDockWidget(PySide2.QtCore.Qt.RightDockWidgetArea,dockwidget)
+        
+        
+    def closeEvent(self, event):
+        """Override of closeEvent to handle custom close behavior"""
+        # You can add custom close handling here if needed
+        # For example:
+        # print("DockWidget is closing")
+        # if not self.shouldClose():
+        #     event.ignore()
+        #     return
+        print("closed")
+        self.__class__.active=False
+        super().closeEvent(event)  # Call parent class implementation
+        
+    def sizeHint(self):
+        return QSize(732, 876)
+        
+class joint_properties(QDockWidget):
+    properties:list=[]
+    active=False
+    def __init__(self,obj,type,property_only,parent=None):
+        if self.__class__.active is True:
+            return
+        super().__init__(parent)
+        
+    def sizeHint(self):
+        return QSize(732,876)
 
 class initialize:
-    ui = None
-
-    def __init__(self, object, type):
+    def __init__(self,parent, object, type,property_only=True):
         # type can either be link or joint
         self.type = type  # either a link or a joint
         self.obj = object
-
-        self.linkd = link_data()
+        self.property_only=property_only
+        self.parent=parent
         self.UI()
+        
     def generate_tab_ui(self,tab,root_file:str,include_files:list):
         '''
         Args:
@@ -414,7 +515,6 @@ class initialize:
         # set layout has to be used or else Qt might ignore it
         # 2. Create a scroll area and set its widget
         scroll = QScrollArea()
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         scroll.setWidgetResizable(True)  # Important for proper resizing
         container = QWidget()
         container.setLayout(QVBoxLayout())  # Or QHBoxLayout if needed
@@ -428,13 +528,17 @@ class initialize:
         
     def UI(self):
         if self.type == "link":
-            link_tab=self.linkd.__class__.ui.link
+            link_tab=self.parent.link_tab
             self.generate_tab_ui(link_tab,"link.sdf",["inertial.sdf"])
             # Todo
             # code related to collision 
-            collision_tab=self.linkd.__class__.ui.collision
+            collision_tab=self.parent.collision_tab
             self.generate_tab_ui(collision_tab,"collision.sdf",["surface.sdf"])
-            # code related to visual 
+            visual_tab=self.parent.visual_tab
+            self.generate_tab_ui(visual_tab,"visual.sdf",[])
+            #  avoid similar names on the same object only since reserved names is global clear it
+            # so that the next object will have an empty list 
+            reserved_names.clear()
             # visual_tab=self.linkd.__class__.ui.visual
         elif self.type == "joint":
             pass  # Todo
@@ -458,54 +562,69 @@ class initialize:
             # pick from here April 9 ,2025 14:30
             # Todo
             #   1.add property to object
-            if defined is False:
-                self.obj.addProperty(
-                "App::PropertyString", alias, parent_tag, hidden=True
-            )  # Todo
-            widget.add_widget(
-                self.create_labeled_lineedit(name, alias, default_text=default)
-            )
+            if self.property_only:
+                if defined is False:
+                    self.obj.addProperty(
+                    "App::PropertyString", alias, parent_tag, hidden=True
+                )  # Todo
+                setattr(self.obj,alias,default)
+            else:
+                widget.add_widget(
+                    self.create_labeled_lineedit(name, alias, default_text=default)
+                )
         elif data_type == "bool":
-            if defined is False:
-                self.obj.addProperty(
-                "App::PropertyBool", alias, parent_tag, hidden=True
-            )  # Todo
-            wd = self.create_labeled_checkbox(
-                name, alias, default_state=True if default == "true" else False
-            )
-            widget.add_widget(wd)
+            if self.property_only:   
+                if defined is False:
+                    self.obj.addProperty(
+                    "App::PropertyBool", alias, parent_tag, hidden=True
+                    )  # Todo
+                    setattr(self.obj,alias,True if default == "true" else False)
+            else:
+                widget.add_widget(self.create_labeled_checkbox(
+                    name, alias, default_state=True if default == "true" else False
+                ))
         elif data_type == "double":
-            if defined is False:
-                self.obj.addProperty(
-                "App::PropertyFloat", alias, parent_tag, hidden=True
-            )  # Todo
+            if self.property_only:
+                if defined is False: 
+                    self.obj.addProperty     (
+                    "App::PropertyFloat", alias, parent_tag, hidden=True
+                    )  # Todo
+                    setattr(self.obj,alias,float(default))
             # Todo
             #  1.  how to determin min and max value
             #     options
             #       i. read current default value and set max to twice the value
             #           issue arises for default values of  0
-            widget.add_widget(
-                self.create_labeled_double_spinbox(name, alias, default_val=default)
-            )
-        elif data_type == "unsigned int":
-            if defined is False:
-                self.obj.addProperty(
-                "App::PropertyInteger", alias, parent_tag, hidden=True
-            )  # Todo
-            widget.add_widget(
-                self.create_labeled_spinbox(name, alias, default_val=default)
-            )
-        elif data_type == "vector3":
-            if defined is False:
-                self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
-            default_list = extract_vector_n(default)
-            widget.add_widget(
-                self.create_vector3_group(
-                    name,
-                    alias,
-                    default_values=[default_list[0], default_list[1], default_list[2]],
+            else:
+                widget.add_widget(
+                    self.create_labeled_double_spinbox(name, alias, default_val=default)
                 )
-            )
+        elif data_type == "unsigned int":
+            if self.property_only:
+                if defined is False:
+                    self.obj.addProperty(
+                    "App::PropertyInteger", alias, parent_tag, hidden=True
+                )  # Todo
+                    setattr(self.obj,alias,int(default))
+            else:
+                widget.add_widget(
+                    self.create_labeled_spinbox(name, alias, default_val=default)
+                )
+        elif data_type == "vector3":
+            default_list = extract_vector_n(default)
+            if self.property_only:   
+                if defined is False:
+                    self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
+                    setattr(self.obj,alias,tuple(default_list))
+            else:
+                
+                widget.add_widget(
+                    self.create_vector3_group(
+                        name,
+                        alias,
+                        default_values=[default_list[0], default_list[1], default_list[2]],
+                    )
+                )
         elif data_type == "pose":
             pass
         elif data_type=="color":
@@ -540,16 +659,22 @@ class initialize:
             for attribute in dc["attributes"]:
                 # attributes are of type Element_Attributes see sdf_schema_parser
                 name, default, data_type = attribute.get_complete().values()
+                # check if the tag anme is part of the ones whose properties have already defined in FreeCAD
+                # if its available  check if the name is already defined see defined_names
                 if defined_names.get(tag,None) is not None and name in defined_names[tag].keys():
+                    # take alias as the property name in FreeCAD
                     alias=defined_names[tag][name]
                     if isinstance(alias,list):
                         alias=alias[0]
                     defined=True
+                    # if the name is not available generate its alias 
                 else:
                     alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
-                self.linkd.params.append(
+                
+                self.parent.__class__.properties.append(
                     {"name": name, "alias": alias, "parent": tag, "default": default}
                 )
+                
                 
                 self.property_n_widget_setup(
                     widget, name, alias, default, data_type, parent_tag=parent_tag,defined=defined
@@ -565,7 +690,6 @@ class initialize:
                 else:  
                     alias = generate_parameter_name(tag, parent_names=parent_tag,reserved_names=reserved_names)
         
-                
             else:
                 # probably unreachable
                 if defined_names.get(tag,None) is not None and tag in defined_names[tag].keys():
@@ -575,9 +699,10 @@ class initialize:
                     defined=True
                 # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
-                
             
-           
+            self.parent.__class__.properties.append(
+                    {"name": tag, "alias": alias, "parent": parent_tag, "default": dc["value"]}
+                )
             self.property_n_widget_setup(
                 widget,
                 tag,
@@ -640,7 +765,7 @@ class initialize:
         # Create spinbox
         spinbox = QDoubleSpinBox()
         spinbox.setRange(min_val, max_val)
-        spinbox.setValue(float(default_val))
+        spinbox.setValue(getattr(self.obj,alias))
         spinbox.setSingleStep(step)
         spinbox.setDecimals(decimals)
         spinbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -693,7 +818,7 @@ class initialize:
 
         # Create line edit
         line_edit = QLineEdit()
-        line_edit.setText(default_text)
+        line_edit.setText(getattr(self.obj,alias))
         line_edit.setPlaceholderText(placeholder)
         line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         # only a line edit has 2 names defined for asingle item e.g link had Label1 and Label2
@@ -758,7 +883,7 @@ class initialize:
         # SpinBox
         spinbox = QSpinBox()
         spinbox.setRange(min_val, max_val)
-        spinbox.setValue(int(default_val))
+        spinbox.setValue(getattr(self.obj,alias))
         spinbox.setSingleStep(step)
         spinbox.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         if spinbox_width:
@@ -805,7 +930,7 @@ class initialize:
 
         # Checkbox
         checkbox = QCheckBox()
-        checkbox.setChecked(default_state)
+        checkbox.setChecked(getattr(self.obj,alias))
         checkbox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         # callback
         checkbox.stateChanged.connect(
@@ -860,7 +985,7 @@ class initialize:
         x_layout.addWidget(QLabel("X:"))
         x_spinbox = QDoubleSpinBox()
         x_spinbox.setRange(min_val, max_val)
-        x_spinbox.setValue(float(default_values[0]))
+        x_spinbox.setValue(getattr(self.obj,alias)[0])
         x_spinbox.setDecimals(decimals)
         x_spinbox.setSingleStep(step)
         x_layout.addWidget(x_spinbox)
@@ -871,7 +996,7 @@ class initialize:
         y_layout.addWidget(QLabel("Y:"))
         y_spinbox = QDoubleSpinBox()
         y_spinbox.setRange(min_val, max_val)
-        y_spinbox.setValue(float(default_values[1]))
+        y_spinbox.setValue(getattr(self.obj,alias)[1])
         y_spinbox.setDecimals(decimals)
         y_spinbox.setSingleStep(step)
         y_layout.addWidget(y_spinbox)
@@ -882,7 +1007,7 @@ class initialize:
         z_layout.addWidget(QLabel("Z:"))
         z_spinbox = QDoubleSpinBox()
         z_spinbox.setRange(min_val, max_val)
-        z_spinbox.setValue(float(default_values[2]))
+        z_spinbox.setValue(getattr(self.obj,alias)[2])
         z_spinbox.setDecimals(decimals)
         z_spinbox.setSingleStep(step)
         z_layout.addWidget(z_spinbox)
@@ -913,4 +1038,5 @@ class initialize:
         group.setMinimumSize(200, 120)
 
         return group
+
 
