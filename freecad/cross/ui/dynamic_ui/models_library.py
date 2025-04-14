@@ -286,7 +286,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.radio_button_group.addButton(radio_button)
             self.layout.addWidget(radio_button)
 
-        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Create without solids (fast but just for view)")
+        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Don`t create solids (fast but only for view)")
         self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
         self.layout.addWidget(self.create_without_solids_checkbox)
 
