@@ -262,7 +262,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.parrent_window = parrent_window
         self.package_name = package_name
         self.create_without_solids = False
-        self.remove_solid_splitter = False
+        self.remove_solid_splitter = True
         self.initUI()
 
 
