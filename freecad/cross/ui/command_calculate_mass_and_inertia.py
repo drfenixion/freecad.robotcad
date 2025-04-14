@@ -86,6 +86,7 @@ class _CalculateMassAndInertiaCommand:
             elem_with_volume = first_object_with_volume(compound)
 
             if not elem_with_volume:
+                doc.removeObject(compound.Name)
                 error(f'Link "{link.Label}" does not link to any child with volume.', gui=True)
                 continue
 
