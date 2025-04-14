@@ -41,6 +41,7 @@ class _UrdfImportCommand:
             robot_from_urdf_path(
                 fc.activeDocument(),
                 urdf_filename,
+                remove_solid_splitter = True,
             )
             fcgui.SendMsgToActiveView('ViewFit')
 
