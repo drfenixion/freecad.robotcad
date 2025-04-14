@@ -40,6 +40,7 @@ def obj_from_geometry(
         doc_or_group: [Doc | DO],
         convert_mesh_to_solid: bool = False,
         min_vol_instead_zero: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> tuple[Optional[DO], Optional[Path]]:
     """Return a FreeCAD object for the URDF shape with the path for meshes."""
     if isinstance(geometry, Box):
@@ -47,7 +48,7 @@ def obj_from_geometry(
     if isinstance(geometry, Cylinder):
         return obj_from_cylinder(geometry, doc_or_group, min_vol_instead_zero)
     if isinstance(geometry, Mesh):
-        return obj_from_mesh(geometry, doc_or_group, convert_mesh_to_solid)
+        return obj_from_mesh(geometry, doc_or_group, convert_mesh_to_solid, remove_solid_splitter)
     if isinstance(geometry, Sphere):
         return obj_from_sphere(geometry, doc_or_group, min_vol_instead_zero)
     raise NotImplementedError('Primitive not implemented')
@@ -167,6 +168,7 @@ def obj_from_mesh(
         geometry: Mesh,
         doc_or_group: [Doc | DO],
         convert_mesh_to_solid: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> tuple[Optional[DO], Optional[Path]]:
     """Return a `Mesh::Feature` object and the path to its file.
 
@@ -245,11 +247,12 @@ def obj_from_mesh(
             mesh_obj_solid.Label = mesh_path.name
             mesh_obj_solid.Label2 = mesh_ros_path
             shell = Part.Shell(mesh_obj_shape.Shape.Faces)
-            try:
-                shell.removeSplitter()
-            except:
-                warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
-                pass
+            if remove_solid_splitter:
+                try:
+                    shell = shell.removeSplitter()
+                except:
+                    warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
+                    pass
             mesh_obj_solid.Shape = Part.Solid(shell)
             mesh_obj_solid.purgeTouched()
             mesh_or_solid_obj = mesh_obj_solid

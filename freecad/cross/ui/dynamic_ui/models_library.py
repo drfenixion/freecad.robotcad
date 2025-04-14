@@ -262,6 +262,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.parrent_window = parrent_window
         self.package_name = package_name
         self.create_without_solids = False
+        self.remove_solid_splitter = False
         self.initUI()
 
 
@@ -289,6 +290,10 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
         self.layout.addWidget(self.create_without_solids_checkbox)
 
+        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitter from solid (remove edges where possible)")
+        self.remove_solid_splitter_checkbox.stateChanged.connect(self.update_remove_solid_splitter)
+        self.layout.addWidget(self.remove_solid_splitter_checkbox)
+
         self.layout.addSpacing(10)
 
         self.load_button = QtWidgets.QPushButton("Create model based on selection")
@@ -306,6 +311,13 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.create_without_solids = True
         else:
             self.create_without_solids = False
+
+
+    def update_remove_solid_splitter(self, state):
+        if state == QtCore.Qt.Checked.value:
+            self.remove_solid_splitter = True
+        else:
+            self.remove_solid_splitter = False
 
 
     def load_urdf(self):
@@ -327,6 +339,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
                 self.module.PACKAGE_PATH,
                 self.module.REPOSITORY_PATH,
                 create_without_solids=self.create_without_solids,
+                remove_solid_splitter=self.remove_solid_splitter,
             )
             # enable buttons
             self.setEnabled(True)

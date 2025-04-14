@@ -100,12 +100,13 @@ def robot_from_urdf_path(
         package_path = None,
         repository_path = None,
         create_without_solids: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> CrossRobot:
     current_file.urdf_filename = filename_path
     current_file.package_path = package_path
     current_file.repository_path = repository_path
     urdf_robot = UrdfLoader.load_from_file(urdf_filename, current_file)
-    robot = robot_from_urdf(doc, urdf_robot, create_without_solids)
+    robot = robot_from_urdf(doc, urdf_robot, create_without_solids, remove_solid_splitter)
 
     return robot
 
@@ -143,6 +144,7 @@ def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
         create_without_solids: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> CrossRobot:
     """Creates a CROSS::Robot from URDF."""
     doc.openTransaction(tr('Robot from URDF'))
@@ -201,7 +203,9 @@ def robot_from_urdf(
             robot.Proxy.created_objects.append(geom_container)
 
         geoms, geom_containers = _add_real(
-                urdf_link, solids_meshes_group, ros_link, real_part, colors, convert_mesh_to_solid = convert_mesh_to_solid,
+                urdf_link, solids_meshes_group, ros_link, real_part, colors,
+                convert_mesh_to_solid = convert_mesh_to_solid,
+                remove_solid_splitter = remove_solid_splitter,
         )
         for geom in geoms:
             robot.Proxy.created_objects.append(geom)
@@ -560,6 +564,7 @@ def _add_real(
         real_part: AppPart,
         colors: dict[str, Color],
         convert_mesh_to_solid: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the real geometries to a robot.
 
@@ -581,6 +586,7 @@ def _add_real(
         name_linked_geom,
         colors,
         convert_mesh_to_solid,
+        remove_solid_splitter,
     )
 
 
@@ -650,6 +656,7 @@ def _add_geometries(
         name_linked_geom: str,
         colors: dict[str, Color],
         convert_mesh_to_solid: bool = False,
+        remove_solid_splitter: bool = False,
 ) -> tuple[DOList, DOList]:
     """Add the geometries from URDF into `group` and an App::Link to it into `link`.
 
@@ -679,7 +686,12 @@ def _add_geometries(
     for geometry in geometries:
         # Make the FC object in the group.
         try:
-            geom_obj, _ = obj_from_geometry(geometry.geometry, parts_group, convert_mesh_to_solid, min_vol_instead_zero = True)
+            geom_obj, _ = obj_from_geometry(
+                geometry.geometry, parts_group,
+                convert_mesh_to_solid,
+                min_vol_instead_zero = True,
+                remove_solid_splitter = remove_solid_splitter,
+            )
         except NotImplementedError:
             continue
         if not geom_obj:
