@@ -10,7 +10,7 @@ from ..freecad_utils import quantity_as
 from ..freecad_utils import volume_mm3
 from ..freecad_utils import warn
 from ..gui_utils import tr
-from ..wb_utils import is_link, ros_name
+from ..wb_utils import is_link, is_link_selected, is_robot, ros_name
 from ..wb_utils import is_robot_selected
 
 
@@ -44,13 +44,23 @@ class _CalculateMassAndInertiaCommand:
         objs = fcgui.Selection.getSelection()
 
         # Implementation note: the command is active only when a robot is selected.
-        robot = objs[0]
+        links = []
+        robot = None
+        if is_robot(objs[0]):
+            robot = objs[0]
+            links = robot.Proxy.get_links()
+        else:
+            for obj in objs:
+                if is_link(obj):
+                    links.append(obj)
+                    if not robot and len(obj.InList) and is_robot(obj.InList[0]):
+                        robot = obj.InList[0]
 
         default_material = material_from_material_editor(robot.MaterialCardPath)
 
         doc.openTransaction(tr('Calculate mass and inertia'))
         # TODO refactor this code block to be more readable (split to functions)
-        for link in robot.Proxy.get_links():
+        for link in links:
             print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
 
             #both MaterialNotCalculate and CalculateInertiaBasedOnMass cannot be true
@@ -184,7 +194,7 @@ class _CalculateMassAndInertiaCommand:
         doc.commitTransaction()
 
     def IsActive(self):
-        return is_robot_selected()
+        return is_robot_selected() or is_link_selected()
 
 
 fcgui.addCommand('CalculateMassAndInertia', _CalculateMassAndInertiaCommand())
