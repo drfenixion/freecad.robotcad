@@ -29,7 +29,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
             'MenuText': tr('Extended external code generator'),
             'ToolTip': tr(
                 'Select Robot and press this tool.\n'
-                'Tool will do mass/inertia calculation then locally generate ROS package files\n'
+                'Tool will locally generate ROS package files\n'
                 'and transfer it to external code generator service and save gotten result files locally.\n'
                 '\n'
                 'Tool can generate:\n'
@@ -65,9 +65,9 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
       path_to_overcross_meta_tmp_dir = path_to_overcross_meta_dir + 'tmp/'
 
-      print('Calculating mass and inertia started.')
-      fcgui.runCommand("CalculateMassAndInertia")
-      print('Calculating mass and inertia finished.')
+      # print('Calculating mass and inertia started.')
+      # fcgui.runCommand("CalculateMassAndInertia")
+      # print('Calculating mass and inertia finished.')
 
       print('Local code generating started.')
       # ensure files present by regenerate them
