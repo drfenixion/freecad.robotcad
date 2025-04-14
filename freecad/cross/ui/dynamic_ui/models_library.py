@@ -290,7 +290,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
         self.layout.addWidget(self.create_without_solids_checkbox)
 
-        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitter from solid (remove edges where possible)")
+        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitter from solid (useful for placement tools)")
         self.remove_solid_splitter_checkbox.stateChanged.connect(self.update_remove_solid_splitter)
         self.layout.addWidget(self.remove_solid_splitter_checkbox)
 
