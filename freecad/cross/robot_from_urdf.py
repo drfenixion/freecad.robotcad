@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from freecad.cross.assembly_from_urdf import assembly_from_urdf
 from freecad.cross.gui_utils import tr
 from freecad.cross.urdf_loader import UrdfLoader
 try:
@@ -94,6 +95,19 @@ class Color:
             Shininess=0.90,
         )
 
+
+def get_urdf_robot_from_urdf_filename(
+    filename_path,
+    package_path = None,
+    repository_path = None,
+):
+    current_file.urdf_filename = filename_path
+    current_file.package_path = package_path
+    current_file.repository_path = repository_path
+    urdf_robot = UrdfLoader.load_from_file(urdf_filename, current_file)
+    return urdf_robot
+
+
 def robot_from_urdf_path(
         doc: fc.Document,
         filename_path,
@@ -102,11 +116,28 @@ def robot_from_urdf_path(
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
 ) -> CrossRobot:
-    current_file.urdf_filename = filename_path
-    current_file.package_path = package_path
-    current_file.repository_path = repository_path
-    urdf_robot = UrdfLoader.load_from_file(urdf_filename, current_file)
+    urdf_robot = get_urdf_robot_from_urdf_filename(
+        filename_path,
+        package_path,
+        repository_path,
+    )
     robot = robot_from_urdf(doc, urdf_robot, create_without_solids, remove_solid_splitter)
+
+    return robot
+
+
+def assembly_from_urdf_path(
+        doc: fc.Document,
+        filename_path,
+        package_path = None,
+        repository_path = None,
+) -> CrossRobot:
+    urdf_robot = get_urdf_robot_from_urdf_filename(
+        filename_path,
+        package_path,
+        repository_path,
+    )
+    robot = assembly_from_urdf(doc, urdf_robot)
 
     return robot
 
