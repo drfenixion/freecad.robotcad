@@ -269,6 +269,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 dialog.exec_()
 
                 return
+        self.setEnabled(True)
         QtWidgets.QMessageBox.warning(self, "Nothing selected", "Please select model to create.")
 
 
