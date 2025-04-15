@@ -90,7 +90,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         # description
         description = QtWidgets.QLabel()
-        description.setText("There is also a service for adding and raising your models, write to <a href='mailto:it.project.devel@gmail.com'>it.project.devel@gmail.com</a>")
+        description.setText("There is also a service for adding your models and raising to top section, write to <a href='mailto:it.project.devel@gmail.com'>it.project.devel@gmail.com</a>")
         description.setTextFormat(QtCore.Qt.RichText)
         description.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
         description.setOpenExternalLinks(True)
