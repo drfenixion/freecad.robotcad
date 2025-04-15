@@ -99,12 +99,17 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         # description
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("If faced crash check free RAM or swap. Some models can take 10gb for create.")
+        description.setText("If faced crash check free RAM or swap.")
         self.main_layout.addWidget(description)
 
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("Some models can take ten or more minutes to create.")
+        description.setText("Some models can take 10 or more minutes and 10Gb RAM to create.")
+        self.main_layout.addWidget(description)
+
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        description = QtWidgets.QLabel()
+        description.setText("Use models without solids only for fast view. Solids is needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
         self.main_layout.addWidget(description)
 
         # adding widgets to main layout
