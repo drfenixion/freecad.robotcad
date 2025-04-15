@@ -78,15 +78,33 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.button.clicked.connect(self.get_selected_value)
         self.main_layout.addWidget(self.button)
 
-        # # link to docks
-        # weblink = QtWidgets.QLabel()
-        # weblink.setText("<a href='https://github.com/drfenixion/robot_descriptions.py#descriptions'>https://github.com/drfenixion/robot_descriptions.py#descriptions</a>")
-        # weblink.setTextFormat(QtCore.Qt.RichText)
-        # weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
-        # weblink.setOpenExternalLinks(True)
-        # self.main_layout.addWidget(QtWidgets.QLabel())
-        # self.main_layout.addWidget(QtWidgets.QLabel())
-        # self.main_layout.addWidget(weblink)
+        # link to docks
+        weblink = QtWidgets.QLabel()
+        weblink.setText("<a href='https://github.com/drfenixion/robot_descriptions.py#descriptions'>https://github.com/drfenixion/robot_descriptions.py#descriptions</a> for manually adding your model do PR.")
+        weblink.setTextFormat(QtCore.Qt.RichText)
+        weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        weblink.setOpenExternalLinks(True)
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        self.main_layout.addWidget(weblink)
+
+        # description
+        description = QtWidgets.QLabel()
+        description.setText("There is also a service for adding and raising your models, write to <a href='mailto:it.project.devel@gmail.com'>it.project.devel@gmail.com</a>")
+        description.setTextFormat(QtCore.Qt.RichText)
+        description.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        description.setOpenExternalLinks(True)
+        self.main_layout.addWidget(description)
+
+        # description
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        description = QtWidgets.QLabel()
+        description.setText("If faced crash check free RAM or swap. Some models can take 10gb for create.")
+        self.main_layout.addWidget(description)
+
+        self.main_layout.addWidget(QtWidgets.QLabel())
+        description.setText("Some models can take ten or more minutes to create.")
+        self.main_layout.addWidget(description)
 
         # adding widgets to main layout
         self.setLayout(self.main_layout)
