@@ -342,7 +342,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
 
         self.layout.addSpacing(10)
 
-        self.load_button = QtWidgets.QPushButton("Create model based on selection")
+        self.load_button = QtWidgets.QPushButton("Create model")
         self.load_button.clicked.connect(self.load_urdf)
         self.layout.addWidget(self.load_button)
 
