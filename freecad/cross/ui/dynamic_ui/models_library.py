@@ -5,6 +5,7 @@ import re
 import sys
 from PySide import QtGui, QtCore, QtWidgets
 import FreeCAD as fc
+from freecad.cross.freecad_utils import message
 from freecad.cross.freecadgui_utils import get_progress_bar
 from freecad.cross.robot_from_urdf import robot_from_urdf_path
 from ...wb_utils import ROBOT_DESCRIPTIONS_MODULE_PATH, ROBOT_DESCRIPTIONS_REPO_PATH, git_init_submodules
@@ -76,6 +77,10 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         self.button = QtWidgets.QPushButton('Open model variants')
         self.button.clicked.connect(self.get_selected_value)
+        self.main_layout.addWidget(self.button)
+
+        self.button = QtWidgets.QPushButton('Update models list')
+        self.button.clicked.connect(self.update_models_list)
         self.main_layout.addWidget(self.button)
 
         # link to docks
@@ -199,6 +204,20 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                         else:
                             self.packages_grouped_by_tags[tag_name]['show'] = True
         self.display_packages_block()
+
+
+    def update_models_list(self):
+        self.setEnabled(False)
+        git_init_submodules(
+            only_first_update = False,
+            submodule_repo_path = ROBOT_DESCRIPTIONS_REPO_PATH,
+        )
+        message("Models list updated", True)
+        self.close()
+        self.deleteLater()
+        form = ModelsLibraryModalClass()
+        form.exec_()
+
 
 
     def get_selected_value(self):
