@@ -114,7 +114,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("Use models without solids only for fast view. Solids is needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
+        description.setText("Use models without creating solids only for fast view. Solids is needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
         self.main_layout.addWidget(description)
 
         # adding widgets to main layout
