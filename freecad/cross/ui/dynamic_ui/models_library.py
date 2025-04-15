@@ -104,7 +104,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("Some models can take 10 or more minutes and 10Gb RAM to create.")
+        description.setText("Some models can take 10 or more minutes and 10Gb free RAM to create.")
         self.main_layout.addWidget(description)
 
         self.main_layout.addWidget(QtWidgets.QLabel())
