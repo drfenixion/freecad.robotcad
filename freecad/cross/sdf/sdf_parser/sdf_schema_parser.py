@@ -10,6 +10,7 @@ class Element_Attributes:
     def __init__(self):
         self._name=""
         self._default=""
+        self._data_type=""
 
     #name property
     @property
@@ -26,20 +27,32 @@ class Element_Attributes:
     @attr_value.setter
     def attr_value(self,value):
         self._default=value
-
+    @property
+    def type(self):
+        return self._data_type
+    @type.setter
+    def type(self,value):
+        self._data_type=value
     #description property
-
+    def __str__(self):
+        return '{name:%s,value:%s,type:%s}'%(self.name,self._default,self._data_type)
+    
+    def __repr__(self):
+        return '{name:%s,value:%s,type:%s}'%(self.name,self._default,self._data_type)
     #get a dictionary of all elements
 
     #get only the name and default value
     def get_all(self):
         return {"name":self._name,"default":self._default}
+    def get_complete(self)->dict:
+        return {"name":self._name,"default":self._default,"type":self._data_type}
 
 
 
 #class to parse the sdf file and generate a dictioanary
 class sdf_schema_parser:
-    def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH):
+    def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
+                 ,includeMetaData:bool=True):
         #initialize directory with the root.sdf
         self.root_dir=os.path.join(sdf_templates_dir, version, file)
         self.version=version
@@ -49,7 +62,8 @@ class sdf_schema_parser:
         self.tree=self.parse_tree(self.root_dir)
         #get the root element
         self.root=self.tree.getroot()
-
+        self.recurse=recurse
+        self.metaData=includeMetaData
         #populate the dictionary with data
         # call the tree with the parent  root element
         self.Main_ElemDict=self.populate_structure(self.root)
@@ -85,7 +99,7 @@ class sdf_schema_parser:
         self._attr.append(e)
 
 
-    def populate_structure(self, Element:ET.Element):
+    def populate_structure( self, Element:ET.Element):
         #add elements to structure
         ElemDict={}
 
@@ -108,13 +122,16 @@ class sdf_schema_parser:
             e=Element_Attributes()
             e.name=result.attrib["name"]
             e.attr_value=result.attrib["default"]
+            e.type=result.attrib["type"]
             self._attr.append(e)
+        if self.metaData:
+            for technical_attr_name, technical_attr_value in Element.attrib.items():
+                self.add_technical_attr_as_attr_to_element(technical_attr_name, technical_attr_value)
 
-        for technical_attr_name, technical_attr_value in Element.attrib.items():
-            self.add_technical_attr_as_attr_to_element(technical_attr_name, technical_attr_value)
 
-
-        self.add_child_text_as_attr_to_element(Element, 'description')
+            self.add_child_text_as_attr_to_element(Element, 'description')
+        else:
+            pass
 
         #check to see that attributes are not empty
         if len(self._attr)==0:
@@ -128,6 +145,7 @@ class sdf_schema_parser:
         #check for default
         if "default" in dict(Element.attrib):
                 ElemDict["value"]=Element.attrib["default"]
+                ElemDict["data_type"]=Element.attrib["type"]
         else:
              ElemDict["value"]=None
 
@@ -137,8 +155,11 @@ class sdf_schema_parser:
         #data in the children field
         for child in Element:
             if child.tag =="include":
-                struct_class=sdf_schema_parser(file=child.attrib["filename"])
-                ElemDict["children"].append(struct_class.data_structure)
+                #  removed include to ensure only one item can be selected at a time 
+                if self.recurse:
+                    struct_class=sdf_schema_parser(file=child.attrib["filename"])
+                    ElemDict["children"].append(struct_class.data_structure)
+                pass
             elif child.tag =="element" \
             and 'name' in child.attrib \
             and child.attrib["name"] != "include":

@@ -23,6 +23,7 @@ from .wb_utils import is_workcell
 from .wb_utils import is_sensor_joint
 from .wb_utils import ros_name
 from .utils import warn_unsupported
+from .SdfUtilities import joint_properties
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -91,6 +92,7 @@ class JointProxy(ProxyBase):
 
         self.init_extensions(obj)
         self.init_properties(obj)
+        joint_properties(self.joint,"joint",True,fcgui.getMainWindow())
 
     def init_extensions(self, obj: CrossJoint) -> None:
         # Need a group to put the generated FreeCAD links in.

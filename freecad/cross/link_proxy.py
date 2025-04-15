@@ -39,6 +39,9 @@ from .wb_utils import ros_name
 from .wb_utils import get_parent_link_of_obj
 from . import wb_constants
 
+from .SdfUtilities import link_properties
+
+
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .link import Link as CrossLink  # A Cross::Link, i.e. a DocumentObject with Proxy "Link". # noqa: E501
@@ -196,6 +199,8 @@ class LinkProxy(ProxyBase):
 
         self.init_extensions(obj)
         self.init_properties(obj)
+        #  add function to add link related data 
+        link_properties(self.link,"link",True,fcgui.getMainWindow())
 
     def init_extensions(self, obj: CrossLink) -> None:
         # Need a group to put the generated FreeCAD links in.
