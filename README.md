@@ -55,6 +55,7 @@ Video of creating controllable models: <br />
         1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
         1. Nvidia video cards container support
         1. README instruction how to use
+1. Integrated ready to use models library
 1. all features from CROSS workbench
 
 # Fast install and run
