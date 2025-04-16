@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import copy
 from pathlib import Path
+import re
 from typing import Optional
 import os
 import sys
@@ -11,6 +12,10 @@ import FreeCAD as fc
 from ..utils import get_parent_by_pattern
 from ..utils import add_path_to_environment_variable
 from .. import wb_constants
+from . import utils as current_file
+
+
+last_pkg_path = ''
 
 
 def warn(text: str, gui: bool = False) -> None:
@@ -98,14 +103,26 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     _add_python_path(f'{ros_workspace}/install/lib/{python_ver}/site-packages')
     _add_python_path(f'{ros_workspace}/install/local/lib/{python_ver}/dist-packages')
 
+    # Get the path of the current Python executable
+    python_path = sys.executable
+    # The site-packages directory is usually in lib/pythonX.Y/site-packages
+    # relative to the executable path
+    site_packages_path = os.path.join(
+        os.path.dirname(os.path.dirname(python_path)),
+        'lib',
+        'python{}.{}/site-packages'.format(sys.version_info.major, sys.version_info.minor),
+    )
+
     # On some systems (e.g. FreeCAD 0.21 on Ubuntu 20), $PYTHONPATH is not
     # taken into account in FreeCAD, add them manually.
     base = f'/opt/ros/{ros_distro}'
     for path in [
         Path(f'{base}/lib/{python_ver}/site-packages'),
         Path(f'{base}/local/lib/{python_ver}/dist-packages'), # Humble and later.
-        Path(f'/usr/lib/python{major}/dist-packages'),
-        Path(f'/usr/lib/{python_ver}/dist-packages'),
+        Path(f'/usr/lib/python{major}/dist-packages'), # system apt python packages
+        Path(f'/usr/lib/{python_ver}/dist-packages'), # system apt python packages
+        Path(f'/usr/local/lib/{python_ver}/dist-packages'), # system pip packages
+        Path(site_packages_path), # conda packages if used conda python
     ]:
         _add_python_path(path)
 
@@ -205,7 +222,7 @@ def without_ros_workspace(path: Path | str) -> str:
     return copy(path)
 
 
-def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
+def get_package_and_file(file_path: Path | str, package_mark: str = 'package.xml') -> tuple[str, str]:
     """Return the package name and relative file path.
 
     For example, if the file path is `$HOME/ros2_ws/src/dir/my_package/file.py`,
@@ -214,7 +231,7 @@ def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
     If the file path is relative, return an empty package and `file_path`.
 
     """
-    pkg_path, relative_file_path = get_parent_by_pattern(file_path, 'package.xml')
+    pkg_path, relative_file_path = get_parent_by_pattern(file_path, package_mark)
     if not pkg_path.name:
         # No package found.
         return '', str(file_path)
@@ -223,6 +240,7 @@ def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
 
 def pkg_and_file_from_ros_path(
         path: str,
+        check_package_compiled: bool = True,
 ) -> tuple[Optional[str], Optional[str]]:
     """Return the tuple (package_name, relative_file_path).
 
@@ -255,7 +273,8 @@ def pkg_and_file_from_ros_path(
         warn(f'Invalid ROS path `{path}`', False)
         return None, None
     try:
-        get_package_share_directory(pkg)
+        if check_package_compiled:
+            get_package_share_directory(pkg)
     except PackageNotFoundError as e:
         warn(f'Package {pkg} not found: {e}', False)
         return None, None
@@ -266,13 +285,13 @@ def abs_path_from_ros_path(
         path: str,
         relative_to: Optional[Path | str] = None,
 ) -> Optional[Path]:
-    """Return the absolute path to a file given in ROS format.
+    """Return the absolute path to a file given in ROS format or some types of regular path format.
 
-    Return the absolute path to a file given in ROS format.
     Supported formats are:
     - `package://<package_name>/<relative_file_path>` and
     - `file://<absolute_file_path>`.
     - `file://<relative_file_path>` if `relative_to` is given.
+    - `../<path>` - path related to urdf file
 
     This is the inverse function of `ros_path_from_abs_path`.
 
@@ -282,35 +301,79 @@ def abs_path_from_ros_path(
     """
     # Import here to be able to import the module without ROS.
     try:
-        from ament_index_python.packages import get_package_share_directory  # type: ignore
+        from ament_index_python.packages import get_package_share_directory, PackageNotFoundError  # type: ignore
     except ImportError:
         warn('Cannot import ament_index_python.packages', False)
         return None
 
     if not path:
         return None
-    if (
-        not (
-            path.startswith('package://')
-            or path.startswith('file://')
-        )
-    ):
-        return None
+
+    from .. import robot_from_urdf
     if path.startswith('package://'):
-        pkg, rel_path = pkg_and_file_from_ros_path(path)
+        pkg, rel_path = pkg_and_file_from_ros_path(path, check_package_compiled = False)
+
         if not pkg:
             return None
-        pkg_path = get_package_share_directory(pkg)
+
+        pkg_path = None
+        try:
+            pkg_path = get_package_share_directory(pkg)
+        except PackageNotFoundError:
+            pass
+
+        # trying get pkg_path for not compiled packages (based urdf path)
+        pkg_path = robot_from_urdf.get_real_pkg_path(pkg)
+        #trying to get pkg_path by various methods
+        if not pkg_path:
+            pkg_path, relative_file_path = get_parent_by_pattern(robot_from_urdf.urdf_filename, ['package.xml'])
+            # confirm found pkg_path contains pkg_name as last element
+            pattern = f".*/{re.escape(pkg)}/"
+            match = re.search(pattern, str(pkg_path))
+            if not match:
+                pkg_path = None
+
+            if not pkg_path:
+                pattern = f".*/{re.escape(pkg)}/"
+                match = re.search(pattern, robot_from_urdf.urdf_filename)
+                if match:
+                    pkg_path = match.group(0)
+                else:
+                    # Looks like it is not a current package
+                    # trying to search for parallel package
+                    parent_dir_of_last_package = Path(current_file.last_pkg_path).parent
+                    pkg_path = parent_dir_of_last_package / pkg
+                    if not os.path.isdir(pkg_path):
+                        # looks like it is just related to urdf_filename path
+                        # f.e. package://assets/wheel2.stl (rsk_description)
+                        pkg_path = Path(robot_from_urdf.urdf_filename).parent / pkg
+                        # raise RuntimeError('Can not find path for package - ' + pkg)
+
+        current_file.last_pkg_path = pkg_path
+
+        if not pkg_path:
+            return None
+
         return Path(pkg_path) / rel_path
     elif path.startswith('file://'):
         if relative_to is not None:
             return Path(relative_to) / path[len('file://'):]
         return Path(path[len('file://'):])
-    return None
+    elif path.startswith('../'):
+        path = Path(robot_from_urdf.urdf_filename).parent / path
+        return path
+    elif robot_from_urdf.get_real_pkg_path(pkg_name = None, default_pkg_path_from_desc_pkg_path = True):
+        path = Path(robot_from_urdf.get_real_pkg_path(pkg_name = None, default_pkg_path_from_desc_pkg_path = True)) / path
+        return path
+    else:
+        path = Path(robot_from_urdf.urdf_filename).parent / path
+        return path
 
 
 def ros_path_from_abs_path(
         path: Path | str,
+        package_mark: str = 'package.xml',
+        stub_package: bool = False,
 ) -> Optional[str]:
     """Return the ROS path to the given file.
 
@@ -318,9 +381,19 @@ def ros_path_from_abs_path(
     `package://<package_name>/<relative_file_path>`.
     This is the inverse function of `abs_path_from_ros_path`.
 
+    Args:
+        path (Path | str): The absolute path to the file.
+        package_mark (str, optional): The file that marks the package root. Defaults to 'package.xml'.
+        stub_package (bool, optional): If True, returns a stub package path (rel path) when the package is not found. Defaults to False.
+
+    Returns:
+        Optional[str]: The ROS package path to the file, or None if the package is not found and stub_package is False.
+
     """
-    pkg, rel_path = get_package_and_file(path)
+    pkg, rel_path = get_package_and_file(path, package_mark)
     if not pkg:
+        if stub_package:
+            return f'package://{rel_path}'
         return None
     return f'package://{pkg}/{rel_path}'
 

@@ -132,7 +132,7 @@ RUN mkdir -p /home/$USER/miniconda3 && \
     conda config --add channels conda-forge && \
     conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
     conda activate freecad_1_0_312 && \
-    conda install numpy pandas matplotlib requests qt6-wayland && \
+    conda install numpy pandas matplotlib requests qt6-wayland pycollada && \
     apt-get autoclean -y && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
@@ -150,6 +150,7 @@ RUN mkdir -p /home/$USER/miniconda3 && \
 #     conda init --all && \
 #     conda install conda-forge::freecad && \
 #     conda install conda-forge::qt6-wayland && \
+#     conda install conda-forge::pycollada && \
 #     apt-get autoclean -y && \
 #     apt-get autoremove -y && \
 #     rm -rf /var/lib/apt/lists/*

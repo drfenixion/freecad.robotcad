@@ -2,7 +2,8 @@
 import FreeCAD as fc
 import FreeCADGui as fcgui
 
-from PySide import QtGui  # FreeCAD's PySide!
+from PySide import QtGui
+from freecad.cross.robot_from_urdf import assembly_from_urdf_path  # FreeCAD's PySide!
 
 from ..assembly_from_urdf import assembly_from_urdf
 from ..freecad_utils import warn
@@ -36,9 +37,11 @@ class _AssemblyFromUrdfCommand:
             if not doc:
                 doc = fc.newDocument()
             filename = str(dialog.selectedFiles()[0])
-            urdf_robot = UrdfLoader.load_from_file(filename)
             doc.openTransaction(tr('Assembly from URDF'))
-            assembly_from_urdf(doc, urdf_robot)
+            assembly_from_urdf_path(
+                doc,
+                filename,
+            )
             doc.commitTransaction()
             doc.recompute()
             fcgui.SendMsgToActiveView('ViewFit')

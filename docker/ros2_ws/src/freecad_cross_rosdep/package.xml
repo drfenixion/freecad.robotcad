@@ -13,7 +13,7 @@
   <depend>urdfdom_py</depend>
   <depend>xacro</depend>
   <depend>python3-requests</depend>
-  <depend>python3-collada</depend>
+  <depend>python3-collada-pip</depend>
   <depend>ament_index_python</depend>
 
   <test_depend>ament_copyright</test_depend>

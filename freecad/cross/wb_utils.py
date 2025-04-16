@@ -32,7 +32,7 @@ from .freecad_utils import message
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
-from .freecadgui_utils import get_placement
+from .freecadgui_utils import get_placement, get_progress_bar, gui_process_events
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals, calc_md5
@@ -64,6 +64,8 @@ MODULES_PATH = MOD_PATH / 'modules'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
 SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
 SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
+ROBOT_DESCRIPTIONS_REPO_PATH = MOD_PATH / 'modules' / 'robot_descriptions'
+ROBOT_DESCRIPTIONS_MODULE_PATH = ROBOT_DESCRIPTIONS_REPO_PATH / 'robot_descriptions'
 SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors'
 LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
 JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
@@ -814,33 +816,68 @@ def make_lcs_at_link_body(
         deactivate_after_map_mode:bool = True,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
-    orienteer body must be wrapper by part and be Real element of robot link'''
+    orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
 
-    link = None
-    # trying get link from subelement
+    # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
+    #     orienteer_parents_reversed = reversed(obj.Parents)
+    #     parent_obj = None
+    #     for parent in orienteer_parents_reversed:
+    #         parent_splited = parent[1].split('.')
+    #         if len(parent_splited) > 2:
+    #             parent_obj = fc.ActiveDocument.getObject(parent_splited[0])
+    #         break
+
+    #     if parent_obj:
+    #         placement = placement * parent_obj.Placement
+    #         return getParentsPlacementRecursively(parent_obj, placement)
+    #     else:
+    #         return obj, placement
+
+
+    link_to_obj = None
+    dynamic_link_of_robot_link = None
+    original_obj = None
+    dynamic_link_of_robot_link = None
+    original_obj_wrapper = None
     try:
         if is_fc_link(orienteer.Object):
-            link = orienteer.Object
+            link_to_obj = orienteer.Object
+            original_obj = link_to_obj.getLinkedObject(True)
+            link_to_obj_placement = link_to_obj.Placement
+
+            parents_reversed = reversed(link_to_obj.Parents)
+            for p in parents_reversed:
+                p = p[0]
+                if is_fc_link(p):
+                    dynamic_link_of_robot_link = p
+                else:
+                    original_obj_wrapper = p
         else:
-            orienteer_parents_reversed = reversed(orienteer.Object.Parents)
-            for parent in orienteer_parents_reversed:
-                parent = parent[0]
-                if is_fc_link(parent):
-                    link = parent
+            original_obj = orienteer.Object
+            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+
+            parents_reversed = reversed(original_obj.Parents)
+            for p in parents_reversed:
+                p = p[0]
+                if is_fc_link(p):
+                    dynamic_link_of_robot_link = p
+                else:
+                    original_obj_wrapper = p
+
     except (AttributeError, IndexError, RuntimeError):
         pass
 
-    # orienteer not a subelement (face, edge, etc)
-    if not link:
-        link = orienteer
+    if not original_obj_wrapper:
+        message('Can find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
+        raise RuntimeError()
 
-    obj = link.getLinkedObject(True)
-    obj_placement = obj.Placement
-    link_to_obj_placement = link.Placement
+    if not original_obj:
+        message('Can find original object for getting reference.', gui=True)
+        raise RuntimeError()
 
-    if not is_part(obj):
-        message('Can not get Part-wrapper of object. Real object of robot link must have Part as wrapper of body.', gui=True)
-        raise NoPartWrapperOfObject()
+    if not dynamic_link_of_robot_link:
+        message('Can find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
+        raise RuntimeError()
 
     sub_element_name = ''
     sub_element_type = ''
@@ -856,12 +893,12 @@ def make_lcs_at_link_body(
 
     body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
 
-    obj.addObject(body_lcs_wrapper)
+    original_obj_wrapper.addObject(body_lcs_wrapper)
 
     lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS')
     body_lcs_wrapper.addObject(lcs)
 
-    setattr(lcs, lcs_attachmentsupport_name(), [(orienteer.Object, sub_element_name)])   # The X axis.
+    setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
 
     if sub_element_type == 'Vertex':
         lcs.MapMode = 'Translate'
@@ -881,11 +918,15 @@ def make_lcs_at_link_body(
         # prevent automove back to InertialCS rotation
         lcs.MapMode = 'Deactivated'
 
+    # remove placement of origin obj (mean in zero point of original obj)
+    lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+    # add placement of link of origin obj (mean in same place at face of link as at original obj)
+    lcs.Placement = link_to_obj_placement * lcs.Placement
     # fix Z rotation to 0 in frame of origin
     lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # find placement of lcs at link of obj. lcs.Placement is placement at support obj
-    placement = link_to_obj_placement * lcs.Placement
+    # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+    placement = dynamic_link_of_robot_link.Placement * lcs.Placement
 
     if delete_created_objects:
         fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
@@ -1033,8 +1074,25 @@ def git_change_submodule_branch(module_path: str, branch: str):
         git_init_submodules()
 
 
-def git_init_submodules(only_first_update: bool = True, update_from_remote_branch: bool = True, update_if_dir_is_empty = ROS2_CONTROLLERS_PATH):
-    """ Do git submodule update --init if ros2_controllers module dir is empty """
+def git_init_submodules(
+        only_first_update: bool = True,
+        update_from_remote_branch: bool = True,
+        submodule_repo_path = ROS2_CONTROLLERS_PATH,
+        pip_deps_install_submodule_paths: list = [ROBOT_DESCRIPTIONS_REPO_PATH],
+):
+    """
+    Initializes and updates Git submodules.
+
+    Args:
+        only_first_update: Update submodules for the first time. Check first time by empty of submodule_repo_path dir.
+        update_from_remote_branch: Whether to update submodules from the remote branch.
+        submodule_repo_path: The path to the submodule repository.
+        pip_deps_install_module_paths: Modules paths where should be made pip install when updates Git submodules.
+
+    Description:
+    This function checks if the submodule_repo_path directory is empty and initializes and updates Git submodules if necessary.
+    Also does update when .gitmodules file changed.
+    """
 
     def git_deinit_submodules():
         message('Deinit git submodules.')
@@ -1059,14 +1117,40 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
         )
         print('process:', p)
 
+        for pip_deps_installmodule_path in pip_deps_install_submodule_paths:
+            pip_install_dependencies_of_module(pip_deps_installmodule_path)
+
+
+    def pip_install_dependencies_of_module(target_module_path: str):
+        message('Pip install dependencies of module.')
+        p = subprocess.run(
+            ["pip download ."],
+            shell=True,
+            capture_output=True,
+            cwd=target_module_path,
+            check=True,
+        )
+        print('process:', p)
+
+
+    progressBar = get_progress_bar(
+        title = "Git submodules download and update...",
+        min = 0,
+        max = 100,
+        show_percents = False,
+    )
+    progressBar.show()
+    progressBar.setValue(0)
+    gui_process_events()
+
 
     update_from_remote_branch_param = ''
     if update_from_remote_branch:
         update_from_remote_branch_param = '--remote'
 
 
-    files_and_dirs = os.listdir(update_if_dir_is_empty)
-    # update if dir is empty
+    files_and_dirs = os.listdir(submodule_repo_path)
+    # update if dir is empty or .gitmodules file was changed
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
         if not len(files_and_dirs):
@@ -1076,6 +1160,10 @@ def git_init_submodules(only_first_update: bool = True, update_from_remote_branc
             git_update_submodules(update_from_remote_branch_param)
     else:
         git_update_submodules(update_from_remote_branch_param)
+
+    progressBar.setValue(100)
+    progressBar.close()
+    gui_process_events()
 
 
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:

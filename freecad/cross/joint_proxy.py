@@ -210,10 +210,11 @@ class JointProxy(ProxyBase):
                 warn(
                     'Mimicked joint must have the same type'
                     f' but "{obj.Label}"\'s type is {obj.Type} and'
-                    f' "{obj.MimickedJoint}"\'s is {obj.MimickedJoint.Type}',
-                    True,
+                    f' "{obj.MimickedJoint.Label}"\'s is {obj.MimickedJoint.Type}',
+                    False,
                 )
-                obj.MimickedJoint = None
+                # obj.MimickedJoint = None
+            pass
         if prop in ('Label', 'Label2'):
             robot = self.get_robot()
             if robot and hasattr(robot, 'Proxy'):
@@ -535,7 +536,7 @@ class _ViewProviderJoint(ProxyBase):
             vobj, 'App::PropertyLength', 'AxisLength',
             'ROS Display Options',
             "Length of the arrow for the joint's axis",
-            500.0,
+            250.0,
         )
 
     def getIcon(self) -> str:
@@ -647,7 +648,7 @@ class _ViewProviderJoint(ProxyBase):
         pass
 
 
-def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None = None) -> CrossJoint:
+def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None = None, recompute_after: bool = True) -> CrossJoint:
     """Add a Cross::Joint to the current document."""
     if doc is None:
         doc = fc.activeDocument()
@@ -689,7 +690,8 @@ def make_joint(name, doc: Optional[fc.Document] = None, robot:CrossRobot | None 
                     joint.Parent = ros_name(candidate)
                     if robot.ViewObject:
                         joint.ViewObject.AxisLength = robot.ViewObject.JointAxisLength
-    doc.recompute()
+    if recompute_after:
+        doc.recompute()
     return joint
 
 

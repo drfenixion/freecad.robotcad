@@ -180,6 +180,7 @@ for dir in 'build' 'install' 'log' 'ros2_system_logs'
 do
     [ -d $build_data_path/$dir ] || mkdir -p $build_data_path/$dir
 done
+#'usr_lib_python-major-ver_dist-packages' 'usr_local_lib_python_ver_dist-packages'
 
 
 # remove current container if want to run new one
@@ -322,6 +323,8 @@ else
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
+    # --mount dst=/usr/lib/python3/dist-packages,volume-opt=device=$build_data_path/usr_lib_python-major-ver_dist-packages$mount_options \
+    # --mount dst=/usr/local/lib/python3.12/dist-packages,volume-opt=device=$build_data_path/usr_local_lib_python_ver_dist-packages$mount_options \
 
     echo "Ran new container."
 

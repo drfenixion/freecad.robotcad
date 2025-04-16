@@ -135,6 +135,14 @@ def _get_xmls_and_export_meshes(
         if is_body(export_datum.object) and volume_mm3(export_datum.object) <= 0.0:
             # dont create visuals and meshes for LCS_wrapper. If create Gazebo will error about empty mesh.
             continue
+        if is_part(export_datum.object):
+            any_with_volume_inside = False
+            for el in export_datum.object.OutListRecursive:
+                if el.TypeId not in ['App::Line', 'App::Plane', 'App::Origin']:
+                    any_with_volume_inside = True
+            # dont create visuals and meshes for empty App::Part
+            if not any_with_volume_inside:
+                continue
         if not is_primitive(export_datum.object):
             mesh_path = (
                 package_parent / package_name
@@ -793,7 +801,7 @@ class _ViewProviderLink(ProxyBase):
         pass
 
 
-def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
+def make_link(name, doc: Optional[fc.Document] = None, recompute_after: bool = True) -> CrossLink:
     """Add a Cross::Link to the current document."""
     if doc is None:
         doc = fc.activeDocument()
@@ -832,7 +840,8 @@ def make_link(name, doc: Optional[fc.Document] = None) -> CrossLink:
                         cross_link.ViewObject.ShowReal = robot.ViewObject.ShowReal
                         cross_link.ViewObject.ShowVisual = robot.ViewObject.ShowVisual
                         cross_link.ViewObject.ShowCollision = robot.ViewObject.ShowCollision
-    doc.recompute()
+    if recompute_after:
+        doc.recompute()
     return cross_link
 
 

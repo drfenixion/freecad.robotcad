@@ -15,7 +15,7 @@ from copy import deepcopy
 import FreeCAD as fc
 
 from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide.QtWidgets import QMenu  # FreeCAD's PySide
+from PySide.QtWidgets import QMenu # FreeCAD's PySide
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -137,9 +137,11 @@ def _add_joint_variable(
         else:
             min_, max_ = joint.LowerLimit, joint.UpperLimit
             if value > max_:
-                error('Joint (' + var_name + ') value can not be more Upper limit')
+                warn('Joint (' + var_name + ') value can not be more Upper limit. Value set as Upper limit.')
+                value = max_
             if value < min_:
-                error('Joint (' + var_name + ') value can not be less LowerLimit limit')
+                warn('Joint (' + var_name + ') value can not be less Lower limit. Value set as Lower limit.')
+                value = min_
             if max_ < min_:
                 error('Joint (' + var_name + ') Upper limit can not be less LowerLimit limit')
         # Deactivate callback on change.
@@ -237,13 +239,14 @@ class RobotProxy(ProxyBase):
         # Used to restore the joint variables from the dumped state because
         # DocumentObject instances cannot be saved.
         # Defined in onDocumentRestored().
-        # TODO: Maybe save as two lists (App::PropertyLinkList and App::PropertyStringList).
+        # TODO: Maybe save as two lists (App::PropertyLinkListGlobal and App::PropertyStringList).
         self._joint_variables_ros_map: dict[str, str]
 
         # Save the children to speed-up get_links() and get_joints().
         self._attached_collision_objects: Optional[list[CrossAttachedCollisionObject]] = None
         self._links: Optional[list[CrossLink]] = None
         self._joints: Optional[list[CrossJoint]] = None
+        self._joints_old: Optional[list[CrossJoint]] = []
 
         self._controllers: Optional[list[CrossController]] = None
         self._broadcasters: Optional[list[CrossController]] = None
@@ -268,8 +271,11 @@ class RobotProxy(ProxyBase):
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
+        # store created objects to PropertyLinkListGlobal leads to error - 'Object can only be in a single Group'
+        # looks like PropertyLinkListGlobal perceived as the group and brokes other object`s group
+        # used PropertyLinkListHidden instead
         add_property(
-            obj, 'App::PropertyLinkList', 'CreatedObjects', 'Internal',
+            obj, 'App::PropertyLinkListHidden', 'CreatedObjects', 'Internal',
             'Objects created for the robot',
         )
 
@@ -359,6 +365,7 @@ class RobotProxy(ProxyBase):
         if prop in ['Group']:
             # Reset _links and _joints to provoke a recompute.
             self._links = None
+            self._joints_old = self._joints
             self._joints = None
             self._controllers = None
             self._broadcasters = None
@@ -504,7 +511,8 @@ class RobotProxy(ProxyBase):
                     links.append(link_name)
             return links
 
-        for joint in self.get_joints():
+        sym_diff_joints = set(self.get_joints()).symmetric_difference(set(self.get_joints_old()))
+        for joint in sym_diff_joints:
             # We add the empty string to show that the child or parent
             # was not set yet.
             parent_links: list[str] = ['']
@@ -648,6 +656,9 @@ class RobotProxy(ProxyBase):
         self._joints = get_joints(self.robot.Group)
         return list(self._joints)  # A copy.
 
+    def get_joints_old(self) -> list[CrossJoint]:
+        """Return the list of CROSS old (before onChanged()) joints in the order of creation."""
+        return self._joints_old
 
     def get_controllers(self) -> list[CrossController]:
         """Return the list of CROSS controllers in the order of creation."""
@@ -1233,7 +1244,7 @@ class _ViewProviderRobot(ProxyBase):
             vobj, 'App::PropertyLength', 'JointAxisLength',
             'ROS Display Options',
             "Length of the arrow for the joints axes",
-            500.0,
+            250.0,
         )
 
     def getIcon(self):
