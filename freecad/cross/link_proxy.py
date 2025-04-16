@@ -39,7 +39,7 @@ from .wb_utils import ros_name
 from .wb_utils import get_parent_link_of_obj
 from . import wb_constants
 
-from .SdfUtilities import link_properties
+from .sdf import setup
 
 
 # Stubs and typing hints.
@@ -200,7 +200,7 @@ class LinkProxy(ProxyBase):
         self.init_extensions(obj)
         self.init_properties(obj)
         #  add function to add link related data 
-        link_properties(self.link,"link",True,fcgui.getMainWindow())
+        setup.link_properties(self.link,"link",True,fcgui.getMainWindow())
 
     def init_extensions(self, obj: CrossLink) -> None:
         # Need a group to put the generated FreeCAD links in.
@@ -850,7 +850,7 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
             True,
         )
         return False
-
+    #  ??ln  is not neccesary since is_part returns a bool 
     if not is_part(obj):
         part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
 

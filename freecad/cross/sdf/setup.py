@@ -20,11 +20,11 @@ from PySide2.QtWidgets import (
 import xml.etree.ElementTree as ET
 from typing import Union
 
-from .sdf.sdf_parser import sdf_tree, sdf_schema_parser
+from .sdf_parser import sdf_tree, sdf_schema_parser
 
 import re
 import os
-from .wb_utils import UI_PATH
+from ..wb_utils import UI_PATH
 
 debug = False
 if debug:
@@ -280,10 +280,44 @@ class CollapsibleSection(QWidget):
 
         """)
         self.toggle_btn.toggled.connect(self.toggle)
-        
         header_layout.addWidget(self.arrow_label)
         header_layout.addWidget(self.toggle_btn)
         header_layout.addStretch()
+        
+        # enable and disable checkbox  this will  enabled on 
+        # optional elements i.e and there state will be store and used 
+        # to generate sdf disabled elements wont be included 
+        self.enable_check = QCheckBox()
+        self.enable_check.setToolTip("activates and deactivates optional items \n only enabled items will be exported as sdf")
+        self.enable_check.setChecked(True)
+        self.enable_check.setStyleSheet("""
+            QCheckBox {
+                spacing: 0;
+                padding: 0;
+                margin-right: 5px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+                border: 1px solid #999;
+                border-radius: 3px;
+            }
+            QCheckBox::indicator:unchecked {
+                background: #e0e0e0;
+            }
+            QCheckBox::indicator:checked {
+                background: #4CAF50;
+                border: 1px solid #3e8e41;
+                image: none;  /* This removes the tick mark */
+            }
+            QCheckBox::indicator:disabled {
+                background: #f0f0f0;
+                border: 1px solid #ddd;
+            }
+        """)
+        self.enable_check.stateChanged.connect(self.toggle_enabled)
+        header_layout.addWidget(self.enable_check)
+        
         
         # Content area
         self.content = QWidget()
@@ -308,6 +342,20 @@ class CollapsibleSection(QWidget):
                 parent.update_layout()
                 break
             parent = parent.parent()
+    # callback for checkbox 
+    def toggle_enabled(self, state):
+        """Enable/disable based on checkbox state"""
+        enabled = state == Qt.Checked
+        self.toggle_btn.setEnabled(enabled)
+        self.content.setEnabled(enabled)
+        
+        # Grey out arrow when disabled
+        self.arrow_label.setStyleSheet(f"color: {'#555' if enabled else '#aaa'}")
+        
+        # Collapse if being disabled
+        if not enabled and self.toggle_btn.isChecked():
+            self.toggle_btn.setChecked(False)
+            self.toggle(False)
     
     def update_layout(self):
         """Force layout update for proper sizing"""
@@ -352,6 +400,7 @@ defined_names:dict={}
 defined_names["link"]={"name":["Label","Label2"]}
 defined_names["inertia"]={"ixx":"Ixx","ixy":"Ixy","ixz":"Ixz","iyy":"Iyy","iyz":"Iyz","izz":"Izz",}
 defined_names["inertial"]={"mass":"Mass"}
+defined_names["joint"]={"name":["Label","Label2"]}
 # {name:str,{parents:list,alias,default value, type}}
 # algorithm
 # i. add parameters to object
@@ -407,6 +456,7 @@ class properties_base(QDockWidget):
         # if not self.shouldClose():
         #     event.ignore()
         #     return
+        reserved_names.clear()
         self.__class__.active=False
         super().closeEvent(event)  # Call parent class implementation
         
@@ -492,7 +542,7 @@ class initialize:
         self.parent=parent
         self.UI()
         
-    def generate_tab_ui(self,tab,root_file:str,include_files:list):
+    def generate_ui(self,tab,root_file:str,include_files:list):
         '''
         Args:
             tab(ui): the tab to add widgets to
@@ -531,20 +581,21 @@ class initialize:
     def UI(self):
         if self.type == "link":
             link_tab=self.parent.link_tab
-            self.generate_tab_ui(link_tab,"link.sdf",["inertial.sdf"])
+            self.generate_ui(link_tab,"link.sdf",["inertial.sdf"])
             # Todo
             # code related to collision 
             collision_tab=self.parent.collision_tab
-            self.generate_tab_ui(collision_tab,"collision.sdf",["surface.sdf"])
+            self.generate_ui(collision_tab,"collision.sdf",["surface.sdf"])
             visual_tab=self.parent.visual_tab
-            self.generate_tab_ui(visual_tab,"visual.sdf",[])
+            self.generate_ui(visual_tab,"visual.sdf",[])
             #  avoid similar names on the same object only since reserved names is global clear it
             # so that the next object will have an empty list 
             reserved_names.clear()
             # visual_tab=self.linkd.__class__.ui.visual
         elif self.type == "joint":
+            
             jointwidget=self.parent.jointWidget
-            self.generate_tab_ui(jointwidget,"joint.sdf",[])
+            self.generate_ui(jointwidget,"joint.sdf",[])
             reserved_names.clear()
         else:
             pass
@@ -573,16 +624,17 @@ class initialize:
                     "App::PropertyString", alias[0], parent_tag, hidden=True
                 )  # Todo
                     else:
-                        self.obj.addProperty(
-                    "App::PropertyString", alias, parent_tag, hidden=True
-                )  # Todo
+                        if  hasattr(self.obj,alias) is False:
+                            self.obj.addProperty(
+                        "App::PropertyString", alias, parent_tag, hidden=True
+                            )  # Todo
             else:
                 widget.add_widget(
                     self.create_labeled_lineedit(name, alias, default_text=default)
                 )
         elif data_type == "bool":
             if self.property_only:   
-                if defined is False:
+                if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty(
                     "App::PropertyBool", alias, parent_tag, hidden=True
                     )  # Todo
@@ -593,7 +645,7 @@ class initialize:
                 ))
         elif data_type == "double":
             if self.property_only:
-                if defined is False: 
+                if defined is False and hasattr(self.obj,alias) is False: 
                     self.obj.addProperty     (
                     "App::PropertyFloat", alias, parent_tag, hidden=True
                     )  # Todo
@@ -609,7 +661,7 @@ class initialize:
                 )
         elif data_type == "unsigned int":
             if self.property_only:
-                if defined is False:
+                if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty(
                     "App::PropertyInteger", alias, parent_tag, hidden=True
                 )  # Todo
@@ -621,7 +673,7 @@ class initialize:
         elif data_type == "vector3":
             default_list = extract_vector_n(default)
             if self.property_only:   
-                if defined is False:
+                if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
                     setattr(self.obj,alias,tuple(default_list))
             else:
@@ -665,11 +717,13 @@ class initialize:
 
         if dc["attributes"] is not None:
             for attribute in dc["attributes"]:
+                defined:bool=False
                 # attributes are of type Element_Attributes see sdf_schema_parser
                 name, default, data_type = attribute.get_complete().values()
                 # check if the tag anme is part of the ones whose properties have already defined in FreeCAD
                 # if its available  check if the name is already defined see defined_names
-                if defined_names.get(tag,None) is not None and name in defined_names[tag].keys():
+                # might be remove in fuature after synchronization 
+                if tag in defined_names and name in defined_names[tag].keys():
                     # take alias as the property name in FreeCAD
                     alias=defined_names[tag][name]
                     # if isinstance(alias,list):
@@ -678,23 +732,26 @@ class initialize:
                     # if the name is not available generate its alias 
                 else:
                     alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
-                if isinstance(alias,list):
-                    self.parent.__class__.properties.append(
-                    {"name": name, "alias": alias[0], "parent": tag, "default": default}
-                )
-                else:
-                     self.parent.__class__.properties.append(
-                    {"name": name, "alias": alias, "parent": tag, "default": default}
-                )
-                
-                
+                    # dont add properties more than once
+                    
+                if self.property_only :
+                    prop_data = {
+                    "name": name,
+                    "alias": alias[0] if isinstance(alias, list) else alias,
+                    "parent": tag,
+                    "default": default,
+                        }
+                    self.parent.__class__.properties.append(prop_data)
+                    
                 self.property_n_widget_setup(
                     widget, name, alias, default, data_type, parent_tag=parent_tag,defined=defined
                 )
         
         if dc["value"] is not None:
+            defined=False
+            alias = None
             if parent_tag is not None:
-                if defined_names.get(parent_tag,None) is not None and tag in defined_names[parent_tag].keys():
+                if parent_tag in defined_names and tag in defined_names[parent_tag].keys():# and and isinstance(defined_names[parent_tag], dict)
                     alias=defined_names[parent_tag][tag]
                     # if isinstance(alias,list):
                     #     alias=alias[0]
@@ -704,20 +761,24 @@ class initialize:
         
             else:
                 # probably unreachable
-                if defined_names.get(tag,None) is not None and tag in defined_names[tag].keys():
+                print("reached\n")
+                if tag in defined_names and tag in defined_names[tag].keys():
                     alias=defined_names[tag][name]
                     # if isinstance(alias,list):
                     #     alias=alias[0]
                     defined=True
                 # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
-            if isinstance(alias,list):
+            # append list only once during initialization 
+            if self.property_only:
+                prop_alias = alias[0] if isinstance(alias, list) else alias
                 self.parent.__class__.properties.append(
-                    {"name": tag, "alias": alias[0], "parent": parent_tag, "default": dc["value"]}
-                )
-            else:
-                self.parent.__class__.properties.append(
-                    {"name": tag, "alias": alias[0], "parent": parent_tag, "default": dc["value"]}
+                    {
+                "name": tag,
+                "alias": prop_alias,
+                "parent": parent_tag,
+                "default": dc["value"],
+              }
                 )
             self.property_n_widget_setup(
                 widget,
@@ -730,15 +791,16 @@ class initialize:
         # loop through allchildren , and perform neccesary steps
         # recursion might be requiered
         if len(children) > 0:
+            # create a new container only for nested items not the root item which does not 
+            # have a parent 
+            # Determine the container widget (CollapsibleSection if parent exists)
+            container = CollapsibleSection(tag) if parent_tag is not None else widget
             if parent_tag is not None:
-                c = CollapsibleSection(tag)
-                widget.add_widget(c)
-            else:
-                c = widget
+                widget.add_widget(container)
+            # loop through each child recursively
             for child in children:
-                
                 if child["tag"] not in ignore_list:
-                    self.add_dynamic_widgets(c, child, child["children"], tag)
+                    self.add_dynamic_widgets(container, child, child["children"], tag)
 
     def create_labeled_double_spinbox(
         self,

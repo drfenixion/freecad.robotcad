@@ -46,7 +46,7 @@ from .ui import command_set_material # noqa: F401
 from .ui import command_calculate_mass_and_inertia # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
-
+from .ui import command_edit_prameters
 
 from .wb_utils import ICON_PATH
 from . import wb_constants
