@@ -14,6 +14,8 @@ from ...wb_utils import ROBOT_DESCRIPTIONS_MODULE_PATH, ROBOT_DESCRIPTIONS_REPO_
 class ModelsLibraryModalClass(QtGui.QDialog):
     """ Display modal with models library """
 
+    is_models_list_updated = False
+
     def __init__(self):
         super(ModelsLibraryModalClass, self).__init__()
 
@@ -79,9 +81,11 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.button.clicked.connect(self.get_selected_value)
         self.main_layout.addWidget(self.button)
 
-        self.button = QtWidgets.QPushButton('Update models list')
-        self.button.clicked.connect(self.update_models_list)
-        self.main_layout.addWidget(self.button)
+        self.update_models_list_button = QtWidgets.QPushButton('Update models list')
+        self.update_models_list_button.clicked.connect(self.update_models_list)
+        if self.__class__.is_models_list_updated:
+            self.update_models_list_button.setEnabled(False)
+        self.main_layout.addWidget(self.update_models_list_button)
 
         # link to docks
         weblink = QtWidgets.QLabel()
@@ -212,9 +216,9 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         message("Models list updated", True)
         self.close()
         self.deleteLater()
+        self.__class__.is_models_list_updated = True
         form = ModelsLibraryModalClass()
         form.exec_()
-
 
 
     def get_selected_value(self):
