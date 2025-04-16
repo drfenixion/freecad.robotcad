@@ -85,7 +85,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         # link to docks
         weblink = QtWidgets.QLabel()
-        weblink.setText("<a href='https://github.com/drfenixion/robot_descriptions.py#descriptions'>https://github.com/drfenixion/robot_descriptions.py#descriptions</a> for manually adding your model do PR.")
+        weblink.setText("<a href='https://github.com/robot-descriptions/robot_descriptions.py#descriptions'>https://github.com/robot-descriptions/robot_descriptions.py#descriptions</a> for manually adding your model do PR. You can also check the licenses of the models there.")
         weblink.setTextFormat(QtCore.Qt.RichText)
         weblink.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
         weblink.setOpenExternalLinks(True)
@@ -94,8 +94,9 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.main_layout.addWidget(weblink)
 
         # description
+        self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("There is also a service for adding your models and raising to top section, write to <a href='mailto:it.project.devel@gmail.com'>it.project.devel@gmail.com</a>")
+        description.setText("To raise your models to the top of the section, write to <a href='mailto:it.project.devel@gmail.com'>it.project.devel@gmail.com</a>. It is also possible to add your models as a service.")
         description.setTextFormat(QtCore.Qt.RichText)
         description.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
         description.setOpenExternalLinks(True)
@@ -104,14 +105,10 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         # description
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("If faced crash check free RAM or swap.")
+        description.setText("If faced crash check free RAM or swap. Some models can take 10 or more minutes and 10Gb free RAM to create.")
         self.main_layout.addWidget(description)
 
-        self.main_layout.addWidget(QtWidgets.QLabel())
-        description = QtWidgets.QLabel()
-        description.setText("Some models can take 10 or more minutes and 10Gb free RAM to create.")
-        self.main_layout.addWidget(description)
-
+        # description
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
         description.setText("Use models without creating solids only for fast view. Solids is needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
