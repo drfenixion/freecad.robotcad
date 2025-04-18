@@ -26,7 +26,7 @@ class Editor():
                 "ToolTip" : "edit link,joint and world parameters"}
 
     def Activated(self):
-        obj=fcgui.Selection.getSelection()[0]
+        obj=fcgui.Selection.getSelection('',0,True)[0]
         mw=fcgui.getMainWindow() # get main freecad window to add dockwidget
         # load UI 
         if obj.Proxy.Type=='Cross::Link':
@@ -43,6 +43,7 @@ class Editor():
 
     def IsActive(self):
         s=fcgui.Selection.getSelection()
+        
         if len(s)>1:
             return False
         else:

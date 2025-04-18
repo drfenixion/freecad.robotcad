@@ -1,5 +1,6 @@
 from PySide2.QtCore import QObject, Qt, QPropertyAnimation, QEasingCurve,QSize
 import FreeCADGui as fcgui
+import FreeCAD
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import (
     QWidget,
@@ -25,6 +26,7 @@ from .sdf_parser import sdf_tree, sdf_schema_parser
 import re
 import os
 from ..wb_utils import UI_PATH
+from ..freecad_utils import warn
 
 debug = False
 if debug:
@@ -237,13 +239,13 @@ def _ensure_unique_name(name, reserved_names=None):
 # collapsible sections
 
 class CollapsibleSection(QWidget):
-    def __init__(self, title="", parent=None):
+    def __init__(self, title="", parent=None,required:bool=False):
         super().__init__(parent)
-        
+        self.required=required
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
-        
+        self.title=title
         # Header with arrow indicator
         self.header = QWidget()
         header_layout = QHBoxLayout(self.header)
@@ -289,7 +291,7 @@ class CollapsibleSection(QWidget):
         # to generate sdf disabled elements wont be included 
         self.enable_check = QCheckBox()
         self.enable_check.setToolTip("activates and deactivates optional items \n only enabled items will be exported as sdf")
-        self.enable_check.setChecked(True)
+        self.enable_check.setChecked(self.required)
         self.enable_check.setStyleSheet("""
             QCheckBox {
                 spacing: 0;
@@ -343,9 +345,11 @@ class CollapsibleSection(QWidget):
                 break
             parent = parent.parent()
     # callback for checkbox 
-    def toggle_enabled(self, state):
-        """Enable/disable based on checkbox state"""
-        enabled = state == Qt.Checked
+    def toggle_enabled(self, state,obj=None):
+        """Enable/disable based on checkbox state
+        """
+        
+        enabled = (state == Qt.Checked) or state is True
         self.toggle_btn.setEnabled(enabled)
         self.content.setEnabled(enabled)
         
@@ -356,6 +360,40 @@ class CollapsibleSection(QWidget):
         if not enabled and self.toggle_btn.isChecked():
             self.toggle_btn.setChecked(False)
             self.toggle(False)
+            
+        # logic for tracking enbled and disabled 
+        
+        selection_list = fcgui.Selection.getSelection('', 0, True) if obj is None else None
+        has_valid_selection = isinstance(selection_list, list) and len(selection_list) > 0
+        if has_valid_selection or obj is not None:
+            selected_obj =  selection_list[0] if obj is None  else obj
+            try:
+                # Get the current list - using getattr for dynamic property access
+                current_list = list(selected_obj.enabled) # Ensure it's a list
+
+                if state:  # If adding to list
+                    if self.title not in current_list:
+                        current_list.append(self.title)
+                        # Reassign the modified list back to the property
+                        selected_obj.enabled=current_list
+                        selected_obj.touch()  # Mark object as modified
+                else:  # If removing from list
+                    if self.title in current_list:
+                        current_list.remove(self.title)
+                        # Reassign the modified list back to the property
+                        selected_obj.enabled=current_list
+                        selected_obj.touch()  # Mark object as modified
+
+                # Optional: Commit transaction if needed
+                if FreeCAD.ActiveDocument:
+                    FreeCAD.ActiveDocument.recompute()
+
+            except AttributeError:
+                warn(f"Object has no enabled property")
+            except Exception as e:
+                warn(f"Error updating list: {str(e)}")
+        else:
+            warn("No selection made - update not performed")       
     
     def update_layout(self):
         """Force layout update for proper sizing"""
@@ -439,11 +477,13 @@ class properties_base(QDockWidget):
         
     def onRestoreDefaults(self):
         """Placeholder for RestoreDefaults functionality"""
-        print("Restore Defaults clicked")  # Add your restore logic here
+        print("TODO")  
+        # TODO
+        # Add your restore logic here
         # all properties in properties class variable will be called , and the alias will have its
         # and default values will be used to reset values using setattr 
         # the dockwidget will be closed
-        # link_properties will be called with property_only set to false
+        # link_properties will be called with initial set to false
         # the link_properties dockwidget will then be displayed again using ...
         #  main_window.addDockWidget(PySide2.QtCore.Qt.RightDockWidgetArea,dockwidget)
         
@@ -466,7 +506,7 @@ class properties_base(QDockWidget):
 class link_properties(properties_base):
     properties:list=[]#{name:str,{parents:list,alias,default value, type}}
     active=False
-    def __init__(self,obj,type,property_only,parent=None):
+    def __init__(self,obj,type,initial,parent=None):
         if self.__class__.active is True:
             return
         super().__init__(parent)
@@ -485,7 +525,7 @@ class link_properties(properties_base):
         
         # Connect OK button signal
         super().connectButtonSignals()
-        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
+        self.prop_N_uiSetup=initialize(self,self.obj,self.type,initial)
     def initializeTabs(self):
         self.tab = QTabWidget()
         self.tab.setObjectName("linkTabs")
@@ -514,7 +554,7 @@ class link_properties(properties_base):
 class joint_properties(properties_base):
     properties:list=[]
     active=False
-    def __init__(self,obj,type,property_only,parent=None):
+    def __init__(self,obj,type,initial,parent=None):
         if self.__class__.active is True:
             return
         super().__init__(parent)
@@ -529,17 +569,22 @@ class joint_properties(properties_base):
         self.contents.addWidget(self.jointWidget)
         super().initializeButtons(layout=self.contents)
         super().connectButtonSignals()
-        self.prop_N_uiSetup=initialize(self,self.obj,self.type,property_only)
+        self.prop_N_uiSetup=initialize(self,self.obj,self.type,initial)
     
     
 
 class initialize:
-    def __init__(self,parent, object, type,property_only=True):
+    def __init__(self,parent, object, type,initial=True):
         # type can either be link or joint
         self.type = type  # either a link or a joint
         self.obj = object
-        self.property_only=property_only
+        # intial run only true during initial run 
+        self.initial=initial
         self.parent=parent
+        # 
+        if initial:
+            self.obj.addProperty("App::PropertyStringList","enabled","sdf","maintains a list of enabled sdf elements")
+            self.obj.setPropertyStatus('enabled', ['Hidden', 'ReadOnly'])
         self.UI()
         
     def generate_ui(self,tab,root_file:str,include_files:list):
@@ -555,14 +600,20 @@ class initialize:
         structure: dict = sdf_schema_parser.sdf_schema_parser(
             file=root_file, recurse=False, includeMetaData=False
         ).data_structure
-        top = CollapsibleSection(structure["tag"])
+        top = CollapsibleSection(structure["tag"],required=structure["required"])
+        # update enabled list 
+        top.toggle_enabled(structure["required"],obj=self.obj)
         self.add_dynamic_widgets(top, structure, structure["children"])
         # now loop through all other files and add them
         for f in include_files:
             s: dict = sdf_schema_parser.sdf_schema_parser(
             file=f, recurse=False, includeMetaData=False
                 ).data_structure
-            self.add_dynamic_widgets(top,s,s["children"])
+            childCollapsible=CollapsibleSection(s["tag"],required=s["required"])
+            # update enabled list 
+            childCollapsible.toggle_enabled(s["required"],obj=self.obj)
+            top.add_widget(childCollapsible)
+            self.add_dynamic_widgets(childCollapsible,s,s["children"])
         
         # set layout has to be used or else Qt might ignore it
         # 2. Create a scroll area and set its widget
@@ -617,7 +668,7 @@ class initialize:
             # pick from here April 9 ,2025 14:30
             # Todo
             #   1.add property to object
-            if self.property_only:
+            if self.initial:
                 if defined is False:
                     if isinstance(alias,list):
                         self.obj.addProperty(
@@ -633,7 +684,7 @@ class initialize:
                     self.create_labeled_lineedit(name, alias, default_text=default)
                 )
         elif data_type == "bool":
-            if self.property_only:   
+            if self.initial:   
                 if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty(
                     "App::PropertyBool", alias, parent_tag, hidden=True
@@ -644,7 +695,7 @@ class initialize:
                     name, alias, default_state=True if default == "true" else False
                 ))
         elif data_type == "double":
-            if self.property_only:
+            if self.initial:
                 if defined is False and hasattr(self.obj,alias) is False: 
                     self.obj.addProperty     (
                     "App::PropertyFloat", alias, parent_tag, hidden=True
@@ -660,7 +711,7 @@ class initialize:
                     self.create_labeled_double_spinbox(name, alias, default_val=default)
                 )
         elif data_type == "unsigned int":
-            if self.property_only:
+            if self.initial:
                 if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty(
                     "App::PropertyInteger", alias, parent_tag, hidden=True
@@ -672,7 +723,7 @@ class initialize:
                 )
         elif data_type == "vector3":
             default_list = extract_vector_n(default)
-            if self.property_only:   
+            if self.initial:   
                 if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty("App::PropertyVector", alias, parent_tag, hidden=True)
                     setattr(self.obj,alias,tuple(default_list))
@@ -734,7 +785,7 @@ class initialize:
                     alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
                     # dont add properties more than once
                     
-                if self.property_only :
+                if self.initial :
                     prop_data = {
                     "name": name,
                     "alias": alias[0] if isinstance(alias, list) else alias,
@@ -770,7 +821,7 @@ class initialize:
                 # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
             # append list only once during initialization 
-            if self.property_only:
+            if self.initial:
                 prop_alias = alias[0] if isinstance(alias, list) else alias
                 self.parent.__class__.properties.append(
                     {
@@ -794,8 +845,10 @@ class initialize:
             # create a new container only for nested items not the root item which does not 
             # have a parent 
             # Determine the container widget (CollapsibleSection if parent exists)
-            container = CollapsibleSection(tag) if parent_tag is not None else widget
+            container = CollapsibleSection(tag,required=dc["required"]) if parent_tag is not None else widget
             if parent_tag is not None:
+                # update the stuff and add items to list if neccesary
+                container.toggle_enabled(dc["required"],obj=self.obj)
                 widget.add_widget(container)
             # loop through each child recursively
             for child in children:
@@ -1119,5 +1172,4 @@ class initialize:
         group.setMinimumSize(200, 120)
 
         return group
-
 

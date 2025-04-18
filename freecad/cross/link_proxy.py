@@ -199,7 +199,7 @@ class LinkProxy(ProxyBase):
 
         self.init_extensions(obj)
         self.init_properties(obj)
-        #  add function to add link related data 
+        #  add function to add sdf link related data 
         setup.link_properties(self.link,"link",True,fcgui.getMainWindow())
 
     def init_extensions(self, obj: CrossLink) -> None:
@@ -595,7 +595,8 @@ class LinkProxy(ProxyBase):
         if new_group != link.Group:
             link.Group = new_group
 
-
+    def export_sdf(self):
+        pass
     def export_urdf(
         self,
         package_parent: Path,

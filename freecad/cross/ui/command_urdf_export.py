@@ -32,7 +32,9 @@ from ..wb_utils import is_robot
 from ..wb_utils import is_workcell
 from ..wb_utils import is_xacro_object
 
-
+debug=True
+if debug:
+    import pdb
 # Typing hints.
 DO = fc.DocumentObject
 SO = ForwardRef('FreeCADGui.SelectionObject')  # Could not get the class from Python.
@@ -76,7 +78,8 @@ class _UrdfExportCommand:
                 package_name_lineedit.text(),
             )
             txt_view.setPlainText(txt)
-
+        if debug:
+            pdb.set_trace()
         selection = fcgui.Selection.getSelectionEx('', 0)
         if not selection:
             warn(tr('Nothing selected, nothing to do'), True)

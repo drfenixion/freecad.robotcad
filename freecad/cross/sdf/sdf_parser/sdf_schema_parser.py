@@ -110,7 +110,9 @@ class sdf_schema_parser:
             ElemDict["tag"]=Element.attrib["name"]
         except:
             return ElemDict
-
+        # add required name 
+        required = Element.attrib.get("required", "").strip().lower()
+        ElemDict["required"] = required in {"*", "1", "true"} 
         #find all attributes and store them  in a list
         #this is due to some classes having multiple attributes
         #store attibute dictionary and descritpion in a tuple
