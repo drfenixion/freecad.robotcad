@@ -342,7 +342,8 @@ echo -e "\nFreeCAD mods from host binded to container and will be accessible.\n"
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 echo -e "\n\n\n${GREEN}FreeCAD was started inside container. Wait it window load to your host... (about 20 seconds)\n
-The first time, dependencies will be downloaded and installed via pip, which will take longer.${NC}\n\n\n"
+The first time, dependencies will be downloaded and installed via pip, which will take longer.\n
+Must be internet connection for first run (for dependencies download).${NC}\n\n\n"
 
 
 # Echo container logs to host console if container run
