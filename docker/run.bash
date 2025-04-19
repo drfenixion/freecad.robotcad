@@ -280,6 +280,10 @@ else
     host_freecad_share_path=$HOME/.local/share/FreeCAD
     cont_freecad_mods_path=$cont_user_path/.local/share/FreeCAD/Mod
     cont_freecad_share_path=$cont_user_path/.local/share/FreeCAD
+    host_freecad_user_config_path=$HOME/.FreeCAD
+    cont_freecad_user_config_path=$cont_user_path/.FreeCAD
+    host_freecad_cache_path=$HOME/.cache/FreeCAD
+    cont_freecad_cache_path=$cont_user_path/.cache/FreeCAD
 
     if [ ! -d "$host_freecad_mods_path" ]; then
         # Create the directory and its parents if they don't exist
@@ -305,6 +309,8 @@ else
         --mount dst=$cont_user_path/.ros/log,volume-opt=device=$build_data_path/ros2_system_logs$mount_options \
         --volume=$root_of_freecad_robotcad/docker/ros2_ws/src:$cont_path_ws/src \
         --volume=$host_freecad_share_path:$cont_freecad_share_path \
+        --volume=$host_freecad_user_config_path:$cont_freecad_user_config_path \
+        --volume=$host_freecad_cache_path:$cont_freecad_cache_path \
         --volume=$root_of_freecad_robotcad:$host_freecad_mods_path/freecad.robotcad \
         --volume=$root_of_freecad_robotcad/docker/freecad:$cont_path_ws/../freecad \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
