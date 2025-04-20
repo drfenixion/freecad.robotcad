@@ -52,10 +52,11 @@ class Element_Attributes:
 #class to parse the sdf file and generate a dictioanary
 class sdf_schema_parser:
     def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
-                 ,includeMetaData:bool=True):
+                 ,includeMetaData:bool=True,minimal:bool=False):
         #initialize directory with the root.sdf
         self.root_dir=os.path.join(sdf_templates_dir, version, file)
         self.version=version
+        self.minimal=minimal
         #create a dictionary
         self.Main_ElemDict={}
         #parse tree and store the result in local variable tree
@@ -111,8 +112,9 @@ class sdf_schema_parser:
         except:
             return ElemDict
         # add required name 
-        required = Element.attrib.get("required", "").strip().lower()
-        ElemDict["required"] = required in {"*", "1", "true"} 
+        if self.minimal is False:
+            required = Element.attrib.get("required", "").strip().lower()
+            ElemDict["required"] = required in {"*", "1", "true"} 
         #find all attributes and store them  in a list
         #this is due to some classes having multiple attributes
         #store attibute dictionary and descritpion in a tuple
@@ -162,30 +164,31 @@ class sdf_schema_parser:
                     struct_class=sdf_schema_parser(file=child.attrib["filename"])
                     ElemDict["children"].append(struct_class.data_structure)
                 pass
-            elif child.tag =="element" \
-            and 'name' in child.attrib \
-            and child.attrib["name"] != "include":
-                _c=self.populate_structure(child)
-                if len(_c) !=0:
-                    ElemDict["children"].append(_c)
-            elif child.tag =="element" \
-            and 'name' not in child.attrib \
-            and 'copy_data' in child.attrib:
-                # case of "copy_data" attr. It is technical tag. Ignore it
+            
+            elif child.tag =="element":
+                # ensure child has and element tag has a name attribute and the name attribute is not  include
+                if 'name' in child.attrib:
+                    if child.attrib["name"] != "include":
+                        _c=self.populate_structure(child)
+                        if len(_c) !=0:
+                            ElemDict["children"].append(_c)
+                    elif 'copy_data' in child.attrib:
+                        # case of "copy_data" attr. It is technical tag. Ignore it
 
-                # copy_data - This is a special element that should not be specified in an SDFormat file.
-                # It automatically copies child elements into the SDFormat element so that a plugin can access the data
-                pass
-            elif child.tag =="element" \
-            and 'name' not in child.attrib:
-                # check for any other technical tag cases.
-                # There is not other cases but check saved for future
-                pass
+                        # copy_data - This is a special element that should not be specified in an SDFormat file.
+                        # It automatically copies child elements into the SDFormat element so that a plugin can access the data
+                        pass
+                # elif 'name' not in child.attrib:
+                else:
+                    # check for any other technical tag cases.
+                    # There is not other cases but check saved for future
+                    pass
             #add description item
             elif child.tag =="description":
-                ElemDict["description"] = child.text
+                if self.minimal is False:
+                        ElemDict["description"] = child.text
             else:
-               pass
+                pass
 
         return ElemDict
 

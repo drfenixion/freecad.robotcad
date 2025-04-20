@@ -16,7 +16,8 @@ from PySide2.QtWidgets import (
     QGroupBox,
     QScrollArea,
     QDockWidget,
-    QTabWidget,QDialogButtonBox,QSpacerItem
+    QTabWidget,QDialogButtonBox,
+    QMessageBox
 )
 import xml.etree.ElementTree as ET
 from typing import Union
@@ -369,19 +370,19 @@ class CollapsibleSection(QWidget):
             selected_obj =  selection_list[0] if obj is None  else obj
             try:
                 # Get the current list - using getattr for dynamic property access
-                current_list = list(selected_obj.enabled) # Ensure it's a list
+                current_list = list(selected_obj.selected) # Ensure it's a list
 
                 if state:  # If adding to list
                     if self.title not in current_list:
                         current_list.append(self.title)
                         # Reassign the modified list back to the property
-                        selected_obj.enabled=current_list
+                        selected_obj.selected=current_list
                         selected_obj.touch()  # Mark object as modified
                 else:  # If removing from list
                     if self.title in current_list:
                         current_list.remove(self.title)
                         # Reassign the modified list back to the property
-                        selected_obj.enabled=current_list
+                        selected_obj.selected=current_list
                         selected_obj.touch()  # Mark object as modified
 
                 # Optional: Commit transaction if needed
@@ -389,7 +390,7 @@ class CollapsibleSection(QWidget):
                     FreeCAD.ActiveDocument.recompute()
 
             except AttributeError:
-                warn(f"Object has no enabled property")
+                warn(f"Object has no selected property")
             except Exception as e:
                 warn(f"Error updating list: {str(e)}")
         else:
@@ -450,7 +451,7 @@ defined_names["joint"]={"name":["Label","Label2"]}
 class properties_base(QDockWidget):
     def __init__(self,parent):
         super().__init__(parent)
-    
+    #  create button box for the Ok and Restore defaults button 
     def initializeButtons(self,layout:QHBoxLayout|QVBoxLayout):
         self.buttons = QDialogButtonBox()
         self.buttons.setObjectName("buttonbox")
@@ -459,16 +460,17 @@ class properties_base(QDockWidget):
         )
         
         self.buttonsLayout = QHBoxLayout()
-        self.buttonsLayout.addItem(
-            QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        )
+        self.buttonsLayout.addStretch()
         self.buttonsLayout.addWidget(self.buttons)
         layout.addLayout(self.buttonsLayout)
-        
+    # signal 
     def connectButtonSignals(self):
         """Connect button signals to their respective slots"""
+        restore_btn = self.buttons.button(QDialogButtonBox.RestoreDefaults)
         self.buttons.accepted.connect(self.onOkClicked)  # OK button
-        self.buttons.rejected.connect(self.onRestoreDefaults)  # Note: RestoreDefaults is actually a 'reject' role
+        # restore defaults callback not responding
+        restore_btn.clicked.connect(self.onRestoreDefaults)
+        # self.buttons.rejected.connect(lambda: print("Rejected signal emitted!"))  # Note: RestoreDefaults is actually a 'reject' role
         
     def onOkClicked(self):
         """Handler for OK button click - closes the dock widget"""
@@ -477,16 +479,61 @@ class properties_base(QDockWidget):
         
     def onRestoreDefaults(self):
         """Placeholder for RestoreDefaults functionality"""
-        print("TODO")  
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Warning")
+        msg.setText(  #
+        "Are you sure you want to proceed ?\n all values will be set to default values \n ACTION CANNOT BE UNDONE!",  # Message
+        )
+        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msg.setDefaultButton(QMessageBox.No)  # Default to 'No' for safety
+        reply=msg.exec_()
+        if reply!=QMessageBox.Yes:
+            return
         # TODO
-        # Add your restore logic here
-        # all properties in properties class variable will be called , and the alias will have its
-        # and default values will be used to reset values using setattr 
-        # the dockwidget will be closed
-        # link_properties will be called with initial set to false
-        # the link_properties dockwidget will then be displayed again using ...
-        #  main_window.addDockWidget(PySide2.QtCore.Qt.RightDockWidgetArea,dockwidget)
-        
+        # Add logic here
+        #  get  object, initialize link_properties or joint_properties for data i.e data_only set to true
+        # loop through the properties class varibales of the link  or joint 
+        # get the alias and default value use setattr to to reset values 
+        # i.e setattr(obj,alias,default)
+        # get the currently selected item 
+        obj=fcgui.Selection.getSelection('',0,True)[0]
+        if obj.Proxy.Type=='Cross::Link':
+            lnk_items=link_properties(data_only=True).__class__.properties
+            self.restore_defaults(obj,lnk_items)
+        elif  obj.Proxy.Type=='Cross::Joint':
+            jnt_items=joint_properties(data_only=True).__class__.properties
+            
+            self.restore_defaults(obj,jnt_items)
+        else:
+            pass
+        # TODO
+        # find a better instead of closing 
+        self.close()
+       
+    def restore_defaults(self,obj,data):
+        for item in data:
+            alias_name=item["alias"]
+            value:str=item[ "default"]
+            if value.lower()=='true':
+                value=True 
+            elif value.lower()=='false':
+                value=False
+            else:
+                try:
+                    try:
+                        value=int(value)
+                    except Exception:
+                        value= float(value)
+                except Exception:
+                    # check if type is a vector
+                    isv=assert_vect(value)
+                    if isv:
+                        value=tuple(extract_vector_n(value))
+                    else:
+                        pass
+                        
+            setattr(obj,alias_name,value)
         
     def closeEvent(self, event):
         """Override of closeEvent to handle custom close behavior"""
@@ -506,7 +553,14 @@ class properties_base(QDockWidget):
 class link_properties(properties_base):
     properties:list=[]#{name:str,{parents:list,alias,default value, type}}
     active=False
-    def __init__(self,obj,type,initial,parent=None):
+    # this is to ensure the property list  doesn't have repetitions
+    initialized:bool=False
+    def __init__(self,obj=None,type:str|None=None,initial:bool|None=None,parent=None,data_only:bool=False):
+        if data_only:
+            # this will be used when the properties variable is to be read
+            # no need to initialize 
+            return
+        
         if self.__class__.active is True:
             return
         super().__init__(parent)
@@ -526,6 +580,8 @@ class link_properties(properties_base):
         # Connect OK button signal
         super().connectButtonSignals()
         self.prop_N_uiSetup=initialize(self,self.obj,self.type,initial)
+        self.__class__.initialized=True
+        
     def initializeTabs(self):
         self.tab = QTabWidget()
         self.tab.setObjectName("linkTabs")
@@ -554,7 +610,13 @@ class link_properties(properties_base):
 class joint_properties(properties_base):
     properties:list=[]
     active=False
-    def __init__(self,obj,type,initial,parent=None):
+    initialized:bool=False
+    # this is to ensure the property list  doesn't have repetitions
+    def __init__(self,obj=None,type:str|None=None,initial:bool|None=None,parent=None,data_only:bool=False):
+        if data_only:
+            # this will be used when the properties variable is to be read
+            # no need to initialize 
+            return
         if self.__class__.active is True:
             return
         super().__init__(parent)
@@ -570,10 +632,10 @@ class joint_properties(properties_base):
         super().initializeButtons(layout=self.contents)
         super().connectButtonSignals()
         self.prop_N_uiSetup=initialize(self,self.obj,self.type,initial)
-    
-    
+        self.__class__.initialized=True
 
 class initialize:
+    
     def __init__(self,parent, object, type,initial=True):
         # type can either be link or joint
         self.type = type  # either a link or a joint
@@ -582,9 +644,13 @@ class initialize:
         self.initial=initial
         self.parent=parent
         # 
-        if initial:
-            self.obj.addProperty("App::PropertyStringList","enabled","sdf","maintains a list of enabled sdf elements")
-            self.obj.setPropertyStatus('enabled', ['Hidden', 'ReadOnly'])
+        
+        # pdb.set_trace()
+        if initial and hasattr(self.obj,"selected") is False:
+            self.obj.addProperty("App::PropertyStringList","selected","sdf","maintains a list of enabled sdf elements")
+            self.obj.setPropertyStatus('selected', ['Hidden', 'ReadOnly'])
+        else:
+            self.selected=getattr(self.obj,"selected")
         self.UI()
         
     def generate_ui(self,tab,root_file:str,include_files:list):
@@ -600,18 +666,34 @@ class initialize:
         structure: dict = sdf_schema_parser.sdf_schema_parser(
             file=root_file, recurse=False, includeMetaData=False
         ).data_structure
-        top = CollapsibleSection(structure["tag"],required=structure["required"])
+        #    ensure consistency between UI and the selected list
+        if self.initial:
+                top=CollapsibleSection(structure["tag"],required=structure["required"])
+                top.toggle_enabled(structure["required"],obj=self.obj)
+        else:
+            check= structure["tag"] in self.selected
+            top=CollapsibleSection(structure["tag"],required=True) if check else \
+            CollapsibleSection(structure["tag"],required=False)
         # update enabled list 
-        top.toggle_enabled(structure["required"],obj=self.obj)
+            top.toggle_enabled(check,obj=self.obj)
+        
         self.add_dynamic_widgets(top, structure, structure["children"])
         # now loop through all other files and add them
         for f in include_files:
             s: dict = sdf_schema_parser.sdf_schema_parser(
             file=f, recurse=False, includeMetaData=False
                 ).data_structure
-            childCollapsible=CollapsibleSection(s["tag"],required=s["required"])
-            # update enabled list 
-            childCollapsible.toggle_enabled(s["required"],obj=self.obj)
+            #    ensure consistency between UI and the selected list
+            if self.initial:
+                childCollapsible=CollapsibleSection(s["tag"],required=s["required"])
+                childCollapsible.toggle_enabled(s["required"],obj=self.obj)
+            else:
+                check= s["tag"] in self.selected
+                childCollapsible=CollapsibleSection(s["tag"],required=True) if check else\
+                CollapsibleSection(s["tag"],required=False)
+                # update enabled list 
+                childCollapsible.toggle_enabled(check,obj=self.obj)
+            
             top.add_widget(childCollapsible)
             self.add_dynamic_widgets(childCollapsible,s,s["children"])
         
@@ -710,7 +792,7 @@ class initialize:
                 widget.add_widget(
                     self.create_labeled_double_spinbox(name, alias, default_val=default)
                 )
-        elif data_type == "unsigned int":
+        elif data_type == "unsigned int" or data_type=="int":
             if self.initial:
                 if defined is False and hasattr(self.obj,alias) is False:
                     self.obj.addProperty(
@@ -784,8 +866,12 @@ class initialize:
                 else:
                     alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
                     # dont add properties more than once
-                    
-                if self.initial :
+               
+                # since any time a link is clicked  initilization happens 
+                # hence this section runs multiple times  once for each link 
+                # this causes repetitions 
+                #  the initialized property solves this
+                if self.initial and not self.parent.__class__.initialized:
                     prop_data = {
                     "name": name,
                     "alias": alias[0] if isinstance(alias, list) else alias,
@@ -821,7 +907,8 @@ class initialize:
                 # reachable
                 alias = generate_parameter_name(tag,reserved_names=reserved_names)
             # append list only once during initialization 
-            if self.initial:
+            
+            if self.initial and not self.parent.__class__.initialized:
                 prop_alias = alias[0] if isinstance(alias, list) else alias
                 self.parent.__class__.properties.append(
                     {
@@ -845,11 +932,25 @@ class initialize:
             # create a new container only for nested items not the root item which does not 
             # have a parent 
             # Determine the container widget (CollapsibleSection if parent exists)
-            container = CollapsibleSection(tag,required=dc["required"]) if parent_tag is not None else widget
+            # pdb.set_trace()
+        #    ensure consistency between UI and the selected list
             if parent_tag is not None:
                 # update the stuff and add items to list if neccesary
-                container.toggle_enabled(dc["required"],obj=self.obj)
+                if self.initial:
+                    container=CollapsibleSection(tag,required=dc["required"])
+                    container.toggle_enabled(dc["required"],obj=self.obj)
+                else:
+                    check= dc["tag"] in self.selected
+                    container=CollapsibleSection(tag,required=True) if check else \
+                    CollapsibleSection(tag,required=False)
+        # update enabled list 
+                    container.toggle_enabled(check,obj=self.obj)
                 widget.add_widget(container)
+                
+            else:
+                container=widget
+                
+            
             # loop through each child recursively
             for child in children:
                 if child["tag"] not in ignore_list:

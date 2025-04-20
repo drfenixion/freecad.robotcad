@@ -7,11 +7,11 @@ from ...utils import dict_to_xml
 
 
 class sdf_tree:
-    def __init__(self, sfile:str,metaData:bool=True,recurse:bool=True):
+    def __init__(self, sfile:str,metaData:bool=True,recurse:bool=True,minimal:bool=False):
         '''sfile : file name to read the element properties from  located in ../sdf \n
         use the get_elem  property  to get the initialized element '''
         #initialize class
-        self.struct_class=sdf_schema_parser(file=sfile,includeMetaData=metaData,recurse=recurse)
+        self.struct_class=sdf_schema_parser(file=sfile,includeMetaData=metaData,recurse=recurse,minimal=minimal)
         #get the dictionary structure
         self.structured=self.struct_class.data_structure
         #a stack of parent elements
