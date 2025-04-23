@@ -1,2 +1,320 @@
-from .sdf_parser import sdf_schema_parser
+from .sdf_parser import sdf_tree
+import xml.etree.ElementTree as ET
+from typing import List, Optional
+from . import setup
+import copy
+from typing import List, TypedDict,Union
+from .. import urdf_utils
+# a list of elements must have children that will be includeded whether selected or not 
+override_list=["inertia"]
+class LinkElements:
+    """A class to manage and cache common SDF link elements with cleanup functionality."""
+    
+    # Class-level element caches
+    link: Optional[ET.Element] = None
+    surface: Optional[ET.Element] = None
+    collision: Optional[ET.Element] = None
+    inertial: Optional[ET.Element] = None
+    material: Optional[ET.Element] = None
+    visual: Optional[ET.Element] = None
+    
+    def __init__(self):
+        """Initialize the link elements by loading and caching the required SDF elements."""
+        self._initialize_elements()
+        
+    def _initialize_elements(self) -> None:
+        """Initialize and cache all required elements with their respective cleanups."""
+        element_configs = [
+            ('link', "link.sdf", None),
+            ('surface', "surface.sdf", None),
+            ('collision', "collision.sdf", None),  # Fixed typo in filename
+            ('inertial', "inertial.sdf", ["pose"]),
+            ('material', "material.sdf", ["script", "shader", "render_order",
+                                        "double_sided", "pbr", "lighting"]),
+            ('visual', "visual.sdf", ["meta", "visibility_flags"])
+        ]
+        
+        for element_name, filename, remove_list in element_configs:
+            if getattr(self.__class__, element_name) is None:
+                element = self.get_element(filename)
+                if remove_list:
+                    self.clean_element(element, remove_list)
+                setattr(self.__class__, element_name, element)
+    
+    def clean_element(self, element: ET.Element, remove_list: List[str]) -> None:
+        """
+        Recursively remove elements whose tag names are in the remove_list.
+        
+        Args:
+            element: The root element to clean
+            remove_list: List of element tag names to remove
+        """
+        to_remove:List[ET.Element]=[]
+        if element is None:
+            return
+        for child in element:
+            if len(child)>0:
+                if child.tag in remove_list:
+                    # prefer using a to_remove instead of element.remove(child)
+                    # the later causes issues 
+                    to_remove.append(child) 
+                else:
+                    self.clean_element(child,remove_list)
+            elif child.tag in remove_list:
+                to_remove.append(child)
+            else:
+                pass
+        for e in to_remove:
+            element.remove(e)
+            
 
+
+         
+    def get_element(self, file: str) -> ET.Element:
+        """
+        Get an SDF element from a file.
+        
+        Args:
+            file: The SDF file to load
+            
+        Returns:
+            The root element of the SDF tree
+        """
+        return sdf_tree.sdf_tree(file, metaData=False, recurse=False, minimal=True).get_element
+link_elements=LinkElements()
+
+class element_property_map(TypedDict):
+    name:str
+    alias:str
+    parent:str
+    default:str
+    
+def get_alias(dlist:List[element_property_map],name:str,parent:str)->str:
+    """
+    get the alias name of xml properties 
+    used to retrieve info from  FreeCAD 
+
+    Args:
+        dlist (List[element_property_map]):a list of dictionaries from the properties class variable
+        {name,alias,parent,default}
+        name (str): tag name of element
+        parent (str): parent tag name
+
+    Returns:
+        str: alias name to be used to retrieve the propety
+    """
+    for item in dlist:
+        if item["name"]==name and item["parent"]==parent:
+            return item["alias"]
+
+def update(obj,el:ET.Element,selected_list:list,property_struct:List[element_property_map])->ET.Element|None:
+    """
+    update element  text and attributes of elements based on values  in FreeCAD Properties 
+    remove unselected elements 
+
+    Args:
+        obj (_type_): document object i.e {link,joint,...}
+        el (ET.Element):parent xml element 
+        selected_list (list): list of elements to be included see selected list in FreeCAD properties 
+        property_struct (_type_): object properties and  and there aliases
+    Returns:
+        ET.Element: updated element
+    """
+    to_remove:List[ET.Element]=[]
+    for element in el:
+        # check if element has children 
+        if len(element)>0:
+             # some elements such as inertial will be included whether they are selected or not 
+            if element.tag in selected_list or element.tag in override_list:
+                    update(obj,element,selected_list,property_struct)
+            else:
+                # remove element
+                to_remove.append(element)
+                # el.remove(element) <-this causes issues i.e some elements are skipped
+        else:
+            for name,_ in element.attrib:
+                # use the tag name here see setup.py  add_dynamic widgets
+                # for attributes the name is the attribute name and the parent is the tag
+                id:str=get_alias(property_struct,name,element.tag)
+                # special treatment for quantities and ...
+                # type conversions are reqired
+                value=sanitize_for_sdf(getattr(obj,id))
+                element.set(element.tag,value)
+            if element.text is not None:
+                # for text name is the tag and the parent is the parent tag 
+                id:str=get_alias(property_struct,element.tag,el.tag)
+                # undefined items will return None
+                if id is not None:
+                    if id.lower() in ["mass"]:
+                        value=sanitize_for_sdf(getattr(obj,id).getValueAs("kg"))
+                    else:
+                     value=sanitize_for_sdf(getattr(obj,id))
+                    
+                    element.text=value
+    for e in to_remove:
+        el.remove(e)
+    # return el
+
+def sanitize_for_sdf(data:str|list|tuple|bool)->str:
+    """
+    convert  data types to sdf compatible string  e.g True->'true', False->'false'
+
+    Args:
+        data (str | list | tuple | bool):item to be converted
+
+    Returns:
+        str: sdf compatible string 
+    """
+    # check if its a type FreeCAD Vector by checking for the x attribute 
+    if hasattr(data,'x'):
+        data=list(data)
+    if isinstance(data, list) | isinstance(data,tuple):
+            # equivalent string
+        return " ".join(map(str, data))
+    elif isinstance(data,bool):
+        return 'true' if data is True else 'false'
+    else:
+        return str(data)
+
+visual_container:list=[]
+"""
+    # description
+    visual container will contain a pointer or reference  to a 
+    ET.Element item for the most recent link visual item  processed
+    # why create this?
+    create_visual_sdf requires  cross::link object so as to access user defined
+    sdf parameters while  sdf_visual object required a partobject to access physical properties 
+    of a link such placement , material info i.e colors
+    each need to append to the same element
+    so to ensure that both functions write to the correct Element list visual_container stores the most 
+    recently processed link element by create_visual_sdf ,sdf_visual object will pop the  element and append 
+    geometry and pose info ,tranparency ,and colors 
+    
+    # Assumption:
+    all links are proccesed linearly i.e one at a time with no multithreading so that the element stored in ...
+    visual_container  will the correct element to which pose geometry and color data is written
+     with multi threading a way to track items will be required 
+    # pitfalls 
+    
+    # TODO
+     some code refactors later to avoid this 
+    
+"""
+collison_container:list=[]
+"""
+   # description
+see visual_container
+"""  
+# sdf elements 
+def create_sdf_element(obj,name:str,type:str):
+    if type=="link":
+        element=copy.deepcopy(link_elements.__class__.link)
+    elif type=="visual":
+        element=copy.deepcopy(link_elements.__class__.visual)
+    elif type=="collision":
+        element=copy.deepcopy(link_elements.__class__.collision)
+        surface=copy.deepcopy(link_elements.__class__.surface)
+        element.append(surface)
+    elif type=="inertial":
+        element=copy.deepcopy(link_elements.__class__.inertial)
+        element.attrib.pop('auto', None)
+    else:
+        pass
+    property_struct=setup.link_properties(data_only=True).__class__.properties
+    # set name
+    if type!="inertial":
+        element.attrib["name"]=name
+    selected_list=getattr(obj,"selected")
+
+    update(obj,element,selected_list,property_struct)
+    if type=="visual":
+        visual_container.append(element)
+    elif type=="collision":
+        collison_container.append(element)
+    return element
+
+
+
+def object_as_sdf(obj,name:str,placement,type:str,element_type:str)->ET.Element:
+    """
+    map object properties to sdf 
+
+    Args:
+        obj (_type_): object.
+        name (str): label name 
+        type (str): can be box,spere , cylinder, mesh ...
+        element_type(str):"visual" or "collision" 
+
+    Returns:
+        ET.Element: object 
+    """
+    if element_type=="visual":  
+    # geometry will be simple to inlude 
+    # type will be used to determine whether its a box, cylinder,mesh ...
+    # get reference to element
+        root_element:ET.Element=visual_container.pop()
+        tranparency=root_element.find("transparency")
+    # the FreeCAD Transparency flag varies from 0-100 ,sdf from 0-1
+    # scale 
+        viewobj=getattr(obj,"ViewObject",None)
+        
+        if viewobj is not None:
+            set_material_element(viewobj,root_element)
+            tranparency.text=getattr(viewobj,"Transparency",0)/100
+            
+    elif element_type=="collision":
+        root_element=collison_container.pop()
+        # pose
+
+    root_element.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
+    
+    if type=="box":
+        # geometry
+        root_element.append(urdf_utils.urdf_geometry_box(obj.Length.getValueAs('m'),
+            obj.Width.getValueAs('m'),
+            obj.Height.getValueAs('m'),format='sdf'))
+          
+    elif type=="sphere":
+        root_element.append(urdf_utils.urdf_geometry_sphere(obj.Radius.getValueAs('m'),format="sdf"))
+    elif type=="cylinder":
+        root_element.append(urdf_utils.urdf_geometry_cylinder(obj.Radius.getValueAs('m'),
+                                                        obj.Height.getValueAs('m'),format="sdf"))
+    else:
+        pass 
+   
+    return root_element
+
+def set_material_element(viewobj,parent_element):
+    material=copy.deepcopy(link_elements.__class__.material)
+    shapeAppearence=getattr(viewobj,"ShapeAppearance")[0]
+    # extract and update material data 
+    materialProperties={
+            "shininess":sanitize_for_sdf(shapeAppearence.Shininess),
+            "diffuse":sanitize_for_sdf(shapeAppearence.DiffuseColor),
+            "specular":sanitize_for_sdf(shapeAppearence.SpecularColor),
+            "emissive":sanitize_for_sdf(shapeAppearence.EmissiveColor),
+            "ambient":sanitize_for_sdf(shapeAppearence.AmbientColor)}
+    for tag,text in materialProperties.items():
+        e=material.find(tag)
+        e.text=text
+    parent_element.append(material)
+def sdf_mesh(obj,placement,package_name,mesh_name):
+    
+    geometry=ET.fromstring("<geometry/>")
+    mesh=ET.fromstring("<mesh/>")
+    uri=ET.fromstring("<uri/>")
+    uri.text=f'filename=package://{package_name}/meshes/{mesh_name}'
+    mesh.append(uri)
+    geometry.append(mesh)
+    visual:ET.Element=visual_container.pop()
+    # append mesh to geometry 
+    visual.append(geometry)
+    # append pose 
+    visual.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
+    # add material info 
+    if obj is not None:
+        viewobj=getattr(obj,"ViewObject",None)
+        if viewobj is not None:
+            set_material_element(viewobj,visual)
+    # fill maunally for now dynamic filling later based on available features
+    return visual

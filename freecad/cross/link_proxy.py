@@ -40,7 +40,7 @@ from .wb_utils import get_parent_link_of_obj
 from . import wb_constants
 
 from .sdf import setup
-
+from .sdf import export
 
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -112,7 +112,7 @@ def _get_xmls_and_export_meshes(
         urdf_function,
         placement,
         package_parent: [Path | str] = Path(),
-        package_name: str = '',
+        package_name: str = '',format:str='urdf'
 ) -> list[et.Element]:
     """
     Save the meshes as dae files.
@@ -128,10 +128,11 @@ def _get_xmls_and_export_meshes(
                     to save the package.
 
     """
+    
     export_data: list[XmlForExport] = urdf_function(
         obj,
         package_name=str(package_name),
-        placement=placement,
+        placement=placement,format=format
     )
     xmls: list[et.Element] = []
     for export_datum in export_data:
@@ -595,12 +596,10 @@ class LinkProxy(ProxyBase):
         if new_group != link.Group:
             link.Group = new_group
 
-    def export_sdf(self):
-        pass
     def export_urdf(
         self,
         package_parent: Path,
-        package_name: [Path | str],
+        package_name: [Path | str],format:str="urdf"
     ) -> et.ElementTree:
         """Return the xml for this link.
 
@@ -612,10 +611,20 @@ class LinkProxy(ProxyBase):
                         directory).
 
         """
-
-        link_xml = et.fromstring(
+ 
+        format="sdf"
+        if format=="urdf":
+            link_xml = et.fromstring(
             f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />',
         )
+        elif format=="sdf":
+            from .sdf import export
+            link_xml=export.create_sdf_element(self.link,ros_name(self.link),type="link")
+            collision_xml=export.create_sdf_element(self.link,"collision_"+ros_name(self.link),type="collision")
+            visual_xml:et.Element=export.create_sdf_element(self.link,"visual_"+ros_name(self.link),type="visual")
+        else:
+            pass
+           
         for obj in self.link.Visual:
             for xml in _get_xmls_and_export_meshes(
                     obj,
@@ -623,18 +632,29 @@ class LinkProxy(ProxyBase):
                     self.link.MountedPlacement,
                     package_parent,
                     package_name,
+                    format=format
             ):
-                link_xml.append(xml)
+                if format=="sdf":
+                    # append visual properties to link
+                    # useless check 
+                    if xml==visual_xml:
+                        link_xml.append(xml)
+                elif format=="urdf":
+                    link_xml.append(xml)
+                    
         for obj in self.link.Collision:
             for xml in _get_xmls_and_export_meshes(
                     obj,
                     urdf_collision_from_object,
                     self.link.MountedPlacement,
                     package_parent,
-                    package_name,
+                    package_name,format=format
             ):
-                link_xml.append(xml)
-        link_xml.append(
+                # this check is mostly useless
+                if xml==collision_xml:
+                    link_xml.append(xml)
+        if format=="urdf":    
+            link_xml.append(
             urdf_inertial(
                 mass=self.link.Mass.Value,
                 center_of_mass=self.link.CenterOfMass,
@@ -646,6 +666,9 @@ class LinkProxy(ProxyBase):
                 izz=self.link.Izz,
             ),
         )
+        elif format=="sdf":
+            inertial=export.create_sdf_element(self.link,ros_name(self.link),"inertial")
+            link_xml.append(inertial)
         return link_xml
 
     def _fix_lost_fc_links(self) -> None:

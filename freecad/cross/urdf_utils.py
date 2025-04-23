@@ -32,6 +32,7 @@ from .freecad_utils import warn
 from .utils import get_valid_filename
 from .wb_utils import is_primitive
 
+from .sdf import export
 
 # Typing hints.
 DO = fc.DocumentObject
@@ -142,8 +143,9 @@ def xml_comment_element(obj_label: str) -> et.Element:
     # return et.fromstring(f'<cad_name value="{obj_label}"/>')
     return et.Comment(sanitize_for_xml_comment(obj_label))
 
-
-def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
+# TODO
+# to be renamed description_specific_placement_format
+def urdf_origin_from_placement(p: fc.Placement,format:str="urdf") -> et.Element:
     """Return an xml element 'origin'."""
 
     # previous implementation had a precision bug.
@@ -177,23 +179,36 @@ def urdf_origin_from_placement(p: fc.Placement) -> et.Element:
         base_corrected.y = 0
     if abs(base_corrected.z) < min_xyz_acc:
         base_corrected.z = 0
+    if format=="urdf":
+        pattern = '<origin xyz="{v.x:.6} {v.y:.6} {v.z:.6}" rpy="{r[0]} {r[1]} {r[2]}" />'
+        return et.fromstring(pattern.format(v=base_corrected * 1e-3, r=xyz_rad_corrected))
+    elif format=="sdf":
+        pose=et.fromstring("<pose/>")
+        v=p.Base
+        pose.text=f"{v[0]} {v[1]} {v[2]} {xyz_rad[0]} {xyz_rad[1]} {xyz_rad[2]}"
+        return pose
 
-    pattern = '<origin xyz="{v.x:.6} {v.y:.6} {v.z:.6}" rpy="{r[0]} {r[1]} {r[2]}" />'
-    return et.fromstring(pattern.format(v=base_corrected * 1e-3, r=xyz_rad_corrected))
 
-
-def urdf_geometry_box(length_x: float, length_y: float, length_z: float) -> et.Element:
+def urdf_geometry_box(length_x: float, length_y: float, length_z: float,format:str="urdf") -> et.Element:
     """Return an xml element 'geometry' with a box.
 
     Lengths must be given in meters.
 
     """
-    geometry = et.fromstring('<geometry/>')
-    geometry.append(
-        et.fromstring(
-        f'<box size="{length_x} {length_y} {length_z}" />',
-        ),
-    )
+    if format=="urdf":
+        geometry = et.fromstring('<geometry/>')
+        geometry.append(
+            et.fromstring(
+            f'<box size="{length_x} {length_y} {length_z}" />',
+            ),
+        )
+    elif format=="sdf":
+        geometry=et.fromstring("<geometry/>")
+        b=et.fromstring("<box/>")
+        size=et.fromstring("<size/>")
+        size.text=f'{length_x} {length_y} {length_z}'
+        b.append(size)
+        geometry.append(b)
     return geometry
 
 
@@ -222,18 +237,29 @@ def urdf_box_placement_from_object(
     return placement * to_center
 
 
-def urdf_geometry_sphere(radius: float) -> et.Element:
+def urdf_geometry_sphere(radius: float,format:str="urdf") -> et.Element:
     """Return an xml element 'geometry' with a sphere.
 
     The radius must be given in meters.
 
     """
     geometry = et.fromstring('<geometry/>')
-    geometry.append(
-        et.fromstring(
-        f'<sphere radius="{radius}" />',
-        ),
-    )
+    if format=="urdf":
+        
+        geometry.append(
+            et.fromstring(
+            f'<sphere radius="{radius}" />',
+            ),
+        )
+    elif format=="sdf":
+        # create sphere element
+        sphere=et.fromstring("<sphere/>")
+        # create radius element this is a child of sphere
+        s=et.fromstring("<radius/>")
+        # set the text of radius cast to string 
+        s.text=str(radius)
+        sphere.append(s)
+        geometry.append(sphere)
     return geometry
 
 
@@ -253,18 +279,32 @@ def urdf_sphere_placement_from_object(
     return placement
 
 
-def urdf_geometry_cylinder(radius: float, length: float) -> et.Element:
+def urdf_geometry_cylinder(radius: float, length: float,format:str="urdf") -> et.Element:
     """Return an xml element 'geometry' with a cylinder.
 
     Lengths must be given in meters.
 
     """
     geometry = et.fromstring('<geometry/>')
-    geometry.append(
+    if format=="urdf":
+        geometry.append(
         et.fromstring(
         f'<cylinder radius="{radius}" length="{length}" />',
         ),
     )
+    elif format=="sdf":
+        # create cylinder elements
+        cylinder=et.fromstring("<cylinder/>")
+    #   create radius and length elements  and set there values 
+        r=et.fromstring("<radius/>")
+        r.text=str(radius)
+        l=et.fromstring("<length/>")
+        l.text=str(length)
+        # append both to cylinder 
+        cylinder.append(r)
+        cylinder.append(l)
+        # append cylinder  to geometry 
+        geometry.append(cylinder)
     return geometry
 
 
@@ -291,7 +331,7 @@ def _urdf_generic_from_box(
         generic: str,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for visual or collision for a FreeCAD's box.
 
@@ -311,24 +351,28 @@ def _urdf_generic_from_box(
     """
     if not is_box(box):
         raise RuntimeError("Argument must be a 'Part::Box'")
-    parent = et.fromstring(f'<{generic}/>')
-
-    if not obj_label:
-        obj_label = box.Label
-    parent.append(xml_comment_element(obj_label))
-
     if not ignore_obj_placement:
         placement = placement * box.Placement
+    if not obj_label:
+        obj_label = box.Label
     center_placement = urdf_box_placement_from_object(box, placement)
-    parent.append(urdf_origin_from_placement(center_placement))
+    if format=="urdf":
+        parent = et.fromstring(f'<{generic}/>')
 
-    parent.append(
-        urdf_geometry_box(
-        box.Length.getValueAs('m'),
-        box.Width.getValueAs('m'),
-        box.Height.getValueAs('m'),
-        ),
-    )
+        parent.append(xml_comment_element(obj_label))
+        parent.append(urdf_origin_from_placement(center_placement,format=format))
+        parent.append(
+            urdf_geometry_box(
+            box.Length.getValueAs('m'),
+            box.Width.getValueAs('m'),
+            box.Height.getValueAs('m'),format=format
+            ),
+        )
+    elif format=='sdf':
+        if generic=="visual":
+            parent=export.object_as_sdf(box,obj_label,center_placement,"box",element_type="visual")
+        elif generic=="collision":
+            parent=export.object_as_sdf(box,obj_label,center_placement,"box",element_type="collision")
     return parent
 
 
@@ -336,7 +380,7 @@ def urdf_visual_from_box(
         box: PartBox,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False, format:str="urdf"
 ) -> et.Element:
     """Return the xml element for visual for a FreeCAD's box.
 
@@ -355,7 +399,7 @@ def urdf_visual_from_box(
     """
     return _urdf_generic_from_box(
         box, 'visual', obj_label,
-        placement, ignore_obj_placement,
+        placement, ignore_obj_placement,format=format
     )
 
 
@@ -391,7 +435,7 @@ def _urdf_generic_from_sphere(
         generic: str,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for visual or collision for a FreeCAD's sphere.
 
@@ -411,23 +455,28 @@ def _urdf_generic_from_sphere(
     """
     if not is_sphere(sphere):
         raise RuntimeError("Argument must be a 'Part::Sphere'")
-
-    parent = et.fromstring(f'<{generic}/>')
-
-    if not obj_label:
-        obj_label = sphere.Label
-    parent.append(xml_comment_element(obj_label))
-
     if not ignore_obj_placement:
         placement = placement * sphere.Placement
     center_placement = urdf_sphere_placement_from_object(sphere, placement)
-    parent.append(urdf_origin_from_placement(center_placement))
+    if not obj_label:
+            obj_label = sphere.Label
+    if format=="urdf":
+        parent = et.fromstring(f'<{generic}/>')
+   
+        parent.append(xml_comment_element(obj_label))
 
-    parent.append(
-        urdf_geometry_sphere(
-        sphere.Radius.getValueAs('m'),
-        ),
-    )
+        parent.append(urdf_origin_from_placement(center_placement))
+
+        parent.append(
+            urdf_geometry_sphere(
+            sphere.Radius.getValueAs('m'),
+            ),
+        )
+    elif format=="sdf":
+        if generic=="visual":
+            parent=export.object_as_sdf(sphere,obj_label,center_placement,"sphere",element_type="visual")
+        elif generic=="collision":
+            parent=export.object_as_sdf(sphere,obj_label,center_placement,"sphere",element_type="collision")
     return parent
 
 
@@ -490,7 +539,7 @@ def _urdf_generic_from_cylinder(
         generic: str,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for visual or collision for a FreeCAD's cylinder.
 
@@ -510,24 +559,29 @@ def _urdf_generic_from_cylinder(
     """
     if not is_cylinder(cyl):
         raise RuntimeError("Argument must be a 'Part::Cylinder'")
-
-    parent = et.fromstring(f'<{generic}/>')
-
     if not obj_label:
         obj_label = cyl.Label
-    parent.append(xml_comment_element(obj_label))
-
     if not ignore_obj_placement:
-        placement = placement * cyl.Placement
+            placement = placement * cyl.Placement
     center_placement = urdf_cylinder_placement_from_object(cyl, placement)
-    parent.append(urdf_origin_from_placement(center_placement))
+    if format=="urdf":
+        parent = et.fromstring(f'<{generic}/>')
+        parent.append(xml_comment_element(obj_label))
 
-    parent.append(
-        urdf_geometry_cylinder(
-        cyl.Radius.getValueAs('m'),
-        cyl.Height.getValueAs('m'),
-        ),
-    )
+        parent.append(urdf_origin_from_placement(center_placement))
+
+        parent.append(
+            urdf_geometry_cylinder(
+            cyl.Radius.getValueAs('m'),
+            cyl.Height.getValueAs('m'),
+            ),
+        )
+    elif format=="sdf":
+        if generic=="visual":
+            parent=export.object_as_sdf(cyl,obj_label,center_placement,"cylinder",element_type="visual")
+        elif generic=="collision":
+            parent=export.object_as_sdf(cyl,obj_label,center_placement,"cylinder",element_type="collision")
+        
     return parent
 
 
@@ -585,7 +639,7 @@ def urdf_collision_from_cylinder(
     )
 
 
-def urdf_geometry_mesh(mesh_name: str, package_name: str) -> et.Element:
+def urdf_geometry_mesh(mesh_name: str, package_name: str,format:str="urdf",obj: fc.DocumentObject|None=None,placement:fc.Placement|None=None) -> et.Element:
     """Return an xml element 'geometry' with a mesh.
 
     Parameters
@@ -595,12 +649,16 @@ def urdf_geometry_mesh(mesh_name: str, package_name: str) -> et.Element:
     - package_name: name of the ROS package.
 
     """
-    geometry = et.fromstring('<geometry/>')
-    geometry.append(
-        et.fromstring(
-        f'<mesh filename="package://{package_name}/meshes/{mesh_name}" />',
-        ),
-    )
+    
+    if format=="urdf":
+        geometry = et.fromstring('<geometry/>')
+        geometry.append(
+            et.fromstring(
+            f'<mesh filename="package://{package_name}/meshes/{mesh_name}" />',
+            ),
+        )
+    elif format=="sdf":
+       geometry=export.sdf_mesh(obj,placement,package_name,mesh_name)
     return geometry
 
 
@@ -609,7 +667,7 @@ def _urdf_generic_mesh(
         mesh_name: str,
         package_name: str,
         generic: str,
-        placement: fc.Placement = fc.Placement(),
+        placement: fc.Placement = fc.Placement(),format:str="urdf",obj: fc.DocumentObject|None=None,
 ) -> et.Element:
     """Return the xml element for visual or collision mesh for a FreeCAD object.
 
@@ -628,10 +686,14 @@ def _urdf_generic_mesh(
         original placement is added to this.
 
     """
-    parent = et.fromstring(f'<{generic}/>')
-    parent.append(xml_comment_element(obj_label))
-    parent.append(urdf_origin_from_placement(placement))
-    parent.append(urdf_geometry_mesh(mesh_name, package_name))
+    if format=="urdf":
+        parent = et.fromstring(f'<{generic}/>')
+        parent.append(xml_comment_element(obj_label))
+        parent.append(urdf_origin_from_placement(placement))
+        parent.append(urdf_geometry_mesh(mesh_name, package_name))
+    elif format=="sdf":
+        parent=urdf_geometry_mesh(mesh_name,package_name,format="sdf",obj=obj,placement=placement)
+        
     return parent
 
 
@@ -725,7 +787,7 @@ def _urdf_generic_from_object(
         obj: fc.DocumentObject,
         generic: str,
         package_name: Optional[str] = None,
-        placement: Optional[fc.Placement] = None,
+        placement: Optional[fc.Placement] = None,format="urdf"
 ) -> list[XmlForExport]:
     """Return the xml elements for visual or collision for a FreeCAD object.
 
@@ -749,6 +811,7 @@ def _urdf_generic_from_object(
         be added to this.
 
     """
+
     out_data: list[XmlForExport] = []
     for subobj, subname in get_leafs_and_subnames(obj):
         # Implementation note: linked_object is subobj if subobj is not a link.
@@ -785,19 +848,19 @@ def _urdf_generic_from_object(
             # We ignore the object placement because it's given by link_matrix.
             xml = _urdf_generic_from_box(
                 linked_object, generic, name_for_comment,
-                this_placement, ignore_obj_placement=True,
+                this_placement, ignore_obj_placement=True,format=format
             )
         elif is_sphere(linked_object):
             # We ignore the object placement because it's given by link_matrix.
             xml = _urdf_generic_from_sphere(
                 linked_object, generic, name_for_comment,
-                this_placement, ignore_obj_placement=True,
+                this_placement, ignore_obj_placement=True,format=format
             )
         elif is_cylinder(linked_object):
             # We ignore the object placement because it's given by link_matrix.
             xml = _urdf_generic_from_cylinder(
                 linked_object, generic, name_for_comment,
-                this_placement, ignore_obj_placement=True,
+                this_placement, ignore_obj_placement=True,format=format
             )
         elif is_lcs(linked_object):
             # LCS have a shape and would thus be exported.
@@ -813,7 +876,7 @@ def _urdf_generic_from_object(
                 package_name = 'package'
             xml = _urdf_generic_mesh(
                 name_for_comment, filename,
-                package_name, generic, this_placement,
+                package_name, generic, this_placement,format=format,obj=linked_object
             )
         out_data.append(XmlForExport(xml, linked_object, this_placement, filename))
     return out_data
@@ -822,7 +885,7 @@ def _urdf_generic_from_object(
 def urdf_visual_from_object(
         obj: fc.DocumentObject,
         package_name: Optional[str] = None,
-        placement: Optional[fc.Placement] = None,
+        placement: Optional[fc.Placement] = None,format="urdf"
 ) -> list[XmlForExport]:
     """Return the xml element for visual for a FreeCAD object.
 
@@ -842,13 +905,13 @@ def urdf_visual_from_object(
         If not given, obj.Placement will be used.
 
     """
-    return _urdf_generic_from_object(obj, 'visual', package_name, placement)
+    return _urdf_generic_from_object(obj, 'visual', package_name, placement,format=format)
 
 
 def urdf_collision_from_object(
         obj: fc.DocumentObject,
         package_name: str = '',
-        placement: Optional[fc.Placement] = None,
+        placement: Optional[fc.Placement] = None,format:str="urdf"
 ) -> list[XmlForExport]:
     """Return the xml element for collision for a FreeCAD object.
 
@@ -868,7 +931,7 @@ def urdf_collision_from_object(
         If not given, obj.Placement will be used.
 
     """
-    return _urdf_generic_from_object(obj, 'collision', package_name, placement)
+    return _urdf_generic_from_object(obj, 'collision', package_name, placement,format=format)
 
 
 def urdf_inertial(
@@ -879,7 +942,7 @@ def urdf_inertial(
         ixz: float,
         iyy: float,
         iyz: float,
-        izz: float,
+        izz: float,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for inertial."""
     inertial_et = et.Element('inertial')

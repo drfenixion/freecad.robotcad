@@ -28,6 +28,7 @@ import re
 import os
 from ..wb_utils import UI_PATH
 from ..freecad_utils import warn
+from typing import List, TypedDict
 
 debug = False
 if debug:
@@ -71,102 +72,6 @@ def extract_vector_n(input_string):
 
     return [float(num) for num in numbers]
 
-
-def get_xml_data(
-    element: ET.Element, tag: Union[str, list], Is_Attribute: bool = False
-) -> Union[list, dict, str]:
-    """
-    see set_xml_data()
-    The functions have  similar parameters
-    except for the value parameter which is not included and tag \n
-    for attributes a list is used in place of tag with the parent tag at index 0 and attribute name at index 1  \n
-    This e.g ['world','name'] will return the name attribute of the world element\n
-    ->for none string values the caller  is responsible for converting to appropriate types"""
-
-    def get_value(elem_data):
-        if assert_vect(elem_data):
-            # equivalent string
-            vect_eq = extract_vector_n(elem_data)
-            return vect_eq
-        else:
-            # try converting to int or float date type
-            try:
-                try:
-                    return int(elem_data)
-                except Exception:
-                    return float(elem_data)
-            except Exception:
-                return elem_data
-
-    if Is_Attribute is not True:
-        elem_iter = element.iter(tag)
-    else:
-        elem_iter = element.iter(tag[0])
-    # only a single element exists no need to use a for loop
-    try:
-        elem = elem_iter.__next__()
-    except Exception:
-        return None
-    if Is_Attribute is False:
-        txt = elem.text
-        if txt is None:
-            txt = ""
-        return get_value(txt)
-    else:
-        # return the  the attribute dictionary
-        try:
-            try:
-                return int(elem.attrib[tag[1]])
-            except Exception:
-                return float(elem.attrib[tag[1]])
-        except Exception:
-            return elem.attrib[tag[1]]
-
-
-def set_xml_data(
-    element: ET.Element,
-    tag: str,
-    Is_Attribute: bool,
-    value: Union[dict, float, int, list, str],
-) -> ET.Element:
-    """
-    tag is the tag name of the element to be edited \n
-    Element is
-    Is Attribute  can either be true or false , True if th value is an attribute \n
-    if Is_Attribute is True value has to be a dictionary with one or more key value pairs \n
-    The value parameter will contain the actual value to be updated
-    """
-    # get the affected element
-    elem_iter = element.iter(tag)
-    # no need for a loop
-    try:
-        elem = elem_iter.__next__()
-    except Exception:
-        return None
-        # ensure no dictionaries are sent for non attributes
-    if Is_Attribute is False and isinstance(value, dict) is False:
-        if isinstance(value, list):
-            # equivalent string
-            elem.text = " ".join(map(str, value))
-        else:
-            elem.text = str(value)
-    else:
-        # add/edit  attributes
-        for key in value.keys():
-            elem.set(key, str(value[key]))
-    return element
-
-
-# *******
-# xml access
-# *******
-
-
-# *******
-# start of logic responsible for generating parameter names
-# *******
-# *******
-# *******
 
 reserved_names=set()
 def generate_parameter_name(element_name, parent_names=None, reserved_names=None):
@@ -549,9 +454,13 @@ class properties_base(QDockWidget):
         
     def sizeHint(self):
         return QSize(732, 876)
-    
+class element_property_map(TypedDict):
+    name:str
+    alias:str
+    parent:str
+    default:str 
 class link_properties(properties_base):
-    properties:list=[]#{name:str,{parents:list,alias,default value, type}}
+    properties:List[element_property_map]=[]#{name:str,{parents:list,alias,default value, type}}
     active=False
     # this is to ensure the property list  doesn't have repetitions
     initialized:bool=False
@@ -608,7 +517,7 @@ class link_properties(properties_base):
     
         
 class joint_properties(properties_base):
-    properties:list=[]
+    properties:List[element_property_map]=[]
     active=False
     initialized:bool=False
     # this is to ensure the property list  doesn't have repetitions
@@ -649,6 +558,8 @@ class initialize:
         if initial and hasattr(self.obj,"selected") is False:
             self.obj.addProperty("App::PropertyStringList","selected","sdf","maintains a list of enabled sdf elements")
             self.obj.setPropertyStatus('selected', ['Hidden', 'ReadOnly'])
+            # dummy used here  677: if self.initial and len(self.selected)==0:
+            self.selected=[]
         else:
             self.selected=getattr(self.obj,"selected")
         self.UI()
@@ -667,7 +578,7 @@ class initialize:
             file=root_file, recurse=False, includeMetaData=False
         ).data_structure
         #    ensure consistency between UI and the selected list
-        if self.initial:
+        if self.initial and len(self.selected)==0:
                 top=CollapsibleSection(structure["tag"],required=structure["required"])
                 top.toggle_enabled(structure["required"],obj=self.obj)
         else:
@@ -1273,4 +1184,3 @@ class initialize:
         group.setMinimumSize(200, 120)
 
         return group
-

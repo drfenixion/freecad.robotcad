@@ -70,6 +70,7 @@ from .wb_utils import get_controllers_config_file_name
 from .sdf.sdf_parser.sdf_tree import sdf_dict_to_xml
 
 
+
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -873,6 +874,7 @@ class RobotProxy(ProxyBase):
             return
         project_path, package_name, description_package_path = split_package_path(output_path)
         # TODO: warn if package name doesn't end with `_description`.
+        
         xml = et.fromstring('<robot/>')
         xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
         xml.append(

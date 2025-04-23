@@ -32,7 +32,7 @@ from ..wb_utils import is_robot
 from ..wb_utils import is_workcell
 from ..wb_utils import is_xacro_object
 
-debug=True
+debug=False
 if debug:
     import pdb
 # Typing hints.
@@ -58,6 +58,36 @@ def _supported_object_selected():
         if is_workcell(obj):
             return True
     return False
+from PySide2.QtWidgets import (QDialog, QVBoxLayout, 
+                              QComboBox, QDialogButtonBox, QLabel)
+from PySide2.QtCore import QSize
+class ExportDialog(QDialog):
+    def __init__(self, parent=None):
+        super(ExportDialog, self).__init__(parent)
+        
+        self.setWindowTitle("Export As")
+        self.setFixedSize(QSize(300, 150))
+        # Create layout
+        layout = QVBoxLayout(self)
+        
+        # Add label
+        label = QLabel("Select export format:")
+        layout.addWidget(label)
+        
+        # Create combo box
+        self.combo_box = QComboBox()
+        self.combo_box.addItems(["urdf", "sdf"])
+        layout.addWidget(self.combo_box)
+        
+        # Add dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+    
+    def selected_format(self):
+        """Returns the currently selected format"""
+        return self.combo_box.currentText()
 
 
 class _UrdfExportCommand:
@@ -71,6 +101,11 @@ class _UrdfExportCommand:
         }
 
     def Activated(self):
+        dialog = ExportDialog()
+        if dialog.exec_() == QDialog.Accepted:
+            format=dialog.selected_format()
+        else:
+            return
         def set_package_name() -> None:
             nonlocal txt
             txt = original_txt.replace(
