@@ -827,7 +827,7 @@ class RobotProxy(ProxyBase):
                     )
         return None
 
-    def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
+    def export_urdf(self, interactive: bool = False,format:str="urdf") -> Optional[et.Element]:
         """Export the robot as URDF, writing files."""
         if not self.is_execute_ready():
             return None
@@ -891,7 +891,7 @@ class RobotProxy(ProxyBase):
                     True,
                 )
                 return
-            xml.append(link.Proxy.export_urdf(project_path, package_name))
+            xml.append(link.Proxy.export_urdf(project_path, package_name,format=format))
 
         for joint in self.get_joints():
             if not joint.Parent:
@@ -901,7 +901,7 @@ class RobotProxy(ProxyBase):
                 error(f"Joint '{joint.Label}' has no child link", True)
                 continue
             if hasattr(joint, 'Proxy') and joint.Proxy:
-                xml.append(joint.Proxy.export_urdf())
+                xml.append(joint.Proxy.export_urdf(format=format))
             else:
                 error(
                     f"Internal error with joint '{joint.Label}'"

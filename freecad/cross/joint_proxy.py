@@ -23,8 +23,7 @@ from .wb_utils import is_workcell
 from .wb_utils import is_sensor_joint
 from .wb_utils import ros_name
 from .utils import warn_unsupported
-from .sdf import setup
-
+from .sdf import setup,export
 # Stubs and typing hints.
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
 from .joint import ViewProviderJoint as VP
@@ -412,22 +411,54 @@ class JointProxy(ProxyBase):
             return 'Angle'
         return ''
 
-    def export_urdf(self) -> et.ElementTree:
+    def export_urdf(self,format:str="urdf") -> et.ElementTree:
+       
         joint = self.joint
-        joint_xml = et.fromstring('<joint/>')
+        if format=="urdf":
+            joint_xml = et.fromstring('<joint/>')
+        
+        elif format=="sdf":
+            # this configures most ot the user defined properties 
+            joint_xml:et.Element=export.create_sdf_element(joint,ros_name(joint),"joint")
+        # this are similar for both sdf and urdf
         joint_xml.attrib['name'] = get_valid_urdf_name(ros_name(joint))
         joint_xml.attrib['type'] = joint.Type
+        # # find the axis element 
+        ax=joint_xml.find("axis")
         if joint.Parent:
-            joint_xml.append(et.fromstring(f'<parent link="{get_valid_urdf_name(joint.Parent)}"/>'))
+            if format=="urdf":
+                joint_xml.append(et.fromstring(f'<parent link="{get_valid_urdf_name(joint.Parent)}"/>'))
+            elif format=="sdf":
+                #  parent was ignored hence not part of the joint_xml 
+                # needs to be added 
+                prnt=et.fromstring("<parent/>")
+                prnt.text=get_valid_urdf_name(joint.Parent)
+                joint_xml.append(prnt)
         else:
             joint_xml.append(et.fromstring('<parent link="NO_PARENT_DEFINED"/>'))
         if joint.Child:
-            joint_xml.append(et.fromstring(f'<child link="{get_valid_urdf_name(joint.Child)}"/>'))
+            if format=="urdf":
+                joint_xml.append(et.fromstring(f'<child link="{get_valid_urdf_name(joint.Child)}"/>'))
+            elif format=="sdf":
+                c=et.fromstring("<child/>")
+                c.text=get_valid_urdf_name(joint.Child)
+                joint_xml.append(c)
         else:
             joint_xml.append(et.fromstring('<child link="NO_CHILD_DEFINED"/>'))
-        joint_xml.append(urdf_origin_from_placement(joint.Origin))
+        if format=="urdf":
+            joint_xml.append(urdf_origin_from_placement(joint.Origin))
+        elif format=="sdf":
+            # this was also removed hence needs to be added i.e pose
+            ps=urdf_origin_from_placement(joint.Origin,format=format)
+            joint_xml.append(ps)
         if joint.Type != 'fixed':
-            joint_xml.append(et.fromstring('<axis xyz="0 0 1" />'))
+            if format=="urdf":
+                joint_xml.append(et.fromstring('<axis xyz="0 0 1" />'))
+            elif format=="sdf":
+                # xyz element was ignored a child of the axis element add it 
+                xyz=et.fromstring("<xyz/>")
+                xyz.text="0 0 1"
+                ax.append(xyz)
             if joint.Type in ('revolute', 'continuous'):
                 factor = radians(1.0)
             else:
@@ -439,26 +470,49 @@ class JointProxy(ProxyBase):
                 # present but not complete but the `lower` and `upper` values
                 # should not be set for the `continuous` joint type .
                 # Cf. https://github.com/ros/urdfdom/issues/180.
-                limit_xml = et.fromstring('<limit/>')
-                limit_xml.attrib['lower'] = str(joint.LowerLimit * factor)
-                limit_xml.attrib['upper'] = str(joint.UpperLimit * factor)
-                limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
-                limit_xml.attrib['effort'] = str(joint.Effort)
-                joint_xml.append(limit_xml)
+                if format=="urdf":
+                    limit_xml = et.fromstring('<limit/>')
+                    limit_xml.attrib['lower'] = str(joint.LowerLimit * factor)
+                    limit_xml.attrib['upper'] = str(joint.UpperLimit * factor)
+                    limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
+                    limit_xml.attrib['effort'] = str(joint.Effort)
+                    joint_xml.append(limit_xml)
+                elif format=="sdf":
+                    lim=ax.find("limit")
+                    l=et.fromstring("<lower/>")
+                    l.text=radians(joint.LowerLimit)
+                    up=et.fromstring("<upper/>")
+                    up.text=radians(joint.UpperLimit)
+                    vel=et.fromstring("<velocity/>")
+                    vel.text=joint.Velocity
+                    eff=et.fromstring("<effort/>")
+                    eff.text=joint.Effort
+                    lim.append(l)
+                    lim.append(up)
+                    lim.append(vel)
+                    lim.append(eff)
+        elif joint.Type=="fixed":
+            lim=ax.find("limit")
+            if len(lim)==0:
+                ax.remove(lim) 
         if joint.Mimic:
-            mimic_xml = et.fromstring('<mimic/>')
-            mimic_joint = ros_name(joint.MimickedJoint)
-            mimic_xml.attrib['joint'] = get_valid_urdf_name(mimic_joint)
-            mimic_xml.attrib['multiplier'] = str(joint.Multiplier)
-            if joint.Type == 'prismatic':
-                # Millimeters (FreeCAD) to meters (URDF).
-                urdf_offset = joint.Offset / 1000.0
-            else:
-                # Should be only 'revolute' or 'continuous'.
-                # Degrees (FreeCAD) to meters (URDF).
-                urdf_offset = radians(joint.Offset)
-            mimic_xml.attrib['offset'] = str(urdf_offset)
-            joint_xml.append(mimic_xml)
+            if format=="urdf":
+                mimic_xml = et.fromstring('<mimic/>')
+                mimic_joint = ros_name(joint.MimickedJoint)
+                mimic_xml.attrib['joint'] = get_valid_urdf_name(mimic_joint)
+                mimic_xml.attrib['multiplier'] = str(joint.Multiplier)
+                if joint.Type == 'prismatic':
+                    # Millimeters (FreeCAD) to meters (URDF).
+                    urdf_offset = joint.Offset / 1000.0
+                else:
+                    # Should be only 'revolute' or 'continuous'.
+                    # Degrees (FreeCAD) to meters (URDF).
+                    urdf_offset = radians(joint.Offset)
+                mimic_xml.attrib['offset'] = str(urdf_offset)
+                joint_xml.append(mimic_xml)
+            elif format=="sdf":
+                # ignore mimic for now
+                pass
         return joint_xml
 
     def _toggle_editor_mode(self):

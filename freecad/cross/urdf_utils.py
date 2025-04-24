@@ -185,7 +185,8 @@ def urdf_origin_from_placement(p: fc.Placement,format:str="urdf") -> et.Element:
     elif format=="sdf":
         pose=et.fromstring("<pose/>")
         v=p.Base
-        pose.text=f"{v[0]} {v[1]} {v[2]} {xyz_rad[0]} {xyz_rad[1]} {xyz_rad[2]}"
+        # this works only for mm
+        pose.text=f"{v[0]*1e-3} {v[1]*1e-3} {v[2]*1e-3} {xyz_rad[0]} {xyz_rad[1]} {xyz_rad[2]}"
         return pose
 
 
@@ -407,7 +408,7 @@ def urdf_collision_from_box(
         box: PartBox,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for collision for a FreeCAD's box.
 
@@ -426,7 +427,7 @@ def urdf_collision_from_box(
     """
     return _urdf_generic_from_box(
         box, 'collision', obj_label,
-        placement, ignore_obj_placement,
+        placement, ignore_obj_placement,format=format
     )
 
 
@@ -511,7 +512,7 @@ def urdf_collision_from_sphere(
         sphere: PartSphere,
         obj_label: str = '',
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for collision for a FreeCAD's sphere.
 
@@ -530,7 +531,7 @@ def urdf_collision_from_sphere(
     """
     return _urdf_generic_from_sphere(
         sphere, 'collision', obj_label,
-        placement, ignore_obj_placement,
+        placement, ignore_obj_placement,format=format
     )
 
 
@@ -616,7 +617,7 @@ def urdf_collision_from_cylinder(
         obj_label: str,
         cyl: PartCyl,
         placement: fc.Placement = fc.Placement(),
-        ignore_obj_placement: bool = False,
+        ignore_obj_placement: bool = False,format:str="urdf"
 ) -> et.Element:
     """Return the xml element for collision for a FreeCAD's cylinder.
 
@@ -635,7 +636,7 @@ def urdf_collision_from_cylinder(
     """
     return _urdf_generic_from_cylinder(
         cyl, 'collision', obj_label,
-        placement, ignore_obj_placement,
+        placement, ignore_obj_placement,format=format
     )
 
 

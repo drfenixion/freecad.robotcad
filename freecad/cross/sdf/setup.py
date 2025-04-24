@@ -319,14 +319,26 @@ class CollapsibleSection(QWidget):
 # ******
 # end of collapsible section
 ignore_list = [
+    # world
     "audio",
     "include",
     "pose",
     "meta",
+    "density",
     "visibility_flags",
-    "transparency"
-    ,"type",
-    "axis",
+    "transparency",
+    # joint 
+    "type",
+    "xyz",
+    "gearbox_ratio",
+    "gearbox_reference_body",
+    "thread_pitch",
+    "screw_thread_pitch",
+    # joint limit
+    "lower",
+    "upper",
+    "effort",
+    "velocity",
     "axis2",
     "pose",
     "sensor",
@@ -344,8 +356,9 @@ defined_names:dict={}
 defined_names["link"]={"name":["Label","Label2"]}
 defined_names["inertia"]={"ixx":"Ixx","ixy":"Ixy","ixz":"Ixz","iyy":"Iyy","iyz":"Iyz","izz":"Izz",}
 defined_names["inertial"]={"mass":"Mass"}
-defined_names["joint"]={"name":["Label","Label2"]}
-# {name:str,{parents:list,alias,default value, type}}
+defined_names["joint"]={"name":["Label","Label2"],"type":"Type",}
+
+# {name:str,{parent:str,alias,default value, type}}
 # algorithm
 # i. add parameters to object
 # ii. update ui and display it
@@ -764,36 +777,38 @@ class initialize:
                 defined:bool=False
                 # attributes are of type Element_Attributes see sdf_schema_parser
                 name, default, data_type = attribute.get_complete().values()
+                # check if attribute is in ignore list skip if it is 
+                if name not in ignore_list:
                 # check if the tag anme is part of the ones whose properties have already defined in FreeCAD
                 # if its available  check if the name is already defined see defined_names
                 # might be remove in fuature after synchronization 
-                if tag in defined_names and name in defined_names[tag].keys():
-                    # take alias as the property name in FreeCAD
-                    alias=defined_names[tag][name]
-                    # if isinstance(alias,list):
-                    #     alias=alias[0]
-                    defined=True
-                    # if the name is not available generate its alias 
-                else:
-                    alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
-                    # dont add properties more than once
+                    if tag in defined_names and name in defined_names[tag].keys():
+                        # take alias as the property name in FreeCAD
+                        alias=defined_names[tag][name]
+                        # if isinstance(alias,list):
+                        #     alias=alias[0]
+                        defined=True
+                        # if the name is not available generate its alias 
+                    else:
+                        alias = generate_parameter_name(name, parent_names=parent_tag,reserved_names=reserved_names)
+                        # dont add properties more than once
                
-                # since any time a link is clicked  initilization happens 
-                # hence this section runs multiple times  once for each link 
-                # this causes repetitions 
-                #  the initialized property solves this
-                if self.initial and not self.parent.__class__.initialized:
-                    prop_data = {
-                    "name": name,
-                    "alias": alias[0] if isinstance(alias, list) else alias,
-                    "parent": tag,
-                    "default": default,
-                        }
-                    self.parent.__class__.properties.append(prop_data)
+                    # since any time a link is clicked  initilization happens 
+                    # hence this section runs multiple times  once for each link 
+                    # this causes repetitions 
+                    #  the initialized property solves this
+                    if self.initial and not self.parent.__class__.initialized:
+                        prop_data = {
+                        "name": name,
+                        "alias": alias[0] if isinstance(alias, list) else alias,
+                        "parent": tag,
+                        "default": default,
+                            }
+                        self.parent.__class__.properties.append(prop_data)
                     
-                self.property_n_widget_setup(
-                    widget, name, alias, default, data_type, parent_tag=parent_tag,defined=defined
-                )
+                    self.property_n_widget_setup(
+                        widget, name, alias, default, data_type, parent_tag=parent_tag,defined=defined
+                    )
         
         if dc["value"] is not None:
             defined=False
@@ -873,10 +888,10 @@ class initialize:
         alias,
         parent=None,
         min_val=0.0,
-        max_val=100.0,
+        max_val=1000,
         default_val=0.0,
-        step=1.0,
-        decimals=2,
+        step=0.1,
+        decimals=5,
     ):
         """
             Creates a horizontal layout with a label and double spinbox.
@@ -958,9 +973,10 @@ class initialize:
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         if label_width:
             label.setFixedWidth(label_width)
-
+        label.setFixedHeight(27)
         # Create line edit
         line_edit = QLineEdit()
+        line_edit.setFixedHeight(27)
         if isinstance(alias,list):
             line_edit.setText(getattr(self.obj,alias[0]))
         else:

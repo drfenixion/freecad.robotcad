@@ -6,8 +6,9 @@ import copy
 from typing import List, TypedDict,Union
 from .. import urdf_utils
 # a list of elements must have children that will be includeded whether selected or not 
-override_list=["inertia"]
-class LinkElements:
+override_list=["inertia","axis","limit",]
+
+class elements:
     """A class to manage and cache common SDF link elements with cleanup functionality."""
     
     # Class-level element caches
@@ -17,7 +18,7 @@ class LinkElements:
     inertial: Optional[ET.Element] = None
     material: Optional[ET.Element] = None
     visual: Optional[ET.Element] = None
-    
+    joint:Optional[ET.Element]=None
     def __init__(self):
         """Initialize the link elements by loading and caching the required SDF elements."""
         self._initialize_elements()
@@ -31,7 +32,8 @@ class LinkElements:
             ('inertial', "inertial.sdf", ["pose"]),
             ('material', "material.sdf", ["script", "shader", "render_order",
                                         "double_sided", "pbr", "lighting"]),
-            ('visual', "visual.sdf", ["meta", "visibility_flags"])
+            ('visual', "visual.sdf", ["meta", "visibility_flags"]),
+             ("joint","joint.sdf",None)
         ]
         
         for element_name, filename, remove_list in element_configs:
@@ -81,7 +83,7 @@ class LinkElements:
             The root element of the SDF tree
         """
         return sdf_tree.sdf_tree(file, metaData=False, recurse=False, minimal=True).get_element
-link_elements=LinkElements()
+Elements=elements()
 
 class element_property_map(TypedDict):
     name:str
@@ -120,7 +122,8 @@ def update(obj,el:ET.Element,selected_list:list,property_struct:List[element_pro
     Returns:
         ET.Element: updated element
     """
-    to_remove:List[ET.Element]=[]
+    elements_to_remove:List[ET.Element]=[]
+    attributes_to_remove:List[List[ET.Element,str]]=[]
     for element in el:
         # check if element has children 
         if len(element)>0:
@@ -129,17 +132,22 @@ def update(obj,el:ET.Element,selected_list:list,property_struct:List[element_pro
                     update(obj,element,selected_list,property_struct)
             else:
                 # remove element
-                to_remove.append(element)
+                elements_to_remove.append(element)
                 # el.remove(element) <-this causes issues i.e some elements are skipped
         else:
-            for name,_ in element.attrib:
+            for name,*_ in element.attrib.items():
                 # use the tag name here see setup.py  add_dynamic widgets
                 # for attributes the name is the attribute name and the parent is the tag
                 id:str=get_alias(property_struct,name,element.tag)
                 # special treatment for quantities and ...
                 # type conversions are reqired
-                value=sanitize_for_sdf(getattr(obj,id))
-                element.set(element.tag,value)
+                if id is not None:
+                    
+                    value=sanitize_for_sdf(getattr(obj,id))
+                    element.set(element.tag,value)
+                else:
+                    # prevent changing of size during iteration 
+                    attributes_to_remove.append([element,name])
             if element.text is not None:
                 # for text name is the tag and the parent is the parent tag 
                 id:str=get_alias(property_struct,element.tag,el.tag)
@@ -148,10 +156,13 @@ def update(obj,el:ET.Element,selected_list:list,property_struct:List[element_pro
                     if id.lower() in ["mass"]:
                         value=sanitize_for_sdf(getattr(obj,id).getValueAs("kg"))
                     else:
-                     value=sanitize_for_sdf(getattr(obj,id))
-                    
+                        value=sanitize_for_sdf(getattr(obj,id))
                     element.text=value
-    for e in to_remove:
+                else:
+                    elements_to_remove.append(element)
+    for elem,attr in attributes_to_remove:
+        del elem.attrib[attr]
+    for e in elements_to_remove:
         el.remove(e)
     # return el
 
@@ -208,19 +219,24 @@ see visual_container
 # sdf elements 
 def create_sdf_element(obj,name:str,type:str):
     if type=="link":
-        element=copy.deepcopy(link_elements.__class__.link)
+        element=copy.deepcopy(Elements.__class__.link)
     elif type=="visual":
-        element=copy.deepcopy(link_elements.__class__.visual)
+        element=copy.deepcopy(Elements.__class__.visual)
     elif type=="collision":
-        element=copy.deepcopy(link_elements.__class__.collision)
-        surface=copy.deepcopy(link_elements.__class__.surface)
+        element=copy.deepcopy(Elements.__class__.collision)
+        surface=copy.deepcopy(Elements.__class__.surface)
         element.append(surface)
     elif type=="inertial":
-        element=copy.deepcopy(link_elements.__class__.inertial)
+        element=copy.deepcopy(Elements.__class__.inertial)
         element.attrib.pop('auto', None)
+    elif type=="joint":
+        element=copy.deepcopy(Elements.__class__.joint)
     else:
         pass
-    property_struct=setup.link_properties(data_only=True).__class__.properties
+    if type in ["link","visual","collision","inertial"]:
+        property_struct=setup.link_properties(data_only=True).__class__.properties
+    elif type=="joint":
+        property_struct=setup.joint_properties(data_only=True).__class__.properties
     # set name
     if type!="inertial":
         element.attrib["name"]=name
@@ -285,7 +301,7 @@ def object_as_sdf(obj,name:str,placement,type:str,element_type:str)->ET.Element:
     return root_element
 
 def set_material_element(viewobj,parent_element):
-    material=copy.deepcopy(link_elements.__class__.material)
+    material=copy.deepcopy(Elements.__class__.material)
     shapeAppearence=getattr(viewobj,"ShapeAppearance")[0]
     # extract and update material data 
     materialProperties={
@@ -318,3 +334,21 @@ def sdf_mesh(obj,placement,package_name,mesh_name):
             set_material_element(viewobj,visual)
     # fill maunally for now dynamic filling later based on available features
     return visual
+
+# joint ignore list 
+# "type",
+# "xyz",
+# "gearbox_ratio",
+# "gearbox_reference_body",
+# "thread_pitch",
+# "screw_thread_pitch",
+# # joint limit
+# "lower",
+# "upper",
+# "effort",
+# "velocity"
+# "axis2",
+# "pose",
+# "sensor",
+# "parent",
+# "child"

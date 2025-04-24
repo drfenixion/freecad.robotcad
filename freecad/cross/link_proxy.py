@@ -611,8 +611,7 @@ class LinkProxy(ProxyBase):
                         directory).
 
         """
- 
-        format="sdf"
+
         if format=="urdf":
             link_xml = et.fromstring(
             f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />',
@@ -651,7 +650,10 @@ class LinkProxy(ProxyBase):
                     package_name,format=format
             ):
                 # this check is mostly useless
-                if xml==collision_xml:
+                if format=="sdf":
+                    if xml==collision_xml:
+                        link_xml.append(xml)
+                elif format=="urdf":
                     link_xml.append(xml)
         if format=="urdf":    
             link_xml.append(

@@ -140,21 +140,21 @@ class _UrdfExportCommand:
                 xmls.append(
                     urdf_collision_from_box(
                         linked_obj, obj.Label, placement,
-                        ignore_obj_placement=True,
+                        ignore_obj_placement=True,format=format
                     ),
                 )
             elif is_sphere(linked_obj):
                 xmls.append(
                     urdf_collision_from_sphere(
                         linked_obj, obj.Label, placement,
-                        ignore_obj_placement=True,
+                        ignore_obj_placement=True,format=format
                     ),
                 )
             elif is_cylinder(linked_obj):
                 xmls.append(
                     urdf_collision_from_cylinder(
                         linked_obj, obj.Label, placement,
-                        ignore_obj_placement=True,
+                        ignore_obj_placement=True,format=format
                     ),
                 )
             elif (
@@ -162,19 +162,19 @@ class _UrdfExportCommand:
                 or is_workcell(obj)
             ):
                 if hasattr(obj, 'Proxy'):
-                    xmls.append(obj.Proxy.export_urdf(interactive=True))
+                    xmls.append(obj.Proxy.export_urdf(interactive=True,format=format))
                     show_xml = False
             elif (
                 is_xacro_object(obj)
                 or is_joint(obj)
             ):
                 if hasattr(obj, 'Proxy'):
-                    xmls.append(obj.Proxy.export_urdf())
+                    xmls.append(obj.Proxy.export_urdf(format=format))
             elif is_link(obj):
                 if hasattr(obj, 'Proxy'):
                     temp_dir = tempfile.TemporaryDirectory(prefix='cross-')
                     package_path = Path(temp_dir.name)
-                    xmls.append(obj.Proxy.export_urdf(package_path, 'package_name'))
+                    xmls.append(obj.Proxy.export_urdf(package_path, 'package_name',format=format))
                     if list(package_path.iterdir()):
                         # Non empty directory.
                         xmls.append(
@@ -191,7 +191,7 @@ class _UrdfExportCommand:
                 xml_for_exports = urdf_collision_from_object(
                         obj,
                         package_name=package_name,
-                        placement=placement,
+                        placement=placement,format=format
                 )
                 for xml_for_export in xml_for_exports:
                     xmls.append(
