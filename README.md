@@ -217,6 +217,8 @@ You need a recent version of FreeCAD v0.21.2 with the ability to configure custo
 
 Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently.
 
+You can see how to install Conda FreeCAD with correct Python version with required dependencies in dockerfile [dockerfile](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/dockerfile#L126)
+
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"
 - Add an entry to "Custom repository" by clicking on the "+" sign.
