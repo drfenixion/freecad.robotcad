@@ -215,6 +215,22 @@ Compatible with ROS2.
 
 You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
+Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently.
+
+Example of installation of Conda FreeCAD with correct Python veriosn:
+```
+mkdir -p /home/$USER/miniconda3 && \
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
+bash /home/$USER/miniconda3/miniconda.sh -b -u -p /home/$USER/miniconda3 && \
+rm /home/$USER/miniconda3/miniconda.sh && \
+. /home/$USER/miniconda3/bin/activate && \
+conda init --all && \
+conda config --add channels conda-forge && \
+conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
+conda activate freecad_1_0_312 && \
+conda install numpy pandas matplotlib requests qt6-wayland pycollada
+```
+
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"
 - Add an entry to "Custom repository" by clicking on the "+" sign.
