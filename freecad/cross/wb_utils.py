@@ -1124,7 +1124,7 @@ def git_init_submodules(
     def pip_install_dependencies_of_module(target_module_path: str):
         message('Pip install dependencies of module.')
         p = subprocess.run(
-            ["pip download ."],
+            ["pip install ."],
             shell=True,
             capture_output=True,
             cwd=target_module_path,

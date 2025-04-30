@@ -57,7 +57,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                         repository_name = match.group(1)
                         repository = REPOSITORIES[repository_name]
 
-                        # select sendor
+                        # select vendor
                         match = re.search(r"https://github.com/(.*)/", repository.url)
                         if match:
                             vendor = match.group(1)
