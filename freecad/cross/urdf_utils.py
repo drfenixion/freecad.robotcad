@@ -640,7 +640,7 @@ def urdf_collision_from_cylinder(
     )
 
 
-def urdf_geometry_mesh(mesh_name: str, package_name: str,format:str="urdf",obj: fc.DocumentObject|None=None,placement:fc.Placement|None=None) -> et.Element:
+def urdf_geometry_mesh(mesh_name: str, package_name: str,format:str="urdf",obj: fc.DocumentObject|None=None,placement:fc.Placement|None=None,element_type:str="visual") -> et.Element:
     """Return an xml element 'geometry' with a mesh.
 
     Parameters
@@ -659,7 +659,7 @@ def urdf_geometry_mesh(mesh_name: str, package_name: str,format:str="urdf",obj: 
             ),
         )
     elif format=="sdf":
-       geometry=export.sdf_mesh(obj,placement,package_name,mesh_name)
+       geometry=export.sdf_mesh(obj,placement,package_name,mesh_name,element_type=element_type)
     return geometry
 
 
@@ -693,7 +693,7 @@ def _urdf_generic_mesh(
         parent.append(urdf_origin_from_placement(placement))
         parent.append(urdf_geometry_mesh(mesh_name, package_name))
     elif format=="sdf":
-        parent=urdf_geometry_mesh(mesh_name,package_name,format="sdf",obj=obj,placement=placement)
+        parent=urdf_geometry_mesh(mesh_name,package_name,format="sdf",obj=obj,placement=placement,element_type=generic)
         
     return parent
 

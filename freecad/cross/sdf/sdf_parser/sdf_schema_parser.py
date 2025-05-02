@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 import os
 import re
 
-from ...wb_utils import SDFORMAT_SDF_TEMPLATES_PATH
+from ...wb_utils import SDFORMAT_SDF_TEMPLATES_PATH,SDF_VERSION
 
 
 #this class will store element attributes to allow ease of access later
@@ -51,7 +51,7 @@ class Element_Attributes:
 
 #class to parse the sdf file and generate a dictioanary
 class sdf_schema_parser:
-    def __init__(self,version='1.10',file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
+    def __init__(self,version=SDF_VERSION,file='root.sdf', sdf_templates_dir = SDFORMAT_SDF_TEMPLATES_PATH,recurse:bool=True
                  ,includeMetaData:bool=True,minimal:bool=False):
         #initialize directory with the root.sdf
         self.root_dir=os.path.join(sdf_templates_dir, version, file)

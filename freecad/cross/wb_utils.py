@@ -70,7 +70,7 @@ LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
 JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
 ROBOT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'robot'
 
-
+SDF_VERSION="1.10"
 
 class SupportsStr(Protocol):
     def __str__(self) -> str:
@@ -577,10 +577,13 @@ def _has_ros_type(obj: DO, type_: str) -> bool:
 
 def _has_meshes_directory(
         package_parent: [Path | str],
-        package_name: str,
+        package_name: str,format:str="urdf",
 ) -> bool:
     """Return True if the directory "meshes" exists in the package."""
-    meshes_directory = Path(package_parent) / package_name / 'meshes'
+    if format=="urdf":
+        meshes_directory = Path(package_parent) / package_name / 'meshes'
+    elif format=="sdf":
+        meshes_directory = Path(package_parent) / package_name / 'sdf'/'meshes'
     return meshes_directory.exists()
 
 
@@ -688,16 +691,21 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
     )
 
 
-def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
+def get_urdf_path(robot: CrossRobot, output_path: str,format:str="urdf") -> Path:
     """Return URDF file path`.
     """
-
+    # to be renamed to get format path 
     file_base = get_valid_filename(ros_name(robot))
-    urdf_file = f'{file_base}.urdf'
-    urdf_path = output_path / f'urdf/{urdf_file}'
-    urdf_path = Path(urdf_path)
+    if format=="urdf":
+        file_name = f'{file_base}.urdf'
+        file_path = output_path / f'urdf/{file_name}'
+        file_path = Path(file_path)
+    elif format=="sdf":
+        file_name=f'{file_base}.sdf'
+        file_path=output_path / f'models/robot/{file_name}'
+        file_path = Path(file_path)
 
-    return urdf_path
+    return file_path
 
 
 def get_xacro_wrapper_path(robot: CrossRobot, output_path: str) -> Path:

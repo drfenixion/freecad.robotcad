@@ -416,13 +416,19 @@ class JointProxy(ProxyBase):
         joint = self.joint
         if format=="urdf":
             joint_xml = et.fromstring('<joint/>')
-        
+            joint_xml.attrib['name'] = get_valid_urdf_name(ros_name(joint))
+            joint_xml.attrib['type'] = joint.Type
         elif format=="sdf":
             # this configures most ot the user defined properties 
             joint_xml:et.Element=export.create_sdf_element(joint,ros_name(joint),"joint")
         # this are similar for both sdf and urdf
-        joint_xml.attrib['name'] = get_valid_urdf_name(ros_name(joint))
-        joint_xml.attrib['type'] = joint.Type
+            joint_xml.attrib['name'] = get_valid_urdf_name(ros_name(joint))
+            if joint.Type=="continuous":
+                # gazebo harmonic seems not to recognize continuous joints only revolute 
+                # so basically a continuous  joint is a  revolute with range (-inf,inf)
+                joint_xml.attrib['type'] = "revolute"
+            
+        
         # # find the axis element 
         ax=joint_xml.find("axis")
         if joint.Parent:
@@ -449,8 +455,10 @@ class JointProxy(ProxyBase):
             joint_xml.append(urdf_origin_from_placement(joint.Origin))
         elif format=="sdf":
             # this was also removed hence needs to be added i.e pose
-            ps=urdf_origin_from_placement(joint.Origin,format=format)
-            joint_xml.append(ps)
+            # ps=urdf_origin_from_placement(joint.Origin,format=format)
+            # joint_xml.append(ps)
+            pass
+            # pose is defined  for link
         if joint.Type != 'fixed':
             if format=="urdf":
                 joint_xml.append(et.fromstring('<axis xyz="0 0 1" />'))

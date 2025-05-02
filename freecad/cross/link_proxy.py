@@ -635,7 +635,12 @@ class LinkProxy(ProxyBase):
             ):
                 if format=="sdf":
                     # append visual properties to link
-                    # useless check 
+                    # useless check ,I'm just getting rid of unused variable warning
+                    # without this visual_xml would be marked as unused 
+                    # visual_xml has a reference in sdf/export.py stored in visual_container
+                    # that reference is extracted and additional elements and info is added
+                    # it is later return as xml
+                    # the same with collision_xml 
                     if xml==visual_xml:
                         link_xml.append(xml)
                 elif format=="urdf":
@@ -649,8 +654,11 @@ class LinkProxy(ProxyBase):
                     package_parent,
                     package_name,format=format
             ):
-                # this check is mostly useless
+                
                 if format=="sdf":
+                    # this check is mostly useless
+                    # I'm just getting rid of unused variable warning
+                    # stores reference in collision_container in sdf/export.py 
                     if xml==collision_xml:
                         link_xml.append(xml)
                 elif format=="urdf":

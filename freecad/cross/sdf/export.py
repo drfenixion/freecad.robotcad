@@ -2,8 +2,8 @@ from .sdf_parser import sdf_tree
 import xml.etree.ElementTree as ET
 from typing import List, Optional
 from . import setup
-import copy
-from typing import List, TypedDict,Union
+import copy,os
+from typing import List, TypedDict
 from .. import urdf_utils
 # a list of elements must have children that will be includeded whether selected or not 
 override_list=["inertia","axis","limit",]
@@ -187,8 +187,11 @@ def sanitize_for_sdf(data:str|list|tuple|bool)->str:
     else:
         return str(data)
 
-visual_container:list=[]
-"""
+
+class ref_data:
+    root_link:str|None=None
+    visual_container:list=[]
+    """
     # description
     visual container will contain a pointer or reference  to a 
     ET.Element item for the most recent link visual item  processed
@@ -210,12 +213,13 @@ visual_container:list=[]
     # TODO
      some code refactors later to avoid this 
     
-"""
-collison_container:list=[]
-"""
-   # description
-see visual_container
-"""  
+    """
+    collison_container:list=[]
+    """
+        # description
+        see visual_container
+    """  
+    
 # sdf elements 
 def create_sdf_element(obj,name:str,type:str):
     if type=="link":
@@ -243,10 +247,19 @@ def create_sdf_element(obj,name:str,type:str):
     selected_list=getattr(obj,"selected")
 
     update(obj,element,selected_list,property_struct)
+    if type in ["link",]:
+        if ref_data.root_link is not None:
+            placement=obj.Placement
+            if obj.Label2==ref_data.root_link:
+                element.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
+            else:
+                placement_xml=urdf_utils.urdf_origin_from_placement(placement,format="sdf")
+                placement_xml.set("relative_to",f'{ref_data.root_link}')
+                element.append(placement_xml)
     if type=="visual":
-        visual_container.append(element)
+        ref_data.visual_container.append(element)
     elif type=="collision":
-        collison_container.append(element)
+        ref_data.collison_container.append(element)
     return element
 
 
@@ -268,7 +281,7 @@ def object_as_sdf(obj,name:str,placement,type:str,element_type:str)->ET.Element:
     # geometry will be simple to inlude 
     # type will be used to determine whether its a box, cylinder,mesh ...
     # get reference to element
-        root_element:ET.Element=visual_container.pop()
+        root_element:ET.Element=ref_data.visual_container.pop()
         tranparency=root_element.find("transparency")
     # the FreeCAD Transparency flag varies from 0-100 ,sdf from 0-1
     # scale 
@@ -279,10 +292,8 @@ def object_as_sdf(obj,name:str,placement,type:str,element_type:str)->ET.Element:
             tranparency.text=getattr(viewobj,"Transparency",0)/100
             
     elif element_type=="collision":
-        root_element=collison_container.pop()
-        # pose
+        root_element=ref_data.collison_container.pop()
 
-    root_element.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
     
     if type=="box":
         # geometry
@@ -300,40 +311,51 @@ def object_as_sdf(obj,name:str,placement,type:str,element_type:str)->ET.Element:
    
     return root_element
 
+    
 def set_material_element(viewobj,parent_element):
+    # round color values to 4 decimal places and set last value to 1 if it's zero
+    fix_color = lambda c: [round(i, 3) for i in c[:-1]] + [1.0 if c[-1] == 0 else round(c[-1], 4)]
     material=copy.deepcopy(Elements.__class__.material)
     shapeAppearence=getattr(viewobj,"ShapeAppearance")[0]
     # extract and update material data 
     materialProperties={
-            "shininess":sanitize_for_sdf(shapeAppearence.Shininess),
-            "diffuse":sanitize_for_sdf(shapeAppearence.DiffuseColor),
-            "specular":sanitize_for_sdf(shapeAppearence.SpecularColor),
-            "emissive":sanitize_for_sdf(shapeAppearence.EmissiveColor),
-            "ambient":sanitize_for_sdf(shapeAppearence.AmbientColor)}
+            "shininess":sanitize_for_sdf(round(shapeAppearence.Shininess,4)),
+            "diffuse":sanitize_for_sdf(fix_color(shapeAppearence.DiffuseColor)),
+            "specular":sanitize_for_sdf(fix_color(shapeAppearence.SpecularColor)),
+            "emissive":sanitize_for_sdf(fix_color(shapeAppearence.EmissiveColor)),
+            "ambient":sanitize_for_sdf(fix_color(shapeAppearence.AmbientColor))}
     for tag,text in materialProperties.items():
         e=material.find(tag)
         e.text=text
     parent_element.append(material)
-def sdf_mesh(obj,placement,package_name,mesh_name):
+def sdf_mesh(obj,placement,package_name,mesh_name,element_type:str='visual'):
     
     geometry=ET.fromstring("<geometry/>")
     mesh=ET.fromstring("<mesh/>")
     uri=ET.fromstring("<uri/>")
-    uri.text=f'filename=package://{package_name}/meshes/{mesh_name}'
+    # uri.text=f'model://{package_name}/meshes/{mesh_name}'
+    # uri.text=f'model://{package_name}/meshes/{mesh_name}'
+    uri.text=f'../../meshes/{mesh_name}'
     mesh.append(uri)
     geometry.append(mesh)
-    visual:ET.Element=visual_container.pop()
-    # append mesh to geometry 
-    visual.append(geometry)
-    # append pose 
-    visual.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
+    # get collision or visual based on calling function 
+    if element_type=="visual":
+        elem:ET.Element=ref_data.visual_container.pop()
+    # collision
+    else:
+        elem:ET.Element=ref_data.collison_container.pop()
+    # # append mesh to geometry 
+    elem.append(geometry)
+ 
+    # visual.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
     # add material info 
-    if obj is not None:
-        viewobj=getattr(obj,"ViewObject",None)
-        if viewobj is not None:
-            set_material_element(viewobj,visual)
+    if element_type=="visual":
+        if obj is not None:
+            viewobj=getattr(obj,"ViewObject",None)
+            if viewobj is not None:
+                set_material_element(viewobj,elem)
     # fill maunally for now dynamic filling later based on available features
-    return visual
+    return elem
 
 # joint ignore list 
 # "type",
@@ -352,3 +374,39 @@ def sdf_mesh(obj,placement,package_name,mesh_name):
 # "sensor",
 # "parent",
 # "child"
+from ..wb_utils import SDF_VERSION
+def make_model_cfg(package_name, description_file_name):
+    model = ET.Element("model")
+    name = ET.SubElement(model, "name")
+    name.text = package_name  # Fixed f-string usage
+    ver = ET.SubElement(model, "version")
+    ver.text = "1.0"
+    sdf = ET.SubElement(model, "sdf", version=SDF_VERSION)  # Fixed attribute and f-string
+    author=ET.SubElement(model,"author")
+    author.append(ET.fromstring("<name>RoboCAD</name>"))
+    sdf.text = description_file_name
+    return model
+
+def make_world(package_name:str,include_models:list):
+    sdf=ET.fromstring("<sdf/>")
+    sdf.attrib["version"]=SDF_VERSION
+    world=ET.fromstring("<world/>")
+    world.attrib["name"]="robot_world"
+    sdf.append(world)
+    
+    for n in include_models:
+        inc=ET.fromstring("<include/>")
+        uri=ET.fromstring("<uri/>")
+        # TODO
+        # have this refer to the package name instead
+        uri.text=f'../models/{n}'
+        inc.append(uri)
+        world.append(inc)
+    return sdf
+import shutil
+def copy_files(src,dest):
+    for file in os.listdir(src):
+        src_file=os.path.join(src,file)
+        dest_file=os.path.join(dest,file)
+        if os.path.isfile(src_file):
+            shutil.copyfile(src_file,dest_file)
