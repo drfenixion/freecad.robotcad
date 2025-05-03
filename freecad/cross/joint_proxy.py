@@ -455,8 +455,12 @@ class JointProxy(ProxyBase):
             joint_xml.append(urdf_origin_from_placement(joint.Origin))
         elif format=="sdf":
             # this was also removed hence needs to be added i.e pose
-            # ps=urdf_origin_from_placement(joint.Origin,format=format)
-            # joint_xml.append(ps)
+            # get placement
+            # ensure joints are aligned to child link axis 
+            child_placement=export.ref_data.placement_info[joint.Child]
+            placement=child_placement.inverse() *joint.Origin
+            ps=urdf_origin_from_placement(placement,format=format)
+            joint_xml.append(ps)
             pass
             # pose is defined  for link
         if joint.Type != 'fixed':

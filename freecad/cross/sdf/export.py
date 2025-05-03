@@ -219,6 +219,9 @@ class ref_data:
         # description
         see visual_container
     """  
+    # {link_name,placement}
+    placement_info:dict={}
+    
     
 # sdf elements 
 def create_sdf_element(obj,name:str,type:str):
@@ -250,12 +253,24 @@ def create_sdf_element(obj,name:str,type:str):
     if type in ["link",]:
         if ref_data.root_link is not None:
             placement=obj.Placement
+            # append link-name and placement
+            ref_data.placement_info[obj.Label2]=obj.Placement
             if obj.Label2==ref_data.root_link:
                 element.append(urdf_utils.urdf_origin_from_placement(placement,format="sdf"))
             else:
                 placement_xml=urdf_utils.urdf_origin_from_placement(placement,format="sdf")
-                placement_xml.set("relative_to",f'{ref_data.root_link}')
+                # placement_xml.set("relative_to",f'{ref_data.root_link}')
                 element.append(placement_xml)
+    if type=="collision":
+        #NOTE
+        # from link_proxy.py->export_urdf link and visual are processed before collisions
+        # so a visual container exists in ref_data
+        lnk_name=name.replace("collision_",'')
+        lnk_placement=ref_data.placement_info[lnk_name]
+        # get collision placement relative to link
+        plc=lnk_placement.inverse()*obj.Placement
+        placement_xml=urdf_utils.urdf_origin_from_placement(plc,format="sdf")
+        element.append(placement_xml)
     if type=="visual":
         ref_data.visual_container.append(element)
     elif type=="collision":
