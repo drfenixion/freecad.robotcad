@@ -142,7 +142,14 @@ def read(filename):
 
     global col
     try:
-        col = collada.Collada(filename, ignore=[collada.common.DaeUnsupportedError])
+        col = collada.Collada(
+            filename,
+            ignore=[
+                collada.common.DaeUnsupportedError,
+                collada.common.DaeBrokenRefError,
+                collada.common.DaeMalformedError,
+            ],
+        )
     except Exception as e:
         error("Parse error: " + str(e) + '. File: ' + filename)
         return False

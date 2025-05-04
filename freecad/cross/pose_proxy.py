@@ -176,7 +176,7 @@ class _ViewProviderPose(ProxyBase):
             vobj, 'App::PropertyLength', 'AxisLength',
             'ROS Display Options',
             "Length of the rods for the joint's axis",
-            500.0,
+            250.0,
         )  # mm.
 
     def getIcon(self) -> str:

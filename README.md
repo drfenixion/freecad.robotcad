@@ -12,7 +12,11 @@ RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or
 <a href="https://vkvideo.ru/video-219386643_456239075" target="_blank">RobotCAD 6 - Reforged - some made models</a>
 <a href="https://vkvideo.ru/video-219386643_456239075" target="_blank">![robotcad_reforged_new](https://github.com/user-attachments/assets/fc0f731e-5840-4689-aa95-83769f879d48)</a>
 
+<br /><br />
+<a href="https://vkvideo.ru/video-219386643_456239078" target="_blank">RobotCAD 8 - Library - demo</a>
+<a href="https://vkvideo.ru/video-219386643_456239078" target="_blank">![models library_menu_demo](https://github.com/user-attachments/assets/71d7fdce-db16-4812-afd8-61a3aeb02eb5)</a>
 
+<br />
 Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=NUw6PLPC4x4" target="_blank">Diff drive chassis</a> <br />
 <a href="https://www.youtube.com/watch?v=o8casCU7c7Q" target="_blank">Manipulator on chassis</a> <br />
@@ -55,6 +59,7 @@ Video of creating controllable models: <br />
         1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
         1. Nvidia video cards container support
         1. README instruction how to use
+1. Integrated ready to use models library
 1. all features from CROSS workbench
 
 # Fast install and run
@@ -209,6 +214,22 @@ Compatible with ROS2.
 ## Installation 
 
 You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
+
+Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently.
+
+Example of installation of Conda FreeCAD with correct Python veriosn:
+```
+mkdir -p /home/$USER/miniconda3 && \
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
+bash /home/$USER/miniconda3/miniconda.sh -b -u -p /home/$USER/miniconda3 && \
+rm /home/$USER/miniconda3/miniconda.sh && \
+. /home/$USER/miniconda3/bin/activate && \
+conda init --all && \
+conda config --add channels conda-forge && \
+conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
+conda activate freecad_1_0_312 && \
+conda install numpy pandas matplotlib requests qt6-wayland pycollada
+```
 
 - In FreeCAD, menu "Edit / Preferences ..."
 - Category "Addon Manager"

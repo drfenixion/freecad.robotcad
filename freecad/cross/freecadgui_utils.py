@@ -6,16 +6,18 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 from copy import deepcopy
 import re
+
 try:
-    from PySide import QtWidgets
+    from PySide import QtWidgets, QtGui
 except:
-    from PySide2 import QtWidgets
+    from PySide2 import QtWidgets, QtGui
 
 from .freecad_utils import copy_obj_geometry, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
 from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import message
+from .freecad_utils import is_link as is_fc_link
 from .placement_utils import get_global_placement
 
 # Typing hints.
@@ -202,16 +204,28 @@ def createBoundAbstract(obj, createPrimitive = createBox):
 
 
 def set_collision_appearance(boundObj):
-    # LineColor
-    red   = 1.0  # 1 = 255
-    green = 1.0  #
-    blue  = 0.4  #
     boundObjGui = fcgui.ActiveDocument.getObject(boundObj.Name)
-    boundObjGui.LineColor  = (red, green, blue)
-    boundObjGui.PointColor = (red, green, blue)
-    boundObjGui.ShapeColor = (red, green, blue)
-    boundObjGui.LineWidth = 1
-    boundObjGui.Transparency = 90
+    if is_fc_link(boundObj):
+        boundObjGui.ShapeMaterial = fc.Material(
+            DiffuseColor=(1.00,1.00,0.4),
+            AmbientColor=(1.00,1.00,0.4),
+            SpecularColor=(1.00,1.00,0.4),
+            EmissiveColor=(1.00,1.00,0.4),
+            Shininess=(0.90),
+            Transparency=(0.70),
+        )
+        boundObjGui.OverrideMaterial = True
+    else:
+        # LineColor
+        red   = 1.0  # 1 = 255
+        green = 1.0  #
+        blue  = 0.4  #
+
+        boundObjGui.LineColor  = (red, green, blue)
+        boundObjGui.PointColor = (red, green, blue)
+        boundObjGui.ShapeColor = (red, green, blue)
+        boundObjGui.LineWidth = 1
+        boundObjGui.Transparency = 90
     return boundObj
 
 
@@ -325,3 +339,24 @@ def get_sorted_concated_names(objs: list[DO]) -> str:
     objs_names.sort()
     objs_names_concated = '_'.join(objs_names)
     return objs_names_concated
+
+
+def get_progress_bar(title:str = '', min: int = 0, max: int = 0, show_percents:bool = True):
+    # Create a progress bar
+    progressBar = QtGui.QProgressBar()
+    # progressBar.setGeometry(10, 10, 280, 30)
+    progressBar.setRange(min, max)
+    percents = ''
+    if show_percents:
+        percents = " %p%"
+    progressBar.setFormat(title + percents)
+    mw = fcgui.getMainWindow()
+    mw.statusBar().setStyleSheet("QStatusBar::item { border: none; }")
+    mw.statusBar().addWidget(progressBar, stretch=1)
+
+    return progressBar
+
+
+def gui_process_events():
+    """Use for unblock gui between ticks when sothing hard calculating"""
+    QtGui.QApplication.processEvents()

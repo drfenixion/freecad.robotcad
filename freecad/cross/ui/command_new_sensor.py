@@ -28,7 +28,7 @@ class _NewSensorCommand:
         return is_robot_selected() or is_link_selected() or is_joint_selected()
 
     def Activated(self):
-        git_init_submodules(update_if_dir_is_empty = SDFORMAT_PATH)
+        git_init_submodules(submodule_repo_path = SDFORMAT_PATH)
         form = SensorsSelectorModalClass()
         form.exec_()
 
