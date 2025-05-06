@@ -40,7 +40,7 @@ from .utils import values_from_string
 from .utils import get_valid_filename
 from .exceptions import NoPartWrapperOfObject
 from .freecad_utils import validate_types
-
+import re
 # Stubs and typing hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "AttachedCollisionObject". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -514,6 +514,7 @@ def remove_ros_workspace(path) -> str:
 def export_templates(
         template_files: list[str],
         package_parent: [Path | str],
+        format:str="urdf",
         **keys: SupportsStr,
 ) -> None:
     """Export generated files.
@@ -549,10 +550,17 @@ def export_templates(
             if _has_meshes_directory(package_parent, package_name)
             else ''
         )
-
+    
     for f in template_files:
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
+        if f =="CMakeLists.txt":
+            if format=='sdf':
+                template=re.sub("{install}","install(DIRECTORY launch {meshes_dir} models worlds DESTINATION share/${{PROJECT_NAME}} )",template)
+                
+            elif format=='urdf':
+                template=re.sub("{install}","install(DIRECTORY launch {meshes_dir} rviz urdf worlds DESTINATION share/${{PROJECT_NAME}})",template)
+
         txt = template.format(**keys)
 
         xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
@@ -579,13 +587,12 @@ def _has_ros_type(obj: DO, type_: str) -> bool:
 
 def _has_meshes_directory(
         package_parent: [Path | str],
-        package_name: str,format:str="urdf",
+        package_name: str,
 ) -> bool:
     """Return True if the directory "meshes" exists in the package."""
-    if format=="urdf":
-        meshes_directory = Path(package_parent) / package_name / 'meshes'
-    elif format=="sdf":
-        meshes_directory = Path(package_parent) / package_name / 'sdf'/'meshes'
+    
+    meshes_directory = Path(package_parent) / package_name / 'meshes'
+   
     return meshes_directory.exists()
 
 

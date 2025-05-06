@@ -891,12 +891,13 @@ class RobotProxy(ProxyBase):
             template_files = [
             'package.xml',
             'CMakeLists.txt',
-            'launch/description.launch.py',
-            'launch/display.launch.py',
-            'launch/gazebo.launch.py',
-            'rviz/robot_description.rviz',
+            # 'launch/description.launch.py',
+            # 'launch/display.launch.py',
+            # 'launch/gazebo.launch.py',
+            # 'rviz/robot_description.rviz',
             'worlds/cars_and_trees.sdf',
             'worlds/empty.sdf',
+            'launch/gazebo_sdf.launch.py'
             ]
             write_files = template_files + [
                 'meshes/',
@@ -982,7 +983,7 @@ class RobotProxy(ProxyBase):
             return
         meshes_dir = (
             'meshes '
-            if _has_meshes_directory(Path(project_path), package_name,format=format)
+            if _has_meshes_directory(Path(project_path), package_name)
             else ''
         )
         robot_name = get_valid_urdf_name(ros_name(self.robot))
@@ -1026,6 +1027,7 @@ class RobotProxy(ProxyBase):
         export_templates(
             template_files,
             project_path,
+            format=format,
             meshes_dir=meshes_dir,
             package_name=package_name,
             urdf_file=urdf_file,
