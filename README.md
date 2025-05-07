@@ -74,10 +74,10 @@ Same in one line
 ```
 cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd freecad.robotcad/docker && bash run.bash -c
 ```
-Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu).
+Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
-If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
-
+If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manullay Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
+ 
 **You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
 
 RobotCAD will not work with CROSS workbench (same namespace). Remove CROSS before install RobotCAD.
