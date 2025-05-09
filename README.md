@@ -74,7 +74,7 @@ Same in one line
 ```
 cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd freecad.robotcad/docker && bash run.bash -c
 ```
-Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
+Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
 If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manullay Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
 
