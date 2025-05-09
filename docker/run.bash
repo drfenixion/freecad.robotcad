@@ -174,7 +174,9 @@ fi
 echo "Command to run in container: $command"
 
 
-[ "$force_run_new_container" = true ] && [ -d $build_data_path ] && rm -rf $build_data_path # remove build dirs if new container
+[ "$force_run_new_container" = true ] && [ -d $build_data_path ] && \
+    echo "Ask sudo password for remove dir (container build data dir at host). It need to clear before run new container: $build_data_path" && \
+    sudo rm -rf $build_data_path # remove build dirs if new container
 # make dirs at host for builds, logs, other from container
 for dir in 'build' 'install' 'log' 'ros2_system_logs'
 do
@@ -324,6 +326,7 @@ else
         --network=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
+        --user=$uid:$gid \
         $debug_port \
         $localhost_address \
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
