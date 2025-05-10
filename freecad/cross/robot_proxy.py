@@ -14,8 +14,9 @@ from copy import deepcopy
 
 import FreeCAD as fc
 
-from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide.QtWidgets import QMenu # FreeCAD's PySide
+from PySide2.QtWidgets import QFileDialog  # FreeCAD's PySide
+from PySide2.QtWidgets import QMenu # FreeCAD's PySide
+from PySide2.QtWidgets import QMessageBox
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -36,7 +37,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH
+from .wb_utils import ICON_PATH,SDF_VERSION,RESOURCES_PATH
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -67,6 +68,8 @@ from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_sensors_file_name
 from .wb_utils import get_controllers_config_file_name
 from .sdf.sdf_parser.sdf_tree import sdf_dict_to_xml
+
+
 
 # Stubs and type hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -214,16 +217,18 @@ class RobotProxy(ProxyBase):
                 'MaterialCardPath',
                 'MaterialDensity',
                 'RobotType',
+
                 'GenerateCodeForRosVersion',
                 '_Type',
                 'Mass',
             ],
         )
 
+
         if obj.Proxy is not self:
             obj.Proxy = self
         self.robot = obj
-
+        
         # List of objects created for the robot.
         # Used for example by `robot_from_urdf` to keep track of imported
         # meshes.
@@ -252,7 +257,9 @@ class RobotProxy(ProxyBase):
         self._broadcasters: Optional[list[CrossController]] = None
 
         self._init_properties(obj)
-
+#  initialize sdf world properties 
+#   sdf parameters
+        
     @property
     def created_objects(self) -> DOList:
         """List of objects created for the robot."""
@@ -262,7 +269,7 @@ class RobotProxy(ProxyBase):
     def joint_variables(self) -> dict[CrossJoint, str]:
         """Map of CROSS joints to joint variable names."""
         return self._joint_variables
-
+    
     def _init_properties(self, obj: CrossRobot):
         add_property(
             obj, 'App::PropertyString', '_Type', 'Internal',
@@ -299,7 +306,8 @@ class RobotProxy(ProxyBase):
             'The path to the ROS package to export files to,'
             ' relative to $ROS_WORKSPACE/src',
         )
-
+       
+        
         add_property(
                 obj,
                 'App::PropertyString',
@@ -847,7 +855,7 @@ class RobotProxy(ProxyBase):
                     )
         return None
 
-    def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
+    def export_urdf(self, interactive: bool = False,format:str="urdf") -> Optional[et.Element]:
         """Export the robot as URDF, writing files."""
         if not self.is_execute_ready():
             return None
@@ -859,8 +867,8 @@ class RobotProxy(ProxyBase):
         p, output_path = get_rel_and_abs_path(self.robot.OutputPath)
         if p != self.robot.OutputPath:
             self.robot.OutputPath = p
-
-        template_files = [
+        if format=="urdf":
+            template_files = [
             'package.xml',
             'CMakeLists.txt',
             'launch/description.launch.py',
@@ -871,14 +879,33 @@ class RobotProxy(ProxyBase):
             'urdf/sensors_template.urdf.xacro',
             'worlds/cars_and_trees.sdf',
             'worlds/empty.sdf',
-        ]
+            ]
 
-        write_files = template_files + [
+            write_files = template_files + [
                 'meshes/',
                 'urdf/',
                 'overcross/',
                 'worlds/',
-        ]
+            ]
+        elif format=="sdf":
+            template_files = [
+            'package.xml',
+            'CMakeLists.txt',
+            # 'launch/description.launch.py',
+            # 'launch/display.launch.py',
+            # 'launch/gazebo.launch.py',
+            # 'rviz/robot_description.rviz',
+            'worlds/cars_and_trees.sdf',
+            'worlds/empty.sdf',
+            'launch/gazebo_sdf.launch.py'
+            ]
+            write_files = template_files + [
+                'meshes/',
+                'models/',
+                'world',
+                'overcross/',
+                'worlds/',
+            ]
 
         if interactive and fc.GuiUp:
             diag = FileOverwriteConfirmationDialog(
@@ -894,15 +921,30 @@ class RobotProxy(ProxyBase):
             return
         project_path, package_name, description_package_path = split_package_path(output_path)
         # TODO: warn if package name doesn't end with `_description`.
-        xml = et.fromstring('<robot/>')
-        xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
-        xml.append(
+        if format=="urdf":
+            xml = et.fromstring('<robot/>')
+            xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
+            xml.append(
             xml_comment_element(
             'Generated by RobotCAD, a ROS Workbench for FreeCAD ('
             'https://github.com/drfenixion/freecad.robotcad)',
             ),
-        )
-
+            )
+        elif format=="sdf":
+            sdf_declaration=et.fromstring(f'<sdf version="{SDF_VERSION}"/>')
+            sdf_declaration.append(
+            xml_comment_element(
+            'Generated by RobotCAD, a ROS Workbench for FreeCAD ('
+            'https://github.com/drfenixion/freecad.robotcad)',
+            ),
+            )
+            xml=et.fromstring("<model/>")
+            xml.attrib['name'] = get_valid_urdf_name(self.robot.Label)
+            sdf_declaration.append(xml)
+            # set rootlink
+            from .sdf.export import ref_data
+            ref_data.root_link=root_link=self.get_root_link().Label2
+        
         for link in self.get_links():
             if not hasattr(link, 'Proxy'):
                 error(
@@ -910,7 +952,7 @@ class RobotProxy(ProxyBase):
                     True,
                 )
                 return
-            xml.append(link.Proxy.export_urdf(project_path, package_name))
+            xml.append(link.Proxy.export_urdf(project_path, package_name,format=format))
 
         for joint in self.get_joints():
             if not joint.Parent:
@@ -920,7 +962,7 @@ class RobotProxy(ProxyBase):
                 error(f"Joint '{joint.Label}' has no child link", True)
                 continue
             if hasattr(joint, 'Proxy') and joint.Proxy:
-                xml.append(joint.Proxy.export_urdf())
+                xml.append(joint.Proxy.export_urdf(format=format))
             else:
                 error(
                     f"Internal error with joint '{joint.Label}'"
@@ -929,20 +971,21 @@ class RobotProxy(ProxyBase):
 
         # Save the xml into a file.
         description_package_path.mkdir(parents=True, exist_ok=True)
-        urdf_path = get_urdf_path(self.robot, description_package_path)
-        urdf_file = urdf_path.name
+        # return sdf or urdf based on the path
+        description_path = get_urdf_path(self.robot, description_package_path,format=format)
+            
+        urdf_file = description_path.name
+        
         root_link=self.get_root_link()
 
         if root_link == None:
             error('Bad kinematics. Double root link or link not in joint ralationship or empty kinematic chain detected. Fix it and repeat.', True)
             return
-
         meshes_dir = (
             'meshes '
             if _has_meshes_directory(Path(project_path), package_name)
             else ''
         )
-
         robot_name = get_valid_urdf_name(ros_name(self.robot))
         controllers_config_file_name = get_controllers_config_file_name(robot_name)
         xacro_wrapper_file = get_xacro_wrapper_file_name(robot_name)
@@ -956,11 +999,35 @@ class RobotProxy(ProxyBase):
 
         robot_controllers_yaml = self.get_robot_controllers_yaml()
         save_yaml(robot_controllers_yaml, output_path / f'overcross/{controllers_config_file_name}')
-
-        save_xml(xml, urdf_path)
+        if format=="urdf":
+            save_xml(xml, description_path)
+        elif format=="sdf":
+            save_xml(sdf_declaration, description_path)
+            from .sdf.export import make_model_cfg
+            save_xml(make_model_cfg(description_package_path.name,urdf_file)
+                     ,description_package_path/'models'/'robot'/'model.config')
+            # TODO 
+            # copy files from the groundplane to models/groundplane
+            from .sdf import export
+            grnd_src_file_path = Path(RESOURCES_PATH / 'templates'/'groundPlane')
+            grnd_dest_file_path=description_package_path/'models'/'groundPlane'
+            Path(grnd_dest_file_path).mkdir(parents=True,exist_ok=True)
+            export.copy_files(grnd_src_file_path,grnd_dest_file_path)
+            # sun
+            sun_src_file_path=Path(RESOURCES_PATH / 'templates'/'sun')
+            sun_dest_file_path=description_package_path/'models'/'sun'
+            Path(sun_dest_file_path).mkdir(parents=True,exist_ok=True)
+            export.copy_files(sun_src_file_path,sun_dest_file_path)
+            # create a worlds folder that has a world file that will include the robot and the ground plane
+            worlds=description_package_path/'worlds'
+            Path(worlds).mkdir(parents=True,exist_ok=True)
+            from .sdf import export
+            save_xml(export.make_world(package_name,['groundPlane','sun','robot',]),worlds/'world.sdf')
+            
         export_templates(
             template_files,
             project_path,
+            format=format,
             meshes_dir=meshes_dir,
             package_name=package_name,
             urdf_file=urdf_file,
@@ -971,7 +1038,7 @@ class RobotProxy(ProxyBase):
             robot_name=robot_name,
         )
 
-        return xml
+        return xml if format=="urdf" else sdf_declaration
 
     def get_sensors_xml(self) -> str:
 

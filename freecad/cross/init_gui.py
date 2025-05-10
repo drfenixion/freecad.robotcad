@@ -47,6 +47,7 @@ from .ui import command_set_material # noqa: F401
 from .ui import command_calculate_mass_and_inertia # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
+from .ui import command_edit_prameters
 
 from .wb_utils import ICON_PATH
 from . import wb_constants
@@ -104,6 +105,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewPose',  # Defined in ./ui/command_new_pose.py.
             'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
+            'EditParameters',
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.

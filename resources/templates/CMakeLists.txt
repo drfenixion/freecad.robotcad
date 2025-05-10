@@ -15,8 +15,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(DIRECTORY launch {meshes_dir}rviz urdf worlds
-  DESTINATION share/${{PROJECT_NAME}}
-)
+{install}
 
 ament_package()
