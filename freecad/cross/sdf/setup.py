@@ -291,8 +291,12 @@ class CollapsibleSection(QWidget):
                         selected_obj.touch()  # Mark object as modified
 
                 # Optional: Commit transaction if needed
-                if FreeCAD.ActiveDocument:
-                    FreeCAD.ActiveDocument.recompute()
+                
+                # if FreeCAD.ActiveDocument:
+                #     FreeCAD.ActiveDocument.recompute()
+                # executing line 295 causes errors by  forcing execute method to trigger too early \
+                # If some objects haven’t finished restoring, dependencies may be broken
+                # FreeCAD automatically recomputes after restoration
 
             except AttributeError:
                 warn(f"Object has no selected property")
