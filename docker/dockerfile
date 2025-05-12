@@ -44,18 +44,6 @@ RUN apt-get update && \
 ### End Install system packages
 
 
-### Install FreeCAD Daily
-RUN echo 'Install FreeCAD Daily'
-RUN add-apt-repository ppa:freecad-maintainers/freecad-daily && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        freecad-daily -y && \
-    apt-get autoclean -y && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
-### End Install FreeCAD Daily
-
-
 # ### Install FreeCAD Stable (0.21.2 - at time of commit)
 # RUN echo 'Install FreeCAD'
 # RUN add-apt-repository ppa:freecad-maintainers/freecad-stable && \
@@ -120,6 +108,18 @@ RUN chown -R $USER:$USER /var/lib/dpkg/
 USER $USER
 
 
+### Install FreeCAD Daily
+RUN echo 'Install FreeCAD Daily'
+RUN sudo add-apt-repository ppa:freecad-maintainers/freecad-daily && \
+    sudo apt-get update && \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        freecad-daily -y && \
+    sudo apt-get autoclean -y && \
+    sudo apt-get autoremove -y && \
+    sudo rm -rf /var/lib/apt/lists/*
+### End Install FreeCAD Daily
+
+
 # should be after user activation
 ### Install FreeCAD from conda py3.12
 RUN echo 'Install FreeCAD conda py3.12'
@@ -133,9 +133,9 @@ RUN mkdir -p /home/$USER/miniconda3 && \
     conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
     conda activate freecad_1_0_312 && \
     conda install numpy pandas matplotlib requests qt6-wayland pycollada && \
-    apt-get autoclean -y && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/*
+    sudo apt-get autoclean -y && \
+    sudo apt-get autoremove -y && \
+    sudo rm -rf /var/lib/apt/lists/*
 ### End Install FreeCAD conda py3.12
 
 

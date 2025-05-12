@@ -202,6 +202,11 @@ if [ "$force_build_new_image" = true ]; then
 fi
 
 
+uid=$(id -u $USER)
+# Use old user group in case of group was changed after docker install
+# or use current user group if installion without docker install
+gid=${OLD_GID:-$(id -g $USER)}
+group=${OLD_GROUP:-$(groups | awk '{print $1}')}
 # build if image not exists
 if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo 'Build docker container...'
@@ -209,12 +214,6 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo ''
     echo 'Docker image will take about 12Gb free space. Check you have more.'
     echo ''
-
-    uid=$(id -u $USER)
-    # Use old user group in case of group was changed after docker install
-    # or use current user group if installion without docker install
-    gid=${OLD_GID:-$(id -g $USER)}
-    group=${OLD_GROUP:-$(groups | awk '{print $1}')}
 
     echo "UID will be used for user inside image:  $uid"
     echo "User name will be used for user inside image:  $USER"
@@ -287,17 +286,19 @@ else
     host_freecad_cache_path=$HOME/.cache/FreeCAD
     cont_freecad_cache_path=$cont_user_path/.cache/FreeCAD
 
-    if [ ! -d "$host_freecad_mods_path" ]; then
-        # Create the directory and its parents if they don't exist
-        echo "Create host freecad mods directory."
-        mkdir -p "$host_freecad_mods_path"
-    fi
 
+    # create freecad dirs in case there is no FreeCAD at host
+    for dir in $host_freecad_mods_path $host_freecad_user_config_path $host_freecad_cache_path
+    do
+        [ -d $dir ] || echo "Create directory: $dir" && mkdir -p $dir
+    done
 
+    # fix wrong dirs owrner
     if [ "$fix_freecad_dirs_owner" = true ]; then
-        echo 'Change "~/.local/share/FreeCAD" directory owner to current user. (required password for sudo)'
-        # Set the ownership of the created directory to the current user
-        sudo chown -R $USER:$USER "$host_freecad_share_path"
+        for dir in $host_freecad_mods_path $host_freecad_user_config_path $host_freecad_cache_path
+        do
+            echo "Change owner to $USER of directory: $dir (required password for sudo)" && sudo chown -R $USER:$USER "$dir"
+        done
     fi
 
 
@@ -326,11 +327,11 @@ else
         --network=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
-        --user=$uid:$gid \
         $debug_port \
         $localhost_address \
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
+    # --user=$uid:$gid \
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
     # --mount dst=/usr/lib/python3/dist-packages,volume-opt=device=$build_data_path/usr_lib_python-major-ver_dist-packages$mount_options \
     # --mount dst=/usr/local/lib/python3.12/dist-packages,volume-opt=device=$build_data_path/usr_local_lib_python_ver_dist-packages$mount_options \
