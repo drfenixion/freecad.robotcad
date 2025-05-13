@@ -196,7 +196,7 @@ The key features of RobotCAD are:
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2 - FreeCAD AppImage build (Python 3.10+ in FreeCAD).
+Compatible with FreeCAD at least v0.21.2 - min Python 3.12 inside FreeCAD (FreeCAD Conda build, FreeCAD-Daily).
 Compatible with ROS2.
 
 ## Features
