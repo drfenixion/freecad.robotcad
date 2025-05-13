@@ -46,16 +46,17 @@ Video of creating controllable models: <br />
     1. Add the necessary sensors and use it in Gazebo.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
-    1. URDF
+    1. URDF (kinematics, mass, inertia, sensors, etc.)
     1. Meshes
-1. Tool for use external extended code generating service (startup script, docker, multicopters)
+    1. Controllers config (use extended generator if need all ready to use controllers code)
+1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
     1. External code generator:
         1. all of basic code generator
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
-        1. ros2_controllers 
+        1. ros2_controllers (integrated in your package with ros2_control launcher)
         1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
         1. Nvidia video cards container support
         1. README instruction how to use
