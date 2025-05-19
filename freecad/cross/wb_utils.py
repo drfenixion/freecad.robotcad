@@ -1151,13 +1151,22 @@ def git_init_submodules(
 
     files_and_dirs = os.listdir(submodule_repo_path)
     # update if dir is empty or .gitmodules file was changed
+    is_gitsubmodules_updated = os.path.expanduser('~/.is_gitsubmodules_updated')
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
+        # update if empty dir
         if not len(files_and_dirs):
             git_update_submodules(update_from_remote_branch_param)
+        # update when changed
         elif gitmodules_changed:
             git_deinit_submodules()
             git_update_submodules(update_from_remote_branch_param)
+        # first update in clear container
+        elif not os.path.exists(is_gitsubmodules_updated):
+            with open(is_gitsubmodules_updated, 'w+') as f:
+                git_update_submodules(update_from_remote_branch_param)
+                f.write("git submodules updated")
+                f.close()                
     else:
         git_update_submodules(update_from_remote_branch_param)
 
