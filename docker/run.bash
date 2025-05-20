@@ -273,7 +273,8 @@ else
     if [ "$debug" = true ] ; then
         debug_port='-p 5678:5678'
         debug_env='export DEBUG=1 &&'
-        localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
+        # localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
+        localhost_address='--add-host localhost=10.0.2.2' # 10.0.2.2 - docker host OC address in rootless mode with env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false
     fi
 
 
@@ -335,6 +336,7 @@ else
         --env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
         --env PULSE_SERVER=$PULSE_SERVER \
         --env QT_X11_NO_MITSHM=1 \
+        --env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false \
         --network=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
