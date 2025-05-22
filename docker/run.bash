@@ -307,7 +307,7 @@ else
     # in regular docker will be used user from dockerfile (same as at host)
     # in rootless mode will be used root user
     user_option=''
-    is_rootless_docker=$(docker info -f "{{println .SecurityOptions}}" 2> /dev/null | grep rootless)
+    is_rootless_docker=$(docker info 2> /dev/null | grep rootless)
     if [ -n "$is_rootless_docker" ]; then
         echo -e "\nDetected rootless Docker. I use root user in container.\n"
         user_option='--user=root'
