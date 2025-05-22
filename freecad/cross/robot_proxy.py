@@ -121,6 +121,12 @@ def _add_joint_variable(
         prop_type = 'App::PropertyFloatConstraint'
     else:
         prop_type = 'App::PropertyFloat'
+
+    # recreate prop in case of type was changed
+    prop = getattr(robot, var_name, False)
+    if prop is not False:
+        robot.removeProperty(var_name)
+
     _, used_var_name = add_property(
         robot,
         prop_type,
@@ -128,6 +134,13 @@ def _add_joint_variable(
         category,
         help_txt,
     )
+
+    try:
+        # try to set old value in case of type was changed
+        setattr(robot, used_var_name, prop)
+    except:
+        pass
+    
     if joint.Type in ['prismatic', 'revolute']:
         # Set the default value to the current value to set min/max.
         value = robot.getPropertyByName(used_var_name)
