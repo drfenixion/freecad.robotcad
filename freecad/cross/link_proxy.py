@@ -618,7 +618,6 @@ class LinkProxy(ProxyBase):
         link_xml = et.fromstring(
             f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />',
         )
-        any_visual_appended = False
         for obj in self.link.Visual:
             for xml in _get_xmls_and_export_meshes(
                     obj,
@@ -627,7 +626,6 @@ class LinkProxy(ProxyBase):
                     package_parent,
                     package_name,
             ):
-                any_visual_appended = True
                 link_xml.append(xml)
         for obj in self.link.Collision:
             for xml in _get_xmls_and_export_meshes(
@@ -638,8 +636,8 @@ class LinkProxy(ProxyBase):
                     package_name,
             ):
                 link_xml.append(xml)
-        # link with only inertia tag leads to error in Gazebo (then check for visual)
-        if any_visual_appended:
+        # link with zero mass and inertia can leads to error ("pose must be finite") in Gazebo
+        if self.link.Mass.Value > 0:
             link_xml.append(
                 urdf_inertial(
                     mass=self.link.Mass.Value,
