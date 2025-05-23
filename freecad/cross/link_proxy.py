@@ -618,6 +618,7 @@ class LinkProxy(ProxyBase):
         link_xml = et.fromstring(
             f'<link name="{get_valid_urdf_name(ros_name(self.link))}" />',
         )
+        any_visual_appended = False
         for obj in self.link.Visual:
             for xml in _get_xmls_and_export_meshes(
                     obj,
@@ -626,6 +627,7 @@ class LinkProxy(ProxyBase):
                     package_parent,
                     package_name,
             ):
+                any_visual_appended = True
                 link_xml.append(xml)
         for obj in self.link.Collision:
             for xml in _get_xmls_and_export_meshes(
@@ -636,18 +638,20 @@ class LinkProxy(ProxyBase):
                     package_name,
             ):
                 link_xml.append(xml)
-        link_xml.append(
-            urdf_inertial(
-                mass=self.link.Mass.Value,
-                center_of_mass=self.link.CenterOfMass,
-                ixx=self.link.Ixx,
-                ixy=self.link.Ixy,
-                ixz=self.link.Ixz,
-                iyy=self.link.Iyy,
-                iyz=self.link.Iyz,
-                izz=self.link.Izz,
-            ),
-        )
+        # link with only inertia tag leads to error in Gazebo (then check for visual)
+        if any_visual_appended:
+            link_xml.append(
+                urdf_inertial(
+                    mass=self.link.Mass.Value,
+                    center_of_mass=self.link.CenterOfMass,
+                    ixx=self.link.Ixx,
+                    ixy=self.link.Ixy,
+                    ixz=self.link.Ixz,
+                    iyy=self.link.Iyy,
+                    iyz=self.link.Iyz,
+                    izz=self.link.Izz,
+                ),
+            )
         return link_xml
 
     def _fix_lost_fc_links(self) -> None:
