@@ -69,7 +69,7 @@ def generate_launch_description():
             arguments=[
                 '-name', '{robot_name}',
                 '-x', '1.2',
-                '-z', '2.3',
+                '-z', '1.0',
                 '-Y', '3.4',
                 '-topic', '/robot_description',
             ],
