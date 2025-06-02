@@ -982,6 +982,7 @@ class RobotProxy(ProxyBase):
             sensors_file=sensors_file,
             sensors_urdf=sensors_urdf,
             robot_name=robot_name,
+            cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera'])
         )
 
         return xml
@@ -993,6 +994,26 @@ class RobotProxy(ProxyBase):
             sensors_xml += '\n\n' + sdf_dict_to_xml(sensor_xml_as_dict, full_document = False, pretty = True)
 
         return sensors_xml
+    
+    def get_sensors_topics_by_types(self, sensor_types: list) -> str:
+        """Return comma separated sensors topics by sensors type"""
+
+        topics = []
+        for sensor_xml_as_dict in self.get_sensors_data().values():
+            for sensor_type in sensor_types:
+                try:
+                    type = sensor_xml_as_dict['gazebo']['sensor']['@type']
+                    if type == sensor_type:
+                        topic = sensor_xml_as_dict['gazebo']['sensor']['topic']
+                        if type == 'rgbd_camera':
+                            topics.append("'"+topic+"/image'")
+                            topics.append("'"+topic+"/depth_image'")
+                        else:
+                            topics.append("'"+topic+"'")
+                except KeyError:
+                    pass                    
+
+        return ','.join(topics)
 
     def get_sensors_data(self, parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE) -> dict:
         """Get sensors data as sensors dictionaries from all elements (links, joints) of robot"""

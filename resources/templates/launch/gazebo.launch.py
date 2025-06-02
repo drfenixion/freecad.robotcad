@@ -105,7 +105,7 @@ def generate_launch_description():
         launch_arguments=dict(use_sim_time=use_sim_time).items(),
     )
 
-    gz_bridge = Node(
+    gz_bridge_parameter = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=['/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'],
@@ -114,6 +114,14 @@ def generate_launch_description():
             'use_sim_time': use_sim_time,
         }}],
     )
+
+    gz_bridge_camera = Node(
+        package='ros_gz_image',
+        executable='image_bridge',
+        arguments=[{cameras_topics_comma_sep}],
+        output='screen'
+    )
+    gz_bridge_camera_dummy = DeclareLaunchArgument('', default_value='') # dummy for LaunchDescription could take empty element
 
     return LaunchDescription([
         use_sim_time_launch_arg,
@@ -124,5 +132,6 @@ def generate_launch_description():
         rviz,
         gazebo,
         spawn,
-        gz_bridge,
+        gz_bridge_parameter,
+        (gz_bridge_camera if [{cameras_topics_comma_sep}] else gz_bridge_camera_dummy)
     ])
