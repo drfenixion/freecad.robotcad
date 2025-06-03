@@ -28,6 +28,12 @@ ENV PIP_BREAK_SYSTEM_PACKAGES 1
 SHELL ["/bin/bash", "-c"]
 
 
+# update gpg keys because can be expired (01.06.2025)
+RUN echo 'Update gpg keys...'
+RUN sudo apt-key del F42ED6FBAB17C654
+RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros2-latest-archive-keyring.gpg
+
+
 ### Install system packages
 RUN echo 'Install system packages'
 RUN apt-get update && \
