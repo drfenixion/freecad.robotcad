@@ -214,7 +214,7 @@ Compatible with ROS2.
 
 ## Installation 
 
-You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
+You need a recent version of FreeCAD (v1 or above) with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
 Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently. At moment of writing there is FreeCAD-Daily with py3.12 but it is not recomended because not stable version. Best way is use Conda for install currently.
 
