@@ -218,7 +218,7 @@ You need a recent version of FreeCAD (v1 or above) with the ability to configure
 
 Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently. At moment of writing there is FreeCAD-Daily with py3.12 but it is not recomended because not stable version. Best way is use Conda for install currently.
 
-Example of installation of Conda FreeCAD with correct Python veriosn:
+Example of installation of Conda FreeCAD with correct Python versios and RobotCAD by git clone:
 ```
 mkdir -p /home/$USER/miniconda3 && \
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
@@ -230,15 +230,12 @@ conda config --add channels conda-forge && \
 conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
 conda activate freecad_1_0_312 && \
 conda install numpy pandas matplotlib requests qt6-wayland pycollada
+conda install robostack-jazzy::ros-jazzy-xacro
+cd ~/.local/share/FreeCAD/Mod
+git clone https://github.com/drfenixion/freecad.robotcad.git
+cd -
+freecad
 ```
-
-- In FreeCAD, menu "Edit / Preferences ..."
-- Category "Addon Manager"
-- Add an entry to "Custom repository" by clicking on the "+" sign.
-- Repository URL: `https://github.com/drfenixion/freecad.robotcad.git`, branch: `main`
-- Click on "OK" to close the dialog "Preferences"
-- Back to FreeCAD's main window, menu "Tools / Addon manager"
-- Search and install the workbench via the [Addon Manager](https://wiki.freecad.org/Std_AddonMgr)
 
 ## Launching FreeCAD with ROS
 
