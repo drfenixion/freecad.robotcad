@@ -95,10 +95,11 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('urdf_parser_py')
 
-try:
-    import xacro
-except (ModuleNotFoundError, ImportError):
-    pip_install('xacro')
+# # Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
+# try:
+#     import xacro
+# except (ModuleNotFoundError, ImportError):
+#     pip_install('xacro')
 
 try:
     import xmltodict
