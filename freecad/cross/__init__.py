@@ -111,9 +111,14 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('pycollada')
 
+
 # Must be imported after the call to `add_ros_library_path`.
-from .ros.utils import is_ros_found  # noqa: E402.
-
-
-if is_ros_found():
+try:
+    import xacro
     fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
+    imports_ok = True
+except Exception as e:
+    # TODO: Warn the user more nicely.
+    from freecad.cross.freecad_utils import warn
+    warn(str(e) + '. Models library tool is disabled.', gui=False)
+    imports_ok = False
