@@ -3,17 +3,18 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 
 from PySide import QtGui
-from freecad.cross.robot_from_urdf import assembly_from_urdf_path  # FreeCAD's PySide!
 
-from ..assembly_from_urdf import assembly_from_urdf
+
 from ..freecad_utils import warn
 from ..gui_utils import tr
 from ..ros.utils import is_ros_found
 try:
-    from ..urdf_loader import UrdfLoader
+    from freecad.cross.robot_from_urdf import assembly_from_urdf_path  # FreeCAD's PySide!
+    imports_ok = True
 except ImportError as e:
     # TODO: Warn the user more nicely.
-    warn(str(e), gui=False)
+    warn(str(e) + '. Assembly from URDF tool is disabled.', gui=False)
+    imports_ok = False
 
 
 class _AssemblyFromUrdfCommand:
@@ -47,7 +48,7 @@ class _AssemblyFromUrdfCommand:
             fcgui.SendMsgToActiveView('ViewFit')
 
     def IsActive(self):
-        return is_ros_found()
+        return imports_ok
 
 
 fcgui.addCommand('AssemblyFromUrdf', _AssemblyFromUrdfCommand())
