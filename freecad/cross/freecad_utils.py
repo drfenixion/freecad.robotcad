@@ -22,7 +22,7 @@ from . import wb_constants
 try:
     # For v0.21:
     from addonmanager_utilities import get_python_exe
-except (ModuleNotFoundError, ImportError):
+except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
