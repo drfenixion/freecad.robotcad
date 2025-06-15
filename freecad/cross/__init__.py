@@ -113,12 +113,17 @@ except (ModuleNotFoundError, ImportError):
 
 
 # Must be imported after the call to `add_ros_library_path`.
+from freecad.cross.freecad_utils import warn
 try:
     import xacro
-    fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
+    from .ros.utils import is_ros_found  # noqa: E402.
+    if is_ros_found():
+        fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
+    else:
+        fc.addImportType('URDF files (*.urdf)', 'freecad.cross.import_urdf')
+        warn('ROS2 was not detected. Import of Xacro files is disabled. URDF import is posible.', gui=False)
     imports_ok = True
 except Exception as e:
     # TODO: Warn the user more nicely.
-    from freecad.cross.freecad_utils import warn
     warn(str(e) + '. Models library tool is disabled.', gui=False)
     imports_ok = False
