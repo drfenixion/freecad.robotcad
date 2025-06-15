@@ -10,6 +10,7 @@ from ..robot_from_urdf import robot_from_urdf_path
 from ..ros.utils import is_ros_found
 try:
     from ..urdf_loader import UrdfLoader
+    import xacro
     imports_ok = True
 except ImportError as e:
     # TODO: Warn the user more nicely.
@@ -47,7 +48,7 @@ class _UrdfImportCommand:
 
 
     def IsActive(self):
-        return is_ros_found() and imports_ok
+        return imports_ok
 
 
 fcgui.addCommand('UrdfImport', _UrdfImportCommand())
