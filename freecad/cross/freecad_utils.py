@@ -8,12 +8,9 @@ from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
 import sys
-
 import numpy as np
-
 import FreeCAD as fc
 import Part
-import MaterialEditor
 
 from .utils import true_then_false
 from . import wb_constants
@@ -793,6 +790,7 @@ def material_from_material_editor(
     """
     material = Material(card_path)
     material.card_path = card_path
+    import MaterialEditor
     material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
     try:
         material.material_name = material_editor.cards[material_editor.card_path]
