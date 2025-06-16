@@ -264,6 +264,10 @@ git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
 bash run.bash -d
 ```
+- Install RobotCAD manually via Conda, see installation section. Run FreeCAD with DEBUG=1 env.
+```
+DEBUG=1 freecad
+```
 - Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.robotcad.git` on Linux
 - Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.robotcad`)
 - Clone this repository and create a symbolic link to the directory `freecad.robotcad` (or the directory containing this repository if you changed the name) to FreeCAD's `Mod` directory (`~/.local/share/FreeCAD/Mod` on Linux).
