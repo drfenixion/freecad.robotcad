@@ -218,7 +218,7 @@ You need a recent version of FreeCAD (v1 or above) with the ability to configure
 
 Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently. At moment of writing there is FreeCAD-Daily with py3.12 but it is not recomended because not stable version. Best way is use Conda for install currently.
 
-Example of installation of Conda FreeCAD with correct Python versios and RobotCAD by git clone:
+Example of installation of Conda FreeCAD with correct Python version and RobotCAD by git clone:
 ```
 mkdir -p /home/$USER/miniconda3 && \
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
