@@ -27,9 +27,9 @@ Video of creating controllable models: <br />
 1. Autoinstall and run by startup script
 1. Modeling parts (in FreeCAD),
 1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc),
-    1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
+    1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
     1. Set placement just by selecting faces of links and it will automatically connected
     1. Joint/link placement rotation tools
