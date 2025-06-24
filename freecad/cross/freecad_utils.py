@@ -15,6 +15,9 @@ import Part
 from .utils import true_then_false
 from . import wb_constants
 
+from PySide import QtCore  # FreeCAD's PySide!
+from PySide import QtGui  # FreeCAD's PySide!
+
 
 try:
     # For v0.21:
@@ -25,9 +28,6 @@ except (ModuleNotFoundError, ImportError, AttributeError):
 
 
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
-    from PySide import QtCore  # FreeCAD's PySide!
-    from PySide import QtGui  # FreeCAD's PySide!
-
     def tr(text: str) -> str:
         return QtGui.QApplication.translate('cross', text)
 else:
