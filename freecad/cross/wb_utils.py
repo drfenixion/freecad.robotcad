@@ -56,7 +56,15 @@ CrossBasicElement = Union[CrossJoint, CrossLink]
 CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
 DOList = List[DO]
 
-MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
+MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
+MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad' 
+if os.path.exists(MOD_PATH_IN_USER_SHARE_DIR):
+    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
+else:
+    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
+
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
