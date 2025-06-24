@@ -237,6 +237,20 @@ cd -
 freecad
 ```
 
+#### One more install distribution option here
+It is Conda solo archive with RobotCAD, FreeCAD and dependencies.
+If you have any issue with installation you can download this archive and unpack it. RobotCAD will already installed in FreeCAD with it`s dependencies.
+How to run RobotCAD from Conda archive.
+Download (~900Mb) robotcad_8_3_3_freecad_1_0_py312.tar.gz  (the archive is available for RobotCAD donors, if interested, write to it.project.devel@gmail.com)
+```
+mkdir robotcad
+tar -xzf robotcad_8_3_3_freecad_1_0_py312.tar.gz -C robotcad
+source robotcad/bin/activate
+conda-unpack
+freecad
+```
+Tested on Ubuntu 24.04.
+
 ## Launching FreeCAD with ROS
 
 The RobotCAD workbench is supposed to load also without ROS, with limited functionality.
