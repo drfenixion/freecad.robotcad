@@ -1,7 +1,11 @@
 """Global workbench constants. Excluded from wb_globals.py with reason eliminate circular dependency"""
 
 import FreeCAD as fc
-from .utils import str_to_bool
+
+
+def str_to_bool(s: str) -> bool:
+    return s.lower() == "true"
+
 
 # Constants.
 PREFS_CATEGORY = 'RobotCAD'  # Category in the preferences dialog.
