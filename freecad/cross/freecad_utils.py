@@ -15,8 +15,10 @@ import Part
 from .utils import true_then_false
 from . import wb_constants
 
-from PySide import QtCore  # FreeCAD's PySide!
-from PySide import QtGui  # FreeCAD's PySide!
+try:
+    from PySide import QtCore, QtGui
+except:
+    from PySide2 import QtCore, QtGui
 
 
 try:
