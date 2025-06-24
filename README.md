@@ -249,7 +249,7 @@ source robotcad/bin/activate
 conda-unpack
 freecad
 ```
-Tested on Ubuntu 24.04.
+Tested on Xubuntu 24.04.
 
 ## Launching FreeCAD with ROS
 
