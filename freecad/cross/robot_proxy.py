@@ -17,7 +17,7 @@ import FreeCAD as fc
 from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
 from PySide.QtWidgets import QMenu # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase
+from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -26,6 +26,7 @@ from .freecad_utils import is_origin
 from .freecad_utils import label_or
 from .freecad_utils import quantity_as
 from .freecad_utils import warn
+from .freecad_utils import is_link as is_fc_link
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
@@ -36,7 +37,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH
+from .wb_utils import ICON_PATH, get_chain
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -60,8 +61,8 @@ from .wb_utils import get_urdf_path
 from .wb_utils import git_init_submodules
 from xml.dom.minidom import parseString
 from pathlib import Path
-from .joint_proxy import make_robot_joints_filled
-from .link_proxy import make_robot_links_filled
+from .joint_proxy import make_robot_joint_filled, make_robot_joints_filled
+from .link_proxy import make_robot_link_filled, make_robot_links_filled
 from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_sensors_file_name
@@ -1396,4 +1397,200 @@ def make_filled_robot(name:str = 'Robot') -> CrossRobot:
         make_robot_joints_filled(links, robot)
 
     fc.ActiveDocument.recompute()
+    return robot
+
+
+def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO = None, assembly_link:DO = None) -> tuple:
+    """Get assemble links, joints, grounded_joints from
+    from assembly (default Assembly WB)."""
+
+    if not is_assembly_from_assembly_wb(assembly) and not is_link_to_assembly_from_assembly_wb(assembly):
+        raise TypeError('Not an assembly from Assembly WB')
+
+    doc = assembly.Document
+
+    # separate assembly sub elements
+    assembly_links = []
+    assembly_joints = []
+    grounded_joints = []
+
+    # Assembly in other assembly does not included joints 
+    # it need to get linked assembly for it joints.
+    for el in assembly.Group:
+        if is_grounded_join_from_assembly_wb(el) and not root_grounded_joint_of_root_assembly:
+            root_grounded_joint_of_root_assembly = el
+            break
+        
+    for el in assembly.Group:
+        if is_fc_link(el):
+            assembly_links.append(el)
+        elif is_join_from_assembly_wb(el):
+            r1 = el.Reference1[1][0]
+            r1_name_path = r1.split('.')
+            r1_obj0_link = doc.getObject(r1_name_path[0])
+
+            r2 = el.Reference2[1][0]
+            r2_name_path = r2.split('.')
+            r2_obj0_link = doc.getObject(r2_name_path[0])
+
+            is_link2_root_assembly_link = False
+            is_link1_root_assembly_link = False
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r2_name_path[0]:
+                is_link2_root_assembly_link = True
+            if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
+                r1_obj1_link = doc.getObject(r1_name_path[1])
+                if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[1]:
+                    is_link1_root_assembly_link = True
+                assembly_joints.append({
+                        'joint': el,
+                        'assembly': assembly,
+                        'assembly_link': assembly_link,
+                        'is_root_joint_to_new_assembly_branch': True,
+                        'new_assembly_branch': r1_obj0_link.LinkedObject,
+                        'link2': r2_obj0_link,
+                         # get child link (root of new assembly branch) from it source assembly not from assembly link
+                        'link1': r1_obj1_link.getLinkedObject(False),
+                        'is_link2_root_assembly_link': is_link2_root_assembly_link,
+                        'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                    })
+            else:
+                if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[0]:
+                    is_link1_root_assembly_link = True
+                assembly_joints.append({
+                        'joint': el,
+                        'assembly': assembly,
+                        'assembly_link': assembly_link,
+                        'is_root_joint_to_new_assembly_branch': False,
+                        'new_assembly_branch': None,
+                        'link2': r2_obj0_link,
+                         # get child link (root of new assembly branch) from it source assembly not from assembly link
+                        'link1': r1_obj0_link,
+                        'is_link2_root_assembly_link': is_link2_root_assembly_link,
+                        'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                    })
+        elif is_grounded_join_from_assembly_wb(el):
+            grounded_joints.append(el)
+        elif is_link_to_assembly_from_assembly_wb(el):
+            assembly_links_rec, assembly_joints_rec, grounded_joint_rec = get_assembly_elements(el.LinkedObject, root_grounded_joint_of_root_assembly, el)
+            assembly_links = assembly_links + assembly_links_rec
+            assembly_joints = assembly_joints + assembly_joints_rec
+            grounded_joints = grounded_joints + grounded_joint_rec
+    
+    return assembly_links, assembly_joints, grounded_joints
+
+
+def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> CrossRobot:
+    """Add a Cross::Robot to the current document and fill it with links and joints
+    from assembly (default Assembly WB)."""
+
+    if not robot:
+        robot = make_robot(ros_name(assembly))
+
+    assembly_links, assembly_joints, grounded_joints = get_assembly_elements(assembly)
+
+    # create robot links based on assembly links
+    robot_links:list[CrossLink] = []
+    for link in assembly_links:
+        obj = link.getLinkedObject(True)
+        res = make_robot_link_filled(obj, True)
+        if is_link(res):
+            robot_link = res
+            # robot_link.Placement = link.Placement
+            robot_links.append(robot_link)
+            if robot:
+                robot_link.adjustRelativeLinks(robot)
+                robot.addObject(robot_link)
+
+    # make root joint on top
+    assembly_joints_sorted = sorted(
+        assembly_joints, 
+        key=lambda x: x['is_link2_root_assembly_link'] or x['is_link1_root_assembly_link'],
+        reverse=True
+    )
+
+    # make chain
+    assembly_joints_chain = []
+    root_joint = assembly_joints_sorted[0]
+    assembly_joints_sorted.remove(root_joint) # we will use root_joint separated
+    def filter_func(joint):
+        for i in assembly_joints_sorted:
+            if joint['link1'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                yield i
+    while len(assembly_joints_sorted):
+        if root_joint:
+            assembly_joints_chain.append(root_joint)
+            child_joint = next(filter_func(root_joint))
+            root_joint = None
+        else:
+            child_joint = next(filter_func(child_joint))
+        assembly_joints_chain.append(child_joint)
+
+    # create robot joints based on assembly joints
+    for joint in assembly_joints_chain:
+        # prepare data
+        r1 = joint['joint'].Reference1[1][0]
+        r2 = joint['joint'].Reference2[1][0]
+        p1 = joint['joint'].Placement1
+        p2 = joint['joint'].Placement2
+        o1 = joint['joint'].Offset1
+        o2 = joint['joint'].Offset1
+        r1_name_path = r1.split('.')
+        r2_name_path = r2.split('.')
+        r1_obj_link = assembly.Document.getObject(r1_name_path[0])
+        r2_obj_link = assembly.Document.getObject(r2_name_path[0])
+        if is_link_to_assembly_from_assembly_wb(r1_obj_link):
+            r1_obj_link = assembly.Document.getObject(r1_name_path[1])
+        if is_link_to_assembly_from_assembly_wb(r2_obj_link):
+            r2_obj_link = assembly.Document.getObject(r2_name_path[1])
+        r1_obj = r1_obj_link.getLinkedObject(True)
+        r2_obj = r2_obj_link.getLinkedObject(True)
+        parent_robot_link = None
+        child_robot_link = None
+        for robot_link in robot_links:
+            if is_part(robot_link.Real[0]):
+                for real_sub_el in robot_link.Real[0].Group:
+                    if is_fc_link(real_sub_el):
+                        real_sub_el = real_sub_el.getLinkedObject(True)
+
+                    if r1_obj.Name == real_sub_el.Name:
+                        child_robot_link = robot_link
+                    elif r2_obj.Name == real_sub_el.Name:
+                        parent_robot_link = robot_link
+        
+        if not child_robot_link:
+            break
+
+        # calc robot link MountedPlacement 
+        mounted_placement = fc.Placement()
+        link_assembly_placement = fc.Placement()
+        # it need to adding assembly link placement to it`s elements (links)
+        # when assembly in other assembly case
+        # for get placement of elements relative to assembly link
+        elem0 = assembly.Document.getObject(r1_name_path[0])
+        if is_link_to_assembly_from_assembly_wb(elem0):
+            link_assembly_placement = elem0.Placement
+        sub_el = assembly.Document.getObject(r1_name_path[1])
+        if is_lcs(sub_el):
+            mounted_placement = sub_el.Placement * o1
+        else: # face of obj case
+            mounted_placement = p1 * o1
+
+        child_robot_link.MountedPlacement = mounted_placement.inverse()
+
+        # calc joint Origin
+        robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
+        chain = get_chain(child_robot_link)
+        comulative_joint_placement = fc.Placement()
+        for el in chain:
+            if is_joint(el):
+                comulative_joint_placement = comulative_joint_placement * el.Origin
+
+        assembly_link_placement = fc.Placement()
+        if joint['assembly_link']:
+            assembly_link_placement = joint['assembly_link'].Placement
+            
+        robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement * r1_obj_link.Placement  * mounted_placement
+
+
     return robot

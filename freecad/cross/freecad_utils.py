@@ -375,6 +375,21 @@ def is_link(obj: DO) -> bool:
     """Return True if the object is a 'App::Link'."""
     return is_derived_from(obj, 'App::Link')
 
+def is_assembly_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a 'Assembly::AssemblyObject'."""
+    return is_derived_from(obj, 'Assembly::AssemblyObject')
+
+def is_link_to_assembly_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a 'Assembly::AssemblyLink'."""
+    return is_derived_from(obj, 'Assembly::AssemblyLink')
+
+def is_join_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a Joint from default assembly WB."""
+    return is_derived_from(obj, 'App::FeaturePython') and hasattr(obj, 'JointType')
+
+def is_grounded_join_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a Grounded Joint from default assembly WB."""
+    return is_derived_from(obj, 'App::FeaturePython') and hasattr(obj, 'ObjectToGround')
 
 def is_selection_object(obj: DO) -> bool:
     """Return True if the object is a 'Gui::SelectionObject'."""

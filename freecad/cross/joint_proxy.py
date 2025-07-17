@@ -714,7 +714,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         return joint
     else:
         message(
-            'Make filled robot joint(s) works only with selected links. Select minimum 2 links.',
+            'Make filled robot joint works only with 2 links.',
             True,
         )
 
