@@ -1420,7 +1420,7 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
         if is_grounded_join_from_assembly_wb(el) and not root_grounded_joint_of_root_assembly:
             root_grounded_joint_of_root_assembly = el
             break
-        
+
     for el in assembly.Group:
         if is_fc_link(el):
             assembly_links.append(el)
@@ -1441,6 +1441,8 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                 r1_obj1_link = doc.getObject(r1_name_path[1])
                 if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[1]:
                     is_link1_root_assembly_link = True
+                # get child link (root of new assembly branch) from it source assembly not from assembly link
+                r1_obj1_link_from_its_source_assemble = r1_obj1_link.getLinkedObject(False)
                 assembly_joints.append({
                         'joint': el,
                         'assembly': assembly,
@@ -1448,10 +1450,12 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                         'is_root_joint_to_new_assembly_branch': True,
                         'new_assembly_branch': r1_obj0_link.LinkedObject,
                         'link2': r2_obj0_link,
-                         # get child link (root of new assembly branch) from it source assembly not from assembly link
-                        'link1': r1_obj1_link.getLinkedObject(False),
+                        'link1': r1_obj1_link_from_its_source_assemble,
+                        'link2_name': r2_obj0_link.Name,
+                        'link1_name': r1_obj1_link_from_its_source_assemble.Name,
                         'is_link2_root_assembly_link': is_link2_root_assembly_link,
                         'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                        'chain_direction': None,
                     })
             else:
                 if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[0]:
@@ -1463,10 +1467,12 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                         'is_root_joint_to_new_assembly_branch': False,
                         'new_assembly_branch': None,
                         'link2': r2_obj0_link,
-                         # get child link (root of new assembly branch) from it source assembly not from assembly link
                         'link1': r1_obj0_link,
+                        'link2_name': r2_obj0_link.Name,
+                        'link1_name': r1_obj0_link.Name,
                         'is_link2_root_assembly_link': is_link2_root_assembly_link,
                         'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                        'chain_direction': None,
                     })
         elif is_grounded_join_from_assembly_wb(el):
             grounded_joints.append(el)
@@ -1512,19 +1518,61 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     assembly_joints_chain = []
     root_joint = assembly_joints_sorted[0]
     assembly_joints_sorted.remove(root_joint) # we will use root_joint separated
-    def filter_func(joint):
+    
+    def get_next_child_joint(joint) -> DO:
         for i in assembly_joints_sorted:
-            if joint['link1'].Name == i['link2'].Name:
+            if joint['link1'].Name == i['link1'].Name or joint['link2'].Name == i['link2'].Name \
+            or joint['link2'].Name == i['link1'].Name:
+                # revers chain direction
                 assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
                 yield i
+                break
+            elif joint['link1'].Name == i['link2'].Name:
+            # or joint['link2'].Name in [i['link1'].Name, i['link2'].Name]:
+                # forward chain direction
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+                break
+                
+
+    def get_next_branch_root_joint(joint) -> DO:
+        for i in assembly_joints_sorted:
+            #TODO check direction of chain
+            if joint['link1'].Name == i['link1'].Name or joint['link2'].Name == i['link2'].Name \
+            or joint['link2'].Name == i['link1'].Name:
+                # revers chain direction
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+                break
+            elif joint['link1'].Name == i['link2'].Name:
+            # or joint['link2'].Name in [i['link1'].Name, i['link2'].Name]:
+                # forward chain direction
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+                break
+
     while len(assembly_joints_sorted):
         if root_joint:
             assembly_joints_chain.append(root_joint)
-            child_joint = next(filter_func(root_joint))
+            child_joint = next(get_next_child_joint(root_joint))
+            assembly_joints_chain.append(child_joint)
             root_joint = None
         else:
-            child_joint = next(filter_func(child_joint))
-        assembly_joints_chain.append(child_joint)
+            try:
+                child_joint = next(get_next_child_joint(child_joint))
+                assembly_joints_chain.append(child_joint)
+            except StopIteration:
+                for chain_joint in assembly_joints_chain:
+                    try:
+                        child_joint = next(get_next_branch_root_joint(chain_joint))
+                        assembly_joints_chain.append(child_joint)
+                        break
+                    except StopIteration:
+                        pass
 
     # create robot joints based on assembly joints
     for joint in assembly_joints_chain:
@@ -1535,6 +1583,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         p2 = joint['joint'].Placement2
         o1 = joint['joint'].Offset1
         o2 = joint['joint'].Offset1
+        # joint['chain_direction']
         r1_name_path = r1.split('.')
         r2_name_path = r2.split('.')
         r1_obj_link = assembly.Document.getObject(r1_name_path[0])
@@ -1554,9 +1603,15 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                         real_sub_el = real_sub_el.getLinkedObject(True)
 
                     if r1_obj.Name == real_sub_el.Name:
-                        child_robot_link = robot_link
+                        if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
+                            child_robot_link = robot_link
+                        else:
+                            parent_robot_link = robot_link
                     elif r2_obj.Name == real_sub_el.Name:
-                        parent_robot_link = robot_link
+                        if joint['chain_direction'] == 'reverse':
+                            child_robot_link = robot_link
+                        else:
+                            parent_robot_link = robot_link
         
         if not child_robot_link:
             break
@@ -1567,6 +1622,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         # it need to adding assembly link placement to it`s elements (links)
         # when assembly in other assembly case
         # for get placement of elements relative to assembly link
+
+        # if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
         elem0 = assembly.Document.getObject(r1_name_path[0])
         if is_link_to_assembly_from_assembly_wb(elem0):
             link_assembly_placement = elem0.Placement
@@ -1576,7 +1633,26 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         else: # face of obj case
             mounted_placement = p1 * o1
 
-        child_robot_link.MountedPlacement = mounted_placement.inverse()
+        # else:
+        elem0 = assembly.Document.getObject(r2_name_path[0])
+        if is_link_to_assembly_from_assembly_wb(elem0):
+            link_assembly_placement = elem0.Placement
+        sub_el = assembly.Document.getObject(r2_name_path[1])
+        if is_lcs(sub_el):
+            mounted_placement_r2 = sub_el.Placement * o2
+        else: # face of obj case
+            mounted_placement_r2 = p2 * o2
+
+
+        if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
+            child_robot_link.MountedPlacement = mounted_placement.inverse()
+            origin_mounted_placement_correction = mounted_placement
+            origin_obj_link_correction = r1_obj_link.Placement
+        else:
+            # child_robot_link.MountedPlacement = mounted_placement.inverse()
+            child_robot_link.MountedPlacement = mounted_placement_r2.inverse()
+            origin_mounted_placement_correction = mounted_placement_r2
+            origin_obj_link_correction = r2_obj_link.Placement
 
         # calc joint Origin
         robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
@@ -1589,8 +1665,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         assembly_link_placement = fc.Placement()
         if joint['assembly_link']:
             assembly_link_placement = joint['assembly_link'].Placement
-            
-        robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement * r1_obj_link.Placement  * mounted_placement
-
-
+        
+        robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement \
+            * origin_obj_link_correction * origin_mounted_placement_correction
+    
     return robot
