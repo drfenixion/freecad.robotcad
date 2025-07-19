@@ -1525,12 +1525,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-                break
             elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
-                break
                 
 
     def get_next_branch_root_joint(joint) -> DO:
@@ -1540,12 +1538,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-                break
             elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
-                break
 
 
     while len(assembly_joints_sorted):
@@ -1629,7 +1625,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             child_robot_link.MountedPlacement = mounted_placement.inverse()
             origin_mounted_placement_correction = mounted_placement
             origin_obj_link_correction = r1_obj_link.Placement
-        else:
+        else: # reverse chain direction
             elem0 = assembly.Document.getObject(r2_name_path[0])
             if is_link_to_assembly_from_assembly_wb(elem0):
                 link_assembly_placement = elem0.Placement
@@ -1639,7 +1635,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             else: # face of obj case
                 mounted_placement_r2 = p2 * o2
 
-            # child_robot_link.MountedPlacement = mounted_placement.inverse()
             child_robot_link.MountedPlacement = mounted_placement_r2.inverse()
             origin_mounted_placement_correction = mounted_placement_r2
             origin_obj_link_correction = r2_obj_link.Placement
