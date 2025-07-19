@@ -1518,18 +1518,16 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     root_joint = assembly_joints_sorted[0]
     assembly_joints_sorted.remove(root_joint) # we will use root_joint separated
     
+    
     def get_next_child_joint(joint) -> DO:
         for i in assembly_joints_sorted:
-            if joint['link1'].Name == i['link1'].Name or joint['link2'].Name == i['link2'].Name \
+            if joint['link1'].Name == i['link1'].Name \
             or joint['link2'].Name == i['link1'].Name:
-                # revers chain direction
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
                 break
             elif joint['link1'].Name == i['link2'].Name:
-            # or joint['link2'].Name in [i['link1'].Name, i['link2'].Name]:
-                # forward chain direction
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1538,21 +1536,18 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
 
     def get_next_branch_root_joint(joint) -> DO:
         for i in assembly_joints_sorted:
-            #TODO check direction of chain
-            if joint['link1'].Name == i['link1'].Name or joint['link2'].Name == i['link2'].Name \
+            if joint['link1'].Name == i['link1'].Name \
             or joint['link2'].Name == i['link1'].Name:
-                # revers chain direction
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
                 break
             elif joint['link1'].Name == i['link2'].Name:
-            # or joint['link2'].Name in [i['link1'].Name, i['link2'].Name]:
-                # forward chain direction
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
                 break
+
 
     while len(assembly_joints_sorted):
         if root_joint:
