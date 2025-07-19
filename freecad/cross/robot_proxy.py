@@ -1492,30 +1492,27 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
 
     assembly_links, assembly_joints, grounded_joints = get_assembly_elements(assembly)
 
-    # create robot links based on assembly links
+    ### create robot links based on assembly links
     robot_links:list[CrossLink] = []
     for link in assembly_links:
         obj = link.getLinkedObject(True)
         res = make_robot_link_filled(obj, True)
         if is_link(res):
             robot_link = res
-            # robot_link.Placement = link.Placement
             robot_links.append(robot_link)
             if robot:
                 robot_link.adjustRelativeLinks(robot)
                 robot.addObject(robot_link)
 
-    # make root joint on top
+    ### make root joint sorted on top
     assembly_joints_sorted = sorted(
         assembly_joints, 
         key=lambda x: x['is_link2_root_assembly_link'] or x['is_link1_root_assembly_link'],
         reverse=True
     )
-
-    # make chain
-    assembly_joints_chain = []
+    # separated root joint
     root_joint = assembly_joints_sorted[0]
-    assembly_joints_sorted.remove(root_joint) # we will use root_joint separated
+    assembly_joints_sorted.remove(root_joint) # we will use root_joint separetly 
     
     
     def get_next_child_joint(joint) -> DO:
@@ -1543,28 +1540,29 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 i['chain_direction'] = 'forward'
                 yield i
 
-
+    ### make joint chain tree (not looped kinematic chain tree)
+    joint_chain_tree = []
     while len(assembly_joints_sorted):
         if root_joint:
-            assembly_joints_chain.append(root_joint)
+            joint_chain_tree.append(root_joint)
             child_joint = next(get_next_child_joint(root_joint))
-            assembly_joints_chain.append(child_joint)
+            joint_chain_tree.append(child_joint)
             root_joint = None
         else:
             try:
                 child_joint = next(get_next_child_joint(child_joint))
-                assembly_joints_chain.append(child_joint)
+                joint_chain_tree.append(child_joint)
             except StopIteration:
-                for chain_joint in assembly_joints_chain:
+                for chain_joint in joint_chain_tree:
                     try:
                         child_joint = next(get_next_branch_root_joint(chain_joint))
-                        assembly_joints_chain.append(child_joint)
+                        joint_chain_tree.append(child_joint)
                         break
                     except StopIteration:
                         pass
 
-    # create robot joints based on assembly joints
-    for joint in assembly_joints_chain:
+    ### create robot joints based on assembly joints
+    for joint in joint_chain_tree:
         # prepare data
         r1 = joint['joint'].Reference1[1][0]
         r2 = joint['joint'].Reference2[1][0]
@@ -1572,7 +1570,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         p2 = joint['joint'].Placement2
         o1 = joint['joint'].Offset1
         o2 = joint['joint'].Offset1
-        # joint['chain_direction']
         r1_name_path = r1.split('.')
         r2_name_path = r2.split('.')
         r1_obj_link = assembly.Document.getObject(r1_name_path[0])
@@ -1605,7 +1602,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         if not child_robot_link:
             break
 
-        # calc robot link MountedPlacement 
+        ### calc robot link MountedPlacement
         mounted_placement = fc.Placement()
         link_assembly_placement = fc.Placement()
         # it need to adding assembly link placement to it`s elements (links)
@@ -1639,7 +1636,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             origin_mounted_placement_correction = mounted_placement_r2
             origin_obj_link_correction = r2_obj_link.Placement
 
-        # calc joint Origin
+        ### calc joint Origin
         robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
         chain = get_chain(child_robot_link)
         comulative_joint_placement = fc.Placement()
