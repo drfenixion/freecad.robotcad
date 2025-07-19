@@ -1461,7 +1461,6 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                     'joint': el,
                     'assembly': assembly,
                     'assembly_link': assembly_link,
-                    'is_root_joint_to_new_assembly_branch': True,
                     'new_assembly_branch_r2': new_assembly_branch_r2,
                     'new_assembly_branch_r1': new_assembly_branch_r1,
                     'link2': r2_obj_link,
@@ -1617,32 +1616,29 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         # when assembly in other assembly case
         # for get placement of elements relative to assembly link
 
-        # if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
-        elem0 = assembly.Document.getObject(r1_name_path[0])
-        if is_link_to_assembly_from_assembly_wb(elem0):
-            link_assembly_placement = elem0.Placement
-        sub_el = assembly.Document.getObject(r1_name_path[1])
-        if is_lcs(sub_el):
-            mounted_placement = sub_el.Placement * o1
-        else: # face of obj case
-            mounted_placement = p1 * o1
-
-        # else:
-        elem0 = assembly.Document.getObject(r2_name_path[0])
-        if is_link_to_assembly_from_assembly_wb(elem0):
-            link_assembly_placement = elem0.Placement
-        sub_el = assembly.Document.getObject(r2_name_path[1])
-        if is_lcs(sub_el):
-            mounted_placement_r2 = sub_el.Placement * o2
-        else: # face of obj case
-            mounted_placement_r2 = p2 * o2
-
-
         if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
+            elem0 = assembly.Document.getObject(r1_name_path[0])
+            if is_link_to_assembly_from_assembly_wb(elem0):
+                link_assembly_placement = elem0.Placement
+            sub_el = assembly.Document.getObject(r1_name_path[1])
+            if is_lcs(sub_el):
+                mounted_placement = sub_el.Placement * o1
+            else: # face of obj case
+                mounted_placement = p1 * o1
+
             child_robot_link.MountedPlacement = mounted_placement.inverse()
             origin_mounted_placement_correction = mounted_placement
             origin_obj_link_correction = r1_obj_link.Placement
         else:
+            elem0 = assembly.Document.getObject(r2_name_path[0])
+            if is_link_to_assembly_from_assembly_wb(elem0):
+                link_assembly_placement = elem0.Placement
+            sub_el = assembly.Document.getObject(r2_name_path[1])
+            if is_lcs(sub_el):
+                mounted_placement_r2 = sub_el.Placement * o2
+            else: # face of obj case
+                mounted_placement_r2 = p2 * o2
+
             # child_robot_link.MountedPlacement = mounted_placement.inverse()
             child_robot_link.MountedPlacement = mounted_placement_r2.inverse()
             origin_mounted_placement_correction = mounted_placement_r2
@@ -1660,6 +1656,12 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
         if joint['assembly_link']:
             assembly_link_placement = joint['assembly_link'].Placement
         
+        # link_assembly_placement - used for first joint that connected new assembly with old one
+        # (becase technically this joint is in parent assembly and links to child assembly)
+        # assembly_link_placement - used for all other joints in new assembly
+        # (becase technically this joint is in child assembly and links directly to object)
+        # In other words: link_assembly_placement uses for joints between assemblies and assembly_link_placement in same assembly
+
         robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement \
             * origin_obj_link_correction * origin_mounted_placement_correction
     
