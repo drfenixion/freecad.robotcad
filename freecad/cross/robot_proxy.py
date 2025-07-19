@@ -1437,43 +1437,42 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
             is_link1_root_assembly_link = False
             if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r2_name_path[0]:
                 is_link2_root_assembly_link = True
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[1]:
+                is_link1_root_assembly_link = True
+            
+            r2_obj_link = r2_obj0_link
+            r1_obj_link = r1_obj0_link
+            new_assembly_branch_r2 = None
+            new_assembly_branch_r1 = None
             if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
+                new_assembly_branch_r1 = r1_obj0_link.LinkedObject
                 r1_obj1_link = doc.getObject(r1_name_path[1])
-                if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[1]:
-                    is_link1_root_assembly_link = True
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
-                r1_obj1_link_from_its_source_assemble = r1_obj1_link.getLinkedObject(False)
-                assembly_joints.append({
-                        'joint': el,
-                        'assembly': assembly,
-                        'assembly_link': assembly_link,
-                        'is_root_joint_to_new_assembly_branch': True,
-                        'new_assembly_branch': r1_obj0_link.LinkedObject,
-                        'link2': r2_obj0_link,
-                        'link1': r1_obj1_link_from_its_source_assemble,
-                        'link2_name': r2_obj0_link.Name,
-                        'link1_name': r1_obj1_link_from_its_source_assemble.Name,
-                        'is_link2_root_assembly_link': is_link2_root_assembly_link,
-                        'is_link1_root_assembly_link': is_link1_root_assembly_link,
-                        'chain_direction': None,
-                    })
-            else:
-                if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[0]:
-                    is_link1_root_assembly_link = True
-                assembly_joints.append({
-                        'joint': el,
-                        'assembly': assembly,
-                        'assembly_link': assembly_link,
-                        'is_root_joint_to_new_assembly_branch': False,
-                        'new_assembly_branch': None,
-                        'link2': r2_obj0_link,
-                        'link1': r1_obj0_link,
-                        'link2_name': r2_obj0_link.Name,
-                        'link1_name': r1_obj0_link.Name,
-                        'is_link2_root_assembly_link': is_link2_root_assembly_link,
-                        'is_link1_root_assembly_link': is_link1_root_assembly_link,
-                        'chain_direction': None,
-                    })
+                r1_obj1_link = r1_obj1_link.getLinkedObject(False)
+                r1_obj_link = r1_obj1_link
+            if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
+                new_assembly_branch_r2 = r2_obj0_link.LinkedObject
+                r2_obj1_link = doc.getObject(r2_name_path[1])
+                # get child link (root of new assembly branch) from it source assembly not from assembly link
+                r2_obj1_link = r2_obj1_link.getLinkedObject(False)
+                r2_obj_link = r2_obj1_link
+
+            assembly_joints.append({
+                    'joint': el,
+                    'assembly': assembly,
+                    'assembly_link': assembly_link,
+                    'is_root_joint_to_new_assembly_branch': True,
+                    'new_assembly_branch_r2': new_assembly_branch_r2,
+                    'new_assembly_branch_r1': new_assembly_branch_r1,
+                    'link2': r2_obj_link,
+                    'link1': r1_obj_link,
+                    'link2_name': r2_obj_link.Name,
+                    'link1_name': r1_obj_link.Name,
+                    'is_link2_root_assembly_link': is_link2_root_assembly_link,
+                    'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                    'chain_direction': None,
+                })
+
         elif is_grounded_join_from_assembly_wb(el):
             grounded_joints.append(el)
         elif is_link_to_assembly_from_assembly_wb(el):
