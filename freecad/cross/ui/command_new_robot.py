@@ -21,7 +21,8 @@ class _NewRobotCommand:
                               '1) Select (objects): objects (parts, bodies, etc) in order of links in joints.\n'
                                 'The order of objects selection will correspond to the order of links (parent, child) in the joints.\n'
                               '\n'
-                              '2) Select (assembly): assembly from default Assembly workbench.\n'
+                              '2) Select (assembly): assembly from default Assembly workbench \n'
+                                '(closed loop assembly is not supported, break the ring before use).\n'
                               '\n'
                               '3) If no object is selected, an empty robot container will be created.'
                               ),

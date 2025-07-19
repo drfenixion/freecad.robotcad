@@ -706,7 +706,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         except ValueError:
             fc.ActiveDocument.removeObject(joint.Name)
             message(
-                'Links must be in robot container for joint connection. Closed links loop does not supported.',
+                'Links must be in robot container for joint connection. Closed links loop is not supported.',
                 True,
             )
         fc.ActiveDocument.recompute()
