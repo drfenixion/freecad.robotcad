@@ -1748,6 +1748,26 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement \
                 * origin_obj_link_correction * origin_mounted_placement_correction
             
+            ### set joint type
+            assembly_wb_joint_type = joint['joint'].JointType
+            joint_match = wb_constants.ASSEMBLY_WB_JOINTS_MATCHING[assembly_wb_joint_type]
+            
+            if assembly_wb_joint_type == 'Revolute' \
+            and getattr(joint['joint'], 'EnableAngleMin') == False \
+            and getattr(joint['joint'], 'EnableAngleMax') == False:
+                assembly_wb_joint_type = 'Revolute_unlimited'
+                joint_match = wb_constants.ASSEMBLY_WB_JOINTS_MATCHING[assembly_wb_joint_type]
+            
+            if joint_match['type'] != 'undefined':
+                robot_joint.Type = joint_match['type']
+                if joint_match['limits']:
+                    for limit in joint_match['limits']:
+                        if getattr(joint['joint'], limit['assembly_enable_param']) == True:
+                            setattr(robot_joint, limit['robotcad_value_param'], getattr(joint['joint'], limit['assembly_value_param']))
+            else:
+                warn('Can`t automatically match joint type ' + joint['joint'].JointType + ' of joint '+ joint['joint'].Name +' \
+to RobotCAD joint type. Set it manually in resulting structure or change joint type to supported by URDF in assembly.')
+
             i+=1
             progressBar.setValue(i)
             QtGui.QApplication.processEvents()
