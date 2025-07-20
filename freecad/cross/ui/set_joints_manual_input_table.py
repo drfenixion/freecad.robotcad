@@ -7,7 +7,7 @@ import FreeCAD as fc
 from PySide import QtCore  # FreeCAD's PySide!
 from PySide import QtGui  # FreeCAD's PySide!
 
-from ..freecad_utils import convert_units
+from ..freecad_utils import convert_units, warn
 from ..freecad_utils import quantity_as
 from ..freecad_utils import unit_type
 from ..wb_utils import ros_name
@@ -88,7 +88,10 @@ class SetJointsManualInputTable(QtGui.QTableWidget):
         all_joints = self.robot.Proxy.get_actuated_joints()
         for joint in all_joints:
             if joint not in self._cache[robot]:
-                self._cache[robot][joint] = _get_joint_unit(joint)
+                try:
+                    self._cache[robot][joint] = _get_joint_unit(joint)
+                except NotImplementedError as e:
+                    warn(str(e))
 
         # Populate the first column of the table with the joint names, the
         # second column with the joint values and the third column with the
@@ -212,7 +215,7 @@ def _get_joint_unit(joint: CrossJoint) -> str:
         return 'deg'
     else:
         # Other types are not supported.
-        raise NotImplementedError()
+        raise NotImplementedError('Joint ('+joint.Name+') unit is not implemented. Floating and planar joint types units are not implemented')
 
 
 def _get_joint_value(
@@ -226,4 +229,4 @@ def _get_joint_value(
         return quantity_as(fc.Units.Quantity(f'{joint.Position} rad'), unit)
     else:
         # Other types are not supported.
-        raise NotImplementedError()
+        raise NotImplementedError('Joint ('+joint.Name+') unit is not implemented. Floating and planar joint types units are not implemented')
