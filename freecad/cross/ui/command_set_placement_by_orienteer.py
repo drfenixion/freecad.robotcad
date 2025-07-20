@@ -104,11 +104,21 @@ class _SetCROSSPlacementByOrienteerCommand:
             # because link conjuction place in many cases not at origin (zero coordinates) of link
             # and therefore used move_placement() with joint as second orienteer
             chain = get_chain(cross_link)
-            joint = chain[-2]
-            if not is_joint(joint):
-                message('Can not get joint of link. Be sure your link have join.', gui=True)
-                return
-            move_placement(doc, cross_link, 'MountedPlacement', orienteer1, joint)
+            if len(chain) == 1:
+                message('This is root link (no parent joint) of current kinematic chain \
+and link will be aligned to origin point (0 Placement). \
+Add parent joint if you want align to it or use other Set Placement tool.', gui=False)
+                orienteer2 = fc.Placement()
+            else:
+                try:
+                    joint = None
+                    joint = chain[-2]
+                    orienteer2 = joint
+                except:
+                    if not is_joint(joint):
+                        message('Can not get parent joint of link. Be sure your link have join.', gui=True)
+                        return
+            move_placement(doc, cross_link, 'MountedPlacement', orienteer1, orienteer2)
             doc.commitTransaction()
         elif selection_joint:
             doc.openTransaction(tr("Set joint's origin"))

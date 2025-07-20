@@ -196,6 +196,11 @@ def is_controllers_template_for_param_mapping(param_full_name: str) -> bool:
     return False
 
 
+def is_placement(obj: DO) -> bool:
+    """Return True if the object is a FreeCAD Placement."""
+    return isinstance(obj, fc.Placement)
+
+
 def return_true(obj: DO) -> bool:
     """Return always True.
 
@@ -811,6 +816,8 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
         placement = get_placement(orienteer_object)
     elif is_link(orienteer_object) or is_joint(orienteer_object):
         placement = orienteer_object.Placement
+    elif is_placement(orienteer_object):
+        placement = orienteer_object
     else:
         lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
 
