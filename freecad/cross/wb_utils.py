@@ -852,39 +852,31 @@ def make_lcs_at_link_body(
             link_to_obj = orienteer.Object
             original_obj = link_to_obj.getLinkedObject(True)
             link_to_obj_placement = link_to_obj.Placement
-
-            parents_reversed = reversed(link_to_obj.Parents)
-            for p in parents_reversed:
-                p = p[0]
-                if is_fc_link(p):
-                    dynamic_link_of_robot_link = p
-                else:
-                    original_obj_wrapper = p
         else:
             original_obj = orienteer.Object
             link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
-            parents_reversed = reversed(original_obj.Parents)
-            for p in parents_reversed:
-                p = p[0]
-                if is_fc_link(p):
-                    dynamic_link_of_robot_link = p
-                else:
-                    original_obj_wrapper = p
+        parents_reversed = reversed(original_obj.Parents)
+        for p in parents_reversed:
+            p = p[0]
+            if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
+                dynamic_link_of_robot_link = p
+            elif not original_obj_wrapper and is_part(p):
+                original_obj_wrapper = p
 
     except (AttributeError, IndexError, RuntimeError):
         pass
 
     if not original_obj_wrapper:
-        message('Can find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
+        message('Can not find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
-        message('Can find original object for getting reference.', gui=True)
+        message('Can not find original object for getting reference.', gui=True)
         raise RuntimeError()
 
     if not dynamic_link_of_robot_link:
-        message('Can find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
+        message('Can not find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
         raise RuntimeError()
 
     sub_element_name = ''
