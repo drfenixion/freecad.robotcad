@@ -404,7 +404,7 @@ def _add_ros_link(
     real_part.Visibility = False
     robot.Proxy.created_objects.append(real_part)
 
-    collision_part = add_object(collision_group, 'App::Part', f'collision_{name}_')
+    collision_part = add_object(collision_group, 'App::Part', f'col_{name}_')
     collision_part.Visibility = False
     robot.Proxy.created_objects.append(collision_part)
 

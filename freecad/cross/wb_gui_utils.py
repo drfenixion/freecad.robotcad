@@ -12,7 +12,7 @@ import Part as part
 from PySide import QtGui
 from freecad.cross.placement_utils import get_obj_to_subobj_diff  # FreeCAD's PySide!
 
-from .freecad_utils import DO, copy_obj_geometry, is_part, warn
+from .freecad_utils import DO, copy_obj_geometry, is_container, is_part, make_group, warn
 from .freecad_utils import is_link as is_fclink
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
@@ -105,6 +105,14 @@ def createBoundObjects(createBoundFunc = createBoundBox):
         boundObjWrapper.Group = [boundObj]
         boundObjWrapper.Placement = wrapperPlacement
         boundObjWrapper.Visibility = False
+
+        collisions_group = boundObj.Document.getObject('Collisions')
+        if is_container(collisions_group):
+            collisions_group.addObject(boundObjWrapper)
+        else:
+            collisions_group = make_group(doc, 'Collisions', visible=False)
+            collisions_group.addObject(boundObjWrapper)
+
         return boundObjWrapper, boundObj
 
 
@@ -160,7 +168,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 boundWrapper, bound = make_bound_obj_wrapper(
                     bound,
                     obj_to_subobj_middle_wrap_diff,
-                    wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label,
+                    wrapperName = "col__" + robotLink.Label + '__' + bound.Label,
                     wrapperPlacement = robotLink.Placement,
                 )
                 robotLink.Collision = robotLink.Collision + [boundWrapper]
