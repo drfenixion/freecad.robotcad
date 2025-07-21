@@ -744,24 +744,11 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
     Set placement with orienteer placement value
     """
 
-    # set_placement_by_orienteer() does not work for MountedPlacement of link
-    # because link conjuction place in many cases not at origin (zero coordinates) of link
-    # Instead of this use move_placement()
-
     placement1 = get_placement_of_orienteer(orienteer1, lcs_concentric_reversed = True)
 
-    # prepare data
-    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
-    doc.recompute() # trigger compute element placement based on zero Origin
-    element_basic_placement = getattr(link_or_joint, 'Placement')
-    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
-    doc.recompute()
-
-    ## prepare data
+    origin_or_mounted_placement_value_old = getattr(link_or_joint, origin_or_mounted_placement_name)
+    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value_old.inverse()
     placement1_diff = element_basic_placement.inverse() * placement1
-
-    # Set Origin or Mounted placement
     setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
     doc.recompute()
 
