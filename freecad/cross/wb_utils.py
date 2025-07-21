@@ -816,11 +816,6 @@ def move_placement(
     new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
 
-
-        # if is_joint(link_or_joint):
-    #     child_link = doc.getObject(link_or_joint.Child)
-    #     child_link.MountedPlacement * placement1_diff
-    #     chain = get_chain(child_link)
     doc.recompute()
 
 
