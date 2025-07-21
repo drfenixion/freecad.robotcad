@@ -771,16 +771,8 @@ def move_placement(
     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects, lcs_concentric_reversed = True)
 
-    # prepare data
-    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    # set zero Origin
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))
-    doc.recompute() # trigger compute element placement based on zero Origin
-    element_basic_placement = getattr(link_or_joint, 'Placement')
-    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
-    doc.recompute()
-
-    ## prepare data
+    origin_or_mounted_placement_value = getattr(link_or_joint, origin_or_mounted_placement_name)
+    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value.inverse()
     element_local_placement = getattr(link_or_joint, origin_or_mounted_placement_name)
     origin_placement1_diff = (element_basic_placement * element_local_placement).inverse() * placement1
     origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
