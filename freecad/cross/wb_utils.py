@@ -750,8 +750,8 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
 
     placement1 = get_placement_of_orienteer(orienteer1, lcs_concentric_reversed = True)
 
-    origin_or_mounted_placement_value_old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value_old.inverse()
+    origin_or_mounted_placement_value = getattr(link_or_joint, origin_or_mounted_placement_name)
+    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value.inverse()
     placement1_diff = element_basic_placement.inverse() * placement1
     setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
     doc.recompute()
