@@ -744,6 +744,10 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
     Set placement with orienteer placement value
     """
 
+    # set_placement_by_orienteer() does not work for MountedPlacement of link
+    # because link conjuction place in many cases not at origin (zero coordinates) of link
+    # Instead of this use move_placement()
+
     placement1 = get_placement_of_orienteer(orienteer1, lcs_concentric_reversed = True)
 
     origin_or_mounted_placement_value_old = getattr(link_or_joint, origin_or_mounted_placement_name)
