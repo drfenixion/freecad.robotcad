@@ -265,6 +265,25 @@ def get_joints(objs: DOList) -> list[CrossJoint]:
     return [o for o in objs if is_joint(o)]
 
 
+def get_child_joints(link_or_joint: DO) -> list[CrossJoint] | bool:
+    """Return first level child joints of link or joint."""
+    if is_joint(link_or_joint):
+        link_name = link_or_joint.Child
+    elif is_link(link_or_joint):
+        link_name = link_or_joint.Name
+    else:
+        return False
+
+    robot = link_or_joint.Proxy.get_robot()
+    robot_joints = robot.Proxy.get_joints()
+    child_joints = []
+    for joint in robot_joints:
+        if link_name == joint.Parent:
+            child_joints.append(joint)
+
+    return child_joints
+
+
 def get_link_sensors(objs: DOList) -> list[CrossSensor]:
     """Return only the objects that are Cross::SensorLink instances."""
     return [o for o in objs if is_sensor_link(o)]
@@ -738,7 +757,8 @@ def get_controllers_config_path(robot: CrossRobot, path_to_overcross_meta_dir: s
     return Path(path_to_overcross_meta_dir + get_controllers_config_file_name(ros_name(robot)))
 
 
-def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO):
+def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
+    origin_or_mounted_placement_name: str, orienteer1: DO, hold_downstream_chain: bool = False):
     """Set element (joint) placement (Origin) by orienteer.
 
     Set placement with orienteer placement value
@@ -753,7 +773,20 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
     origin_or_mounted_placement_value = getattr(link_or_joint, origin_or_mounted_placement_name)
     element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value.inverse()
     placement1_diff = element_basic_placement.inverse() * placement1
-    setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
+
+    old_placement_diff =  origin_or_mounted_placement_value.inverse() * placement1_diff
+    
+    setattr(link_or_joint, origin_or_mounted_placement_name, link_or_joint.Origin * old_placement_diff)
+
+    if hold_downstream_chain:
+        child_joints = get_child_joints(link_or_joint)
+        for joint in child_joints:
+            joint.Origin = old_placement_diff.inverse() * joint.Origin
+
+        if is_joint(link_or_joint):
+            child_link = doc.getObject(link_or_joint.Child)
+            child_link.MountedPlacement  = old_placement_diff.inverse() * child_link.MountedPlacement
+
     doc.recompute()
 
 
@@ -782,6 +815,12 @@ def move_placement(
     # in local frame every tool click will result Origin move because both orienteers moved and received new position
     new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
+
+
+        # if is_joint(link_or_joint):
+    #     child_link = doc.getObject(link_or_joint.Child)
+    #     child_link.MountedPlacement * placement1_diff
+    #     chain = get_chain(child_link)
     doc.recompute()
 
 
