@@ -155,14 +155,17 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
             bound = createBound(collision_source_obj)
             doc.removeObject(collision_source_obj.Name)
-
-            boundWrapper, bound = make_bound_obj_wrapper(
-                bound,
-                obj_to_subobj_middle_wrap_diff,
-                wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label,
-                wrapperPlacement = robotLink.Placement,
-            )
-            robotLink.Collision = robotLink.Collision + [boundWrapper]
+            
+            if bound:
+                boundWrapper, bound = make_bound_obj_wrapper(
+                    bound,
+                    obj_to_subobj_middle_wrap_diff,
+                    wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label,
+                    wrapperPlacement = robotLink.Placement,
+                )
+                robotLink.Collision = robotLink.Collision + [boundWrapper]
+            else:
+                warn('Can not create collision for object - '+obj.Label+'('+obj.Name+'). Maybe it does not contain any body.')
 
         doc.commitTransaction()
     else:
