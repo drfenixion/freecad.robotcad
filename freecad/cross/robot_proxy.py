@@ -1562,7 +1562,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-            elif joint['link1'].Name == i['link2'].Name:
+            elif joint['link1'].Name == i['link2'].Name \
+            or joint['link2'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1575,7 +1576,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-            elif joint['link1'].Name == i['link2'].Name:
+            elif joint['link1'].Name == i['link2'].Name \
+            or joint['link2'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1611,11 +1613,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             i+=1
             progressBar.setValue(i)
             QtGui.QApplication.processEvents()
-            child_joint = next(get_next_child_joint(root_joint))
-            joint_chain_tree.append(child_joint)
-            i+=1
-            progressBar.setValue(i)
-            QtGui.QApplication.processEvents()
+            child_joint = root_joint
             root_joint = None
         else:
             try:
