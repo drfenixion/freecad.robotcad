@@ -1562,8 +1562,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-            elif joint['link1'].Name == i['link2'].Name \
-            or joint['link2'].Name == i['link2'].Name:
+            elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1576,8 +1575,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
-            elif joint['link1'].Name == i['link2'].Name \
-            or joint['link2'].Name == i['link2'].Name:
+            elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1698,16 +1696,15 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             # when assembly in other assembly case
             # for get placement of elements relative to assembly link
 
-            sub_el = assembly.Document.getObject(r1_name_path[1])
-            if is_lcs(sub_el):
-                mounted_placement = sub_el.Placement * o1
-            else: # face of obj case
-                mounted_placement = p1 * o1
-
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
                 elem0 = assembly.Document.getObject(r1_name_path[0])
                 if is_link_to_assembly_from_assembly_wb(elem0):
                     link_assembly_placement = elem0.Placement
+                sub_el = assembly.Document.getObject(r1_name_path[1])
+                if is_lcs(sub_el):
+                    mounted_placement = sub_el.Placement * o1
+                else: # face of obj case
+                    mounted_placement = p1 * o1
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
@@ -1717,17 +1714,17 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 if is_link_to_assembly_from_assembly_wb(elem0):
                     link_assembly_placement = elem0.Placement
 
-                r1_r2_obj_link_diff = r1_obj_link.Placement.inverse() * r2_obj_link.Placement
-                # need to correct mounted placement by diff because we use r1 link params
-                mounted_placement = mounted_placement * r1_r2_obj_link_diff.inverse()
-
-                child_robot_link.MountedPlacement = mounted_placement.inverse()
-                origin_mounted_placement_correction = mounted_placement
-                origin_obj_link_correction = r1_obj_link.Placement
+                sub_el = assembly.Document.getObject(r2_name_path[1])
                 
-                # need to correct origin by diff because we use r1 link params
-                # Origin depend on MountedPlacement in formula below and thus should be chanded together with MountedPlacement
-                origin_obj_link_correction = origin_obj_link_correction * r1_r2_obj_link_diff
+                if is_lcs(sub_el):
+                    mounted_placement_r2 = sub_el.Placement * o2
+                else: # face of obj case
+                    mounted_placement_r2 = p2 * o2
+
+                child_robot_link.MountedPlacement = mounted_placement_r2.inverse()
+                origin_mounted_placement_correction = mounted_placement_r2
+                origin_obj_link_correction = r2_obj_link.Placement
+
 
             ### calc joint Origin
             robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
