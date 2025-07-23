@@ -1433,6 +1433,13 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
     for el in assembly.Group:
         if is_grounded_join_from_assembly_wb(el) and not root_grounded_joint_of_root_assembly:
             root_grounded_joint_of_root_assembly = el
+            obj_to_ground = root_grounded_joint_of_root_assembly.ObjectToGround
+            # if grounded assembly go deeper to find grounded joint in it
+            if is_link_to_assembly_from_assembly_wb(obj_to_ground):
+                for el in obj_to_ground.LinkedObject.Group:
+                    if is_grounded_join_from_assembly_wb(el):
+                        root_grounded_joint_of_root_assembly = el
+                        break
             i+=1
             progressBar.setValue(i)
             QtGui.QApplication.processEvents()
@@ -1455,22 +1462,27 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
 
             is_link2_root_assembly_link = False
             is_link1_root_assembly_link = False
-            if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r2_name_path[0]:
+
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name in [r2_name_path[0], r2_name_path[1]]:
                 is_link2_root_assembly_link = True
-            if root_grounded_joint_of_root_assembly.ObjectToGround.Name == r1_name_path[1]:
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name in [r1_name_path[0], r1_name_path[1]]:
                 is_link1_root_assembly_link = True
             
             r2_obj_link = r2_obj0_link
             r1_obj_link = r1_obj0_link
             new_assembly_branch_r2 = None
             new_assembly_branch_r1 = None
+            new_assembly_branch_link_r2 = None
+            new_assembly_branch_link_r1 = None
             if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
+                new_assembly_branch_link_r1 = r1_obj0_link
                 new_assembly_branch_r1 = r1_obj0_link.LinkedObject
                 r1_obj1_link = doc.getObject(r1_name_path[1])
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
                 r1_obj1_link = r1_obj1_link.getLinkedObject(False)
                 r1_obj_link = r1_obj1_link
             if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
+                new_assembly_branch_link_r2 = r2_obj0_link
                 new_assembly_branch_r2 = r2_obj0_link.LinkedObject
                 r2_obj1_link = doc.getObject(r2_name_path[1])
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
@@ -1483,6 +1495,8 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                     'assembly_link': assembly_link,
                     'new_assembly_branch_r2': new_assembly_branch_r2,
                     'new_assembly_branch_r1': new_assembly_branch_r1,
+                    'new_assembly_branch_link_r2': new_assembly_branch_link_r2,
+                    'new_assembly_branch_link_r1': new_assembly_branch_link_r1,
                     'link2': r2_obj_link,
                     'link1': r1_obj_link,
                     'link2_name': r2_obj_link.Name,
@@ -1649,6 +1663,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     QtGui.QApplication.processEvents()
 
     try:
+        root_link_setup = False
         for joint in joint_chain_tree:
             # prepare data
             r1 = joint['joint'].Reference1[1][0]
@@ -1709,6 +1724,13 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
                 origin_obj_link_correction = r1_obj_link.Placement
+
+                if not root_link_setup:
+                    assembly_link_placement = fc.Placement()
+                    if joint['assembly_link']:
+                        assembly_link_placement = joint['assembly_link'].Placement
+                        parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
+                        root_link_setup = True
             else: # reverse chain direction
                 elem0 = assembly.Document.getObject(r2_name_path[0])
                 if is_link_to_assembly_from_assembly_wb(elem0):
@@ -1725,6 +1747,13 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 origin_mounted_placement_correction = mounted_placement_r2
                 origin_obj_link_correction = r2_obj_link.Placement
 
+
+                if not root_link_setup:
+                    assembly_link_placement = fc.Placement()
+                    if joint['assembly_link']:
+                        assembly_link_placement = joint['assembly_link'].Placement
+                        parent_robot_link.MountedPlacement = assembly_link_placement * joint['link1'].Placement
+                        root_link_setup = True
 
             ### calc joint Origin
             robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
