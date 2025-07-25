@@ -1705,21 +1705,39 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 break
 
             ### calc robot link MountedPlacement
-            mounted_placement = fc.Placement()
-            link_assembly_placement = fc.Placement()
             # it need to adding assembly link placement to it`s elements (links)
             # when assembly in other assembly case
             # for get placement of elements relative to assembly link
 
+            r2_elem0 = assembly.Document.getObject(r2_name_path[0])
+            r2_link_assembly_placement = fc.Placement()
+            if is_link_to_assembly_from_assembly_wb(r2_elem0):
+                r2_link_assembly_placement = r2_elem0.Placement
+
+            r1_elem0 = assembly.Document.getObject(r1_name_path[0])
+            r1_link_assembly_placement = fc.Placement()
+            if is_link_to_assembly_from_assembly_wb(r1_elem0):
+                r1_link_assembly_placement = r1_elem0.Placement
+
+            sub_el_r2 = assembly.Document.getObject(r2_name_path[1])
+            sub_el_r1 = assembly.Document.getObject(r1_name_path[1])
+
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
-                elem0 = assembly.Document.getObject(r1_name_path[0])
-                if is_link_to_assembly_from_assembly_wb(elem0):
-                    link_assembly_placement = elem0.Placement
-                sub_el = assembly.Document.getObject(r1_name_path[1])
-                if is_lcs(sub_el):
-                    mounted_placement = sub_el.Placement * o1
+ 
+                link_assembly_placement = r1_link_assembly_placement
+                
+                if is_lcs(sub_el_r1):
+                    r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
+                    r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
+                    r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
+                    # r1_r2_sub_el_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child
+                    mounted_placement = (sub_el_r1.Placement * o1) * r1_r2_sub_el_rel_to_outer_plc_diff.inverse()
                 else: # face of obj case
-                    mounted_placement = p1 * o1
+                    p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
+                    p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
+                    p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc
+                    # p1_p2_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child                
+                    mounted_placement = (p1 * o1) * p1_p2_rel_to_outer_plc_diff.inverse()
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
@@ -1732,21 +1750,24 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
                         root_link_setup = True
             else: # reverse chain direction
-                elem0 = assembly.Document.getObject(r2_name_path[0])
-                if is_link_to_assembly_from_assembly_wb(elem0):
-                    link_assembly_placement = elem0.Placement
+                link_assembly_placement = r2_link_assembly_placement
 
-                sub_el = assembly.Document.getObject(r2_name_path[1])
-                
-                if is_lcs(sub_el):
-                    mounted_placement_r2 = sub_el.Placement * o2
+                if is_lcs(sub_el_r2):
+                    # r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
+                    # r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
+                    # r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
+                    # mounted_placement = sub_el_r2.Placement * o2 * r1_r2_sub_el_rel_to_outer_plc_diff
+                    mounted_placement = sub_el_r2.Placement * o2
                 else: # face of obj case
-                    mounted_placement_r2 = p2 * o2
+                    # p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
+                    # p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
+                    # p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc                    
+                    # mounted_placement = p2 * o2 * p1_p2_rel_to_outer_plc_diff
+                    mounted_placement = p2 * o2
 
-                child_robot_link.MountedPlacement = mounted_placement_r2.inverse()
-                origin_mounted_placement_correction = mounted_placement_r2
+                child_robot_link.MountedPlacement = mounted_placement.inverse()
+                origin_mounted_placement_correction = mounted_placement
                 origin_obj_link_correction = r2_obj_link.Placement
-
 
                 if not root_link_setup:
                     assembly_link_placement = fc.Placement()
