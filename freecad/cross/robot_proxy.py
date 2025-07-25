@@ -1720,21 +1720,26 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 r1_link_assembly_placement = r1_elem0.Placement
 
 
-            def get_first_link(obj_name_list: list) -> DO | bool:
-                """Return frist FreeCAD link in list of DO names"""
+            def get_first_lcs_or_link(obj_name_list: list) -> DO | None:
+                """Return first lcs from FreeCAD link or first link if lcs is not exist in that link"""
+                lcs = None
+                link = None
                 for obj_name in obj_name_list:
                     obj = fc.ActiveDocument.getObject(obj_name)
                     if is_fc_link(obj):
-                        return obj
-                return False
+                        link = obj
+                    elif is_lcs(obj):
+                        lcs = obj
+
+                if lcs:
+                    return lcs
+                else:
+                    return link
 
 
-            # sub_el_r2 = get_first_link(r2_name_path)
-            # sub_el_r1 = get_first_link(r1_name_path)
+            sub_el_r2 = get_first_lcs_or_link(r2_name_path)
+            sub_el_r1 = get_first_lcs_or_link(r1_name_path)
             
-            sub_el_r2 = assembly.Document.getObject(r2_name_path[1])
-            sub_el_r1 = assembly.Document.getObject(r1_name_path[1])
-
             mounted_placement = fc.Placement()
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
  
