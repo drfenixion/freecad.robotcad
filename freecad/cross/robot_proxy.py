@@ -1719,9 +1719,23 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             if is_link_to_assembly_from_assembly_wb(r1_elem0):
                 r1_link_assembly_placement = r1_elem0.Placement
 
+
+            def get_first_link(obj_name_list: list) -> DO | bool:
+                """Return frist FreeCAD link in list of DO names"""
+                for obj_name in obj_name_list:
+                    obj = fc.ActiveDocument.getObject(obj_name)
+                    if is_fc_link(obj):
+                        return obj
+                return False
+
+
+            # sub_el_r2 = get_first_link(r2_name_path)
+            # sub_el_r1 = get_first_link(r1_name_path)
+            
             sub_el_r2 = assembly.Document.getObject(r2_name_path[1])
             sub_el_r1 = assembly.Document.getObject(r1_name_path[1])
 
+            mounted_placement = fc.Placement()
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
  
                 link_assembly_placement = r1_link_assembly_placement
@@ -1748,7 +1762,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                     if joint['assembly_link']:
                         assembly_link_placement = joint['assembly_link'].Placement
                         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
-                        root_link_setup = True
+                    root_link_setup = True
             else: # reverse chain direction
                 link_assembly_placement = r2_link_assembly_placement
 
@@ -1774,7 +1788,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                     if joint['assembly_link']:
                         assembly_link_placement = joint['assembly_link'].Placement
                         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link1'].Placement
-                        root_link_setup = True
+                    root_link_setup = True
 
             ### calc joint Origin
             robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
