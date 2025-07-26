@@ -39,7 +39,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH, get_chain
+from .wb_utils import ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_first_link, get_last_link_to_assembly
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -1402,7 +1402,12 @@ def make_filled_robot(name:str = 'Robot') -> CrossRobot:
     return robot
 
 
-def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO = None, assembly_link:DO = None) -> tuple:
+def get_assembly_elements(
+        assembly:DO,
+        root_grounded_joint_of_root_assembly:DO = None,
+        assembly_link:DO = None,
+        assembly_hierarhy: list[DO] = None,
+    ) -> tuple:
     """Get assemble links, joints, grounded_joints from
     from assembly (default Assembly WB)."""
 
@@ -1477,21 +1482,20 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
             if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
                 new_assembly_branch_link_r1 = r1_obj0_link
                 new_assembly_branch_r1 = r1_obj0_link.LinkedObject
-                r1_obj1_link = doc.getObject(r1_name_path[1])
+                r1_link = get_first_link(r1_name_path)
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
-                r1_obj1_link = r1_obj1_link.getLinkedObject(False)
-                r1_obj_link = r1_obj1_link
+                r1_obj_link = r1_link.getLinkedObject(False)
             if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
                 new_assembly_branch_link_r2 = r2_obj0_link
                 new_assembly_branch_r2 = r2_obj0_link.LinkedObject
-                r2_obj1_link = doc.getObject(r2_name_path[1])
+                r2_link = get_first_link(r2_name_path)
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
-                r2_obj1_link = r2_obj1_link.getLinkedObject(False)
-                r2_obj_link = r2_obj1_link
+                r2_obj_link = r2_link.getLinkedObject(False)
 
             assembly_joints.append({
                     'joint': el,
                     'assembly': assembly,
+                    'assembly_hierarhy': assembly_hierarhy if assembly_hierarhy else [assembly],
                     'assembly_link': assembly_link,
                     'new_assembly_branch_r2': new_assembly_branch_r2,
                     'new_assembly_branch_r1': new_assembly_branch_r1,
@@ -1501,6 +1505,8 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
                     'link1': r1_obj_link,
                     'link2_name': r2_obj_link.Name,
                     'link1_name': r1_obj_link.Name,
+                    'joint_reference_2_obj_0_name': r2_obj0_link.Name,
+                    'joint_reference_1_obj_0_name': r1_obj0_link.Name,
                     'is_link2_root_assembly_link': is_link2_root_assembly_link,
                     'is_link1_root_assembly_link': is_link1_root_assembly_link,
                     'chain_direction': None,
@@ -1514,7 +1520,12 @@ def get_assembly_elements(assembly:DO, root_grounded_joint_of_root_assembly:DO =
             progressBar.setValue(i)
             QtGui.QApplication.processEvents()
         elif is_link_to_assembly_from_assembly_wb(el):
-            assembly_links_rec, assembly_joints_rec, grounded_joint_rec = get_assembly_elements(el.LinkedObject, root_grounded_joint_of_root_assembly, el)
+            assembly_links_rec, assembly_joints_rec, grounded_joint_rec = get_assembly_elements(
+                el.LinkedObject,
+                root_grounded_joint_of_root_assembly,
+                el,
+                assembly_hierarhy = assembly_hierarhy + [el] if assembly_hierarhy else [assembly] + [el],
+                )
             assembly_links = assembly_links + assembly_links_rec
             assembly_joints = assembly_joints + assembly_joints_rec
             grounded_joints = grounded_joints + grounded_joint_rec
@@ -1571,12 +1582,19 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     
     def get_next_child_joint(joint) -> DO:
         for i in assembly_joints_sorted:
-            if joint['link1'].Name == i['link1'].Name \
-            or joint['link2'].Name == i['link1'].Name:
+            if joint['link1'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link2'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
             elif joint['link1'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+            elif joint['link2'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
@@ -1584,8 +1602,11 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
 
     def get_next_branch_root_joint(joint) -> DO:
         for i in assembly_joints_sorted:
-            if joint['link1'].Name == i['link1'].Name \
-            or joint['link2'].Name == i['link1'].Name:
+            if joint['link1'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link2'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'reverse'
                 yield i
@@ -1593,7 +1614,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 assembly_joints_sorted.remove(i)
                 i['chain_direction'] = 'forward'
                 yield i
-
+            elif joint['link2'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
 
     ### make joint chain tree (not looped kinematic chain tree)
     # make root joint sorted on top
@@ -1674,12 +1698,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             o2 = joint['joint'].Offset2
             r1_name_path = r1.split('.')
             r2_name_path = r2.split('.')
-            r1_obj_link = assembly.Document.getObject(r1_name_path[0])
-            r2_obj_link = assembly.Document.getObject(r2_name_path[0])
-            if is_link_to_assembly_from_assembly_wb(r1_obj_link):
-                r1_obj_link = assembly.Document.getObject(r1_name_path[1])
-            if is_link_to_assembly_from_assembly_wb(r2_obj_link):
-                r2_obj_link = assembly.Document.getObject(r2_name_path[1])
+            r1_obj_link = get_first_link(r1_name_path)
+            r2_obj_link = get_first_link(r2_name_path)
             r1_obj = r1_obj_link.getLinkedObject(True)
             r2_obj = r2_obj_link.getLinkedObject(True)
             parent_robot_link = None
@@ -1708,34 +1728,11 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             # it need to adding assembly link placement to it`s elements (links)
             # when assembly in other assembly case
             # for get placement of elements relative to assembly link
-
-            r2_elem0 = assembly.Document.getObject(r2_name_path[0])
             r2_link_assembly_placement = fc.Placement()
-            if is_link_to_assembly_from_assembly_wb(r2_elem0):
-                r2_link_assembly_placement = r2_elem0.Placement
+            r2_link_assembly_placement = get_comulative_assemblies_placement(r2_name_path)
 
-            r1_elem0 = assembly.Document.getObject(r1_name_path[0])
             r1_link_assembly_placement = fc.Placement()
-            if is_link_to_assembly_from_assembly_wb(r1_elem0):
-                r1_link_assembly_placement = r1_elem0.Placement
-
-
-            def get_first_lcs_or_link(obj_name_list: list) -> DO | None:
-                """Return first lcs from FreeCAD link or first link if lcs is not exist in that link"""
-                lcs = None
-                link = None
-                for obj_name in obj_name_list:
-                    obj = fc.ActiveDocument.getObject(obj_name)
-                    if is_fc_link(obj):
-                        link = obj
-                    elif is_lcs(obj):
-                        lcs = obj
-
-                if lcs:
-                    return lcs
-                else:
-                    return link
-
+            r1_link_assembly_placement = get_comulative_assemblies_placement(r1_name_path)
 
             sub_el_r2 = get_first_lcs_or_link(r2_name_path)
             sub_el_r1 = get_first_lcs_or_link(r1_name_path)
@@ -1803,9 +1800,9 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 if is_joint(el):
                     comulative_joint_placement = comulative_joint_placement * el.Origin
 
-            assembly_link_placement = fc.Placement()
-            if joint['assembly_link']:
-                assembly_link_placement = joint['assembly_link'].Placement
+            assembly_link_cumulative_placement = fc.Placement()
+            for assembly_hierarhy_el in joint['assembly_hierarhy']:
+                    assembly_link_cumulative_placement = assembly_link_cumulative_placement * assembly_hierarhy_el.Placement
             
             # link_assembly_placement - used for first joint that connected new assembly with old one
             # (becase technically this joint is in parent assembly and links to child assembly)
@@ -1813,7 +1810,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             # (becase technically this joint is in child assembly and links directly to object)
             # In other words: link_assembly_placement uses for joints between assemblies and assembly_link_placement in same assembly
 
-            robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_placement * link_assembly_placement \
+            robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_cumulative_placement * link_assembly_placement \
                 * origin_obj_link_correction * origin_mounted_placement_correction
             
             ### set joint type

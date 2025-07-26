@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_param, get_parents_names, is_selection_object
+from .freecad_utils import get_param, get_parents_names, is_link_to_assembly_from_assembly_wb, is_selection_object
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -1335,3 +1335,59 @@ def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool =
     doc.commitTransaction()
 
     return joint, child_link, parent_link
+
+
+def get_first_lcs_or_link(obj_name_list: list) -> DO | None:
+    """Return first lcs from FreeCAD link or first link if lcs is not exist"""
+    lcs = None
+    link = None
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_fc_link(obj):
+            link = obj
+        elif is_lcs(obj):
+            lcs = obj
+
+    if lcs:
+        return lcs
+    else:
+        return link
+    
+
+def get_first_link(obj_name_list: list) -> DO | None:
+    """Return first FreeCAD link"""
+    link = None
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_fc_link(obj):
+            link = obj
+            break
+
+    return link
+
+
+def get_last_link_to_assembly(obj_name_list: list) -> DO | None:
+    """Return last FreeCAD assembly from Assembly WB"""
+    assembly = None
+    obj_name_list_reversed = list(reversed(obj_name_list))
+    for obj_name in obj_name_list_reversed:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_link_to_assembly_from_assembly_wb(obj):
+            assembly = obj
+            break
+
+    return assembly
+
+
+def get_comulative_assemblies_placement(obj_name_list: list) -> DO | None:
+    """Return comulative assemblies placement of FreeCAD assembly from Assembly WB included one in other.
+    Parent assembly placement to child assembly placement and etc"""
+    comulative_assemblies_placement = fc.Placement()
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_link_to_assembly_from_assembly_wb(obj):
+            comulative_assemblies_placement = comulative_assemblies_placement * obj.Placement
+        else:
+            break
+
+    return comulative_assemblies_placement
