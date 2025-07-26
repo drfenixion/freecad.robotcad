@@ -1831,7 +1831,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                             setattr(robot_joint, limit['robotcad_value_param'], getattr(joint['joint'], limit['assembly_value_param']))
             else:
                 warn('Can`t automatically match joint type ' + joint['joint'].JointType + ' of joint '+ joint['joint'].Name +' \
-to RobotCAD joint type. Set it manually in resulting structure or change joint type to supported by URDF in assembly.')
+to RobotCAD joint type. Set joint type manually in resulting structure or change joint type to supported by URDF in assembly.')
 
             i+=1
             progressBar.setValue(i)
