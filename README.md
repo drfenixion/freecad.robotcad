@@ -24,9 +24,10 @@ Video of creating controllable models: <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
 # Key features short list:
-1. Autoinstall and run by startup script
-1. Modeling parts (in FreeCAD),
-1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc),
+1. Autoinstall and run by startup script.
+1. Modeling parts (in FreeCAD).
+1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
+1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
     1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
