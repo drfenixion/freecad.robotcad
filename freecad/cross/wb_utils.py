@@ -875,12 +875,14 @@ def make_lcs_at_link_body(
         if is_fc_link(orienteer.Object):
             link_to_obj = orienteer.Object
             original_obj = link_to_obj.getLinkedObject(True)
+            obj_for_getting_parents = link_to_obj
             link_to_obj_placement = link_to_obj.Placement
         else:
             original_obj = orienteer.Object
+            obj_for_getting_parents = original_obj
             link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
-        parents_reversed = reversed(original_obj.Parents)
+        parents_reversed = reversed(obj_for_getting_parents.Parents)
         for p in parents_reversed:
             p = p[0]
             if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
@@ -892,7 +894,7 @@ def make_lcs_at_link_body(
         pass
 
     if not original_obj_wrapper:
-        message('Can not find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
