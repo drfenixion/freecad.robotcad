@@ -937,6 +937,8 @@ class RobotProxy(ProxyBase):
                 continue
             if hasattr(joint, 'Proxy') and joint.Proxy:
                 xml.append(joint.Proxy.export_urdf())
+                if hasattr(joint, 'ChildClosedLoop') and joint.ChildClosedLoop:
+                    xml.append(joint.Proxy.export_urdf(closed_loop_joint=True))
             else:
                 error(
                     f"Internal error with joint '{joint.Label}'"

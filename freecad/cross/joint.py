@@ -15,6 +15,7 @@ VPJointProxy = NewType('VPJointProxy', object)
 class Joint(fc.DocumentObject):
     Group: list[fc.DocumentObject]
     Child: str  # Must name a CROSS::Link by its ROS name.
+    ChildClosedLoop: fc.DocumentObject  # link to CROSS::Link.
     Effort: float
     LowerLimit: float
     Mimic: bool

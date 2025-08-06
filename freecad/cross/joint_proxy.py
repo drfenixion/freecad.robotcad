@@ -7,6 +7,7 @@ from typing import NewType, List, Optional, cast
 
 import FreeCAD as fc
 import FreeCADGui as fcgui
+from freecad.cross import wb_constants
 
 from .freecad_utils import ProxyBase
 from .freecad_utils import add_property
@@ -53,6 +54,7 @@ class JointProxy(ProxyBase):
             [
                 'Group',
                 'Child',
+                'ChildClosedLoop',
                 'Effort',
                 'LowerLimit',
                 'Mimic',
@@ -116,6 +118,10 @@ class JointProxy(ProxyBase):
         add_property(
             obj, 'App::PropertyEnumeration', 'Child', 'Elements',
             'Child link (from RobotCAD)',
+        )
+        add_property(
+            obj, 'App::PropertyLinkGlobal', 'ChildClosedLoop', 'Elements',
+            'Closed loop child link (from RobotCAD). Joint dinamics will be added at simulation (Gazebo) stage.',
         )
         add_property(
             obj, 'App::PropertyPlacement', 'Origin', 'Elements',
@@ -246,6 +252,11 @@ class JointProxy(ProxyBase):
             )
                     and (obj.Child != new_link_name)):
                 obj.Child = new_link_name
+        if prop == 'ChildClosedLoop':
+            if obj.ChildClosedLoop:
+                if not is_link(obj.ChildClosedLoop.getLinkedObject()):
+                    warn('ChildClosedLoop must be RobotCAD link. Use filter to select only robot links.')
+                    obj.ChildClosedLoop = None
         if prop == 'Parent':
             if obj.Parent:
                 # No need to update if the link name is still in the enum after
@@ -411,20 +422,36 @@ class JointProxy(ProxyBase):
             return 'Angle'
         return ''
 
-    def export_urdf(self) -> et.ElementTree:
+    def export_urdf(self, closed_loop_joint: bool = False) -> et.ElementTree:
         joint = self.joint
         joint_xml = et.fromstring('<joint/>')
         joint_xml.attrib['name'] = get_valid_urdf_name(ros_name(joint))
         joint_xml.attrib['type'] = joint.Type
+
         if joint.Parent:
             joint_xml.append(et.fromstring(f'<parent link="{get_valid_urdf_name(joint.Parent)}"/>'))
         else:
             joint_xml.append(et.fromstring('<parent link="NO_PARENT_DEFINED"/>'))
-        if joint.Child:
+
+        # add closed loop joint
+        #TODO replace origin to pose for that case cuz SDF does not know origin of joint in Gazebo tag
+        if closed_loop_joint and joint.ChildClosedLoop:
+            childClosedLoopLink = joint.ChildClosedLoop.getLinkedObject()
+            joint_xml.append(et.fromstring(f'<child link="{get_valid_urdf_name(childClosedLoopLink.Name)}"/>'))
+            
+            joint_name = ros_name(joint)
+            if wb_constants.JOINT_NAME_STR_BETWEEN_LINKS + joint.Child in ros_name(joint):
+                joint_name_left_side = ros_name(joint).split(wb_constants.JOINT_NAME_STR_BETWEEN_LINKS)[0]
+                joint_name = joint_name_left_side + wb_constants.JOINT_NAME_STR_BETWEEN_LINKS + childClosedLoopLink.Name
+            joint_name = joint_name + '__closed_loop'
+            joint_xml.attrib['name'] = get_valid_urdf_name(joint_name)
+        elif joint.Child:
             joint_xml.append(et.fromstring(f'<child link="{get_valid_urdf_name(joint.Child)}"/>'))
         else:
             joint_xml.append(et.fromstring('<child link="NO_CHILD_DEFINED"/>'))
+
         joint_xml.append(urdf_origin_from_placement(joint.Origin))
+
         if joint.Type != 'fixed':
             joint_xml.append(et.fromstring('<axis xyz="0 0 1" />'))
             if joint.Type in ('revolute', 'continuous'):
@@ -458,6 +485,13 @@ class JointProxy(ProxyBase):
                 urdf_offset = radians(joint.Offset)
             mimic_xml.attrib['offset'] = str(urdf_offset)
             joint_xml.append(mimic_xml)
+
+        if closed_loop_joint and joint.ChildClosedLoop:
+            # wrap ClosedLoop joint by gazebo tag
+            gazebo_xml = et.fromstring('<gazebo/>')
+            gazebo_xml.append(joint_xml)
+            joint_xml = gazebo_xml
+
         return joint_xml
 
     def _toggle_editor_mode(self):
@@ -699,14 +733,14 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
     ''' Make robot joint and fill it with links (parent, child)  '''
 
     if is_link(link1) and is_link(link2):
-        joint = make_joint(ros_name(link1) + '__to__' + ros_name(link2), robot = robot)
+        joint = make_joint(ros_name(link1) + wb_constants.JOINT_NAME_STR_BETWEEN_LINKS + ros_name(link2), robot = robot)
         try:
             joint.Parent = ros_name(link1)
             joint.Child = ros_name(link2)
         except ValueError:
             fc.ActiveDocument.removeObject(joint.Name)
             message(
-                'Links must be in robot container for joint connection. Closed links loop is not supported.',
+                'Links must be in robot container for joint connection. Closed links loop is not supported. Can not create joint.',
                 True,
             )
         fc.ActiveDocument.recompute()

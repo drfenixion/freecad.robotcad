@@ -344,3 +344,5 @@ ASSEMBLY_WB_JOINTS_MATCHING = {
         'limits': None
     },
 }
+
+JOINT_NAME_STR_BETWEEN_LINKS = '__to__'

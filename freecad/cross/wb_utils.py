@@ -785,7 +785,8 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
 
         if is_joint(link_or_joint):
             child_link = doc.getObject(link_or_joint.Child)
-            child_link.MountedPlacement  = old_placement_diff.inverse() * child_link.MountedPlacement
+            if child_link:
+                child_link.MountedPlacement  = old_placement_diff.inverse() * child_link.MountedPlacement
 
     doc.recompute()
 
