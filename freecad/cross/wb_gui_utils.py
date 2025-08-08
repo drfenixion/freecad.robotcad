@@ -251,7 +251,7 @@ class WbSettingsGetter:
     ) -> Path:
         """Open the dialog to get the ROS workspace."""
         self._old_ros_workspace = Path(old_ros_workspace)
-        if self.get_settings(get_ros_workspace=True, get_vhacd_path=False):
+        if self.get_settings(get_ros_workspace=True, get_vhacd_path=False, get_overcross_token=False):
             return self.ros_workspace
         return self._old_ros_workspace
 

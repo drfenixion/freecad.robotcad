@@ -75,7 +75,7 @@
          <string>You can get this token from robotcad.ru site. It will be used by external code generator.</string>
         </property>
         <property name="text">
-         <string>External codegen token</string>
+         <string>External code generator token (get it at robotcad.ru)</string>
         </property>
        </widget>
       </item>

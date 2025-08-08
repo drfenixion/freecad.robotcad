@@ -892,7 +892,6 @@ class RobotProxy(ProxyBase):
         write_files = template_files + [
                 'meshes/',
                 'urdf/',
-                'overcross/',
                 'worlds/',
         ]
 

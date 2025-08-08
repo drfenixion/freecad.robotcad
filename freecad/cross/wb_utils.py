@@ -480,7 +480,7 @@ def get_valid_urdf_name(name: str) -> str:
     return name.replace('"', '&quot;')
 
 
-def get_rel_and_abs_path(path: str) -> tuple[str, Path]:
+def get_rel_and_abs_path(path: str, ask_user_fill_workspace: bool = True) -> tuple[str, Path]:
     """Return the path relative to src and the absolute path.
 
     Return the path relative to the `src` folder in the  ROS workspace and
@@ -502,9 +502,10 @@ def get_rel_and_abs_path(path: str) -> tuple[str, Path]:
     # Import here to avoid circular import.
     from .wb_gui_utils import get_ros_workspace
 
-    if not wb_globals.g_ros_workspace.name:
-        ws = get_ros_workspace()
-        wb_globals.g_ros_workspace = ws
+    if ask_user_fill_workspace:
+        if not wb_globals.g_ros_workspace.name:
+            ws = get_ros_workspace()
+            wb_globals.g_ros_workspace = ws
     p = without_ros_workspace(path)
     full_path = (
         wb_globals.g_ros_workspace.expanduser() / 'src' / p
