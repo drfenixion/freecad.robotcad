@@ -810,9 +810,19 @@ def material_from_material_editor(
     import MaterialEditor
     material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
     try:
-        material.material_name = material_editor.cards[material_editor.card_path]
+        divider = 'Material/Resources/Materials/'
+        first_key = next(iter(material_editor.cards))
+        fragments = first_key.split(divider)
+        local_system_path_prefix = fragments[0]
+        
+
+        fragments = material_editor.card_path.split(divider)
+        card_path_postfix = fragments[-1]
+        local_system_card_path = local_system_path_prefix + divider + card_path_postfix
+
+        material.material_name = material_editor.cards[local_system_card_path]
         material.density = fc.Units.Quantity(
-                material_editor.materials[material_editor.card_path]['Density'],
+                material_editor.materials[local_system_card_path]['Density'],
         )
     except (KeyError, AttributeError):
         material.material_name = None
