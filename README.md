@@ -24,12 +24,13 @@ Video of creating controllable models: <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
 # Key features short list:
-1. Autoinstall and run by startup script
-1. Modeling parts (in FreeCAD),
-1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc),
-    1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
+1. Autoinstall and run by startup script.
+1. Modeling parts (in FreeCAD).
+1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
+1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
+    1. Automatic creating full robot structure by selected objects (links in joints will have order of objects selection)
 1. Сonvenient new tools to set placement of joints and links (intuitive way)
     1. Set placement just by selecting faces of links and it will automatically connected
     1. Joint/link placement rotation tools
@@ -46,16 +47,17 @@ Video of creating controllable models: <br />
     1. Add the necessary sensors and use it in Gazebo.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
-    1. URDF
+    1. URDF (kinematics, mass, inertia, sensors, etc.)
     1. Meshes
-1. Tool for use external extended code generating service (startup script, docker, multicopters)
+    1. Controllers config (use extended generator if need all ready to use controllers code)
+1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
     1. External code generator:
         1. all of basic code generator
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
-        1. ros2_controllers 
+        1. ros2_controllers (integrated in your package with ros2_control launcher)
         1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
         1. Nvidia video cards container support
         1. README instruction how to use
@@ -74,9 +76,9 @@ Same in one line
 ```
 cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd freecad.robotcad/docker && bash run.bash -c
 ```
-Tested on Ubuntu 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu).
+Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
-If docker is not installed look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information on how to use the startup script.
+If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manually Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
 
 **You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
 
@@ -195,7 +197,7 @@ The key features of RobotCAD are:
 
 ## Compatibility
 
-Compatible with FreeCAD at least v0.21.2 - FreeCAD AppImage build (Python 3.10+ in FreeCAD).
+Compatible with FreeCAD at least v0.21.2 - min Python 3.12 inside FreeCAD (suited: FreeCAD Conda, FreeCAD-Daily. not suited: FreeCAD AppImage).
 Compatible with ROS2.
 
 ## Features
@@ -213,11 +215,11 @@ Compatible with ROS2.
 
 ## Installation 
 
-You need a recent version of FreeCAD v0.21.2 with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
+You need a recent version of FreeCAD (v1 or above) with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
-Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently.
+Min Python version is 3.12 (inside FreeCAD). There is Conda FreeCAD with suited Python version. There is NO AppImage FreeCAD with suited version currently. At moment of writing there is FreeCAD-Daily with py3.12 but it is not recomended because not stable version. Best way is use Conda for install currently.
 
-Example of installation of Conda FreeCAD with correct Python veriosn:
+Example of installation of Conda FreeCAD with correct Python version and RobotCAD by git clone:
 ```
 mkdir -p /home/$USER/miniconda3 && \
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
@@ -229,15 +231,26 @@ conda config --add channels conda-forge && \
 conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
 conda activate freecad_1_0_312 && \
 conda install numpy pandas matplotlib requests qt6-wayland pycollada
+conda install robostack-jazzy::ros-jazzy-xacro
+cd ~/.local/share/FreeCAD/Mod
+git clone https://github.com/drfenixion/freecad.robotcad.git
+cd -
+freecad
 ```
 
-- In FreeCAD, menu "Edit / Preferences ..."
-- Category "Addon Manager"
-- Add an entry to "Custom repository" by clicking on the "+" sign.
-- Repository URL: `https://github.com/drfenixion/freecad.robotcad.git`, branch: `main`
-- Click on "OK" to close the dialog "Preferences"
-- Back to FreeCAD's main window, menu "Tools / Addon manager"
-- Search and install the workbench via the [Addon Manager](https://wiki.freecad.org/Std_AddonMgr)
+#### One more install distribution option here
+It is Conda solo archive with RobotCAD, FreeCAD and dependencies.
+If you have any issue with installation you can download this archive and unpack it. RobotCAD will already installed in FreeCAD with it`s dependencies.
+How to run RobotCAD from Conda archive.
+Download (~900Mb) robotcad_8_3_3_freecad_1_0_py312.tar.gz  (the archive is available for RobotCAD donors, if interested, write to it.project.devel@gmail.com)
+```
+mkdir robotcad
+tar -xzf robotcad_8_3_3_freecad_1_0_py312.tar.gz -C robotcad
+source robotcad/bin/activate
+conda-unpack
+freecad
+```
+Tested on Xubuntu 24.04.
 
 ## Launching FreeCAD with ROS
 
@@ -265,6 +278,10 @@ If you want to work on this workbench you have the following options (choose one
 git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
 bash run.bash -d
+```
+- Install RobotCAD manually via Conda, see installation section. Run FreeCAD with DEBUG=1 env.
+```
+DEBUG=1 freecad
 ```
 - Clone the repository directory in FreeCAD's `Mod` directory: `cd ~/.local/share/FreeCAD/Mod && git clone https://github.com/drfenixion/freecad.robotcad.git` on Linux
 - Start FreeCAD from the root-directory of this repository in a terminal (by default `freecad.robotcad`)

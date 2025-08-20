@@ -1,5 +1,7 @@
 from xml.dom.minidom import parseString, Document
-from ..wb_utils import get_rel_and_abs_path
+
+from freecad.cross.wb_gui_utils import WbSettingsGetter
+from ..wb_utils import get_rel_and_abs_path, set_workbench_param
 import FreeCAD as fc
 import FreeCADGui as fcgui
 from ..wb_utils import get_urdf_path
@@ -51,8 +53,24 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
     def Activated(self):
 
+      settings_getter = WbSettingsGetter()
+      if not settings_getter.overcross_token:
+        if settings_getter.get_settings(get_ros_workspace=False, get_vhacd_path=False, get_overcross_token=True):
+          set_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, str(settings_getter.overcross_token))      
+
+      # print('Calculating mass and inertia started.')
+      # fcgui.runCommand("CalculateMassAndInertia")
+      # print('Calculating mass and inertia finished.')
+
+      print('Local code generating started.')
+      # ensure files present by regenerate them
+      fcgui.runCommand("UrdfExport")
+      print('Local code generating finished.')
+
+      print('Preparing files started')
       robot = self.getSelectedRobot()
-      rel_output_path, abs_output_path = get_rel_and_abs_path(robot.OutputPath)
+      rel_output_path, abs_output_path = get_rel_and_abs_path(robot.OutputPath, ask_user_fill_workspace=False)
+
       project_path, package_name, description_package_path = split_package_path(abs_output_path)
       urdf_path = get_urdf_path(robot, description_package_path)
       xacro_wrapper_path = get_xacro_wrapper_path(robot, description_package_path)
@@ -65,16 +83,6 @@ class _TransferProjectToExternalCodeGeneratorCommand:
 
       path_to_overcross_meta_tmp_dir = path_to_overcross_meta_dir + 'tmp/'
 
-      # print('Calculating mass and inertia started.')
-      # fcgui.runCommand("CalculateMassAndInertia")
-      # print('Calculating mass and inertia finished.')
-
-      print('Local code generating started.')
-      # ensure files present by regenerate them
-      fcgui.runCommand("UrdfExport")
-      print('Local code generating finished.')
-
-      print('External code generating started.')
       # check urdf
       if not urdf_path.exists():
         error(f"File: {urdf_path} does not exists.", True)
@@ -115,7 +123,9 @@ class _TransferProjectToExternalCodeGeneratorCommand:
       self.saveArchive(path_to_overcross_meta_tmp_dir, path_to_overcross_meta_dir + zip_filename)
 
       token = get_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, '')
+      print('Preparing files finished')
 
+      print('External code generating started.')
       if os.environ.get('DEBUG'):
         # send file to external code generator
         print('DEBUG is active. Connect to localhost generator.')

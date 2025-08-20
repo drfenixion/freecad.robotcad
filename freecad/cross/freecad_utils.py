@@ -8,29 +8,28 @@ from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
 import sys
-
 import numpy as np
-
 import FreeCAD as fc
 import Part
-import MaterialEditor
 
 from .utils import true_then_false
 from . import wb_constants
+
+try:
+    from PySide import QtCore, QtGui
+except:
+    from PySide2 import QtCore, QtGui
 
 
 try:
     # For v0.21:
     from addonmanager_utilities import get_python_exe
-except (ModuleNotFoundError, ImportError):
+except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
 
 if hasattr(fc, 'GuiUp') and fc.GuiUp:
-    from PySide import QtCore  # FreeCAD's PySide!
-    from PySide import QtGui  # FreeCAD's PySide!
-
     def tr(text: str) -> str:
         return QtGui.QApplication.translate('cross', text)
 else:
@@ -107,6 +106,9 @@ def set_param(
 
     if type(value) not in fun_map:
         raise ValueError('Unkown type')
+    
+    value = value.strip()
+
     getattr(group, fun_map[type(value)])(param, value)
 
 
@@ -373,6 +375,21 @@ def is_link(obj: DO) -> bool:
     """Return True if the object is a 'App::Link'."""
     return is_derived_from(obj, 'App::Link')
 
+def is_assembly_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a 'Assembly::AssemblyObject'."""
+    return is_derived_from(obj, 'Assembly::AssemblyObject')
+
+def is_link_to_assembly_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a 'Assembly::AssemblyLink'."""
+    return is_derived_from(obj, 'Assembly::AssemblyLink')
+
+def is_join_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a Joint from default assembly WB."""
+    return is_derived_from(obj, 'App::FeaturePython') and hasattr(obj, 'JointType')
+
+def is_grounded_join_from_assembly_wb(obj: DO) -> bool:
+    """Return True if the object is a Grounded Joint from default assembly WB."""
+    return is_derived_from(obj, 'App::FeaturePython') and hasattr(obj, 'ObjectToGround')
 
 def is_selection_object(obj: DO) -> bool:
     """Return True if the object is a 'Gui::SelectionObject'."""
@@ -790,11 +807,22 @@ def material_from_material_editor(
     """
     material = Material(card_path)
     material.card_path = card_path
+    import MaterialEditor
     material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
     try:
-        material.material_name = material_editor.cards[material_editor.card_path]
+        divider = 'Material/Resources/Materials/'
+        first_key = next(iter(material_editor.cards))
+        fragments = first_key.split(divider)
+        local_system_path_prefix = fragments[0]
+        
+
+        fragments = material_editor.card_path.split(divider)
+        card_path_postfix = fragments[-1]
+        local_system_card_path = local_system_path_prefix + divider + card_path_postfix
+
+        material.material_name = material_editor.cards[local_system_card_path]
         material.density = fc.Units.Quantity(
-                material_editor.materials[material_editor.card_path]['Density'],
+                material_editor.materials[local_system_card_path]['Density'],
         )
     except (KeyError, AttributeError):
         material.material_name = None

@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_param, get_parents_names, is_selection_object
+from .freecad_utils import get_param, get_parents_names, is_link_to_assembly_from_assembly_wb, is_selection_object
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -56,7 +56,15 @@ CrossBasicElement = Union[CrossJoint, CrossLink]
 CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
 DOList = List[DO]
 
-MOD_PATH = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
+MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
+MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad' 
+if os.path.exists(MOD_PATH_IN_USER_SHARE_DIR):
+    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
+else:
+    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
+
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
@@ -190,6 +198,11 @@ def is_controllers_template_for_param_mapping(param_full_name: str) -> bool:
     return False
 
 
+def is_placement(obj: DO) -> bool:
+    """Return True if the object is a FreeCAD Placement."""
+    return isinstance(obj, fc.Placement)
+
+
 def return_true(obj: DO) -> bool:
     """Return always True.
 
@@ -252,6 +265,25 @@ def get_links(objs: DOList) -> list[CrossLink]:
 def get_joints(objs: DOList) -> list[CrossJoint]:
     """Return only the objects that are Cross::Joint instances."""
     return [o for o in objs if is_joint(o)]
+
+
+def get_child_joints(link_or_joint: DO) -> list[CrossJoint] | bool:
+    """Return first level child joints of link or joint."""
+    if is_joint(link_or_joint):
+        link_name = link_or_joint.Child
+    elif is_link(link_or_joint):
+        link_name = link_or_joint.Name
+    else:
+        return False
+
+    robot = link_or_joint.Proxy.get_robot()
+    robot_joints = robot.Proxy.get_joints()
+    child_joints = []
+    for joint in robot_joints:
+        if link_name == joint.Parent:
+            child_joints.append(joint)
+
+    return child_joints
 
 
 def get_link_sensors(objs: DOList) -> list[CrossSensor]:
@@ -450,7 +482,7 @@ def get_valid_urdf_name(name: str) -> str:
     return name.replace('"', '&quot;')
 
 
-def get_rel_and_abs_path(path: str) -> tuple[str, Path]:
+def get_rel_and_abs_path(path: str, ask_user_fill_workspace: bool = True) -> tuple[str, Path]:
     """Return the path relative to src and the absolute path.
 
     Return the path relative to the `src` folder in the  ROS workspace and
@@ -472,9 +504,10 @@ def get_rel_and_abs_path(path: str) -> tuple[str, Path]:
     # Import here to avoid circular import.
     from .wb_gui_utils import get_ros_workspace
 
-    if not wb_globals.g_ros_workspace.name:
-        ws = get_ros_workspace()
-        wb_globals.g_ros_workspace = ws
+    if ask_user_fill_workspace:
+        if not wb_globals.g_ros_workspace.name:
+            ws = get_ros_workspace()
+            wb_globals.g_ros_workspace = ws
     p = without_ros_workspace(path)
     full_path = (
         wb_globals.g_ros_workspace.expanduser() / 'src' / p
@@ -742,7 +775,8 @@ def get_controllers_config_path(robot: CrossRobot, path_to_overcross_meta_dir: s
     return Path(path_to_overcross_meta_dir + get_controllers_config_file_name(ros_name(robot)))
 
 
-def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str, orienteer1: DO):
+def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
+    origin_or_mounted_placement_name: str, orienteer1: DO, hold_downstream_chain: bool = False):
     """Set element (joint) placement (Origin) by orienteer.
 
     Set placement with orienteer placement value
@@ -754,19 +788,23 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO, origin_or_mounted_pla
 
     placement1 = get_placement_of_orienteer(orienteer1, lcs_concentric_reversed = True)
 
-    # prepare data
-    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))  # set zero Origin
-    doc.recompute() # trigger compute element placement based on zero Origin
-    element_basic_placement = getattr(link_or_joint, 'Placement')
-    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
-    doc.recompute()
-
-    ## prepare data
+    origin_or_mounted_placement_value = getattr(link_or_joint, origin_or_mounted_placement_name)
+    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value.inverse()
     placement1_diff = element_basic_placement.inverse() * placement1
 
-    # Set Origin or Mounted placement
-    setattr(link_or_joint, origin_or_mounted_placement_name, placement1_diff)
+    old_placement_diff =  origin_or_mounted_placement_value.inverse() * placement1_diff
+    
+    setattr(link_or_joint, origin_or_mounted_placement_name, link_or_joint.Origin * old_placement_diff)
+
+    if hold_downstream_chain:
+        child_joints = get_child_joints(link_or_joint)
+        for joint in child_joints:
+            joint.Origin = old_placement_diff.inverse() * joint.Origin
+
+        if is_joint(link_or_joint):
+            child_link = doc.getObject(link_or_joint.Child)
+            child_link.MountedPlacement  = old_placement_diff.inverse() * child_link.MountedPlacement
+
     doc.recompute()
 
 
@@ -784,16 +822,8 @@ def move_placement(
     placement1 = get_placement_of_orienteer(orienteer1, delete_created_objects)
     placement2 = get_placement_of_orienteer(orienteer2, delete_created_objects, lcs_concentric_reversed = True)
 
-    # prepare data
-    origin_or_mounted_placement_name__old = getattr(link_or_joint, origin_or_mounted_placement_name)
-    # set zero Origin
-    setattr(link_or_joint, origin_or_mounted_placement_name, fc.Placement(fc.Vector(0,0,0), fc.Rotation(0,0,0), fc.Vector(0,0,0)))
-    doc.recompute() # trigger compute element placement based on zero Origin
-    element_basic_placement = getattr(link_or_joint, 'Placement')
-    setattr(link_or_joint, origin_or_mounted_placement_name, origin_or_mounted_placement_name__old)
-    doc.recompute()
-
-    ## prepare data
+    origin_or_mounted_placement_value = getattr(link_or_joint, origin_or_mounted_placement_name)
+    element_basic_placement = link_or_joint.Placement * origin_or_mounted_placement_value.inverse()
     element_local_placement = getattr(link_or_joint, origin_or_mounted_placement_name)
     origin_placement1_diff = (element_basic_placement * element_local_placement).inverse() * placement1
     origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
@@ -803,6 +833,7 @@ def move_placement(
     # in local frame every tool click will result Origin move because both orienteers moved and received new position
     new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
+
     doc.recompute()
 
 
@@ -820,6 +851,8 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
         placement = get_placement(orienteer_object)
     elif is_link(orienteer_object) or is_joint(orienteer_object):
         placement = orienteer_object.Placement
+    elif is_placement(orienteer_object):
+        placement = orienteer_object
     else:
         lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
 
@@ -860,40 +893,34 @@ def make_lcs_at_link_body(
         if is_fc_link(orienteer.Object):
             link_to_obj = orienteer.Object
             original_obj = link_to_obj.getLinkedObject(True)
+            obj_for_getting_parents = link_to_obj
             link_to_obj_placement = link_to_obj.Placement
-
-            parents_reversed = reversed(link_to_obj.Parents)
-            for p in parents_reversed:
-                p = p[0]
-                if is_fc_link(p):
-                    dynamic_link_of_robot_link = p
-                else:
-                    original_obj_wrapper = p
         else:
             original_obj = orienteer.Object
+            obj_for_getting_parents = original_obj
             link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
-            parents_reversed = reversed(original_obj.Parents)
-            for p in parents_reversed:
-                p = p[0]
-                if is_fc_link(p):
-                    dynamic_link_of_robot_link = p
-                else:
-                    original_obj_wrapper = p
+        parents_reversed = reversed(obj_for_getting_parents.Parents)
+        for p in parents_reversed:
+            p = p[0]
+            if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
+                dynamic_link_of_robot_link = p
+            elif not original_obj_wrapper and is_part(p):
+                original_obj_wrapper = p
 
     except (AttributeError, IndexError, RuntimeError):
         pass
 
     if not original_obj_wrapper:
-        message('Can find original object wrapper for adding lcs. Original object must be wrapped by App::Part.', gui=True)
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
-        message('Can find original object for getting reference.', gui=True)
+        message('Can not find original object for getting reference.', gui=True)
         raise RuntimeError()
 
     if not dynamic_link_of_robot_link:
-        message('Can find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
+        message('Can not find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
         raise RuntimeError()
 
     sub_element_name = ''
@@ -1168,13 +1195,22 @@ def git_init_submodules(
 
     files_and_dirs = os.listdir(submodule_repo_path)
     # update if dir is empty or .gitmodules file was changed
+    is_gitsubmodules_updated = os.path.expanduser('~/.is_gitsubmodules_updated')
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
+        # update if empty dir
         if not len(files_and_dirs):
             git_update_submodules(update_from_remote_branch_param)
+        # update when changed
         elif gitmodules_changed:
             git_deinit_submodules()
             git_update_submodules(update_from_remote_branch_param)
+        # first update in clear container
+        elif not os.path.exists(is_gitsubmodules_updated):
+            with open(is_gitsubmodules_updated, 'w+') as f:
+                git_update_submodules(update_from_remote_branch_param)
+                f.write("git submodules updated")
+                f.close()                
     else:
         git_update_submodules(update_from_remote_branch_param)
 
@@ -1319,3 +1355,59 @@ def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool =
     doc.commitTransaction()
 
     return joint, child_link, parent_link
+
+
+def get_first_lcs_or_link(obj_name_list: list) -> DO | None:
+    """Return first lcs from FreeCAD link or first link if lcs is not exist"""
+    lcs = None
+    link = None
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_fc_link(obj):
+            link = obj
+        elif is_lcs(obj):
+            lcs = obj
+
+    if lcs:
+        return lcs
+    else:
+        return link
+    
+
+def get_first_link(obj_name_list: list) -> DO | None:
+    """Return first FreeCAD link"""
+    link = None
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_fc_link(obj):
+            link = obj
+            break
+
+    return link
+
+
+def get_last_link_to_assembly(obj_name_list: list) -> DO | None:
+    """Return last FreeCAD assembly from Assembly WB"""
+    assembly = None
+    obj_name_list_reversed = list(reversed(obj_name_list))
+    for obj_name in obj_name_list_reversed:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_link_to_assembly_from_assembly_wb(obj):
+            assembly = obj
+            break
+
+    return assembly
+
+
+def get_comulative_assemblies_placement(obj_name_list: list) -> DO | None:
+    """Return comulative assemblies placement of FreeCAD assembly from Assembly WB included one in other.
+    Parent assembly placement to child assembly placement and etc"""
+    comulative_assemblies_placement = fc.Placement()
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_link_to_assembly_from_assembly_wb(obj):
+            comulative_assemblies_placement = comulative_assemblies_placement * obj.Placement
+        else:
+            break
+
+    return comulative_assemblies_placement

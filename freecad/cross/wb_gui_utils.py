@@ -12,7 +12,7 @@ import Part as part
 from PySide import QtGui
 from freecad.cross.placement_utils import get_obj_to_subobj_diff  # FreeCAD's PySide!
 
-from .freecad_utils import DO, copy_obj_geometry, is_part, warn
+from .freecad_utils import DO, copy_obj_geometry, is_container, is_part, make_group, warn
 from .freecad_utils import is_link as is_fclink
 from .freecadgui_utils import createBoundBox
 from .gui_utils import tr
@@ -105,6 +105,14 @@ def createBoundObjects(createBoundFunc = createBoundBox):
         boundObjWrapper.Group = [boundObj]
         boundObjWrapper.Placement = wrapperPlacement
         boundObjWrapper.Visibility = False
+
+        collisions_group = boundObj.Document.getObject('Collisions')
+        if is_container(collisions_group):
+            collisions_group.addObject(boundObjWrapper)
+        else:
+            collisions_group = make_group(doc, 'Collisions', visible=False)
+            collisions_group.addObject(boundObjWrapper)
+
         return boundObjWrapper, boundObj
 
 
@@ -155,14 +163,17 @@ def createBoundObjects(createBoundFunc = createBoundBox):
 
             bound = createBound(collision_source_obj)
             doc.removeObject(collision_source_obj.Name)
-
-            boundWrapper, bound = make_bound_obj_wrapper(
-                bound,
-                obj_to_subobj_middle_wrap_diff,
-                wrapperName = "bound_obj__" + robotLink.Label + '__' + bound.Label,
-                wrapperPlacement = robotLink.Placement,
-            )
-            robotLink.Collision = robotLink.Collision + [boundWrapper]
+            
+            if bound:
+                boundWrapper, bound = make_bound_obj_wrapper(
+                    bound,
+                    obj_to_subobj_middle_wrap_diff,
+                    wrapperName = "col__" + robotLink.Label + '__' + bound.Label,
+                    wrapperPlacement = robotLink.Placement,
+                )
+                robotLink.Collision = robotLink.Collision + [boundWrapper]
+            else:
+                warn('Can not create collision for object - '+obj.Label+'('+obj.Name+'). Maybe it does not contain any body.')
 
         doc.commitTransaction()
     else:
@@ -240,7 +251,7 @@ class WbSettingsGetter:
     ) -> Path:
         """Open the dialog to get the ROS workspace."""
         self._old_ros_workspace = Path(old_ros_workspace)
-        if self.get_settings(get_ros_workspace=True, get_vhacd_path=False):
+        if self.get_settings(get_ros_workspace=True, get_vhacd_path=False, get_overcross_token=False):
             return self.ros_workspace
         return self._old_ros_workspace
 

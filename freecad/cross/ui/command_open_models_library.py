@@ -2,7 +2,14 @@ import FreeCADGui as fcgui
 import FreeCAD as fc
 
 from ..gui_utils import tr
-from .dynamic_ui.models_library import ModelsLibraryModalClass
+from ..freecad_utils import warn
+try:
+    from .dynamic_ui.models_library import ModelsLibraryModalClass
+    imports_ok = True
+except ImportError as e:
+    # TODO: Warn the user more nicely.
+    warn(str(e) + '. Models library tool is disabled.', gui=False)
+    imports_ok = False
 
 
 class _OpenModelsLibraryCommand:
@@ -19,7 +26,7 @@ class _OpenModelsLibraryCommand:
         }
 
     def IsActive(self):
-        return True
+        return imports_ok
 
     def Activated(self):
         doc = fc.activeDocument()

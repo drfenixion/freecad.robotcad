@@ -15,10 +15,12 @@ from copy import deepcopy
 import FreeCAD as fc
 
 from PySide2.QtWidgets import QFileDialog  # FreeCAD's PySide
-from PySide2.QtWidgets import QMenu # FreeCAD's PySide
+from PySide2.QtWidgets import QMenu
+from PySide2 import QtGui
+from freecad.cross.freecadgui_utils import get_progress_bar # FreeCAD's PySide
 from PySide2.QtWidgets import QMessageBox
 
-from .freecad_utils import ProxyBase
+from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -27,6 +29,7 @@ from .freecad_utils import is_origin
 from .freecad_utils import label_or
 from .freecad_utils import quantity_as
 from .freecad_utils import warn
+from .freecad_utils import is_link as is_fc_link
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
@@ -37,7 +40,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH,SDF_VERSION,RESOURCES_PATH
+from .wb_utils import ICON_PATH,SDF_VERSION,RESOURCES_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_first_link, get_last_link_to_assembly
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -61,8 +64,8 @@ from .wb_utils import get_urdf_path
 from .wb_utils import git_init_submodules
 from xml.dom.minidom import parseString
 from pathlib import Path
-from .joint_proxy import make_robot_joints_filled
-from .link_proxy import make_robot_links_filled
+from .joint_proxy import make_robot_joint_filled, make_robot_joints_filled
+from .link_proxy import make_robot_link_filled, make_robot_links_filled
 from . import wb_constants
 from .wb_utils import get_xacro_wrapper_file_name
 from .wb_utils import get_sensors_file_name
@@ -124,6 +127,12 @@ def _add_joint_variable(
         prop_type = 'App::PropertyFloatConstraint'
     else:
         prop_type = 'App::PropertyFloat'
+
+    # recreate prop in case of type was changed
+    prop = getattr(robot, var_name, False)
+    if prop is not False:
+        robot.removeProperty(var_name)
+
     _, used_var_name = add_property(
         robot,
         prop_type,
@@ -131,6 +140,13 @@ def _add_joint_variable(
         category,
         help_txt,
     )
+
+    try:
+        # try to set old value in case of type was changed
+        setattr(robot, used_var_name, prop)
+    except:
+        pass
+    
     if joint.Type in ['prismatic', 'revolute']:
         # Set the default value to the current value to set min/max.
         value = robot.getPropertyByName(used_var_name)
@@ -884,10 +900,27 @@ class RobotProxy(ProxyBase):
             write_files = template_files + [
                 'meshes/',
                 'urdf/',
-                'overcross/',
                 'worlds/',
             ]
         elif format=="sdf":
+            template_files = [
+            'package.xml',
+            'CMakeLists.txt',
+            # 'launch/description.launch.py',
+            # 'launch/display.launch.py',
+            # 'launch/gazebo.launch.py',
+            # 'rviz/robot_description.rviz',
+            'worlds/cars_and_trees.sdf',
+            'worlds/empty.sdf',
+            'launch/gazebo_sdf.launch.py'
+            ]
+            write_files = template_files + [
+                'meshes/',
+                'models/',
+                'world',
+                'worlds/',
+            ]
+            elif format=="sdf":
             template_files = [
             'package.xml',
             'CMakeLists.txt',
@@ -1036,6 +1069,7 @@ class RobotProxy(ProxyBase):
             sensors_file=sensors_file,
             sensors_urdf=sensors_urdf,
             robot_name=robot_name,
+            cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera'])
         )
 
         return xml if format=="urdf" else sdf_declaration
@@ -1047,6 +1081,26 @@ class RobotProxy(ProxyBase):
             sensors_xml += '\n\n' + sdf_dict_to_xml(sensor_xml_as_dict, full_document = False, pretty = True)
 
         return sensors_xml
+    
+    def get_sensors_topics_by_types(self, sensor_types: list) -> str:
+        """Return comma separated sensors topics by sensors type"""
+
+        topics = []
+        for sensor_xml_as_dict in self.get_sensors_data().values():
+            for sensor_type in sensor_types:
+                try:
+                    type = sensor_xml_as_dict['gazebo']['sensor']['@type']
+                    if type == sensor_type:
+                        topic = sensor_xml_as_dict['gazebo']['sensor']['topic']
+                        if type == 'rgbd_camera':
+                            topics.append("'"+topic+"/image'")
+                            topics.append("'"+topic+"/depth_image'")
+                        else:
+                            topics.append("'"+topic+"'")
+                except KeyError:
+                    pass                    
+
+        return ','.join(topics)
 
     def get_sensors_data(self, parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE) -> dict:
         """Get sensors data as sensors dictionaries from all elements (links, joints) of robot"""
@@ -1311,7 +1365,7 @@ class _ViewProviderRobot(ProxyBase):
             vobj, 'App::PropertyLength', 'JointAxisLength',
             'ROS Display Options',
             "Length of the arrow for the joints axes",
-            250.0,
+            150.0,
         )
 
     def getIcon(self):
@@ -1429,4 +1483,449 @@ def make_filled_robot(name:str = 'Robot') -> CrossRobot:
         make_robot_joints_filled(links, robot)
 
     fc.ActiveDocument.recompute()
+    return robot
+
+
+def get_assembly_elements(
+        assembly:DO,
+        root_grounded_joint_of_root_assembly:DO = None,
+        assembly_link:DO = None,
+        assembly_hierarhy: list[DO] = None,
+    ) -> tuple:
+    """Get assemble links, joints, grounded_joints from
+    from assembly (default Assembly WB)."""
+
+    progressBar = get_progress_bar(
+        title = "Get assembly ("+assembly.Name+") elements...",
+        min = 0,
+        max = len(assembly.Group),
+        show_percents = False,
+    )
+    progressBar.show()
+
+    i = 0
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+
+    if not is_assembly_from_assembly_wb(assembly) and not is_link_to_assembly_from_assembly_wb(assembly):
+        raise TypeError('Not an assembly from Assembly WB')
+
+    doc = assembly.Document
+
+    # separate assembly sub elements
+    assembly_links = []
+    assembly_joints = []
+    grounded_joints = []
+
+    # Assembly in other assembly does not included joints 
+    # it need to get linked assembly for it joints.
+    for el in assembly.Group:
+        if is_grounded_join_from_assembly_wb(el) and not root_grounded_joint_of_root_assembly:
+            root_grounded_joint_of_root_assembly = el
+            obj_to_ground = root_grounded_joint_of_root_assembly.ObjectToGround
+            # if grounded assembly go deeper to find grounded joint in it
+            if is_link_to_assembly_from_assembly_wb(obj_to_ground):
+                for el in obj_to_ground.LinkedObject.Group:
+                    if is_grounded_join_from_assembly_wb(el):
+                        root_grounded_joint_of_root_assembly = el
+                        break
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+            break
+
+    for el in assembly.Group:
+        if is_fc_link(el):
+            assembly_links.append(el)
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+        elif is_join_from_assembly_wb(el):
+            r1 = el.Reference1[1][0]
+            r1_name_path = r1.split('.')
+            r1_obj0_link = doc.getObject(r1_name_path[0])
+
+            r2 = el.Reference2[1][0]
+            r2_name_path = r2.split('.')
+            r2_obj0_link = doc.getObject(r2_name_path[0])
+
+            is_link2_root_assembly_link = False
+            is_link1_root_assembly_link = False
+
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name in [r2_name_path[0], r2_name_path[1]]:
+                is_link2_root_assembly_link = True
+            if root_grounded_joint_of_root_assembly.ObjectToGround.Name in [r1_name_path[0], r1_name_path[1]]:
+                is_link1_root_assembly_link = True
+            
+            r2_obj_link = r2_obj0_link
+            r1_obj_link = r1_obj0_link
+            new_assembly_branch_r2 = None
+            new_assembly_branch_r1 = None
+            new_assembly_branch_link_r2 = None
+            new_assembly_branch_link_r1 = None
+            if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
+                new_assembly_branch_link_r1 = r1_obj0_link
+                new_assembly_branch_r1 = r1_obj0_link.LinkedObject
+                r1_link = get_first_link(r1_name_path)
+                # get child link (root of new assembly branch) from it source assembly not from assembly link
+                r1_obj_link = r1_link.getLinkedObject(False)
+            if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
+                new_assembly_branch_link_r2 = r2_obj0_link
+                new_assembly_branch_r2 = r2_obj0_link.LinkedObject
+                r2_link = get_first_link(r2_name_path)
+                # get child link (root of new assembly branch) from it source assembly not from assembly link
+                r2_obj_link = r2_link.getLinkedObject(False)
+
+            assembly_joints.append({
+                    'joint': el,
+                    'assembly': assembly,
+                    'assembly_hierarhy': assembly_hierarhy if assembly_hierarhy else [assembly],
+                    'assembly_link': assembly_link,
+                    'new_assembly_branch_r2': new_assembly_branch_r2,
+                    'new_assembly_branch_r1': new_assembly_branch_r1,
+                    'new_assembly_branch_link_r2': new_assembly_branch_link_r2,
+                    'new_assembly_branch_link_r1': new_assembly_branch_link_r1,
+                    'link2': r2_obj_link,
+                    'link1': r1_obj_link,
+                    'link2_name': r2_obj_link.Name,
+                    'link1_name': r1_obj_link.Name,
+                    'joint_reference_2_obj_0_name': r2_obj0_link.Name,
+                    'joint_reference_1_obj_0_name': r1_obj0_link.Name,
+                    'is_link2_root_assembly_link': is_link2_root_assembly_link,
+                    'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                    'chain_direction': None,
+                })
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+        elif is_grounded_join_from_assembly_wb(el):
+            grounded_joints.append(el)
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+        elif is_link_to_assembly_from_assembly_wb(el):
+            assembly_links_rec, assembly_joints_rec, grounded_joint_rec = get_assembly_elements(
+                el.LinkedObject,
+                root_grounded_joint_of_root_assembly,
+                el,
+                assembly_hierarhy = assembly_hierarhy + [el] if assembly_hierarhy else [assembly] + [el],
+                )
+            assembly_links = assembly_links + assembly_links_rec
+            assembly_joints = assembly_joints + assembly_joints_rec
+            grounded_joints = grounded_joints + grounded_joint_rec
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+
+    progressBar.close()
+    QtGui.QApplication.processEvents()
+
+    return assembly_links, assembly_joints, grounded_joints
+
+
+def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> CrossRobot:
+    """Add a Cross::Robot to the current document and fill it with links and joints
+    from assembly (default Assembly WB)."""
+
+    if not robot:
+        robot = make_robot(ros_name(assembly))
+
+
+    ### get assembly elements
+    assembly_links, assembly_joints, grounded_joints = get_assembly_elements(assembly)
+    
+
+    ### create robot links based on assembly links
+    progressBar = get_progress_bar(
+        title = "Make robot links...",
+        min = 0,
+        max = len(assembly_links),
+        show_percents = False,
+    )
+    progressBar.show()
+
+    i = 0
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+
+    robot_links:list[CrossLink] = []
+    for link in assembly_links:
+        obj = link.getLinkedObject(True)
+        res = make_robot_link_filled(obj, True)
+        if is_link(res):
+            robot_link = res
+            robot_links.append(robot_link)
+            if robot:
+                robot_link.adjustRelativeLinks(robot)
+                robot.addObject(robot_link)
+        i += 1
+        progressBar.setValue(i)
+    progressBar.close()
+    QtGui.QApplication.processEvents()
+ 
+    
+    def get_next_child_joint(joint) -> DO:
+        for i in assembly_joints_sorted:
+            if joint['link1'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link2'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link1'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+            elif joint['link2'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+                
+
+    def get_next_branch_root_joint(joint) -> DO:
+        for i in assembly_joints_sorted:
+            if joint['link1'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link2'].Name == i['link1'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'reverse'
+                yield i
+            elif joint['link1'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+            elif joint['link2'].Name == i['link2'].Name:
+                assembly_joints_sorted.remove(i)
+                i['chain_direction'] = 'forward'
+                yield i
+
+    ### make joint chain tree (not looped kinematic chain tree)
+    # make root joint sorted on top
+    assembly_joints_sorted = sorted(
+        assembly_joints, 
+        key=lambda x: x['is_link2_root_assembly_link'] or x['is_link1_root_assembly_link'],
+        reverse=True
+    )
+    # separated root joint
+    root_joint = assembly_joints_sorted[0]
+    assembly_joints_sorted.remove(root_joint) # we will use root_joint separetly 
+    
+    progressBar = get_progress_bar(
+        title = "Calc kinematic chain tree...",
+        min = 0,
+        max = len(assembly_joints_sorted),
+        show_percents = False,
+    )
+    progressBar.show()
+
+    i = 0
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+
+    joint_chain_tree = []
+    while len(assembly_joints_sorted):
+        if root_joint:
+            joint_chain_tree.append(root_joint)
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+            child_joint = root_joint
+            root_joint = None
+        else:
+            try:
+                child_joint = next(get_next_child_joint(child_joint))
+                joint_chain_tree.append(child_joint)
+                i+=1
+                progressBar.setValue(i)
+                QtGui.QApplication.processEvents()
+            except StopIteration:
+                for chain_joint in joint_chain_tree:
+                    try:
+                        child_joint = next(get_next_branch_root_joint(chain_joint))
+                        joint_chain_tree.append(child_joint)
+                        i+=1
+                        progressBar.setValue(i)
+                        QtGui.QApplication.processEvents()
+                        break
+                    except StopIteration:
+                        pass
+    progressBar.close()
+    QtGui.QApplication.processEvents()
+
+
+    ### create robot joints based on assembly joints
+    progressBar = get_progress_bar(
+        title = "Make robot joints...",
+        min = 0,
+        max = len(joint_chain_tree),
+        show_percents = False,
+    )
+    progressBar.show()
+
+    i = 0
+    progressBar.setValue(i)
+    QtGui.QApplication.processEvents()
+
+    try:
+        root_link_setup = False
+        for joint in joint_chain_tree:
+            # prepare data
+            r1 = joint['joint'].Reference1[1][0]
+            r2 = joint['joint'].Reference2[1][0]
+            p1 = joint['joint'].Placement1
+            p2 = joint['joint'].Placement2
+            o1 = joint['joint'].Offset1
+            o2 = joint['joint'].Offset2
+            r1_name_path = r1.split('.')
+            r2_name_path = r2.split('.')
+            r1_obj_link = get_first_link(r1_name_path)
+            r2_obj_link = get_first_link(r2_name_path)
+            r1_obj = r1_obj_link.getLinkedObject(True)
+            r2_obj = r2_obj_link.getLinkedObject(True)
+            parent_robot_link = None
+            child_robot_link = None
+            for robot_link in robot_links:
+                if is_part(robot_link.Real[0]):
+                    for real_sub_el in robot_link.Real[0].Group:
+                        if is_fc_link(real_sub_el):
+                            real_sub_el = real_sub_el.getLinkedObject(True)
+
+                        if r1_obj.Name == real_sub_el.Name:
+                            if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
+                                child_robot_link = robot_link
+                            else:
+                                parent_robot_link = robot_link
+                        elif r2_obj.Name == real_sub_el.Name:
+                            if joint['chain_direction'] == 'reverse':
+                                child_robot_link = robot_link
+                            else:
+                                parent_robot_link = robot_link
+            
+            if not child_robot_link:
+                break
+
+            ### calc robot link MountedPlacement
+            # it need to adding assembly link placement to it`s elements (links)
+            # when assembly in other assembly case
+            # for get placement of elements relative to assembly link
+            r2_link_assembly_placement = fc.Placement()
+            r2_link_assembly_placement = get_comulative_assemblies_placement(r2_name_path)
+
+            r1_link_assembly_placement = fc.Placement()
+            r1_link_assembly_placement = get_comulative_assemblies_placement(r1_name_path)
+
+            sub_el_r2 = get_first_lcs_or_link(r2_name_path)
+            sub_el_r1 = get_first_lcs_or_link(r1_name_path)
+            
+            mounted_placement = fc.Placement()
+            if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
+ 
+                link_assembly_placement = r1_link_assembly_placement
+                
+                if is_lcs(sub_el_r1):
+                    r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
+                    r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
+                    r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
+                    # r1_r2_sub_el_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child
+                    mounted_placement = (sub_el_r1.Placement * o1) * r1_r2_sub_el_rel_to_outer_plc_diff.inverse()
+                else: # face of obj case
+                    p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
+                    p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
+                    p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc
+                    # p1_p2_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child                
+                    mounted_placement = (p1 * o1) * p1_p2_rel_to_outer_plc_diff.inverse()
+
+                child_robot_link.MountedPlacement = mounted_placement.inverse()
+                origin_mounted_placement_correction = mounted_placement
+                origin_obj_link_correction = r1_obj_link.Placement
+
+                if not root_link_setup:
+                    assembly_link_placement = fc.Placement()
+                    if joint['assembly_link']:
+                        assembly_link_placement = joint['assembly_link'].Placement
+                        parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
+                    root_link_setup = True
+            else: # reverse chain direction
+                link_assembly_placement = r2_link_assembly_placement
+
+                if is_lcs(sub_el_r2):
+                    # r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
+                    # r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
+                    # r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
+                    # mounted_placement = sub_el_r2.Placement * o2 * r1_r2_sub_el_rel_to_outer_plc_diff
+                    mounted_placement = sub_el_r2.Placement * o2
+                else: # face of obj case
+                    # p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
+                    # p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
+                    # p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc                    
+                    # mounted_placement = p2 * o2 * p1_p2_rel_to_outer_plc_diff
+                    mounted_placement = p2 * o2
+
+                child_robot_link.MountedPlacement = mounted_placement.inverse()
+                origin_mounted_placement_correction = mounted_placement
+                origin_obj_link_correction = r2_obj_link.Placement
+
+                if not root_link_setup:
+                    assembly_link_placement = fc.Placement()
+                    if joint['assembly_link']:
+                        assembly_link_placement = joint['assembly_link'].Placement
+                        parent_robot_link.MountedPlacement = assembly_link_placement * joint['link1'].Placement
+                    root_link_setup = True
+
+            ### calc joint Origin
+            robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
+            chain = get_chain(child_robot_link)
+            comulative_joint_placement = fc.Placement()
+            for el in chain:
+                if is_joint(el):
+                    comulative_joint_placement = comulative_joint_placement * el.Origin
+
+            assembly_link_cumulative_placement = fc.Placement()
+            for assembly_hierarhy_el in joint['assembly_hierarhy']:
+                    assembly_link_cumulative_placement = assembly_link_cumulative_placement * assembly_hierarhy_el.Placement
+            
+            # link_assembly_placement - used for first joint that connected new assembly with old one
+            # (becase technically this joint is in parent assembly and links to child assembly)
+            # assembly_link_placement - used for all other joints in new assembly
+            # (becase technically this joint is in child assembly and links directly to object)
+            # In other words: link_assembly_placement uses for joints between assemblies and assembly_link_placement in same assembly
+
+            robot_joint.Origin = comulative_joint_placement.inverse() * assembly_link_cumulative_placement * link_assembly_placement \
+                * origin_obj_link_correction * origin_mounted_placement_correction
+            
+            ### set joint type
+            assembly_wb_joint_type = joint['joint'].JointType
+            joint_match = wb_constants.ASSEMBLY_WB_JOINTS_MATCHING[assembly_wb_joint_type]
+            
+            if assembly_wb_joint_type == 'Revolute' \
+            and getattr(joint['joint'], 'EnableAngleMin') == False \
+            and getattr(joint['joint'], 'EnableAngleMax') == False:
+                assembly_wb_joint_type = 'Revolute_unlimited'
+                joint_match = wb_constants.ASSEMBLY_WB_JOINTS_MATCHING[assembly_wb_joint_type]
+            
+            if joint_match['type'] != 'undefined':
+                robot_joint.Type = joint_match['type']
+                if joint_match['limits']:
+                    for limit in joint_match['limits']:
+                        if getattr(joint['joint'], limit['assembly_enable_param']) == True:
+                            setattr(robot_joint, limit['robotcad_value_param'], getattr(joint['joint'], limit['assembly_value_param']))
+            else:
+                warn('Can`t automatically match joint type ' + joint['joint'].JointType + ' of joint '+ joint['joint'].Name +' \
+to RobotCAD joint type. Set joint type manually in resulting structure or change joint type to supported by URDF in assembly.')
+
+            i+=1
+            progressBar.setValue(i)
+            QtGui.QApplication.processEvents()
+    except Exception as e:
+        progressBar.close()
+        QtGui.QApplication.processEvents()
+        raise e
+    
+    progressBar.close()
+    QtGui.QApplication.processEvents()
+
     return robot

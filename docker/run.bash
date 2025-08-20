@@ -174,7 +174,9 @@ fi
 echo "Command to run in container: $command"
 
 
-[ "$force_run_new_container" = true ] && [ -d $build_data_path ] && rm -rf $build_data_path # remove build dirs if new container
+[ "$force_run_new_container" = true ] && [ -d $build_data_path ] && \
+    echo "Ask sudo password for remove dir (container build data dir at host). It need to clear before run new container: $build_data_path" && \
+    sudo rm -rf $build_data_path # remove build dirs if new container
 # make dirs at host for builds, logs, other from container
 for dir in 'build' 'install' 'log' 'ros2_system_logs'
 do
@@ -200,6 +202,11 @@ if [ "$force_build_new_image" = true ]; then
 fi
 
 
+uid=$(id -u $USER)
+# Use old user group in case of group was changed after docker install
+# or use current user group if installion without docker install
+gid=${OLD_GID:-$(id -g $USER)}
+group=${OLD_GROUP:-$(groups | awk '{print $1}')}
 # build if image not exists
 if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo 'Build docker container...'
@@ -207,12 +214,6 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo ''
     echo 'Docker image will take about 12Gb free space. Check you have more.'
     echo ''
-
-    uid=$(id -u $USER)
-    # Use old user group in case of group was changed after docker install
-    # or use current user group if installion without docker install
-    gid=${OLD_GID:-$(id -g $USER)}
-    group=${OLD_GROUP:-$(groups | awk '{print $1}')}
 
     echo "UID will be used for user inside image:  $uid"
     echo "User name will be used for user inside image:  $USER"
@@ -272,7 +273,8 @@ else
     if [ "$debug" = true ] ; then
         debug_port='-p 5678:5678'
         debug_env='export DEBUG=1 &&'
-        localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
+        # localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
+        localhost_address='--add-host localhost=10.0.2.2' # 10.0.2.2 - docker host OC address in rootless mode with env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false
     fi
 
 
@@ -285,17 +287,30 @@ else
     host_freecad_cache_path=$HOME/.cache/FreeCAD
     cont_freecad_cache_path=$cont_user_path/.cache/FreeCAD
 
-    if [ ! -d "$host_freecad_mods_path" ]; then
-        # Create the directory and its parents if they don't exist
-        echo "Create host freecad mods directory."
-        mkdir -p "$host_freecad_mods_path"
+
+    # create freecad dirs in case there is no FreeCAD at host
+    for dir in $host_freecad_mods_path $host_freecad_user_config_path $host_freecad_cache_path
+    do
+        [ -d $dir ] || echo "Create directory: $dir" && mkdir -p $dir
+    done
+
+    # fix wrong dirs owrner
+    if [ "$fix_freecad_dirs_owner" = true ]; then
+        for dir in $host_freecad_mods_path $host_freecad_user_config_path $host_freecad_cache_path
+        do
+            echo "Change owner to $USER of directory: $dir (required password for sudo)" && sudo chown -R $USER:$USER "$dir"
+        done
     fi
 
 
-    if [ "$fix_freecad_dirs_owner" = true ]; then
-        echo 'Change "~/.local/share/FreeCAD" directory owner to current user. (required password for sudo)'
-        # Set the ownership of the created directory to the current user
-        sudo chown -R $USER:$USER "$host_freecad_share_path"
+    # user for container
+    # in regular docker will be used user from dockerfile (same as at host)
+    # in rootless mode will be used root user
+    user_option=''
+    is_rootless_docker=$(docker info 2> /dev/null | grep rootless)
+    if [ -n "$is_rootless_docker" ]; then
+        echo -e "\nDetected rootless Docker. I use root user in container.\n"
+        user_option='--user=root'
     fi
 
 
@@ -321,13 +336,16 @@ else
         --env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
         --env PULSE_SERVER=$PULSE_SERVER \
         --env QT_X11_NO_MITSHM=1 \
+        --env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false \
         --network=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
+        $user_option \
         $debug_port \
         $localhost_address \
         $image bash -c ". \${HOME}/.profile && $debug_env $command"
     xhost -
+    # --user=$uid:$gid \
     # --volume=$HOME/.local/share/FreeCAD/Mod:$cont_user_path/.local/share/FreeCAD/Mod \
     # --mount dst=/usr/lib/python3/dist-packages,volume-opt=device=$build_data_path/usr_lib_python-major-ver_dist-packages$mount_options \
     # --mount dst=/usr/local/lib/python3.12/dist-packages,volume-opt=device=$build_data_path/usr_local_lib_python_ver_dist-packages$mount_options \

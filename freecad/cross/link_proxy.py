@@ -669,21 +669,23 @@ class LinkProxy(ProxyBase):
                     # stores reference in collision_container in sdf/export.py 
                     if xml==collision_xml:
                         link_xml.append(xml)
-                elif format=="urdf":
+        # link with zero mass and inertia can leads to error ("pose must be finite") in Gazebo
+        if self.link.Mass.Value > 0:
+                    elif format=="urdf":
                     link_xml.append(xml)
         if format=="urdf":    
             link_xml.append(
-            urdf_inertial(
-                mass=self.link.Mass.Value,
-                center_of_mass=self.link.CenterOfMass,
-                ixx=self.link.Ixx,
-                ixy=self.link.Ixy,
-                ixz=self.link.Ixz,
-                iyy=self.link.Iyy,
-                iyz=self.link.Iyz,
-                izz=self.link.Izz,
-            ),
-        )
+                urdf_inertial(
+                    mass=self.link.Mass.Value,
+                    center_of_mass=self.link.CenterOfMass,
+                    ixx=self.link.Ixx,
+                    ixy=self.link.Ixy,
+                    ixz=self.link.Ixz,
+                    iyy=self.link.Iyy,
+                    iyz=self.link.Iyz,
+                    izz=self.link.Izz,
+                ),
+            )
         elif format=="sdf":
             inertial=export.create_sdf_element(self.link,ros_name(self.link),"inertial")
             link_xml.append(inertial)
@@ -884,7 +886,7 @@ def make_link(name, doc: Optional[fc.Document] = None, recompute_after: bool = T
     return cross_link
 
 
-def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
+def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False) -> CrossLink | False :
     ''' Make robot link and fill Real and Visual of it by selected objects  '''
 
     if not is_derived_from(obj, 'App::GeoFeature'):
@@ -894,24 +896,32 @@ def make_robot_link_filled(obj:fc.DO) -> CrossLink | False :
         )
         return False
     #  ??ln  is not neccesary since is_part returns a bool 
-    if not is_part(obj):
-        part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
+    part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
+    fc_link_to_obj = add_object(fc.ActiveDocument, 'App::Link', ros_name(obj))
+    fc_link_to_obj.LinkedObject = obj
+    fc_link_to_obj.adjustRelativeLinks(part)
+    part.addObject(fc_link_to_obj)
 
-        parent_of_obj = None
-        try:
-            parent_of_obj = obj.Parents[0][0]
-        except (KeyError, IndexError, AttributeError):
-            pass
+    if create_parts_group:
+        container = fc.ActiveDocument.getObject('robot_parts')
+        if not container:
+            container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', 'robot_parts')
+            container.Visibility = False
+        part.Visibility = False
+        container.addObject(part)
 
-        obj.adjustRelativeLinks(part)
-        part.addObject(obj)
+    parent_of_obj = None
+    try:
+        parent_of_obj = obj.Parents[0][0]
+    except (KeyError, IndexError, AttributeError):
+        pass
 
-        #add created part-wrapper as child to parent of object
-        if parent_of_obj:
-            part.adjustRelativeLinks(parent_of_obj)
-            parent_of_obj.addObject(part)
-    else:
-        part = obj
+    #add created part-wrapper as child to parent of object
+    if parent_of_obj:
+        if is_freecad_link(parent_of_obj):
+            parent_of_obj = parent_of_obj.getLinkedObject(True)
+        part.adjustRelativeLinks(parent_of_obj) 
+        parent_of_obj.addObject(part)
 
     link = make_link('l_' + ros_name(part))
     link.Real = part

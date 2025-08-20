@@ -32,6 +32,7 @@ from .ui import command_set_placement_fast # noqa: F401
 from .ui import command_set_placement_fast_sensor # noqa: F401
 from .ui import command_set_placement_in_absolute_coordinates # noqa: F401
 from .ui import command_set_placement_by_orienteer # noqa: F401
+from .ui import command_set_placement_by_orienteer_with_hold_chain # noqa: F401
 from .ui import command_rotate_joint_x # noqa: F401
 from .ui import command_rotate_joint_y # noqa: F401
 from .ui import command_rotate_joint_z # noqa: F401
@@ -87,6 +88,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
+            'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
             'SetCROSSPlacementFastSensor',  # Defined in ./ui/command_set_placement_fast_sensor.py.
             # 'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
@@ -141,6 +143,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
+            'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
             'SetCROSSPlacementFastSensor',  # Defined in ./ui/command_set_placement_fast_sensor.py.
             'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.

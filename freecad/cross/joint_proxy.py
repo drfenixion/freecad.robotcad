@@ -604,7 +604,7 @@ class _ViewProviderJoint(ProxyBase):
             vobj, 'App::PropertyLength', 'AxisLength',
             'ROS Display Options',
             "Length of the arrow for the joint's axis",
-            250.0,
+            150.0,
         )
 
     def getIcon(self) -> str:
@@ -774,7 +774,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         except ValueError:
             fc.ActiveDocument.removeObject(joint.Name)
             message(
-                'Links must be in robot container for joint connection. Closed links loop does not supported.',
+                'Links must be in robot container for joint connection. Closed links loop is not supported.',
                 True,
             )
         fc.ActiveDocument.recompute()
@@ -782,7 +782,7 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
         return joint
     else:
         message(
-            'Make filled robot joint(s) works only with selected links. Select minimum 2 links.',
+            'Make filled robot joint works only with 2 links.',
             True,
         )
 

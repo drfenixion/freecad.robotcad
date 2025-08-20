@@ -95,10 +95,11 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('urdf_parser_py')
 
-try:
-    import xacro
-except (ModuleNotFoundError, ImportError):
-    pip_install('xacro')
+# # Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
+# try:
+#     import xacro
+# except (ModuleNotFoundError, ImportError):
+#     pip_install('xacro')
 
 try:
     import xmltodict
@@ -110,9 +111,19 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('pycollada')
 
+
 # Must be imported after the call to `add_ros_library_path`.
-from .ros.utils import is_ros_found  # noqa: E402.
-
-
-if is_ros_found():
-    fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
+from freecad.cross.freecad_utils import warn
+try:
+    import xacro
+    from .ros.utils import is_ros_found  # noqa: E402.
+    if is_ros_found():
+        fc.addImportType('URDF files (*.urdf *.xacro)', 'freecad.cross.import_urdf')
+    else:
+        fc.addImportType('URDF files (*.urdf)', 'freecad.cross.import_urdf')
+        warn('ROS2 was not detected. Import of Xacro files is disabled. URDF import is posible.', gui=False)
+    imports_ok = True
+except Exception as e:
+    # TODO: Warn the user more nicely.
+    warn(str(e) + '. Models library tool is disabled.', gui=False)
+    imports_ok = False

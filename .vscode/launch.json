@@ -19,6 +19,22 @@
                 } 
             ],
             "justMyCode": true
+        },
+        {
+            "name": "Python Conda Mod: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "${userHome}/miniconda3/envs/freecad_1_0_312/Mod/freecad.robotcad"
+                } 
+            ],
+            "justMyCode": true
         }
     ]
 }

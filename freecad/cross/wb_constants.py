@@ -1,7 +1,11 @@
 """Global workbench constants. Excluded from wb_globals.py with reason eliminate circular dependency"""
 
 import FreeCAD as fc
-from .utils import str_to_bool
+
+
+def str_to_bool(s: str) -> bool:
+    return s.lower() == "true"
+
 
 # Constants.
 PREFS_CATEGORY = 'RobotCAD'  # Category in the preferences dialog.
@@ -273,5 +277,70 @@ ROS2_CONTROLLERS_EXCLUDED_PARAMS = {
         'params_based_on_controller_dir': 'forward_command_controller',
         'params_based_on_controller_name': 'forward_command_controller',
         'excluded_params': ['interface_name'],
+    },
+}
+
+ASSEMBLY_WB_JOINTS_MATCHING = {
+    'Fixed': {
+        'type': 'fixed', 
+        'limits': None
+    },
+    'Revolute': {
+        'type': 'revolute', 
+        'limits': [
+            {'assembly_enable_param': 'EnableAngleMin', 'assembly_value_param': 'AngleMin', 'robotcad_value_param': 'LowerLimit'},
+            {'assembly_enable_param': 'EnableAngleMax', 'assembly_value_param': 'AngleMax', 'robotcad_value_param': 'UpperLimit'}
+        ]
+    },
+    'Revolute_unlimited': {
+        'type': 'continuous',
+        'limits': None
+    },
+    'Cylindrical': {
+        'type': 'undefined', 
+        'limits': None
+    },
+    'Slider': {
+        'type': 'prismatic', 
+        'limits': [
+            {'assembly_enable_param': 'EnableLengthMin', 'assembly_value_param': 'LengthMin', 'robotcad_value_param': 'LowerLimit'},
+            {'assembly_enable_param': 'EnableLengthMax', 'assembly_value_param': 'LengthMax', 'robotcad_value_param': 'UpperLimit'}
+        ]
+    },
+    'Ball': {
+        'type': 'floating', 
+        'limits': None
+    },
+    'Distance': {
+        'type': 'fixed', 
+        'limits': None
+    },
+    'Parallel': {
+        'type': 'fixed', 
+        'limits': None
+    },
+    'Perpendicular': {
+        'type': 'fixed', 
+        'limits': None
+    },
+    'Angle': {
+        'type': 'fixed', 
+        'limits': None
+    },
+    'RackPinion': {
+        'type': 'undefined', 
+        'limits': None
+    },
+    'Screw': {
+        'type': 'undefined', 
+        'limits': None
+    },
+    'Gears': {
+        'type': 'undefined', 
+        'limits': None
+    },
+    'Belt': {
+        'type': 'undefined', 
+        'limits': None
     },
 }
