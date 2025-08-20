@@ -40,7 +40,7 @@ from .utils import values_from_string
 from .utils import get_valid_filename
 from .exceptions import NoPartWrapperOfObject
 from .freecad_utils import validate_types
-
+import re
 # Stubs and typing hints.
 from .attached_collision_object import AttachedCollisionObject as CrossAttachedCollisionObject  # A Cross::AttachedCollisionObject, i.e. a DocumentObject with Proxy "AttachedCollisionObject". # noqa: E501
 from .joint import Joint as CrossJoint  # A Cross::Joint, i.e. a DocumentObject with Proxy "Joint". # noqa: E501
@@ -70,6 +70,7 @@ UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
 MODULES_PATH = MOD_PATH / 'modules'
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
+
 SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
 SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
 ROBOT_DESCRIPTIONS_REPO_PATH = MOD_PATH / 'modules' / 'robot_descriptions'
@@ -79,6 +80,7 @@ LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
 JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
 ROBOT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'robot'
 
+SDF_VERSION="1.10"
 
 class SupportsStr(Protocol):
     def __str__(self) -> str:
@@ -545,6 +547,7 @@ def remove_ros_workspace(path) -> str:
 def export_templates(
         template_files: list[str],
         package_parent: [Path | str],
+        format:str="urdf",
         **keys: SupportsStr,
 ) -> None:
     """Export generated files.
@@ -580,10 +583,17 @@ def export_templates(
             if _has_meshes_directory(package_parent, package_name)
             else ''
         )
-
+    
     for f in template_files:
         template_file_path = RESOURCES_PATH / 'templates' / f
         template = template_file_path.read_text()
+        if f =="CMakeLists.txt":
+            if format=='sdf':
+                template=re.sub("{install}","install(DIRECTORY launch {meshes_dir} models worlds DESTINATION share/${{PROJECT_NAME}} )",template)
+                
+            elif format=='urdf':
+                template=re.sub("{install}","install(DIRECTORY launch {meshes_dir} rviz urdf worlds DESTINATION share/${{PROJECT_NAME}})",template)
+
         txt = template.format(**keys)
 
         xacro_wrapper_tmpl = 'xacro_wrapper_template.urdf.xacro'
@@ -613,7 +623,9 @@ def _has_meshes_directory(
         package_name: str,
 ) -> bool:
     """Return True if the directory "meshes" exists in the package."""
+    
     meshes_directory = Path(package_parent) / package_name / 'meshes'
+   
     return meshes_directory.exists()
 
 
@@ -721,16 +733,21 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
     )
 
 
-def get_urdf_path(robot: CrossRobot, output_path: str) -> Path:
+def get_urdf_path(robot: CrossRobot, output_path: str,format:str="urdf") -> Path:
     """Return URDF file path`.
     """
-
+    # to be renamed to get format path 
     file_base = get_valid_filename(ros_name(robot))
-    urdf_file = f'{file_base}.urdf'
-    urdf_path = output_path / f'urdf/{urdf_file}'
-    urdf_path = Path(urdf_path)
+    if format=="urdf":
+        file_name = f'{file_base}.urdf'
+        file_path = output_path / f'urdf/{file_name}'
+        file_path = Path(file_path)
+    elif format=="sdf":
+        file_name=f'{file_base}.sdf'
+        file_path=output_path / f'models/robot/{file_name}'
+        file_path = Path(file_path)
 
-    return urdf_path
+    return file_path
 
 
 def get_xacro_wrapper_path(robot: CrossRobot, output_path: str) -> Path:
