@@ -199,6 +199,8 @@ class LinkProxy(ProxyBase):
 
         # Save the parent joint to speed-up self.get_ref_joint().
         self._ref_joint: Optional[CrossJoint] = None
+        # Save the child joints to speed-up self.get_ref_child_joints().
+        self._ref_child_joints: Optional[list[CrossJoint]] = []
 
         self._sensors: Optional[list[CrossSensor]] = None
 
@@ -473,6 +475,29 @@ class LinkProxy(ProxyBase):
                 self._ref_joint = joint
                 return joint
         return None
+    
+
+    def get_ref_child_joints(self) -> Optional[list[CrossJoint]]:
+        """Return the joint(s) this link is the parent of."""
+        # TODO: as property.
+        robot = self.get_robot()
+        if robot is None:
+            return None
+        if (
+            len(self._ref_child_joints)
+            and attr_equals(self._ref_child_joints[0], 'Parent', ros_name(self.link))
+            and hasattr(self._ref_child_joints[0], 'Proxy')
+            and robot == self._ref_child_joints[0].Proxy.get_robot()
+        ):
+            return self._ref_child_joints
+        joints = get_joints(robot.Group)
+        for joint in joints:
+            if joint.Parent == ros_name(self.link):
+                self._ref_child_joints.append(joint)
+        if len(self._ref_child_joints):
+            return self._ref_child_joints
+        return None
+    
 
     def may_be_base_link(self) -> bool:
         """Return True if the link is child of no joint."""

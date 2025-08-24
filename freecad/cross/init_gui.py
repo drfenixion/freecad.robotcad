@@ -29,6 +29,8 @@ from .ui import command_robot_from_urdf # noqa: F401
 from .ui import command_set_joints # noqa: F401
 from .ui import command_set_placement # noqa: F401
 from .ui import command_set_placement_fast # noqa: F401
+from .ui import command_set_placement_fast_child_to_parent # noqa: F401
+from .ui import command_set_placement_fast_parent_to_child # noqa: F401
 from .ui import command_set_placement_fast_sensor # noqa: F401
 from .ui import command_set_placement_in_absolute_coordinates # noqa: F401
 from .ui import command_set_placement_by_orienteer # noqa: F401
@@ -85,6 +87,8 @@ class CrossWorkbench(fcgui.Workbench):
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
+            'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.
+            'SetCROSSPlacementFastParentToChild',  # Defined in ./ui/command_set_placement_fast_parent_to_child.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
@@ -139,6 +143,8 @@ class CrossWorkbench(fcgui.Workbench):
             # Placement
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
+            'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.            
+            'SetCROSSPlacementFastParentToChild',  # Defined in ./ui/command_set_placement_fast_parent_to_child.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
