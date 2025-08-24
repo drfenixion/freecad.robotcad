@@ -28,6 +28,7 @@ class _SetCROSSPlacementFastCommand:
             'Accel': 'P, F',
             'ToolTip': tr(
                 'Set the Origin of a joint and Mounted Placement of link.\n'
+                'Use it for current unplacement tip of kinematic branch.\n'
                 '\n'
                 'Select (with Ctlr): \n'
                 '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
@@ -40,7 +41,7 @@ class _SetCROSSPlacementFastCommand:
                 '\n'
                 'If selected subelement (face, edge, vertex) will be used temporary LCS underhood.\n'
                 '\n'
-                'Dont use this for moving chain of joints because it also set MountedPlacement\n'
+                'Dont use this for moving kinematic branch because it also set MountedPlacement\n'
                 'that is may not be desirable in this case.\n',
             ),
         }
