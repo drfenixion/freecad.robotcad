@@ -10,3 +10,7 @@
 	path = modules/robot_descriptions
 	url = https://github.com/drfenixion/robot_descriptions.py
 	branch = main
+[submodule "modules/Dynamic_World_Generator"]
+	path = modules/Dynamic_World_Generator
+	url = https://github.com/drfenixion/Dynamic_World_Generator
+	branch = main
