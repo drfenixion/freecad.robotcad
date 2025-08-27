@@ -48,6 +48,7 @@ from .ui import command_update_planning_scene # noqa: F401
 from .ui import command_urdf_export # noqa: F401
 from .ui import command_set_material # noqa: F401
 from .ui import command_calculate_mass_and_inertia # noqa: F401
+from .ui import command_world_generator # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
 
@@ -113,6 +114,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
+            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
@@ -181,6 +183,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
+            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
             'Separator',
             # Workbench settings.
