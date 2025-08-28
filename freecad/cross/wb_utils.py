@@ -1114,6 +1114,7 @@ def git_init_submodules(
         update_from_remote_branch: bool = False,
         submodule_repo_path = ROS2_CONTROLLERS_PATH,
         pip_deps_install_submodule_paths: list = [ROBOT_DESCRIPTIONS_REPO_PATH],
+        callback: function = None
 ):
     """
     Initializes and updates Git submodules.
@@ -1204,6 +1205,9 @@ def git_init_submodules(
                 f.close()                
     else:
         git_update_submodules(update_from_remote_branch_param)
+
+    if callable(callback):
+        callback()
 
     progressBar.setValue(100)
     progressBar.close()
