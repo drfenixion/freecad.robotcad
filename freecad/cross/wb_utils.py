@@ -1111,7 +1111,7 @@ def git_change_submodule_branch(module_path: str, branch: str):
 
 def git_init_submodules(
         only_first_update: bool = True,
-        update_from_remote_branch: bool = True,
+        update_from_remote_branch: bool = False,
         submodule_repo_path = ROS2_CONTROLLERS_PATH,
         pip_deps_install_submodule_paths: list = [ROBOT_DESCRIPTIONS_REPO_PATH],
 ):
