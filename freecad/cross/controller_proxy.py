@@ -688,7 +688,7 @@ def filter_controllers_dirs(controllers: dict):
     """Filter controllers directories for that not coded parsing yet"""
 
     # filted does not adapted controller (need some code to adapt)
-    filter_controllers_dirs = [] # no controllers to filter yet
+    filter_controllers_dirs = ['chained_filter_controller']
 
     for controller in list(controllers):
         if controller in filter_controllers_dirs:
