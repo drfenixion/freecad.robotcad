@@ -1033,7 +1033,7 @@ class RobotProxy(ProxyBase):
                     text = "'No' - Fortress, 'Yes' - Harmonic."
                 ):
                     gazebo_version = 'harmonic'
-                print(f"Gazebo {gazebo_version} is selected")
+                print(f"Gazebo {gazebo_version.capitalize()} is selected")
                 source_path = DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH / gazebo_version
                 files = source_path.glob('*.sdf')
                 for sdf_file in files:
