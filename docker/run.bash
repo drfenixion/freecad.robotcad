@@ -337,9 +337,10 @@ else
         --env PULSE_SERVER=$PULSE_SERVER \
         --env QT_X11_NO_MITSHM=1 \
         --env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false \
-        --network=bridge \
+        --net=bridge \
         --shm-size=512m \
         --security-opt seccomp=unconfined \
+        --cap-add IPC_OWNER \
         $user_option \
         $debug_port \
         $localhost_address \
