@@ -119,6 +119,20 @@ RUN chown -R $USER:$USER /var/lib/dpkg/
 USER $USER
 
 
+### Install Gazebo
+RUN echo "Install Gazebo $GZ_VERSION"
+RUN sudo apt-get update && \
+    sudo apt-get install -y lsb-release wget gnupg && \
+    sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
+    sudo apt-get update && \
+    sudo apt-get install gz-${GZ_VERSION} -y && \
+    apt-get autoclean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+### End install Gazebo
+
+
 ### Install FreeCAD Daily
 RUN echo 'Install FreeCAD Daily'
 RUN sudo add-apt-repository ppa:freecad-maintainers/freecad-daily && \
@@ -167,20 +181,6 @@ RUN mkdir -p /home/$USER/miniconda3 && \
 #     apt-get autoremove -y && \
 #     rm -rf /var/lib/apt/lists/*
 # ### End Install FreeCAD conda default
-
-
-### Install Gazebo
-RUN echo "Install Gazebo $GZ_VERSION"
-RUN sudo apt-get update && \
-    sudo apt-get install -y lsb-release wget gnupg && \
-    sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
-    sudo apt-get update && \
-    sudo apt-get install gz-${GZ_VERSION} -y && \
-    apt-get autoclean && \
-    apt-get autoremove && \
-    rm -rf /var/lib/apt/lists/*
-### End install Gazebo
 
 
 ### Copy project to image
