@@ -12,6 +12,9 @@ ARG GROUP=$USER
 ARG GID=$(id -g)
 ARG PASSWD=ubuntu
 ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
+ARG GZ_VERSION_ARG=harmonic
+
+ENV GZ_VERSION=$GZ_VERSION_ARG
 ENV PATH_TO_WS=$CONT_PATH_WS
 
 ENV USER=$USER
@@ -166,20 +169,18 @@ RUN mkdir -p /home/$USER/miniconda3 && \
 # ### End Install FreeCAD conda default
 
 
-### Install Gazebo Harmonic
-RUN echo 'Install FreeCAD Daily'
+### Install Gazebo
+RUN echo "Install Gazebo $GZ_VERSION"
 RUN sudo apt-get update && \
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        curl lsb-release gnupg -y && \
-    sudo curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
-        | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
+    sudo apt-get install -y lsb-release wget gnupg && \
+    sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
     sudo apt-get update && \
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y gz-harmonic && \
-    sudo apt-get autoclean -y && \
-    sudo apt-get autoremove -y && \
-    sudo rm -rf /var/lib/apt/lists/*
-### End Install Gazebo Harmonic
+    sudo apt-get install gz-${GZ_VERSION} -y && \
+    apt-get autoclean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/*
+### End install Gazebo
 
 
 ### Copy project to image
