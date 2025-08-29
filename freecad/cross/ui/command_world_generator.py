@@ -1,6 +1,10 @@
 import FreeCAD as fc
 
 import FreeCADGui as fcgui
+try:
+    from PySide.QtWidgets import QApplication
+except:
+    from PySide2.QtWidgets import QApplication
 
 from ..gui_utils import tr
 import sys
@@ -22,7 +26,6 @@ class _WorldGeneratorCommand:
         return fc.activeDocument() is not None
 
     def Activated(self):
-        doc = fc.activeDocument()
 
         def world_generator_run_wrapper():
             # add module path to sys.path for working local path imports in module
@@ -31,15 +34,19 @@ class _WorldGeneratorCommand:
                 sys.path.insert(0, DYNAMIC_WORLD_GENERATOR_MODULE_PATH_str)
             
             from modules.Dynamic_World_Generator.code.dwg_wizard import run as world_generator_run
-        
-            world_generator_run()
+            from modules.Dynamic_World_Generator.code.dwg_wizard import dwg_wizard_close_emitter
+
+            def close_callback(close_emitter_instance):
+                QApplication.instance().aboutToQuit.connect(close_emitter_instance.on_app_quit)
+
+            close_emitter = dwg_wizard_close_emitter(close_callback)
+
+            world_generator_run(close_emitter)
 
         git_init_submodules(
             submodule_repo_path = DYNAMIC_WORLD_GENERATOR_REPO_PATH,
             callback = world_generator_run_wrapper
         )          
-
-        doc.recompute()
 
 
 fcgui.addCommand('WorldGenerator', _WorldGeneratorCommand())
