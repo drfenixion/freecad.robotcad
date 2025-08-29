@@ -1207,12 +1207,12 @@ def git_init_submodules(
     else:
         git_update_submodules(update_from_remote_branch_param)
 
-    if callable(callback):
-        callback()
-
     progressBar.setValue(100)
     progressBar.close()
     gui_process_events()
+
+    if callable(callback):
+        callback()
 
 
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
