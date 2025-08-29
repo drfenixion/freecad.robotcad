@@ -43,6 +43,7 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common \
         mesa-utils \
+        mesa-vulkan-drivers \
         nano \
         pip \
         wget && \
