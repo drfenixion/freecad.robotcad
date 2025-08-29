@@ -36,6 +36,25 @@ RUN echo 'Update gpg keys...'
 RUN sudo apt-key del F42ED6FBAB17C654
 RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros2-latest-archive-keyring.gpg
 
+# setup timezone
+RUN unlink /etc/localtime || true && \
+    ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
+    apt-get update && \
+    apt-get install -q -y --no-install-recommends tzdata && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Upgrade OS
+RUN echo 'Upgrade OS'
+RUN apt-get update -q && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+# End Upgrade OS
+
 
 ### Install system packages
 RUN echo 'Install system packages'
