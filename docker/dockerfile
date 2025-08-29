@@ -127,8 +127,8 @@ RUN sudo apt-get update && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
     sudo apt-get update && \
     sudo apt-get install gz-${GZ_VERSION} -y && \
-    apt-get autoclean && \
-    apt-get autoremove && \
+    sudo apt-get autoclean && \
+    sudo apt-get autoremove && \
     sudo rm -rf /var/lib/apt/lists/*
 ### End install Gazebo
 
