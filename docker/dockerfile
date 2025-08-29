@@ -91,15 +91,17 @@ RUN deluser --remove-home $(id -un $UID); exit 0
 
 ### Create user
 RUN echo "* enable custom user: $USER"
+RUN groupadd -g 110 render
 RUN getent group $GROUP || groupadd --force -g $GID $GROUP
-RUN useradd --create-home --shell /bin/bash --groups adm,sudo --uid $UID --gid $GID $USER
+RUN useradd --create-home --shell /bin/bash --groups adm,sudo,video,render --uid $UID --gid $GID $USER
 # RUN sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD:ALL/g" /etc/sudoers ## make admin group no ask pass
 RUN echo "$USER  ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 ENV HOME=/home/$USER
 RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
+RUN if [[ -d "/dev/snd" ]] ; then chgrp -R adm /dev/snd ; fi
 RUN export UBUNTU_USER_ID=$UID \
     && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
-    && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
+    && chown $USER:$GROUP /run/user/"${UBUNTU_USER_ID}" \
     && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile
 ### End create user
 
