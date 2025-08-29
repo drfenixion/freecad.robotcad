@@ -129,7 +129,7 @@ RUN sudo apt-get update && \
     sudo apt-get install gz-${GZ_VERSION} -y && \
     apt-get autoclean && \
     apt-get autoremove && \
-    rm -rf /var/lib/apt/lists/*
+    sudo rm -rf /var/lib/apt/lists/*
 ### End install Gazebo
 
 
