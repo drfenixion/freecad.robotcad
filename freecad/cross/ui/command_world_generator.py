@@ -19,7 +19,8 @@ class _WorldGeneratorCommand:
             'Pixmap': 'world_generator.svg',
             'MenuText': tr('Create custom world'),
             'Accel': 'N, W',
-            'ToolTip': tr('Create custom world obstacles.'),
+            'ToolTip': tr('Create custom world with dynamic and static obstacles.' \
+            '\n\nDocs at https://github.com/drfenixion/Dynamic_World_Generator'),
         }
 
     def IsActive(self):
