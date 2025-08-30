@@ -1030,7 +1030,7 @@ class RobotProxy(ProxyBase):
                 gazebo_version = 'fortress'
                 if ask_confirmation(
                     title = "What Gazebo version maps to copy?",
-                    text = "'No' - Fortress, 'Yes' - Harmonic."
+                    text = "'Yes' - Harmonic, 'No' - Fortress."
                 ):
                     gazebo_version = 'harmonic'
                 print(f"Gazebo {gazebo_version.capitalize()} is selected")
