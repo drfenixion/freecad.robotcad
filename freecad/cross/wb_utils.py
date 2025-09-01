@@ -1267,6 +1267,7 @@ def set_placement_fast(
         orienteer1, orienteer2 = validate_types(
             fcgui.Selection.getSelection(),
             ['Any', 'Any'],
+            respect_count = True,
         )
         selection_ok = True
     except RuntimeError:
@@ -1274,8 +1275,14 @@ def set_placement_fast(
 
     if not selection_ok:
         message(
-            'Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
-            'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True,
+            'Select at Real objects of robot links (Parent, Child): \n'
+            '1) face or edge or vertex or LCS of Parent,\n'
+            '2) face or edge or vertex or LCS of Child.\n'
+            '\n'
+            'Robot links must be near to each other (parent, child) and have joint between.\n'
+            '\n'
+            'Check you dont select redundant objects in Project Tree.\n'  \
+            , gui=True,
         )
         return False
 

@@ -551,6 +551,7 @@ def validate_types(
         objects: DOList,
         types: list[str],
         respect_order: [bool | list[bool]] = False,
+        respect_count: bool = False,
 ) -> DOList:
     """Sort objects by required types.
 
@@ -562,9 +563,16 @@ def validate_types(
     Raises a RuntimeError if a listed type has no appropriate object in the input
     list.
 
+    If 'respect_order' is False and 'respect_count' is True then
+    objects order will not controlled but count will.
+
     """
     if len(objects) < len(types):
         raise RuntimeError('More types required that the number of objects')
+    if respect_count and len(objects) > len(types):
+        error_text = 'More objects is selected than required'
+        message(error_text, gui=True)        
+        raise RuntimeError(error_text)
     if isinstance(respect_order, bool):
         respect_order = [respect_order] * len(types)
     if len(respect_order) != len(types):
