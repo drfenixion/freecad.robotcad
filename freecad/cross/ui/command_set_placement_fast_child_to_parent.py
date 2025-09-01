@@ -47,7 +47,7 @@ class _SetCROSSPlacementFastChildToParentCommand:
         return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
-        set_placement_fast(link_mounted_placement = False)
+        set_placement_fast(child_branch_to_parent_tree = True)
 
 
 fcgui.addCommand('SetCROSSPlacementFastChildToParent', _SetCROSSPlacementFastChildToParentCommand())

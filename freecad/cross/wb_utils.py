@@ -1295,7 +1295,8 @@ def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc
 def set_placement_fast(
         joint_origin: bool = True,
         link_mounted_placement: bool = True,
-        parent_tree_to_child_branch: bool = False
+        parent_tree_to_child_branch: bool = False,
+        child_branch_to_parent_tree: bool = False,
     ) -> bool |  tuple[DO, DO, DO]:
     doc = fc.activeDocument()
     selection_ok = False
@@ -1390,8 +1391,11 @@ def set_placement_fast(
         message('Can not get joint between parent links of selected objects', gui=True)
         return False
 
-    if parent_tree_to_child_branch:
-        doc.openTransaction(tr("Set placement - fast - parent tree to child branch"))
+    if parent_tree_to_child_branch or child_branch_to_parent_tree:
+        if parent_tree_to_child_branch:
+            doc.openTransaction(tr("Set placement - fast - parent tree to child branch"))
+        else:
+            doc.openTransaction(tr("Set placement - fast - child branch to parent tree"))
 
         robot = link1.Proxy.get_robot()
         root_link = robot.Proxy.get_root_link()
@@ -1414,24 +1418,23 @@ def set_placement_fast(
         for child_joint in child_link_child_joints:
             move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
             move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+        
+        if parent_tree_to_child_branch:
+            for child_joint in root_link_child_joints:
+                move_placement(doc, child_joint, 'Origin', parent_orienteer_placement_backup, child_orienteer_placement_backup)
 
-        for child_joint in root_link_child_joints:
-            move_placement(doc, child_joint, 'Origin', parent_orienteer_placement_backup, child_orienteer_placement_backup)
-
-        move_placement(doc, root_link, 'MountedPlacement', parent_orienteer_placement_backup, child_orienteer_placement_backup)
+            move_placement(doc, root_link, 'MountedPlacement', parent_orienteer_placement_backup, child_orienteer_placement_backup)
         
         doc.recompute()
         doc.commitTransaction()
     else:
-        if link_mounted_placement:
-            doc.openTransaction(tr("Set placement - fast"))
-        else:
-            doc.openTransaction(tr("Set placement - fast - child branch to parent tree"))
+        doc.openTransaction(tr("Set placement - fast"))
 
         if joint_origin:
             set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
         if link_mounted_placement:
             move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+
         doc.commitTransaction()
 
     return joint, child_link, parent_link
