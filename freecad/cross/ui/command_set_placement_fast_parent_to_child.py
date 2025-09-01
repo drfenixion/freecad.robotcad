@@ -18,7 +18,7 @@ LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
 class _SetCROSSPlacementFastParentToChildCommand:
-    """Command to move parent kinematic tree. Also moved parent join of parent link to reference placement.
+    """Command to move parent kinematic tree to child branch.
     """
 
     def GetResources(self):
@@ -27,7 +27,7 @@ class _SetCROSSPlacementFastParentToChildCommand:
             'MenuText': tr('Set placement - move parent kinematic tree to child branch'),
             'Accel': 'P, P',
             'ToolTip': tr(
-                'Move parent kinematic tree to child branch.\nAlso moved parent join of parent link to reference placement.\n'
+                'Move parent kinematic tree to child branch and connect references.\n'
                 '\n'
                 'Select (with Ctlr): \n'
                 '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
@@ -35,13 +35,10 @@ class _SetCROSSPlacementFastParentToChildCommand:
                 '\n'
                 'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
                 '\n'
-                'This will connect 2 links (child to parent) in reference places.\n'
-                'Joint Origin and link Mounted Placement of parent link will be moved to connection position.\n'
+                'This will connect parent kinematic tree and child branch in reference places.\n'
                 'Parent kinematic tree will be moved relatively. Child branch visually will be in same position\n'
                 '\n'
                 'If selected subelement (face, edge, vertex) will be used temporary LCS underhood.\n'
-                '\n'
-                'This tool for moving parent kinematic tree to reference placement.\n',
             ),
         }
 

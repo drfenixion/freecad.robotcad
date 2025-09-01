@@ -782,7 +782,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
 
     old_placement_diff =  origin_or_mounted_placement_value.inverse() * placement1_diff
     
-    setattr(link_or_joint, origin_or_mounted_placement_name, link_or_joint.Origin * old_placement_diff)
+    setattr(link_or_joint, origin_or_mounted_placement_name, getattr(link_or_joint, origin_or_mounted_placement_name) * old_placement_diff)
 
     if hold_downstream_chain:
         child_joints = get_child_joints(link_or_joint)
@@ -1396,31 +1396,28 @@ def set_placement_fast(
         robot = link1.Proxy.get_robot()
         root_link = robot.Proxy.get_root_link()
         root_link_child_joints = root_link.Proxy.get_ref_child_joints()
-        parent_joint_of_parent_link = parent_link.Proxy.get_ref_joint()
+        child_link_child_joints = child_link.Proxy.get_ref_child_joints()
+        # parent_joint_of_parent_link = parent_link.Proxy.get_ref_joint()
+        parent_joint_of_child_link = child_link.Proxy.get_ref_joint()
         
         child_orienteer_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
         parent_orienteer_placement_backup = get_placement_of_orienteer(parent_orienteer, delete_created_objects=True)
         
-        set_placement_by_orienteer(doc, parent_joint_of_parent_link, 'Origin', parent_orienteer_placement_backup, hold_downstream_chain = True)
-
         root_link_child_joints_backup = []
         for child_joint in root_link_child_joints:
             root_link_child_joints_backup.append({'Name': child_joint.Name, 'Origin': child_joint.Origin})
 
-        parent_joint_of_child_link = child_link.Proxy.get_ref_joint()
-        move_placement(doc, parent_joint_of_child_link, 'Origin', child_orienteer, parent_orienteer)
+        parent_joint_of_child_link_origin_backup = parent_joint_of_child_link.Origin
+        set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
+        move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
 
-        for child_joint in root_link_child_joints:
-            move_placement(doc, child_joint, 'Origin', child_orienteer, parent_orienteer, element_local_placement_inverse = True)
-
-        for child_joint in root_link_child_joints:
-            for child_joint_b in root_link_child_joints_backup:
-                if child_joint.Name == child_joint_b['Name']:
-                    child_joint.Origin = child_joint_b['Origin']
+        for child_joint in child_link_child_joints:
+            move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
+            move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
 
         for child_joint in root_link_child_joints:
             move_placement(doc, child_joint, 'Origin', parent_orienteer_placement_backup, child_orienteer_placement_backup)
-        
+
         move_placement(doc, root_link, 'MountedPlacement', parent_orienteer_placement_backup, child_orienteer_placement_backup)
         
         doc.recompute()
