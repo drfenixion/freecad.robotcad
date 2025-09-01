@@ -739,10 +739,13 @@ class RobotProxy(ProxyBase):
 
     def get_root_link(self) -> Optional[CrossLink]:
         """Return the root link of the robot."""
-        chains = self.get_chains(check_kinematics=True)
-        if not chains or not chains[0]:
+        chains = self.get_chains(check_kinematics=False)
+        if chains is None:
             return None
-        return chains[0][0]
+        chains_most_longest_first = sorted(chains, key=len, reverse=True)
+        if not chains_most_longest_first or not chains_most_longest_first[0]:
+            return None
+        return chains_most_longest_first[0][0]
 
     def get_chains(self, check_kinematics=False) -> list[list[BasicElement]]:
         """Return the list of chains.
