@@ -49,6 +49,7 @@ Video of creating controllable models: <br />
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF (kinematics, mass, inertia, sensors, etc.)
     1. Meshes
+    1. SDF maps created by "Custom world" tool (map editor)
     1. Controllers config (use extended generator if need all ready to use controllers code)
 1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
     1. External code generator:
