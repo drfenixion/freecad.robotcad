@@ -883,14 +883,50 @@ def make_lcs_at_link_body(
     original_obj_wrapper = None
     try:
         if is_fc_link(orienteer.Object):
+            # link to object (like Part::Feature)
             link_to_obj = orienteer.Object
             original_obj = link_to_obj.getLinkedObject(True)
             obj_for_getting_parents = link_to_obj
             link_to_obj_placement = link_to_obj.Placement
         else:
-            original_obj = orienteer.Object
-            obj_for_getting_parents = original_obj
-            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+            # consider fc_link to part design obj. In that case link will be deeper
+            inListRecursive = orienteer.Object.InListRecursive
+            inListRecursiveWithoutRobotAndRealLink = list(inListRecursive)[:-2]
+            inListRecursiveWithoutRobotAndRealLink_dict = {index: value for index, value in enumerate(inListRecursiveWithoutRobotAndRealLink)}
+            inListRecursiveWithoutRobotAndRealLink_dict_reversed = sorted(inListRecursiveWithoutRobotAndRealLink_dict.items(), reverse=True)
+            inListRecursiveWithoutRobotAndRealLink_list_reversed = [item[1] for item in inListRecursiveWithoutRobotAndRealLink_dict_reversed]
+            fc_link = next(
+                filter(
+                    lambda element: is_fc_link(element),
+                    inListRecursiveWithoutRobotAndRealLink_list_reversed
+                ),
+                None
+            )
+            robot_link = next(
+                filter(
+                    lambda element: is_link(element),
+                    inListRecursiveWithoutRobotAndRealLink_list_reversed
+                ),
+                None
+            )
+            try:
+                # check correct fc_link is found
+                if fc_link.LinkedObject.Name != robot_link.Real[0].Group[0].LinkedObject.Name:
+                    fc_link = None
+            except (IndexError, AttributeError):
+                fc_link = None
+                pass
+
+            if fc_link:
+                link_to_obj = fc_link
+                original_obj = link_to_obj.getLinkedObject(True)
+                obj_for_getting_parents = link_to_obj
+                link_to_obj_placement = link_to_obj.Placement                
+            else:
+                #no found fc link
+                original_obj = orienteer.Object
+                obj_for_getting_parents = original_obj
+                link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
         parents_reversed = reversed(obj_for_getting_parents.Parents)
         for p in parents_reversed:
