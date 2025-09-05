@@ -1224,7 +1224,7 @@ def git_init_submodules(
 
     files_and_dirs = os.listdir(submodule_repo_path)
     # update if dir is empty or .gitmodules file was changed
-    is_gitsubmodules_updated = os.path.expanduser('~/.is_gitsubmodules_updated')
+    is_gitsubmodules_updated = os.path.expanduser('~/.is_robotcad_gitsubmodules_updated')
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
         # update if empty dir
