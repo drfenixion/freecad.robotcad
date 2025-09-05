@@ -1143,7 +1143,7 @@ def git_change_submodule_branch(module_path: str, branch: str):
             check=True,
         )
         print('process:', p)
-        git_init_submodules()
+        git_init_submodules(update_from_remote_branch = True, only_first_update = False)
 
 
 def git_init_submodules(
