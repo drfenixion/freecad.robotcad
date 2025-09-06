@@ -23,7 +23,7 @@ Video of creating controllable models: <br />
 <a href="https://www.youtube.com/watch?v=B62JW_0SFl0" target="_blank">Multicopter with manipulator and chassis</a> <br />
 <a href="https://github.com/drfenixion/parts_for_robotcad_lessons" target="_blank">Chassis, manipulator, multicopter parts used in the video</a> <br />
 
-# Key features short list:
+# Key features list:
 1. Autoinstall and run by startup script.
 1. Modeling parts (in FreeCAD).
 1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
@@ -45,6 +45,7 @@ Video of creating controllable models: <br />
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
 1. Sensors based on Gazebo sensors
     1. Add the necessary sensors and use it in Gazebo.
+1. Integrated ready to use models library
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF (kinematics, mass, inertia, sensors, etc.)
@@ -62,7 +63,6 @@ Video of creating controllable models: <br />
         1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
         1. Nvidia video cards container support
         1. README instruction how to use
-1. Integrated ready to use models library
 1. all features from CROSS workbench
 
 # Fast install and run
@@ -204,7 +204,7 @@ Compatible with ROS2.
 ## Features
 
 - Export `Part::Box`, `Part::Sphere`, and `Part::Cylinder` as text to be included in a URDF file,
-- Generate an enclosing box or sphere as collision object (only axis-aligned box for now),
+- Generate an enclosing box, sphere, cylinder (any axis-aligned), copy of original object as collision objects,
 - Build a robot from scratch and generate the URDF file for it,
 - Set a value for each actuated joint of a robot and have the links move accordingly,
 - Import URDF/xacro files,
