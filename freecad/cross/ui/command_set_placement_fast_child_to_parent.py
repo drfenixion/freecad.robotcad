@@ -7,7 +7,6 @@ import FreeCADGui as fcgui
 from ..gui_utils import tr
 from ..wb_utils import set_placement_fast
 
-
 # Stubs and type hints.
 from ..joint import Joint
 from ..link import Link
@@ -17,18 +16,17 @@ CrossJoint = Joint
 LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
-class _SetCROSSPlacementFastCommand:
-    """Command to set the Origin of a joint and Mounted Placement of link and make LCS.
+class _SetCROSSPlacementFastChildToParentCommand:
+    """Command to set the Origin of a joint beetween links to reference placement.
     """
 
     def GetResources(self):
         return {
-            'Pixmap': 'set_cross_placement_fast.svg',
-            'MenuText': tr('Set placement - fast'),
-            'Accel': 'P, F',
+            'Pixmap': 'set_cross_placement_fast_child_to_parent.svg',
+            'MenuText': tr('Set placement - of child kinematic branch'),
+            'Accel': 'P, C',
             'ToolTip': tr(
-                'Set the Origin of a joint and Mounted Placement of link.\n'
-                'Use it for current unplacement tip of kinematic branch.\n'
+                'Set the Origin of a joint beetween links to reference placement.\nIt moves child kinematic branch.\n'
                 '\n'
                 'Select (with Ctlr): \n'
                 '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
@@ -37,12 +35,11 @@ class _SetCROSSPlacementFastCommand:
                 'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
                 '\n'
                 'This will connect 2 links (child to parent) in reference places.\n'
-                'Joint Origin and link Mounted Placement will be moved to connection position.\n'
+                'Joint Origin will be moved to connection position.\n'
                 '\n'
                 'If selected subelement (face, edge, vertex) will be used temporary LCS underhood.\n'
                 '\n'
-                'Dont use this for moving kinematic branch because it also set MountedPlacement\n'
-                'that is may not be desirable in this case.\n',
+                'This tool for moving kinematic branch root joint to reference placement\n',
             ),
         }
 
@@ -50,7 +47,7 @@ class _SetCROSSPlacementFastCommand:
         return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
-        set_placement_fast()
+        set_placement_fast(child_branch_to_parent_tree = True)
 
 
-fcgui.addCommand('SetCROSSPlacementFast', _SetCROSSPlacementFastCommand())
+fcgui.addCommand('SetCROSSPlacementFastChildToParent', _SetCROSSPlacementFastChildToParentCommand())

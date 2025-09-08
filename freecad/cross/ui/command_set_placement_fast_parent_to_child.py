@@ -17,18 +17,17 @@ CrossJoint = Joint
 LCS = DO  # Local coordinate systen, TypeId == "PartDesign::CoordinateSystem"
 
 
-class _SetCROSSPlacementFastCommand:
-    """Command to set the Origin of a joint and Mounted Placement of link and make LCS.
+class _SetCROSSPlacementFastParentToChildCommand:
+    """Command to move parent kinematic tree to child branch.
     """
 
     def GetResources(self):
         return {
-            'Pixmap': 'set_cross_placement_fast.svg',
-            'MenuText': tr('Set placement - fast'),
-            'Accel': 'P, F',
+            'Pixmap': 'set_cross_placement_fast_parent_to_child.svg',
+            'MenuText': tr('Set placement - move parent kinematic tree to child branch'),
+            'Accel': 'P, P',
             'ToolTip': tr(
-                'Set the Origin of a joint and Mounted Placement of link.\n'
-                'Use it for current unplacement tip of kinematic branch.\n'
+                'Move parent kinematic tree to child branch and connect references.\n'
                 '\n'
                 'Select (with Ctlr): \n'
                 '    1) subelement (face, edge, vertex, LCS) of body (of Real) of robot link (first reference)\n'
@@ -36,13 +35,10 @@ class _SetCROSSPlacementFastCommand:
                 '\n'
                 'Robot links must be near to each other in chain (parent, child) and have joint between.\n'
                 '\n'
-                'This will connect 2 links (child to parent) in reference places.\n'
-                'Joint Origin and link Mounted Placement will be moved to connection position.\n'
+                'This will connect parent kinematic tree and child branch in reference places.\n'
+                'Parent kinematic tree will be moved relatively. Child branch visually will be in same position\n'
                 '\n'
                 'If selected subelement (face, edge, vertex) will be used temporary LCS underhood.\n'
-                '\n'
-                'Dont use this for moving kinematic branch because it also set MountedPlacement\n'
-                'that is may not be desirable in this case.\n',
             ),
         }
 
@@ -50,7 +46,7 @@ class _SetCROSSPlacementFastCommand:
         return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
-        set_placement_fast()
+        set_placement_fast(parent_tree_to_child_branch=True)
 
 
-fcgui.addCommand('SetCROSSPlacementFast', _SetCROSSPlacementFastCommand())
+fcgui.addCommand('SetCROSSPlacementFastParentToChild', _SetCROSSPlacementFastParentToChildCommand())

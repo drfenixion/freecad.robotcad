@@ -31,7 +31,7 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",
-                    "remoteRoot": "${userHome}/miniconda3/envs/freecad_1_0_312/Mod/freecad.robotcad"
+                    "remoteRoot": "${userHome}/miniconda3/envs/freecad_1_0_312/share/Mod/freecad.robotcad"
                 } 
             ],
             "justMyCode": true

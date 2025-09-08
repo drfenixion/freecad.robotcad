@@ -111,6 +111,16 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('pycollada')
 
+try:
+    import PyQt5
+except (ModuleNotFoundError, ImportError):
+    pip_install('PyQt5')
+
+try:
+    import lxml
+except (ModuleNotFoundError, ImportError):
+    pip_install('lxml')
+
 
 # Must be imported after the call to `add_ros_library_path`.
 from freecad.cross.freecad_utils import warn

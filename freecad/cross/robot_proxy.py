@@ -8,6 +8,8 @@ exported as URDF file.
 from __future__ import annotations
 
 from math import radians
+import os
+import shutil
 from typing import ForwardRef, List, Optional, Union, cast
 import xml.etree.ElementTree as et
 from copy import deepcopy
@@ -16,8 +18,9 @@ import FreeCAD as fc
 
 from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
 from PySide.QtWidgets import QMenu
+from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
-from freecad.cross.freecadgui_utils import get_progress_bar # FreeCAD's PySide
+from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
 from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part
 from .freecad_utils import add_property
@@ -39,7 +42,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_first_link, get_last_link_to_assembly
+from .wb_utils import DYNAMIC_WORLD_GENERATOR_REPO_PATH, DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH, ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_first_link, get_last_link_to_assembly
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -736,10 +739,13 @@ class RobotProxy(ProxyBase):
 
     def get_root_link(self) -> Optional[CrossLink]:
         """Return the root link of the robot."""
-        chains = self.get_chains(check_kinematics=True)
-        if not chains or not chains[0]:
+        chains = self.get_chains(check_kinematics=False)
+        if chains is None:
             return None
-        return chains[0][0]
+        chains_most_longest_first = sorted(chains, key=len, reverse=True)
+        if not chains_most_longest_first or not chains_most_longest_first[0]:
+            return None
+        return chains_most_longest_first[0][0]
 
     def get_chains(self, check_kinematics=False) -> list[list[BasicElement]]:
         """Return the list of chains.
@@ -987,7 +993,69 @@ class RobotProxy(ProxyBase):
             cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera'])
         )
 
+        self.copy_custom_worlds(description_package_path / 'worlds')
+
         return xml
+    
+
+    def copy_custom_worlds(self, destination_path:str = None):
+        
+        def copy_directory_with_confirmation(source, destination):
+            # Check if the destination directory already exists
+            if os.path.exists(destination):
+                # Show confirmation dialog
+                result = QMessageBox.question(
+                    None,
+                    "Confirmation",  # Window title
+                    "The destination directory already exists. Do you want to overwrite it?",  # Message text
+                    QMessageBox.Yes | QMessageBox.No  # Available buttons
+                )
+                
+                if result == QMessageBox.No:
+                    print("Copy directory of "+source.name+" cancelled by user")
+                    return
+                    
+                # Remove existing directory
+                shutil.rmtree(destination)
+                
+            try:
+                # Copy directory with all contents
+                shutil.copytree(source, destination)
+                print("Successfully copied: directory of "+source.name)
+                
+            except Exception as e:
+                # Handle any errors during copying
+                print(f"An error occurred: {e}")
+        
+        if ask_confirmation(title = "Confirm", text = "Do you want to copy custom world maps?") and destination_path:
+            def copy_worlds_files_wrapper(destination_path:str = destination_path):
+
+                gazebo_version = 'fortress'
+                if ask_confirmation(
+                    title = "What Gazebo version maps to copy?",
+                    text = "'Yes' - Harmonic, 'No' - Fortress."
+                ):
+                    gazebo_version = 'harmonic'
+                print(f"Gazebo {gazebo_version.capitalize()} is selected")
+                source_path = DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH / gazebo_version
+                files = source_path.glob('*.sdf')
+                for sdf_file in files:
+                    destination_file = destination_path / sdf_file.name
+                    
+                    try:
+                        shutil.copy2(sdf_file, destination_file)
+                        print(f"Successfully copied: {sdf_file.name}")
+                    except Exception as e:
+                        print(f"Error of coping {sdf_file.name}: {str(e)}")
+
+                source_move_code_path = source_path / 'move_code'
+                
+                copy_directory_with_confirmation(source_move_code_path, destination_path / 'move_code')
+
+            git_init_submodules(
+                submodule_repo_path = DYNAMIC_WORLD_GENERATOR_REPO_PATH,
+                callback = copy_worlds_files_wrapper
+            )    
 
     def get_sensors_xml(self) -> str:
 

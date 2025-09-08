@@ -12,6 +12,9 @@ ARG GROUP=$USER
 ARG GID=$(id -g)
 ARG PASSWD=ubuntu
 ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
+ARG GZ_VERSION_ARG=harmonic
+
+ENV GZ_VERSION=$GZ_VERSION_ARG
 ENV PATH_TO_WS=$CONT_PATH_WS
 
 ENV USER=$USER
@@ -33,6 +36,25 @@ RUN echo 'Update gpg keys...'
 RUN sudo apt-key del F42ED6FBAB17C654
 RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros2-latest-archive-keyring.gpg
 
+# setup timezone
+RUN unlink /etc/localtime || true && \
+    ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
+    apt-get update && \
+    apt-get install -q -y --no-install-recommends tzdata && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Upgrade OS
+RUN echo 'Upgrade OS'
+RUN apt-get update -q && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+# End Upgrade OS
+
 
 ### Install system packages
 RUN echo 'Install system packages'
@@ -40,6 +62,7 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common \
         mesa-utils \
+        mesa-vulkan-drivers \
         nano \
         pip \
         wget && \
@@ -91,15 +114,17 @@ RUN deluser --remove-home $(id -un $UID); exit 0
 
 ### Create user
 RUN echo "* enable custom user: $USER"
+RUN groupadd -g 110 render
 RUN getent group $GROUP || groupadd --force -g $GID $GROUP
-RUN useradd --create-home --shell /bin/bash --groups adm,sudo --uid $UID --gid $GID $USER
+RUN useradd --create-home --shell /bin/bash --groups adm,sudo,video,render --uid $UID --gid $GID $USER
 # RUN sed -i "s/%admin ALL=(ALL) ALL/%admin ALL=(ALL) NOPASSWD:ALL/g" /etc/sudoers ## make admin group no ask pass
 RUN echo "$USER  ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 ENV HOME=/home/$USER
 RUN echo "$USER:$PASSWD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
+RUN if [[ -d "/dev/snd" ]] ; then chgrp -R adm /dev/snd ; fi
 RUN export UBUNTU_USER_ID=$UID \
     && mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" \
-    && chown $USER:$USER /run/user/"${UBUNTU_USER_ID}" \
+    && chown $USER:$GROUP /run/user/"${UBUNTU_USER_ID}" \
     && echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile
 ### End create user
 
@@ -112,6 +137,20 @@ RUN chown -R $USER:$USER /var/lib/dpkg/
 
 
 USER $USER
+
+
+### Install Gazebo
+RUN echo "Install Gazebo $GZ_VERSION"
+RUN sudo apt-get update && \
+    sudo apt-get install -y lsb-release wget gnupg && \
+    sudo wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
+    sudo apt-get update && \
+    sudo apt-get install gz-${GZ_VERSION} -y && \
+    sudo apt-get autoclean && \
+    sudo apt-get autoremove && \
+    sudo rm -rf /var/lib/apt/lists/*
+### End install Gazebo
 
 
 ### Install FreeCAD Daily
@@ -129,6 +168,7 @@ RUN sudo add-apt-repository ppa:freecad-maintainers/freecad-daily && \
 # should be after user activation
 ### Install FreeCAD from conda py3.12
 RUN echo 'Install FreeCAD conda py3.12'
+ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
 RUN mkdir -p /home/$USER/miniconda3 && \
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /home/$USER/miniconda3/miniconda.sh && \
     bash /home/$USER/miniconda3/miniconda.sh -b -u -p /home/$USER/miniconda3 && \

@@ -9,8 +9,10 @@ import re
 
 try:
     from PySide import QtWidgets, QtGui
+    from PySide.QtWidgets import QMessageBox
 except:
     from PySide2 import QtWidgets, QtGui
+    from PySide2.QtWidgets import QMessageBox
 
 from .freecad_utils import copy_obj_geometry, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
@@ -360,3 +362,15 @@ def get_progress_bar(title:str = '', min: int = 0, max: int = 0, show_percents:b
 def gui_process_events():
     """Use for unblock gui between ticks when sothing hard calculating"""
     QtGui.QApplication.processEvents()
+
+
+def ask_confirmation(title:str = '', text:str = '') -> bool:
+    """Display confirmation popup to user."""
+    msg_box = QMessageBox()
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    
+    result = msg_box.exec_()
+    
+    return result == QMessageBox.Yes

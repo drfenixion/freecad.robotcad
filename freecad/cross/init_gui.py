@@ -29,6 +29,8 @@ from .ui import command_robot_from_urdf # noqa: F401
 from .ui import command_set_joints # noqa: F401
 from .ui import command_set_placement # noqa: F401
 from .ui import command_set_placement_fast # noqa: F401
+from .ui import command_set_placement_fast_child_to_parent # noqa: F401
+from .ui import command_set_placement_fast_parent_to_child # noqa: F401
 from .ui import command_set_placement_fast_sensor # noqa: F401
 from .ui import command_set_placement_in_absolute_coordinates # noqa: F401
 from .ui import command_set_placement_by_orienteer # noqa: F401
@@ -46,6 +48,7 @@ from .ui import command_update_planning_scene # noqa: F401
 from .ui import command_urdf_export # noqa: F401
 from .ui import command_set_material # noqa: F401
 from .ui import command_calculate_mass_and_inertia # noqa: F401
+from .ui import command_world_generator # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
 
@@ -98,11 +101,12 @@ class placement_command_group:
     def GetCommands(self):
         return (
     'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
+    'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.
+    'SetCROSSPlacementFastParentToChild',  # Defined in ./ui/command_set_placement_fast_parent_to_child.py.
     'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
     'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
     'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
     'SetCROSSPlacementFastSensor',  # Defined in ./ui/command_set_placement_fast_sensor.py.
-    'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
         )
 
     def GetResources(self):
@@ -192,6 +196,9 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
         ]
+        self.appendToolbar("world",[
+             'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
+        ])
         self.appendToolbar("import n export",import_n_export)
         settings=[
              # Workbench settings.
@@ -233,11 +240,12 @@ class CrossWorkbench(fcgui.Workbench):
             # Placement
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
+            'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.            
+            'SetCROSSPlacementFastParentToChild',  # Defined in ./ui/command_set_placement_fast_parent_to_child.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
             'SetCROSSPlacementByOrienteerWithHoldChain',  # Defined in ./ui/command_set_placement_by_orienteer_with_hold_chain.py.
             'SetCROSSPlacementFastSensor',  # Defined in ./ui/command_set_placement_fast_sensor.py.
-            'SetCROSSPlacement',  # Defined in ./ui/command_set_placement.py.
             'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
             'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
             'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
@@ -272,6 +280,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
+            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
         ])
         fcgui.addIconPath(str(ICON_PATH))

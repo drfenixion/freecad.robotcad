@@ -69,11 +69,16 @@ RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
 ICON_PATH = RESOURCES_PATH / 'icons'
 MODULES_PATH = MOD_PATH / 'modules'
+
 ROS2_CONTROLLERS_PATH = MOD_PATH / 'modules' / 'ros2_controllers'
 SDFORMAT_PATH = MOD_PATH / 'modules' / 'sdformat'
 SDFORMAT_SDF_TEMPLATES_PATH = MOD_PATH / 'modules' / 'sdformat' / 'sdf'
 ROBOT_DESCRIPTIONS_REPO_PATH = MOD_PATH / 'modules' / 'robot_descriptions'
 ROBOT_DESCRIPTIONS_MODULE_PATH = ROBOT_DESCRIPTIONS_REPO_PATH / 'robot_descriptions'
+DYNAMIC_WORLD_GENERATOR_REPO_PATH = MODULES_PATH / 'Dynamic_World_Generator'
+DYNAMIC_WORLD_GENERATOR_MODULE_PATH = DYNAMIC_WORLD_GENERATOR_REPO_PATH / 'code'
+DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH = DYNAMIC_WORLD_GENERATOR_REPO_PATH / 'worlds' / 'gazebo'
+
 SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors'
 LINK_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'link'
 JOINT_SENSORS_DATA_PATH = MOD_PATH / 'resources' / 'sensors' / 'joint'
@@ -777,7 +782,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
 
     old_placement_diff =  origin_or_mounted_placement_value.inverse() * placement1_diff
     
-    setattr(link_or_joint, origin_or_mounted_placement_name, link_or_joint.Origin * old_placement_diff)
+    setattr(link_or_joint, origin_or_mounted_placement_name, getattr(link_or_joint, origin_or_mounted_placement_name) * old_placement_diff)
 
     if hold_downstream_chain:
         child_joints = get_child_joints(link_or_joint)
@@ -794,6 +799,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
 def move_placement(
     doc: DO, link_or_joint: DO, origin_or_mounted_placement_name: str,
     orienteer1: DO, orienteer2: DO, delete_created_objects:bool = True,
+    element_local_placement_inverse: bool = False
 ):
     """Move element (joint or link) placement (Origin or Mounted placement).
 
@@ -812,9 +818,12 @@ def move_placement(
     origin_placement2_diff = (element_basic_placement * element_local_placement).inverse() * placement2
 
     # do Origin move
-    # first orienteer come to second orienteer place and Origin respectively moved
-    # in local frame every tool click will result Origin move because both orienteers moved and received new position
-    new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
+    if element_local_placement_inverse:
+        new_local_placement = (origin_placement2_diff * origin_placement1_diff.inverse()) * element_local_placement.inverse()
+    else:
+        # first orienteer come to second orienteer place and Origin respectively moved
+        # in local frame every tool click will result Origin move because both orienteers moved and received new position
+        new_local_placement = element_local_placement * origin_placement2_diff * origin_placement1_diff.inverse()
     setattr(link_or_joint, origin_or_mounted_placement_name, new_local_placement)
 
     doc.recompute()
@@ -874,14 +883,50 @@ def make_lcs_at_link_body(
     original_obj_wrapper = None
     try:
         if is_fc_link(orienteer.Object):
+            # link to object (like Part::Feature)
             link_to_obj = orienteer.Object
             original_obj = link_to_obj.getLinkedObject(True)
             obj_for_getting_parents = link_to_obj
             link_to_obj_placement = link_to_obj.Placement
         else:
-            original_obj = orienteer.Object
-            obj_for_getting_parents = original_obj
-            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+            # consider fc_link to part design obj. In that case link will be deeper
+            inListRecursive = orienteer.Object.InListRecursive
+            inListRecursiveWithoutRobotAndRealLink = list(inListRecursive)[:-2]
+            inListRecursiveWithoutRobotAndRealLink_dict = {index: value for index, value in enumerate(inListRecursiveWithoutRobotAndRealLink)}
+            inListRecursiveWithoutRobotAndRealLink_dict_reversed = sorted(inListRecursiveWithoutRobotAndRealLink_dict.items(), reverse=True)
+            inListRecursiveWithoutRobotAndRealLink_list_reversed = [item[1] for item in inListRecursiveWithoutRobotAndRealLink_dict_reversed]
+            fc_link = next(
+                filter(
+                    lambda element: is_fc_link(element),
+                    inListRecursiveWithoutRobotAndRealLink_list_reversed
+                ),
+                None
+            )
+            robot_link = next(
+                filter(
+                    lambda element: is_link(element),
+                    inListRecursiveWithoutRobotAndRealLink_list_reversed
+                ),
+                None
+            )
+            try:
+                # check correct fc_link is found
+                if fc_link.LinkedObject.Name != robot_link.Real[0].Group[0].LinkedObject.Name:
+                    fc_link = None
+            except (IndexError, AttributeError):
+                fc_link = None
+                pass
+
+            if fc_link:
+                link_to_obj = fc_link
+                original_obj = link_to_obj.getLinkedObject(True)
+                obj_for_getting_parents = link_to_obj
+                link_to_obj_placement = link_to_obj.Placement                
+            else:
+                #no found fc link
+                original_obj = orienteer.Object
+                obj_for_getting_parents = original_obj
+                link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
         parents_reversed = reversed(obj_for_getting_parents.Parents)
         for p in parents_reversed:
@@ -1098,14 +1143,15 @@ def git_change_submodule_branch(module_path: str, branch: str):
             check=True,
         )
         print('process:', p)
-        git_init_submodules()
+        git_init_submodules(update_from_remote_branch = True, only_first_update = False)
 
 
 def git_init_submodules(
         only_first_update: bool = True,
-        update_from_remote_branch: bool = True,
+        update_from_remote_branch: bool = False,
         submodule_repo_path = ROS2_CONTROLLERS_PATH,
         pip_deps_install_submodule_paths: list = [ROBOT_DESCRIPTIONS_REPO_PATH],
+        callback: function = None
 ):
     """
     Initializes and updates Git submodules.
@@ -1178,7 +1224,7 @@ def git_init_submodules(
 
     files_and_dirs = os.listdir(submodule_repo_path)
     # update if dir is empty or .gitmodules file was changed
-    is_gitsubmodules_updated = os.path.expanduser('~/.is_gitsubmodules_updated')
+    is_gitsubmodules_updated = os.path.expanduser('~/.is_robotcad_gitsubmodules_updated')
     if only_first_update:
         gitmodules_changed = is_gitmodules_changed()
         # update if empty dir
@@ -1200,6 +1246,9 @@ def git_init_submodules(
     progressBar.setValue(100)
     progressBar.close()
     gui_process_events()
+
+    if callable(callback):
+        callback()
 
 
 def is_gitmodules_changed(workbench_path: Path = MOD_PATH) -> bool:
@@ -1243,13 +1292,19 @@ def find_link_real_in_obj_parents(obj: fc.DocumentObject, link: CrossLink) -> fc
     return None
 
 
-def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool = True) -> bool |  tuple[DO, DO, DO]:
+def set_placement_fast(
+        joint_origin: bool = True,
+        link_mounted_placement: bool = True,
+        parent_tree_to_child_branch: bool = False,
+        child_branch_to_parent_tree: bool = False,
+    ) -> bool |  tuple[DO, DO, DO]:
     doc = fc.activeDocument()
     selection_ok = False
     try:
         orienteer1, orienteer2 = validate_types(
             fcgui.Selection.getSelection(),
             ['Any', 'Any'],
+            respect_count = True,
         )
         selection_ok = True
     except RuntimeError:
@@ -1257,8 +1312,14 @@ def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool =
 
     if not selection_ok:
         message(
-            'Select: face or edge or vertex of body of robot link, face or edge or vertex of body of robot link.'
-            'Robot links must be near to each other (parent, child) and have joint between.\n', gui=True,
+            'Select at Real objects of robot links (Parent, Child): \n'
+            '1) face or edge or vertex or LCS of Parent,\n'
+            '2) face or edge or vertex or LCS of Child.\n'
+            '\n'
+            'Robot links must be near to each other (parent, child) and have joint between.\n'
+            '\n'
+            'Check you dont select redundant objects in Project Tree.\n'  \
+            , gui=True,
         )
         return False
 
@@ -1330,12 +1391,51 @@ def set_placement_fast(joint_origin: bool = True, link_mounted_placement: bool =
         message('Can not get joint between parent links of selected objects', gui=True)
         return False
 
-    doc.openTransaction(tr("Set placement - fast"))
-    if joint_origin:
-        set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
-    if link_mounted_placement:
+    if parent_tree_to_child_branch or child_branch_to_parent_tree:
+        if parent_tree_to_child_branch:
+            doc.openTransaction(tr("Set placement - fast - parent tree to child branch"))
+        else:
+            doc.openTransaction(tr("Set placement - fast - child branch to parent tree"))
+
+        robot = link1.Proxy.get_robot()
+        root_link = robot.Proxy.get_root_link()
+        root_link_child_joints = root_link.Proxy.get_ref_child_joints()
+        child_link_child_joints = child_link.Proxy.get_ref_child_joints()
+        # parent_joint_of_parent_link = parent_link.Proxy.get_ref_joint()
+        parent_joint_of_child_link = child_link.Proxy.get_ref_joint()
+        
+        child_orienteer_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
+        parent_orienteer_placement_backup = get_placement_of_orienteer(parent_orienteer, delete_created_objects=True)
+        
+        root_link_child_joints_backup = []
+        for child_joint in root_link_child_joints:
+            root_link_child_joints_backup.append({'Name': child_joint.Name, 'Origin': child_joint.Origin})
+
+        parent_joint_of_child_link_origin_backup = parent_joint_of_child_link.Origin
+        set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
-    doc.commitTransaction()
+
+        for child_joint in child_link_child_joints:
+            move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
+            move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+        
+        if parent_tree_to_child_branch:
+            for child_joint in root_link_child_joints:
+                move_placement(doc, child_joint, 'Origin', parent_orienteer_placement_backup, child_orienteer_placement_backup)
+
+            move_placement(doc, root_link, 'MountedPlacement', parent_orienteer_placement_backup, child_orienteer_placement_backup)
+        
+        doc.recompute()
+        doc.commitTransaction()
+    else:
+        doc.openTransaction(tr("Set placement - fast"))
+
+        if joint_origin:
+            set_placement_by_orienteer(doc, joint, 'Origin', parent_orienteer)
+        if link_mounted_placement:
+            move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+
+        doc.commitTransaction()
 
     return joint, child_link, parent_link
 
