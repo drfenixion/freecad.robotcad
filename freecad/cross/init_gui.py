@@ -117,7 +117,29 @@ fcgui.addCommand("NewPlacementCommandGroup",placement_command_group())
 
 # ######
 # #############################
+# export and import 
 #####
+class export_command_group:
+    def __init__(self):
+        pass
+    def GetCommands(self):
+        return (
+            'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
+            'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
+            'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
+            'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
+        )
+
+    def GetResources(self):
+        return {'MenuText':"export n import", 'ToolTip': "export n import commands"}
+fcgui.addCommand("ExportCommandGroup",export_command_group())
+
+############
+#############
+#########################
+# workbench
+############
+######
 class CrossWorkbench(fcgui.Workbench):
     """Class which gets initiated at startup of the GUI."""
 
@@ -191,13 +213,10 @@ class CrossWorkbench(fcgui.Workbench):
         self.appendToolbar("Physical properties",physical_properties)
         import_n_export=[
             # Import / export.
-            'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
-            'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
-            'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
-            'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
+            "ExportCommandGroup"
         ]
         self.appendToolbar("world",[
-             'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
+            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
         ])
         self.appendToolbar("import n export",import_n_export)
         settings=[
@@ -214,6 +233,7 @@ class CrossWorkbench(fcgui.Workbench):
         menu_commands = [
             # Mesh simplification.
             'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
+            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             # Workbench settings.
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'Separator',
@@ -280,7 +300,6 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
-            'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
         ])
         fcgui.addIconPath(str(ICON_PATH))
