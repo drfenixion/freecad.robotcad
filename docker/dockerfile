@@ -67,8 +67,8 @@ RUN apt-get update && \
         pip \
         wget && \
     pip install debugpy && \
-    apt-get autoclean && \
-    apt-get autoremove && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 ### End Install system packages
 
@@ -147,8 +147,8 @@ RUN sudo apt-get update && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
     sudo apt-get update && \
     sudo apt-get install gz-${GZ_VERSION} -y && \
-    sudo apt-get autoclean && \
-    sudo apt-get autoremove && \
+    sudo apt-get autoclean -y && \
+    sudo apt-get autoremove -y && \
     sudo rm -rf /var/lib/apt/lists/*
 ### End install Gazebo
 
@@ -197,9 +197,9 @@ RUN mkdir -p /home/$USER/miniconda3 && \
 #     conda install conda-forge::freecad && \
 #     conda install conda-forge::qt6-wayland && \
 #     conda install conda-forge::pycollada && \
-#     apt-get autoclean -y && \
-#     apt-get autoremove -y && \
-#     rm -rf /var/lib/apt/lists/*
+#     sudo apt-get autoclean -y && \
+#     sudo apt-get autoremove -y && \
+#     sudo rm -rf /var/lib/apt/lists/*
 # ### End Install FreeCAD conda default
 
 
