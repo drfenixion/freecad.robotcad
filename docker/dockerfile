@@ -65,6 +65,7 @@ RUN apt-get update && \
         mesa-vulkan-drivers \
         nano \
         pip \
+        x11-xserver-utils \
         wget && \
     pip install debugpy && \
     apt-get autoclean -y && \
