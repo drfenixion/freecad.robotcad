@@ -115,7 +115,7 @@ bash run.bash -c
 
 # Troubleshooting
 
-#### xhost is missed
+#### Fix missed xhost
 apt install x11-xserver-utils
 
 #### Fix "Segmentation fault" (if faced)
