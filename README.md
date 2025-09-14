@@ -113,6 +113,11 @@ You will see logs from current start
 bash run.bash -c
 ```
 
+# Troubleshooting
+
+#### xhost is missed
+apt install x11-xserver-utils
+
 #### Fix "Segmentation fault" (if faced)
 In case of migration from < v7 to v7+ rebuild docker image.
 
