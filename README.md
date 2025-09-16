@@ -115,8 +115,10 @@ bash run.bash -c
 
 # Troubleshooting
 
-#### Fix missed xhost
+#### Fix "xhost: command not found"
+```
 apt install x11-xserver-utils
+```
 
 #### Fix "Segmentation fault" (if faced)
 In case of migration from < v7 to v7+ rebuild docker image.
