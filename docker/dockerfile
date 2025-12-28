@@ -207,7 +207,7 @@ RUN mkdir -p /home/$USER/miniconda3 && \
 RUN mkdir -p $PATH_TO_WS/src
 WORKDIR $PATH_TO_WS/src
 RUN mkdir -p ./freecad_cross_rosdep
-COPY --link --chown=$USER:$USER ros2_ws/src/freecad_cross_rosdep ./freecad_cross_rosdep
+COPY --link --chown=$UID:$GID ros2_ws/src/freecad_cross_rosdep ./freecad_cross_rosdep
 ### END copy project to image
 
 
