@@ -77,7 +77,7 @@ class _SetCROSSPlacementByOrienteerWithHoldChainCommand:
             return
 
         # for work with subelement
-        sel = fcgui.Selection.getSelectionEx()
+        sel = fcgui.Selection.getSelectionEx("", 0)
         orienteer1_sub_element = sel[1]
         if not is_lcs(orienteer1) and not is_joint(orienteer1) and not is_link(orienteer1):
             orienteer1 = orienteer1_sub_element

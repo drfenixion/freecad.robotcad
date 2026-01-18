@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_param, get_parents_names, is_link_to_assembly_from_assembly_wb, is_selection_object
+from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -882,59 +882,69 @@ def make_lcs_at_link_body(
     dynamic_link_of_robot_link = None
     original_obj_wrapper = None
     try:
-        if is_fc_link(orienteer.Object):
-            # link to object (like Part::Feature)
-            link_to_obj = orienteer.Object
-            original_obj = link_to_obj.getLinkedObject(True)
-            obj_for_getting_parents = link_to_obj
-            link_to_obj_placement = link_to_obj.Placement
-        else:
-            # consider fc_link to part design obj. In that case link will be deeper
-            inListRecursive = orienteer.Object.InListRecursive
-            inListRecursiveWithoutRobotAndRealLink = list(inListRecursive)[:-2]
-            inListRecursiveWithoutRobotAndRealLink_dict = {index: value for index, value in enumerate(inListRecursiveWithoutRobotAndRealLink)}
-            inListRecursiveWithoutRobotAndRealLink_dict_reversed = sorted(inListRecursiveWithoutRobotAndRealLink_dict.items(), reverse=True)
-            inListRecursiveWithoutRobotAndRealLink_list_reversed = [item[1] for item in inListRecursiveWithoutRobotAndRealLink_dict_reversed]
-            fc_link = next(
-                filter(
-                    lambda element: is_fc_link(element),
-                    inListRecursiveWithoutRobotAndRealLink_list_reversed
-                ),
-                None
-            )
-            robot_link = next(
-                filter(
-                    lambda element: is_link(element),
-                    inListRecursiveWithoutRobotAndRealLink_list_reversed
-                ),
-                None
-            )
-            try:
-                # check correct fc_link is found
-                if fc_link.LinkedObject.Name != robot_link.Real[0].Group[0].LinkedObject.Name:
-                    fc_link = None
-            except (IndexError, AttributeError):
-                fc_link = None
-                pass
+        # if is_fc_link(orienteer.Object):
+        #     # link to object (like Part::Feature)
+        #     link_to_obj = orienteer.Object
+        #     original_obj = link_to_obj.getLinkedObject(True)
+        #     obj_for_getting_parents = link_to_obj
+        #     link_to_obj_placement = link_to_obj.Placement
+        # else:
+        #     # consider fc_link to part design obj. In that case link will be deeper
+        #     inListRecursive = orienteer.Object.InListRecursive
+        #     inListRecursiveWithoutRobotAndRealLink = list(inListRecursive)[:-2]
+        #     inListRecursiveWithoutRobotAndRealLink_dict = {index: value for index, value in enumerate(inListRecursiveWithoutRobotAndRealLink)}
+        #     inListRecursiveWithoutRobotAndRealLink_dict_reversed = sorted(inListRecursiveWithoutRobotAndRealLink_dict.items(), reverse=True)
+        #     inListRecursiveWithoutRobotAndRealLink_list_reversed = [item[1] for item in inListRecursiveWithoutRobotAndRealLink_dict_reversed]
+        #     fc_link = next(
+        #         filter(
+        #             lambda element: is_fc_link(element),
+        #             inListRecursiveWithoutRobotAndRealLink_list_reversed
+        #         ),
+        #         None
+        #     )
+        #     robot_link = next(
+        #         filter(
+        #             lambda element: is_link(element),
+        #             inListRecursiveWithoutRobotAndRealLink_list_reversed
+        #         ),
+        #         None
+        #     )
+        #     try:
+        #         # check correct fc_link is found
+        #         if fc_link.LinkedObject.Name != robot_link.Real[0].Group[0].LinkedObject.Name:
+        #             fc_link = None
+        #     except (IndexError, AttributeError):
+        #         fc_link = None
+        #         pass
 
-            if fc_link:
-                link_to_obj = fc_link
-                original_obj = link_to_obj.getLinkedObject(True)
-                obj_for_getting_parents = link_to_obj
-                link_to_obj_placement = link_to_obj.Placement                
-            else:
-                #no found fc link
-                original_obj = orienteer.Object
-                obj_for_getting_parents = original_obj
-                link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+        #     if fc_link:
+        #         link_to_obj = fc_link
+        #         original_obj = link_to_obj.getLinkedObject(True)
+        #         obj_for_getting_parents = link_to_obj
+        #         link_to_obj_placement = link_to_obj.Placement                
+        #     else:
+        #         #no found fc link
+        #         original_obj = orienteer.Object
+        #         obj_for_getting_parents = original_obj
+        #         link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
 
-        parents_reversed = reversed(obj_for_getting_parents.Parents)
-        for p in parents_reversed:
-            p = p[0]
-            if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
-                dynamic_link_of_robot_link = p
-            elif not original_obj_wrapper and is_part(p):
-                original_obj_wrapper = p
+        # works inside SetPlacement tools
+        if is_fc_link(orienteer.Object) and orienteer.Object.Name.startswith('real_'):
+            dynamic_link_of_robot_link = orienteer.Object
+            if is_part(dynamic_link_of_robot_link.LinkedObject):
+                original_obj_wrapper = dynamic_link_of_robot_link.LinkedObject
+            if is_selection_object(orienteer):
+                original_obj = get_selected_shape_object(orienteer)
+            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+            
+        # # parents_reversed = reversed(obj_for_getting_parents.Parents)
+        # parents_reversed = reversed(obj_for_getting_parents.InListRecursive)
+        # for p in parents_reversed:
+        #     # p = p[0]
+        #     if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
+        #         dynamic_link_of_robot_link = p
+        #     elif not original_obj_wrapper and is_part(p):
+        #         original_obj_wrapper = p
 
     except (AttributeError, IndexError, RuntimeError):
         pass
@@ -955,7 +965,7 @@ def make_lcs_at_link_body(
     sub_element_type = ''
     sub_element = None
     try:
-        sub_element_name = orienteer.SubElementNames[0]
+        sub_element_name = '.'.join(orienteer.SubElementNames[0].split('.')[-1:])
         sub_element_type = orienteer.SubObjects[0].ShapeType
         sub_element = orienteer.SubObjects[0]
     except (AttributeError, IndexError):
@@ -1077,21 +1087,21 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
             , gui=True,
         )
         return
-
+    
+    orienteer1_sub_obj, *_ = fcgui.Selection.getSelectionEx("", 0)
     joint = None
     if is_joint(orienteer1):
         joint = orienteer1
     if is_link(orienteer1):
         link = orienteer1
     else:
-        link = get_parent_link_of_obj(orienteer1)
+        link = get_parent_link_of_obj(orienteer1_sub_obj.Object)
 
     if not joint:
         if link == None:
             message('Can not get parent robot link of selected object', gui=True)
             return
 
-        orienteer1_sub_obj, *_ = fcgui.Selection.getSelectionEx()
         # for subobjects (face, edge, vertex) and lcs
         if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
         and not is_fc_link(orienteer1) and not is_link(orienteer1):
@@ -1302,7 +1312,7 @@ def set_placement_fast(
     selection_ok = False
     try:
         orienteer1, orienteer2 = validate_types(
-            fcgui.Selection.getSelection(),
+            fcgui.Selection.getSelectionEx("", 0),
             ['Any', 'Any'],
             respect_count = True,
         )
@@ -1334,7 +1344,8 @@ def set_placement_fast(
         message('Can not get parent robot link of second selected object', gui=True)
         return False
 
-    sel = fcgui.Selection.getSelectionEx()
+    sel = fcgui.Selection.getSelectionEx("", 0)
+
     orienteer1_sub_obj = sel[0]
     orienteer2_sub_obj = sel[1]
 

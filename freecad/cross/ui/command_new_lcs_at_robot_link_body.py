@@ -72,7 +72,7 @@ class _NewLCSAtRobotLinkBodyCommand:
             message('Can not get parent robot link of first selected object', gui=True)
             return
 
-        sel = fcgui.Selection.getSelectionEx()
+        sel = fcgui.Selection.getSelectionEx("", 0)
         orienteer1_sub_obj = sel[0]
         if not is_link(orienteer1) and not is_joint(orienteer1):
             orienteer1 = orienteer1_sub_obj

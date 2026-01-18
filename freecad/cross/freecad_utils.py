@@ -546,6 +546,60 @@ def get_leafs_and_subnames(obj: DO) -> list[tuple[DO, str]]:
 
     return get_subobjects_recursive(obj, '')
 
+def get_objs_from_selection_objs(obj_list_or_selection_obj_list_or_mix):
+    objects = []
+    for o in obj_list_or_selection_obj_list_or_mix:
+        if hasattr(o, 'Object'):
+            objects.append(o.Object)
+        else:
+            objects.append(o)
+    return objects
+
+def get_selected_shape_object(selection_obj):
+    """
+    Extracts the underlying shape object (e.g., Part::Box) from a SelectionObject,
+    even if a sub-element like a face, edge, or vertex was selected.
+
+    :param selection_obj: A SelectionObject obtained from Gui.Selection.getSelectionEx()
+    :return: The Part::Feature object (or similar with a 'Shape' attribute), or None if not found
+    """
+    doc = selection_obj.Document
+    sub_names = selection_obj.SubElementNames  # e.g., ['camera_plate001.Box.Face2']
+
+    # If no sub-elements are selected, return None
+    if not sub_names:
+        return None
+
+    # Use the first sub-element name (extend logic if handling multiple selections)
+    full_sub_name = sub_names[0]
+
+    # Split by '.' and remove the last part (e.g., 'Face2', 'Edge5', etc.)
+    parts = full_sub_name.split('.')
+    if len(parts) < 2:
+        return None
+
+    # Reconstruct the path to the actual shape object (without the sub-element suffix)
+    obj_name = parts[-2]
+    obj_name_in_case_of_subelement_not_selected = parts[-1]
+
+    # Retrieve the object using the reconstructed path
+    try:
+        shape_obj = doc.getObject(obj_name)
+        # Ensure it's a valid shape-bearing object
+        if shape_obj and hasattr(shape_obj, 'Shape'):
+            if is_link(shape_obj):
+                return shape_obj.getLinkedObject(True)
+            return shape_obj
+        shape_obj = doc.getObject(obj_name_in_case_of_subelement_not_selected)
+        # Ensure it's a valid shape-bearing object
+        if shape_obj and hasattr(shape_obj, 'Shape'):
+            if is_link(shape_obj):
+                return shape_obj.getLenkedObject(True)
+            return shape_obj
+    except Exception:
+        pass
+
+    return None
 
 def validate_types(
         objects: DOList,
@@ -567,6 +621,9 @@ def validate_types(
     objects order will not controlled but count will.
 
     """
+
+    objects = get_objs_from_selection_objs(objects)
+    
     if len(objects) < len(types):
         raise RuntimeError('More types required that the number of objects')
     if respect_count and len(objects) > len(types):

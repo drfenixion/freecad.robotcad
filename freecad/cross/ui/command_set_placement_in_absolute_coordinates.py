@@ -87,7 +87,7 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
             return
 
         # for work with subelement
-        sel = fcgui.Selection.getSelectionEx()
+        sel = fcgui.Selection.getSelectionEx("", 0)
         orienteer1_sub_element = sel[1]
         orienteer2_sub_element = sel[2]
 
