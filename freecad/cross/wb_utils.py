@@ -1426,9 +1426,10 @@ def set_placement_fast(
         set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
 
-        for child_joint in child_link_child_joints:
-            move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
-            move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+        if child_link_child_joints:
+            for child_joint in child_link_child_joints:
+                move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
+                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
         
         if parent_tree_to_child_branch:
             for child_joint in root_link_child_joints:
