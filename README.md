@@ -55,6 +55,7 @@ Video of creating controllable models: <br />
 1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
     1. External code generator:
         1. all of basic code generator
+        1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker)
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
