@@ -35,6 +35,30 @@
                 } 
             ],
             "justMyCode": true
+        },
+        {
+            "name": "Remote Attach To Agent Package Example",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5680
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/chassis_new_4_cameras_11/chassis_new_4_cameras_11_agent/chassis_new_4_cameras_11_agent",
+                    "remoteRoot": "${userHome}/ros2/ws/build/chassis_new_4_cameras_11_agent/chassis_new_4_cameras_11_agent"
+                },
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/chassis_new_4_cameras_11/chassis_new_4_cameras_11_agent/chassis_new_4_cameras_11_agent",
+                    "remoteRoot": "${userHome}/ros2/ws/install/chassis_new_4_cameras_11_agent/lib/python3.12/site-packages/chassis_new_4_cameras_11_agent"
+                },                
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/.venv/lib/python3.12/site-packages",
+                    "remoteRoot": "${userHome}/ros2/ws/.venv/lib/python3.12/site-packages"
+                } 
+            ],
+            "justMyCode": false
         }
     ]
 }
