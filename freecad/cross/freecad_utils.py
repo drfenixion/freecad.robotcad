@@ -555,6 +555,36 @@ def get_objs_from_selection_objs(obj_list_or_selection_obj_list_or_mix):
             objects.append(o)
     return objects
 
+def parse_freecad_path(path):
+    """Split FreeCAD path"""
+    parts = path.split('.')
+    
+    result = {
+        'object_name': parts[0],
+        'sub_elements': [],
+        'element_type': None,
+        'element_index': None
+    }
+    
+    for part in parts[1:]:
+        if part.startswith('Edge'):
+            result['element_type'] = 'Edge'
+            result['element_index'] = int(part[4:])
+        elif part.startswith('Face'):
+            result['element_type'] = 'Face'
+            result['element_index'] = int(part[4:])
+        elif part.startswith('Vertex'):
+            result['element_type'] = 'Vertex'
+            result['element_index'] = int(part[6:])
+        else:
+            result['sub_elements'].append(part)
+
+    # print(f"object_name: {result['object_name']}")
+    # print(f"element_type: {result['element_type']}")
+    # print(f"element_index: {result['element_index']}")
+    # print(f"sub_elements: {result['sub_elements']}")        
+    return result
+
 def get_selected_shape_object(selection_obj):
     """
     Extracts the underlying shape object (e.g., Part::Box) from a SelectionObject,
@@ -572,15 +602,14 @@ def get_selected_shape_object(selection_obj):
 
     # Use the first sub-element name (extend logic if handling multiple selections)
     full_sub_name = sub_names[0]
+    parsed_path = parse_freecad_path(full_sub_name)
 
-    # Split by '.' and remove the last part (e.g., 'Face2', 'Edge5', etc.)
-    parts = full_sub_name.split('.')
-    if len(parts) < 2:
-        return None
+    # parts = full_sub_name.split('.')
+    # if len(parts) < 2:
+    #     return None
 
-    # Reconstruct the path to the actual shape object (without the sub-element suffix)
-    obj_name = parts[-2]
-    obj_name_in_case_of_subelement_not_selected = parts[-1]
+    # # Reconstruct the path to the actual shape object (without the sub-element suffix)
+    obj_name = parsed_path['object_name']
 
     # Retrieve the object using the reconstructed path
     try:
@@ -589,12 +618,6 @@ def get_selected_shape_object(selection_obj):
         if shape_obj and hasattr(shape_obj, 'Shape'):
             if is_link(shape_obj):
                 return shape_obj.getLinkedObject(True)
-            return shape_obj
-        shape_obj = doc.getObject(obj_name_in_case_of_subelement_not_selected)
-        # Ensure it's a valid shape-bearing object
-        if shape_obj and hasattr(shape_obj, 'Shape'):
-            if is_link(shape_obj):
-                return shape_obj.getLenkedObject(True)
             return shape_obj
     except Exception:
         pass
