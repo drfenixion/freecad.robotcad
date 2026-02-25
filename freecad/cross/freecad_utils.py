@@ -646,7 +646,7 @@ def parse_freecad_path(path: str, doc: Optional[Any]) -> Dict[str, Any]:
                     sub_obj = obj.getSubObject(target_name, retType=ret_type)
                 
                 # Check if we got an actual object (not Placement)
-                if sub_obj and not isinstance(sub_obj, fc.Placement):
+                if sub_obj and not isinstance(sub_obj, fc.Placement) and not isinstance(sub_obj, tuple):
                     return sub_obj
             except:
                 continue
