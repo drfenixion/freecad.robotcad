@@ -275,6 +275,7 @@ else
         debug_env='export DEBUG=1 &&'
         # localhost_address='--add-host localhost=172.17.0.1' # 172.17.0.1 - docker host OC address
         localhost_address='--add-host localhost=10.0.2.2' # 10.0.2.2 - docker host OC address in rootless mode with env DOCKERD_ROOTLESS_ROOTLESSKIT_DISABLE_HOST_LOOPBACK=false
+        # localhost_address='--add-host=host.docker.internal:host-gateway' # in not rootless docker
     fi
 
 
