@@ -1093,36 +1093,43 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
         return
     
     orienteer1_sub_obj, *_ = fcgui.Selection.getSelectionEx("", 0)
+    subNames = orienteer1_sub_obj.SubElementNames
+    subNames = subNames[0] if len(subNames) else ''
+    parsed_path = parse_freecad_path(subNames, orienteer1_sub_obj.Document)
     joint = None
-    if is_joint(orienteer1):
-        joint = orienteer1
-    if is_link(orienteer1):
-        link = orienteer1
+    if is_lcs(parsed_path['object']):
+        LCS = parsed_path['object']
+        LCS.Placement = rotate_placement(LCS.Placement, x, y, z)
     else:
-        link = get_parent_link_of_obj(orienteer1_sub_obj.Object)
-
-    if not joint:
-        if link == None:
-            message('Can not get parent robot link of selected object', gui=True)
-            return
-
-        # for subobjects (face, edge, vertex) and lcs
-        if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
-        and not is_fc_link(orienteer1) and not is_link(orienteer1):
-            orienteer2_placement = get_placement_of_orienteer(
-                orienteer1_sub_obj,
-                lcs_concentric_reversed = True,
-                delete_created_objects = True,
-            )
-            orienteer2_to_link_diff = link.Placement.inverse() * orienteer2_placement
-            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z, orienteer2_to_link_diff.Base)
+        if is_joint(orienteer1):
+            joint = orienteer1
+        elif is_link(orienteer1):
+            link = orienteer1
         else:
-            link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
-    else:
-        joint.Origin = rotate_placement(joint.Origin, x, y, z)
+            link = get_parent_link_of_obj(orienteer1_sub_obj.Object)
 
+        if not joint:
+            if link == None:
+                message('Can not get parent robot link of selected object', gui=True)
+                return
+
+            # for subobjects (face, edge, vertex) and lcs
+            if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
+            and not is_fc_link(orienteer1) and not is_link(orienteer1):
+                orienteer2_placement = get_placement_of_orienteer(
+                    orienteer1_sub_obj,
+                    lcs_concentric_reversed = True,
+                    delete_created_objects = True,
+                )
+                orienteer2_to_link_diff = link.Placement.inverse() * orienteer2_placement
+                link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z, orienteer2_to_link_diff.Base)
+            else:
+                link.MountedPlacement = rotate_placement(link.MountedPlacement, x, y, z)
+        else:
+            joint.Origin = rotate_placement(joint.Origin, x, y, z)
+        
     doc.recompute()
-
+    return True
 
 def get_xacro_wrapper_file_name(robot_name: str) -> str:
     """ Return xacro wrapper file name.
