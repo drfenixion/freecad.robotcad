@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object
+from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -837,10 +837,14 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     orienteer_object = orienteer
     if is_selection_object(orienteer):
         orienteer_object = orienteer.Object
+        parsed_path = parse_freecad_path(orienteer.SubElementNames[0], orienteer.Document)
+        obj = parsed_path['object']
 
+    if is_lcs(orienteer):
+        placement = get_placement(orienteer)
+    elif is_selection_object(orienteer) and parsed_path['datum_type'] in ['LCS', 'Point']:
+        placement = get_placement(obj)
     # TODO process Vertex
-    if is_lcs(orienteer_object) :
-        placement = get_placement(orienteer_object)
     elif is_link(orienteer_object) or is_joint(orienteer_object):
         placement = orienteer_object.Placement
     elif is_placement(orienteer_object):

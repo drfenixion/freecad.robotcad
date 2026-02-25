@@ -7,6 +7,7 @@ from copy import copy
 from dataclasses import dataclass
 import string
 from typing import Any, Iterable, Optional
+from typing import Dict, List, Tuple
 import sys
 import numpy as np
 import FreeCAD as fc
@@ -39,6 +40,25 @@ else:
 # Typing hints.
 DO = fc.DocumentObject
 DOList = Iterable[DO]
+
+DATUM_TYPES = {
+    'PartDesign::CoordinateSystem': 'LCS',
+    'Sketcher::SketchObject': 'Sketch',
+    'PartDesign::Plane': 'Plane',
+    'PartDesign::Line': 'Axis',
+    'PartDesign::Point': 'Point'
+}
+
+DATUM_FEATURES = {
+    'LCS': ['X', 'Y', 'Z', 'XY', 'XZ', 'YZ'],
+    'Sketch': ['X', 'Y'],
+    'Plane': [],
+    'Axis': [],
+    'Point': []
+}
+
+# All possible datum features for quick lookup
+ALL_DATUM_FEATURES = ['X', 'Y', 'Z', 'XY', 'XZ', 'YZ']
 
 
 def with_fc_gui() -> bool:
@@ -555,34 +575,183 @@ def get_objs_from_selection_objs(obj_list_or_selection_obj_list_or_mix):
             objects.append(o)
     return objects
 
-def parse_freecad_path(path):
-    """Split FreeCAD path"""
+def parse_freecad_path(path: str, doc: Optional[Any]) -> Dict[str, Any]:
+    """
+    Parse a FreeCAD object path and determine object type through API verification.
+    
+    Args:
+        path (str): The FreeCAD path string (e.g., "Body.LCS.X")
+        doc (FreeCAD.Document, optional): Required for type verification.
+    
+    Returns:
+        dict: Parsed path information.
+    """
+    
+    # -------------------------------------------------------------------------
+    # Helper: Check if part is geometry token
+    # -------------------------------------------------------------------------
+    def is_geometry_token(part: str) -> bool:
+        prefixes = ['Face', 'Edge', 'Vertex']
+        for prefix in prefixes:
+            if part.startswith(prefix):
+                suffix = part[len(prefix):]
+                if suffix.isdigit():
+                    return True
+        return False
+    
+    # -------------------------------------------------------------------------
+    # Helper: Extract geometry type and index
+    # -------------------------------------------------------------------------
+    def extract_geometry(part: str) -> Tuple[Optional[str], Optional[int]]:
+        if part.startswith('Face') and part[4:].isdigit():
+            return 'Face', int(part[4:])
+        elif part.startswith('Edge') and part[4:].isdigit():
+            return 'Edge', int(part[4:])
+        elif part.startswith('Vertex') and part[6:].isdigit():
+            return 'Vertex', int(part[6:])
+        return None, None
+    
+    # -------------------------------------------------------------------------
+    # Helper: Navigate object hierarchy
+    # -------------------------------------------------------------------------
+    def get_object(base_name: str, sub_path: List[str]) -> Optional[Any]:
+        """
+        Navigate through FreeCAD object hierarchy.
+        Handles the case where getSubObject returns Placement instead of object.
+        """
+        
+        # Step 1: Get base object
+        obj = doc.getObject(base_name)
+        if not obj:
+            return None
+        
+        # Step 2: If sub_path is empty, return base object
+        if not sub_path:
+            return obj
+        
+        # Step 3: Try to find the target object
+        # Priority 1: Search directly in document (most reliable for datums)
+        target_name = sub_path[-1]
+        target_obj = doc.getObject(target_name)
+        
+        if target_obj:
+            return target_obj
+        
+        # Priority 2: Try getSubObject with different retType values
+        for ret_type in [3, 2, 0, None]:
+            try:
+                if ret_type is None:
+                    sub_obj = obj.getSubObject(target_name)
+                else:
+                    sub_obj = obj.getSubObject(target_name, retType=ret_type)
+                
+                # Check if we got an actual object (not Placement)
+                if sub_obj and not isinstance(sub_obj, App.Placement):
+                    return sub_obj
+            except:
+                continue
+        
+        # Priority 3: Search in OutList (direct children)
+        for child in obj.OutList:
+            if child.Name == target_name or child.Label == target_name:
+                return child
+        
+        return None
+
+    # -------------------------------------------------------------------------
+    # Helper: Check object type
+    # -------------------------------------------------------------------------
+    def check_object_type(base_name: str, sub_path: List[str]) -> Tuple[bool, Optional[str], Optional[Any]]:
+        obj = get_object(base_name, sub_path)
+        if not obj:
+            return False, None, None
+        
+        for type_id, name in DATUM_TYPES.items():
+            if obj.isDerivedFrom(type_id):
+                return True, name, obj
+        
+        return False, None, obj
+    
+    # -------------------------------------------------------------------------
+    # Helper: Empty result
+    # -------------------------------------------------------------------------
+    def empty_result() -> Dict[str, Any]:
+        return {
+            'base_name': '',
+            'sub_path': [],
+            'final_part': '',
+            'is_geometry': False,
+            'geometry_type': None,
+            'geometry_index': None,
+            'is_datum': False,
+            'datum_type': None,
+            'datum_feature': None,
+            'object': None
+        }
+    
+    # =========================================================================
+    # MAIN LOGIC
+    # =========================================================================
+    
     parts = path.split('.')
+    if len(parts) < 1:
+        return empty_result()
     
     result = {
-        'object_name': parts[0],
-        'sub_elements': [],
-        'element_type': None,
-        'element_index': None
+        'base_name': parts[0],
+        'sub_path': [],
+        'final_part': parts[-1],
+        'is_geometry': False,
+        'geometry_type': None,
+        'geometry_index': None,
+        'is_datum': False,
+        'datum_type': None,
+        'datum_feature': None,
+        'object': None
     }
     
-    for part in parts[1:]:
-        if part.startswith('Edge'):
-            result['element_type'] = 'Edge'
-            result['element_index'] = int(part[4:])
-        elif part.startswith('Face'):
-            result['element_type'] = 'Face'
-            result['element_index'] = int(part[4:])
-        elif part.startswith('Vertex'):
-            result['element_type'] = 'Vertex'
-            result['element_index'] = int(part[6:])
-        else:
-            result['sub_elements'].append(part)
-
-    # print(f"object_name: {result['object_name']}")
-    # print(f"element_type: {result['element_type']}")
-    # print(f"element_index: {result['element_index']}")
-    # print(f"sub_elements: {result['sub_elements']}")        
+    if not doc:
+        return result
+    
+    # -------------------------------------------------------------------------
+    # STEP 1: Determine sub_path BEFORE checking type
+    # -------------------------------------------------------------------------
+    
+    # Case 1: Last part is geometry (Face5, Edge10, Vertex3)
+    if is_geometry_token(result['final_part']):
+        geom_type, geom_index = extract_geometry(result['final_part'])
+        result['is_geometry'] = True
+        result['geometry_type'] = geom_type
+        result['geometry_index'] = geom_index
+        result['sub_path'] = parts[1:-1]  # Exclude geometry token
+    
+    # Case 2: Last part is a datum feature (X, Y, Z, XY, XZ, YZ)
+    elif result['final_part'] in ALL_DATUM_FEATURES:
+        result['datum_feature'] = result['final_part']
+        result['sub_path'] = parts[1:-1]  # Exclude feature token
+    
+    # Case 3: Last part is the object itself (LCS001, Sketch001, etc.)
+    else:
+        result['sub_path'] = parts[1:]  # Include last part
+    
+    # -------------------------------------------------------------------------
+    # STEP 2: Get object and check its type
+    # -------------------------------------------------------------------------
+    
+    is_datum, datum_type, obj = check_object_type(result['base_name'], result['sub_path'])
+    result['is_datum'] = is_datum
+    result['datum_type'] = datum_type
+    result['object'] = obj
+    
+    # -------------------------------------------------------------------------
+    # STEP 3: Validate datum_feature against detected type
+    # -------------------------------------------------------------------------
+    
+    if result['is_datum'] and result['datum_type'] and result['datum_feature']:
+        allowed = DATUM_FEATURES.get(result['datum_type'], [])
+        if result['datum_feature'] not in allowed:
+            result['datum_feature'] = None
+    
     return result
 
 def get_selected_shape_object(selection_obj):
@@ -602,14 +771,14 @@ def get_selected_shape_object(selection_obj):
 
     # Use the first sub-element name (extend logic if handling multiple selections)
     full_sub_name = sub_names[0]
-    parsed_path = parse_freecad_path(full_sub_name)
+    parsed_path = parse_freecad_path(full_sub_name, doc)
 
     # parts = full_sub_name.split('.')
     # if len(parts) < 2:
     #     return None
 
     # # Reconstruct the path to the actual shape object (without the sub-element suffix)
-    obj_name = parsed_path['object_name']
+    obj_name = parsed_path['base_name']
 
     # Retrieve the object using the reconstructed path
     try:
