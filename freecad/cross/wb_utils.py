@@ -837,7 +837,7 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     orienteer_object = orienteer
     if is_selection_object(orienteer):
         orienteer_object = orienteer.Object
-        parsed_path = parse_freecad_path(orienteer.SubElementNames[0], orienteer.Document)
+        parsed_path = parse_freecad_path(orienteer.SubElementNames, orienteer.Document)
         obj = parsed_path['object']
 
     if is_lcs(orienteer):
@@ -1113,9 +1113,8 @@ def rotate_origin(x:float | None = None, y:float | None = None, z:float | None =
                 message('Can not get parent robot link of selected object', gui=True)
                 return
 
-            # for subobjects (face, edge, vertex) and lcs
-            if (hasattr(orienteer1_sub_obj, 'Object') or is_lcs(orienteer1)) \
-            and not is_fc_link(orienteer1) and not is_link(orienteer1):
+            # for subobjects (face, edge, vertex)
+            if hasattr(orienteer1_sub_obj, 'Object') and not is_link(orienteer1):
                 orienteer2_placement = get_placement_of_orienteer(
                     orienteer1_sub_obj,
                     lcs_concentric_reversed = True,
