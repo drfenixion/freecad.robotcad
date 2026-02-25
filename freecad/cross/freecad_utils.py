@@ -575,7 +575,7 @@ def get_objs_from_selection_objs(obj_list_or_selection_obj_list_or_mix):
             objects.append(o)
     return objects
 
-def parse_freecad_path(path: str, doc: Optional[Any]) -> Dict[str, Any]:
+def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     """
     Parse a FreeCAD object path and determine object type through API verification.
     
@@ -693,6 +693,9 @@ def parse_freecad_path(path: str, doc: Optional[Any]) -> Dict[str, Any]:
     # MAIN LOGIC
     # =========================================================================
     
+    if isinstance(path, tuple):
+        path = path[0] if len(path) else ''
+
     parts = path.split('.')
     if len(parts) < 1:
         return empty_result()
