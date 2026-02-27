@@ -22,7 +22,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part
+from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -1576,6 +1576,8 @@ def get_assembly_elements(
                     'joint_reference_1_obj_0_name': r1_obj0_link.Name,
                     'is_link2_root_assembly_link': is_link2_root_assembly_link,
                     'is_link1_root_assembly_link': is_link1_root_assembly_link,
+                    'reference1_1_0': r1,
+                    'reference2_1_0': r2,
                     'chain_direction': None,
                 })
             i+=1
@@ -1630,60 +1632,100 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     i = 0
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
+    
 
     robot_links:list[CrossLink] = []
-    for link in assembly_links:
-        obj = link.getLinkedObject(True)
-        res = make_robot_link_filled(obj, True)
-        if is_link(res):
-            robot_link = res
-            robot_links.append(robot_link)
-            if robot:
-                robot_link.adjustRelativeLinks(robot)
-                robot.addObject(robot_link)
-        i += 1
-        progressBar.setValue(i)
+    references = {}
+    for joint in assembly_joints:
+        
+        parsed_path = parse_freecad_path(joint['reference1_1_0'], assembly.Document)
+        if parsed_path['base_name'] not in references:
+            references[parsed_path['base_name']] = parsed_path['base_name']
+
+            obj = joint['link1'].getLinkedObject(True)
+            res = make_robot_link_filled(obj, True, assembly_reference=joint['reference1_1_0'])
+            if is_link(res):
+                robot_link = res
+                robot_links.append(robot_link)
+                if robot:
+                    robot_link.adjustRelativeLinks(robot)
+                    robot.addObject(robot_link)
+            i += 1
+            progressBar.setValue(i)
+
+        parsed_path = parse_freecad_path(joint['reference2_1_0'], assembly.Document)
+        if parsed_path['base_name'] not in references:
+            references[parsed_path['base_name']] = parsed_path['base_name']
+
+            obj = joint['link2'].getLinkedObject(True)
+            res = make_robot_link_filled(obj, True, assembly_reference=joint['reference2_1_0'])
+            if is_link(res):
+                robot_link = res
+                robot_links.append(robot_link)
+                if robot:
+                    robot_link.adjustRelativeLinks(robot)
+                    robot.addObject(robot_link)
+            i += 1
+            progressBar.setValue(i)            
     progressBar.close()
-    QtGui.QApplication.processEvents()
+    QtGui.QApplication.processEvents() 
  
     
     def get_next_child_joint(joint) -> DO:
         for i in assembly_joints_sorted:
+            if i['is_link1_root_assembly_link'] == True:
+                i['chain_direction'] = 'reverse'
+            elif i['is_link2_root_assembly_link'] == True:
+                i['chain_direction'] = 'forward'
+
             if joint['link1'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'reverse'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'reverse'
                 yield i
             elif joint['link2'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'reverse'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'reverse'
                 yield i
             elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'forward'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'forward'
                 yield i
             elif joint['link2'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'forward'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'forward'
                 yield i
                 
 
     def get_next_branch_root_joint(joint) -> DO:
         for i in assembly_joints_sorted:
+            if i['is_link1_root_assembly_link'] == True:
+                i['chain_direction'] = 'reverse'
+            elif i['is_link2_root_assembly_link'] == True:
+                i['chain_direction'] = 'forward'
+
             if joint['link1'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'reverse'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'reverse'
                 yield i
             elif joint['link2'].Name == i['link1'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'reverse'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'reverse'
                 yield i
             elif joint['link1'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'forward'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'forward'
                 yield i
             elif joint['link2'].Name == i['link2'].Name:
                 assembly_joints_sorted.remove(i)
-                i['chain_direction'] = 'forward'
+                if i['chain_direction'] == None:
+                    i['chain_direction'] = 'forward'
                 yield i
 
     ### make joint chain tree (not looped kinematic chain tree)
@@ -1695,6 +1737,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     )
     # separated root joint
     root_joint = assembly_joints_sorted[0]
+    if root_joint['is_link1_root_assembly_link'] == True:
+        root_joint['chain_direction'] = 'reverse'
+    elif root_joint['is_link2_root_assembly_link'] == True:
+        root_joint['chain_direction'] = 'forward'    
     assembly_joints_sorted.remove(root_joint) # we will use root_joint separetly 
     
     progressBar = get_progress_bar(
@@ -1765,6 +1811,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             o2 = joint['joint'].Offset2
             r1_name_path = r1.split('.')
             r2_name_path = r2.split('.')
+            r1_path = parse_freecad_path(r1, assembly.Document)
+            r2_path = parse_freecad_path(r2, assembly.Document)
             r1_obj_link = get_first_link(r1_name_path)
             r2_obj_link = get_first_link(r2_name_path)
             r1_obj = r1_obj_link.getLinkedObject(True)
@@ -1773,20 +1821,23 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             child_robot_link = None
             for robot_link in robot_links:
                 if is_part(robot_link.Real[0]):
+                    
+                    assembly_ref_path = parse_freecad_path(robot_link.AssemblyReference, assembly.Document)
                     for real_sub_el in robot_link.Real[0].Group:
                         if is_fc_link(real_sub_el):
+                            real_sub_el_link = real_sub_el
                             real_sub_el = real_sub_el.getLinkedObject(True)
-
-                        if r1_obj.Name == real_sub_el.Name:
+                            
+                        if r1_path['base_name'] == assembly_ref_path['base_name']:
                             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
                                 child_robot_link = robot_link
                             else:
                                 parent_robot_link = robot_link
-                        elif r2_obj.Name == real_sub_el.Name:
+                        elif r2_path['base_name'] == assembly_ref_path['base_name']:
                             if joint['chain_direction'] == 'reverse':
                                 child_robot_link = robot_link
                             else:
-                                parent_robot_link = robot_link
+                                parent_robot_link = robot_link                        
             
             if not child_robot_link:
                 break
@@ -1806,21 +1857,12 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             
             mounted_placement = fc.Placement()
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
- 
                 link_assembly_placement = r1_link_assembly_placement
-                
+
                 if is_lcs(sub_el_r1):
-                    r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
-                    r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
-                    r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
-                    # r1_r2_sub_el_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child
-                    mounted_placement = (sub_el_r1.Placement * o1) * r1_r2_sub_el_rel_to_outer_plc_diff.inverse()
+                    mounted_placement = sub_el_r1.Placement * o1
                 else: # face of obj case
-                    p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
-                    p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
-                    p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc
-                    # p1_p2_rel_to_outer_plc_diff - required to get parent reference for joint placement instead of child                
-                    mounted_placement = (p1 * o1) * p1_p2_rel_to_outer_plc_diff.inverse()
+                    mounted_placement = p1 * o1
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
@@ -1831,21 +1873,14 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                     if joint['assembly_link']:
                         assembly_link_placement = joint['assembly_link'].Placement
                         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
-                    root_link_setup = True
+                    root_link_setup = True                
+
             else: # reverse chain direction
                 link_assembly_placement = r2_link_assembly_placement
 
                 if is_lcs(sub_el_r2):
-                    # r2_sub_el_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * sub_el_r2.Placement
-                    # r1_sub_el_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * sub_el_r1.Placement
-                    # r1_r2_sub_el_rel_to_outer_plc_diff = r2_sub_el_rel_to_outer_plc.inverse() * r1_sub_el_rel_to_outer_plc
-                    # mounted_placement = sub_el_r2.Placement * o2 * r1_r2_sub_el_rel_to_outer_plc_diff
                     mounted_placement = sub_el_r2.Placement * o2
                 else: # face of obj case
-                    # p2_rel_to_outer_plc = r2_link_assembly_placement * r2_obj_link.Placement * p2
-                    # p1_rel_to_outer_plc = r1_link_assembly_placement * r1_obj_link.Placement * p1
-                    # p1_p2_rel_to_outer_plc_diff = p2_rel_to_outer_plc.inverse() * p1_rel_to_outer_plc                    
-                    # mounted_placement = p2 * o2 * p1_p2_rel_to_outer_plc_diff
                     mounted_placement = p2 * o2
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()

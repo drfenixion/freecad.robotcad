@@ -176,6 +176,7 @@ class LinkProxy(ProxyBase):
                 'MaterialDensity',
                 'MaterialNotCalculate',
                 'CalculateInertiaBasedOnMass',
+                'AssemblyReference',                
                 '_Type',
             ],
         )
@@ -216,8 +217,14 @@ class LinkProxy(ProxyBase):
             obj, 'App::PropertyString', '_Type', 'Internal',
             'The type of object',
         )
+        add_property(
+            obj, 'App::PropertyString', 'AssemblyReference', 'Internal',
+            'The type of object',
+        )        
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
+        obj.setPropertyStatus('AssemblyReference', ['Hidden', 'ReadOnly'])
+        
 
         add_property(
             obj, 'App::PropertyLinkListGlobal', 'Real', 'Elements',
@@ -872,7 +879,7 @@ def make_link(name, doc: Optional[fc.Document] = None, recompute_after: bool = T
     return cross_link
 
 
-def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False) -> CrossLink | False :
+def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_reference:str = '') -> CrossLink | False :
     ''' Make robot link and fill Real and Visual of it by selected objects  '''
 
     if not is_derived_from(obj, 'App::GeoFeature'):
@@ -912,6 +919,8 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False) -> CrossL
     link = make_link('l_' + ros_name(part))
     link.Real = part
     link.Visual = part
+    if assembly_reference:
+        link.AssemblyReference = assembly_reference
 
     link.ViewObject.ShowReal = False
     link.ViewObject.ShowReal = True

@@ -18,4 +18,5 @@ class Link(fc.DocumentObject):
     MaterialDensity: str
     MaterialNotCalculate: bool
     CalculateInertiaBasedOnMass:bool
+    AssemblyReference:str
     _Type: str
