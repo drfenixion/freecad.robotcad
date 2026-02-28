@@ -679,6 +679,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
         return {
             'base_name': '',
             'sub_path': [],
+            'sub_path_str': '',
             'final_part': '',
             'is_geometry': False,
             'geometry_type': None,
@@ -703,6 +704,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     result = {
         'base_name': parts[0],
         'sub_path': [],
+        'sub_path_str': '',
         'final_part': parts[-1],
         'is_geometry': False,
         'geometry_type': None,
@@ -755,6 +757,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
         if result['datum_feature'] not in allowed:
             result['datum_feature'] = None
     
+    result['sub_path_str'] = '.'.join(result['sub_path'])
     return result
 
 def get_selected_shape_object(selection_obj):
