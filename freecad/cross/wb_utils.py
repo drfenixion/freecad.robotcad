@@ -1480,18 +1480,6 @@ def get_first_lcs_or_link(obj_name_list: list) -> DO | None:
         return link
     
 
-def get_first_link(obj_name_list: list) -> DO | None:
-    """Return first FreeCAD link"""
-    link = None
-    for obj_name in obj_name_list:
-        obj = fc.ActiveDocument.getObject(obj_name)
-        if is_fc_link(obj):
-            link = obj
-            break
-
-    return link
-
-
 def get_last_link_to_assembly(obj_name_list: list) -> DO | None:
     """Return last FreeCAD assembly from Assembly WB"""
     assembly = None

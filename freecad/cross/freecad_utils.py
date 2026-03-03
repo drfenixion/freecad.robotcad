@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass
+from itertools import dropwhile
 import string
 from typing import Any, Iterable, Optional
 from typing import Dict, List, Tuple
@@ -798,6 +799,57 @@ def get_selected_shape_object(selection_obj):
         pass
 
     return None
+
+
+def get_first_not_assembly(parsed_path, doc):  
+    """Takes parsed path from parse_freecad_path() and return first not assemly link name in path"""  
+    if is_link_to_assembly_from_assembly_wb(doc.getObject(parsed_path['base_name'])):
+        for path in parsed_path['sub_path']:
+            if not is_link_to_assembly_from_assembly_wb(doc.getObject(path)):  
+                path_after = '.'.join(list(dropwhile(lambda x: x != path, parsed_path['sub_path'])))
+                return (doc.getObject(path), path, path_after) 
+            
+        path_after = parsed_path['object'].Name
+        return (parsed_path['object'], parsed_path['object'].Name, path_after)    
+          
+    else:
+        
+        path_after = '.'.join([parsed_path['base_name']] + parsed_path['sub_path'])
+        return (doc.getObject(parsed_path['base_name']), parsed_path['base_name'], path_after) 
+        
+
+def get_first_link(obj_name_list: list) -> DO | None:
+    """Return first FreeCAD link"""
+    link = None
+    for obj_name in obj_name_list:
+        obj = fc.ActiveDocument.getObject(obj_name)
+        if is_link(obj):
+            link = obj
+            break
+
+    return link
+        
+
+def get_local_path_in_external_assembly(reference, doc):
+    """FreeCAD path of element of Assembly from default Assembly WB.
+    Resolve local reference by external reference assemble3.object3.face1 -> object2.face1 (in other external assembly)"""
+    path = parse_freecad_path(reference, doc)
+    
+    r1_obj0_link = doc.getObject(path['base_name'])
+    if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
+        # exclude outer assembly
+        parts = reference.split('.')
+        remaining_parts = parts[1:]
+        result_path = '.'.join(remaining_parts)
+        return get_local_path_in_external_assembly(result_path, doc)
+    else:
+        r_path_parts = reference.split('.')
+        r_obj_link = doc.getObject(r_path_parts[0])
+        if is_link(r_obj_link):
+            r_obj_link = r_obj_link.LinkedObject
+        r1_local_reference_in_external_assembly = '.'.join([r_obj_link.Name, '.'.join(r_path_parts[2:])])        
+        return r1_local_reference_in_external_assembly
+
 
 def validate_types(
         objects: DOList,

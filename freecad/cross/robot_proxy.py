@@ -22,7 +22,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path
+from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -32,6 +32,7 @@ from .freecad_utils import label_or
 from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .freecad_utils import is_link as is_fc_link
+from .freecad_utils import get_first_link
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
@@ -42,7 +43,7 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import DYNAMIC_WORLD_GENERATOR_REPO_PATH, DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH, ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_first_link, get_last_link_to_assembly
+from .wb_utils import DYNAMIC_WORLD_GENERATOR_REPO_PATH, DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH, ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_last_link_to_assembly
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
 from .wb_utils import get_chains
@@ -1556,10 +1557,7 @@ def get_assembly_elements(
                 r1_obj_link = r1_link.getLinkedObject(False)
 
                 # resolve local reference by external reference assemble3.object3.face1 -> object2.face1 (in other external assembly)
-                r1_obj1_link = doc.getObject(r1_name_path[1])
-                if is_fc_link(r1_obj1_link):
-                    r1_obj1_link = r1_obj1_link.LinkedObject
-                r1_local_reference_in_external_assembly = '.'.join([r1_obj1_link.Name, '.'.join(r1_name_path[2:])])
+                r1_local_reference_in_external_assembly = get_local_path_in_external_assembly(r1, assembly.Document)
             if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
                 new_assembly_branch_link_r2 = r2_obj0_link
                 new_assembly_branch_r2 = r2_obj0_link.LinkedObject
@@ -1568,10 +1566,7 @@ def get_assembly_elements(
                 r2_obj_link = r2_link.getLinkedObject(False)
 
                 # resolve local reference by external reference assemble3.object3.face1 -> object2.face1 (in other external assembly)
-                r2_obj1_link = doc.getObject(r2_name_path[1])
-                if is_fc_link(r2_obj1_link):
-                    r2_obj1_link = r2_obj1_link.LinkedObject
-                r2_local_reference_in_external_assembly = '.'.join([r2_obj1_link.Name, '.'.join(r2_name_path[2:])])
+                r2_local_reference_in_external_assembly = get_local_path_in_external_assembly(r2, assembly.Document)
 
             assembly_joints.append({
                 'joint': el,
@@ -1648,15 +1643,20 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     i = 0
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
-    
+
 
     robot_links:list[CrossLink] = []
     references = {}
     for joint in assembly_joints:
         
-        parsed_path = parse_freecad_path(joint['reference1_1_0'], assembly.Document)
-        if parsed_path['base_name'] not in references: # and not joint['r1_local_reference_in_external_assembly']
-            references[parsed_path['base_name']] = parsed_path['base_name']
+        if joint['r1_local_reference_in_external_assembly']:
+            parsed_path = parse_freecad_path(joint['r1_local_reference_in_external_assembly'], assembly.Document)
+        else:
+            parsed_path = parse_freecad_path(joint['reference1_1_0'], assembly.Document)
+        
+        ref = parsed_path['base_name']
+        if ref not in references:
+            references[ref] = ref
 
             obj = joint['link1'].getLinkedObject(True)
             res = make_robot_link_filled(obj, True, assembly_reference=joint['reference1_1_0'])
@@ -1668,10 +1668,15 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                     robot.addObject(robot_link)
             i += 1
             progressBar.setValue(i)
+        
+        if joint['r2_local_reference_in_external_assembly']:
+            parsed_path = parse_freecad_path(joint['r2_local_reference_in_external_assembly'], assembly.Document)
+        else:
+            parsed_path = parse_freecad_path(joint['reference2_1_0'], assembly.Document)
 
-        parsed_path = parse_freecad_path(joint['reference2_1_0'], assembly.Document)
-        if parsed_path['base_name'] not in references: # and not joint['r2_local_reference_in_external_assembly']
-            references[parsed_path['base_name']] = parsed_path['base_name']
+        ref = parsed_path['base_name']
+        if ref not in references:
+            references[ref] = ref
 
             obj = joint['link2'].getLinkedObject(True)
             res = make_robot_link_filled(obj, True, assembly_reference=joint['reference2_1_0'])
@@ -1685,7 +1690,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             progressBar.setValue(i)            
     progressBar.close()
     QtGui.QApplication.processEvents() 
- 
+
     
     def get_next_child_joint(joint) -> DO:
         for i in assembly_joints_sorted:
@@ -1807,121 +1812,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     QtGui.QApplication.processEvents()
 
 
-    # ### create robot links based on assembly links
-    # progressBar = get_progress_bar(
-    #     title = "Make robot links...",
-    #     min = 0,
-    #     max = len(assembly_links),
-    #     show_percents = False,
-    # )
-    # progressBar.show()
-
-    # i = 0
-    # progressBar.setValue(i)
-    # QtGui.QApplication.processEvents()
-
-    # robot_links:list[CrossLink] = []
-    # references = {}
-    # for joint in assembly_joints:
-    #     # if joint['new_branch_way']:
-    #     #     continue
-        
-    #     if joint['r1_local_reference_in_external_assembly']:
-    #         parsed_path = parse_freecad_path(joint['r1_local_reference_in_external_assembly'], assembly.Document)
-    #     else:
-    #         parsed_path = parse_freecad_path(joint['reference1_1_0'], assembly.Document)
-        
-    #     assembly_link_name = joint['assembly_link'].Name if joint['assembly_link'] else ''
-    #     ref = assembly_link_name + '_' + parsed_path['base_name']
-    #     if ref not in references:
-    #         references[ref] = ref
-
-    #         obj = joint['link1'].getLinkedObject(True)
-    #         res = make_robot_link_filled(obj, True, assembly_reference=joint['reference1_1_0'])
-    #         if is_link(res):
-    #             robot_link = res
-    #             robot_links.append(robot_link)
-    #             if robot:
-    #                 robot_link.adjustRelativeLinks(robot)
-    #                 robot.addObject(robot_link)
-    #         i += 1
-    #         progressBar.setValue(i)
-        
-    #     if joint['r2_local_reference_in_external_assembly']:
-    #         parsed_path = parse_freecad_path(joint['r2_local_reference_in_external_assembly'], assembly.Document)
-    #     else:
-    #         parsed_path = parse_freecad_path(joint['reference2_1_0'], assembly.Document)
-
-    #     assembly_link_name = joint['assembly_link'].Name if joint['assembly_link'] else ''
-    #     ref = assembly_link_name + '_' + parsed_path['base_name']
-    #     if ref not in references:
-    #         references[ref] = ref
-
-    #         obj = joint['link2'].getLinkedObject(True)
-    #         res = make_robot_link_filled(obj, True, assembly_reference=joint['reference2_1_0'])
-    #         if is_link(res):
-    #             robot_link = res
-    #             robot_links.append(robot_link)
-    #             if robot:
-    #                 robot_link.adjustRelativeLinks(robot)
-    #                 robot.addObject(robot_link)
-    #         i += 1
-    #         progressBar.setValue(i)            
-    # progressBar.close()
-    # QtGui.QApplication.processEvents() 
-
-
-    # ### create robot links based on assembly links
-    # progressBar = get_progress_bar(
-    #     title = "Make robot links...",
-    #     min = 0,
-    #     max = len(assembly_links),
-    #     show_percents = False,
-    # )
-    # progressBar.show()
-
-    # i = 0
-    # progressBar.setValue(i)
-    # QtGui.QApplication.processEvents()
-    
-
-    # robot_links:list[CrossLink] = []
-    # references = {}
-    # # for joint in assembly_joints:
-    # for joint in assembly_joints:
-        
-    #     parsed_path = parse_freecad_path(joint['reference1_1_0'], assembly.Document)
-    #     if parsed_path['base_name'] not in references: # and not joint['r1_local_reference_in_external_assembly']
-    #         references[parsed_path['base_name']] = parsed_path['base_name']
-
-    #         obj = joint['link1'].getLinkedObject(True)
-    #         res = make_robot_link_filled(obj, True, assembly_reference=joint['reference1_1_0'])
-    #         if is_link(res):
-    #             robot_link = res
-    #             robot_links.append(robot_link)
-    #             if robot:
-    #                 robot_link.adjustRelativeLinks(robot)
-    #                 robot.addObject(robot_link)
-    #         i += 1
-    #         progressBar.setValue(i)
-
-    #     parsed_path = parse_freecad_path(joint['reference2_1_0'], assembly.Document)
-    #         references[parsed_path['base_name']] = parsed_path['base_name']
-
-    #         obj = joint['link2'].getLinkedObject(True)
-    #         res = make_robot_link_filled(obj, True, assembly_reference=joint['reference2_1_0'])
-    #         if is_link(res):
-    #             robot_link = res
-    #             robot_links.append(robot_link)
-    #             if robot:
-    #                 robot_link.adjustRelativeLinks(robot)
-    #                 robot.addObject(robot_link)
-    #         i += 1
-    #         progressBar.setValue(i)            
-    # progressBar.close()
-    # QtGui.QApplication.processEvents()     
-
-
     ### create robot joints based on assembly joints
     progressBar = get_progress_bar(
         title = "Make robot joints...",
@@ -1936,7 +1826,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     QtGui.QApplication.processEvents()
 
     try:
-        root_link_setup = False
         for joint in joint_chain_tree:
             # prepare data
             r1 = joint['joint'].Reference1[1][0]
@@ -1949,10 +1838,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             r2_name_path = r2.split('.')
             r1_path = parse_freecad_path(r1, assembly.Document)
             r2_path = parse_freecad_path(r2, assembly.Document)
-            # if joint['r1_local_reference_in_external_assembly']:
-            #     r1_path = parse_freecad_path(joint['r1_local_reference_in_external_assembly'], assembly.Document)
-            # if joint['r2_local_reference_in_external_assembly']:
-            #     r2_path = parse_freecad_path(joint['r2_local_reference_in_external_assembly'], assembly.Document)
+            if joint['r1_local_reference_in_external_assembly']:
+                r1_path = parse_freecad_path(joint['r1_local_reference_in_external_assembly'], assembly.Document)
+            if joint['r2_local_reference_in_external_assembly']:
+                r2_path = parse_freecad_path(joint['r2_local_reference_in_external_assembly'], assembly.Document)
 
             r1_obj_link = get_first_link(r1_name_path)
             r2_obj_link = get_first_link(r2_name_path)
@@ -2009,13 +1898,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 origin_mounted_placement_correction = mounted_placement
                 origin_obj_link_correction = r1_obj_link.Placement
 
-                # if not root_link_setup:
-                #     assembly_link_placement = fc.Placement()
-                #     if joint['assembly_link']:
-                #         assembly_link_placement = joint['assembly_link'].Placement
-                #         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link2'].Placement
-                #     root_link_setup = True                
-
             else: # reverse chain direction
                 link_assembly_placement = r2_link_assembly_placement
 
@@ -2027,13 +1909,6 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
                 origin_obj_link_correction = r2_obj_link.Placement
-
-                # if not root_link_setup:
-                #     assembly_link_placement = fc.Placement()
-                #     if joint['assembly_link']:
-                #         assembly_link_placement = joint['assembly_link'].Placement
-                #         parent_robot_link.MountedPlacement = assembly_link_placement * joint['link1'].Placement
-                #     root_link_setup = True
 
             ### calc joint Origin
             robot_joint = make_robot_joint_filled(parent_robot_link, child_robot_link, robot)
