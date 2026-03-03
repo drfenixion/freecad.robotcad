@@ -142,7 +142,7 @@ git pull && cd docker && bash run.bash -fcn
 ```
 
 #### Fix - Wrong UID - in Docker build stage
-Check $USER env var in your OS like `echo $USER`. If it is empty remove RobotCAD created docker image if exist. Then run `$USER=replace_with_your_user_name bash run.bash` or `$USER=replace_with_your_user_name bash run_basic.bash` dependent you try to run RobotCAD or generated project. 
+Check $USER env var in your OS like `echo $USER`. If it is empty remove RobotCAD created docker image if exist. Then run `USER=replace_with_your_user_name bash run.bash` or `USER=replace_with_your_user_name bash run_basic.bash` dependent you try to run RobotCAD or generated project. 
 
 # Screenshots
 ### Launched RViz and Gazebo using generated code:
