@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from math import copysign, hypot
+from collections import deque
 
 import FreeCAD as fc
 from freecad.cross.freecad_utils import get_linked_obj
@@ -129,3 +130,69 @@ def get_obj_to_subobj_diff(obj: fc.DocumentObject, subobj: fc.DocumentObject, wi
     obj_to_subobj_diff = subobj_ab_pl * obj_ab_pl.inverse()
 
     return obj_to_subobj_diff
+
+
+def find_path_downwards(parent_obj, target_obj):
+    """
+    Searches for a path from parent_obj down to target_obj using BFS.
+    Returns a list of objects: [parent, intermediate_1, ..., target].
+    This works correct for cases with intermidiate links. 
+    If links in childs chain they will included not their original objects.
+    That way required for correct calculation of cumulative placement.
+    
+    Result: # Path: [Parent, Child1, Child2, ..., Target]
+    """
+    if parent_obj == target_obj:
+        return [parent_obj]
+    
+    queue = deque([(parent_obj, [parent_obj])])
+    visited = set()
+    visited.add(id(parent_obj))
+    
+    while queue:
+        current, path = queue.popleft()
+        
+        if hasattr(current, 'Group'):
+            children = current.Group
+        else:
+            return path + [current] 
+        
+        for child in children:
+            if id(child) in visited:
+                continue
+            
+            new_path = path + [child]
+            
+            if child == target_obj:
+                return new_path
+            
+            visited.add(id(child))
+            queue.append((child, new_path))
+            
+    return None
+
+
+def get_cumulative_placement_top_to_down(parent_obj, subobj):
+    """
+    Calculates the cumulative placement of subobj relative to parent_obj,
+    by traversing the hierarchy from top to bottom and summing the local Placements.
+    """
+    # Path: [Parent, Child1, Child2, ..., Target]
+    path = find_path_downwards(parent_obj, subobj)
+    
+    if not path:
+        print("Error: The path was not found. Check if subobj is really nested in obj.")
+        # Fallback:
+        p_glob = parent_obj.getPlacement().toMatrix()
+        s_glob = subobj.getPlacement().toMatrix()
+        return fc.Placement(p_glob.inverse().multiply(s_glob))
+    
+    cumulative_matrix = fc.Matrix()
+    
+    for i in range(1, len(path)):
+        node = path[i]
+        node_plc = node.Placement.toMatrix()
+        
+        cumulative_matrix = cumulative_matrix.multiply(node_plc)
+        
+    return fc.Placement(cumulative_matrix)
