@@ -16,9 +16,10 @@ class CreateCollisionCopyObj:
             'MenuText': tr('Create collision as copy of object'),
             'ToolTip': tr(
                 'Add a Part::Feature copies of the selected objects.'
-                '.'
-                '\n\nIf selected a link, an object based on Real element will be created. '
-                'This object will then be bound to the link as a collision.',
+                ''
+                '\n\nSelect Robot or Robot Links.\n'
+                'An object will be created based on Real element.'
+                ' This object will be then bound to the link as a collision.',
             ),
         }
 

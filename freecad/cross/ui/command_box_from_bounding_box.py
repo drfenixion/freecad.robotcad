@@ -13,12 +13,13 @@ class BoxFromBoundingBoxCommand:
     def GetResources(self):
         return {
             'Pixmap': 'box_from_bbox.svg',
-            'MenuText': tr('Box from bounding box'),
+            'MenuText': tr('Create collision box from bounding box'),
             'ToolTip': tr(
                 'Add a Part::Cube corresponding to the'
                 ' bounding box of the selected objects.'
-                '\n\nIf you select a link, an object based on Real element will be created. '
-                'This object will then be bound to the link as a collision.',
+                '\n\nSelect Robot or Robot Links.\n'
+                'An object will be created based on Real element.'
+                ' This object will be then bound to the link as a collision.',
             ),
         }
 

@@ -119,6 +119,16 @@ def createBoundObjects(createBoundFunc = createBoundBox):
     if len(objs) >= 1:
         doc.openTransaction(tr(createBoundFunc.__name__ + ' from bounding box'))
 
+        # convert robot to links
+        for obj in objs: 
+            if is_robot(obj):
+                robot_links = obj.Proxy.get_links()
+                objs = objs + robot_links
+
+        # filter unique
+        unique_objs = list({obj.Name: obj for obj in objs}.values())
+        objs = unique_objs
+
         for obj in objs:
             if is_joint(obj) or is_robot(obj):
                 continue
