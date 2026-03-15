@@ -818,12 +818,12 @@ def get_first_not_assembly(parsed_path, doc):
         return (doc.getObject(parsed_path['base_name']), parsed_path['base_name'], path_after) 
         
 
-def get_first_link(obj_name_list: list) -> DO | None:
-    """Return first FreeCAD link"""
+def get_first_not_assembly(obj_name_list: list) -> DO | None:
+    """Return first FreeCAD not assembly"""
     link = None
     for obj_name in obj_name_list:
         obj = fc.ActiveDocument.getObject(obj_name)
-        if is_link(obj):
+        if not is_link_to_assembly_from_assembly_wb(obj) and not is_assembly_from_assembly_wb(obj):
             link = obj
             break
 

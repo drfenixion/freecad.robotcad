@@ -32,7 +32,7 @@ from .freecad_utils import label_or
 from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .freecad_utils import is_link as is_fc_link
-from .freecad_utils import get_first_link
+from .freecad_utils import get_first_not_assembly
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
@@ -1552,7 +1552,7 @@ def get_assembly_elements(
             if is_link_to_assembly_from_assembly_wb(r1_obj0_link):
                 new_assembly_branch_link_r1 = r1_obj0_link
                 new_assembly_branch_r1 = r1_obj0_link.LinkedObject
-                r1_link = get_first_link(r1_name_path)
+                r1_link = get_first_not_assembly(r1_name_path)
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
                 r1_obj_link = r1_link.getLinkedObject(False)
 
@@ -1561,7 +1561,7 @@ def get_assembly_elements(
             if is_link_to_assembly_from_assembly_wb(r2_obj0_link):
                 new_assembly_branch_link_r2 = r2_obj0_link
                 new_assembly_branch_r2 = r2_obj0_link.LinkedObject
-                r2_link = get_first_link(r2_name_path)
+                r2_link = get_first_not_assembly(r2_name_path)
                 # get child link (root of new assembly branch) from it source assembly not from assembly link
                 r2_obj_link = r2_link.getLinkedObject(False)
 
@@ -1843,10 +1843,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             if joint['r2_local_reference_in_external_assembly']:
                 r2_path = parse_freecad_path(joint['r2_local_reference_in_external_assembly'], assembly.Document)
 
-            r1_obj_link = get_first_link(r1_name_path)
-            r2_obj_link = get_first_link(r2_name_path)
-            r1_obj = r1_obj_link.getLinkedObject(True)
-            r2_obj = r2_obj_link.getLinkedObject(True)
+            r1_obj_link = get_first_not_assembly(r1_name_path)
+            r2_obj_link = get_first_not_assembly(r2_name_path)
+            # r1_obj = r1_obj_link.getLinkedObject(True)
+            # r2_obj = r2_obj_link.getLinkedObject(True)
             parent_robot_link = None
             child_robot_link = None
             for robot_link in robot_links:
