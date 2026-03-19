@@ -502,17 +502,17 @@ def get_leafs_and_subnames(obj: DO) -> list[tuple[DO, str]]:
 def validate_types(
         objects: DOList,
         types: list[str],
-        respect_order: [bool | list[bool]] = False,
+        respect_order: bool | list[bool] = False,
 ) -> DOList:
     """Sort objects by required types.
 
     Return a list of objects sorted by the order in `types`.
     If `respect_order` is True, the required type must be in the same order as
     the objects in the input list. If `respect_order` is a list of booleans, it
-    must have the same length as `types` and the strict order is only required if
-    the corresponding boolean is True.
-    Raises a RuntimeError if a listed type has no appropriate object in the input
-    list.
+    must have the same length as `types` and the strict order is only required
+    if the corresponding boolean is True.
+    Raises a RuntimeError if a listed type has no appropriate object in the
+    input list.
 
     """
     if len(objects) < len(types):

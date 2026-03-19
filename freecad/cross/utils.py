@@ -5,21 +5,22 @@
 
 from __future__ import annotations
 
-from itertools import islice
-from itertools import zip_longest
-from functools import reduce
 import os
-from pathlib import Path
-from typing import Any, Generator, Iterable, Optional
-import xml.etree.ElementTree as et
-from xml.dom import minidom
 import re
+import sys
+import xml.etree.ElementTree as et
+from functools import reduce
+from itertools import islice, zip_longest
+from pathlib import Path
+from typing import Any, Generator, Iterable, Optional, TypeVar
+from xml.dom import minidom
 
 import FreeCAD as fc
 
 INVALID_FILENAME_CHARS = re.compile(r'[^\w.\-]+')
 
 # Stubs and type hints.
+T = TypeVar('T')
 DO = fc.DocumentObject
 DOList = Iterable[DO]
 
@@ -46,6 +47,31 @@ def add_path_to_environment_variable(path: [Path | str], env_var: str) -> None:
     existing_paths = os.environ.get(env_var).split(path_sep)
     if path_str not in existing_paths:
         os.environ[env_var] += f'{path_sep}{path_str}'
+
+
+def prepend_python_path(path: Path | str) -> None:
+    """Add the path to sys.path if existing."""
+    path = Path(path).expanduser().absolute()
+    if (str(path) not in sys.path) and path.exists():
+        sys.path.insert(0, str(path))
+
+
+def add_python_path(path: Path | str) -> None:
+    """Add the path to sys.path if existing."""
+    path = Path(path).expanduser().absolute()
+    if (str(path) not in sys.path) and path.exists():
+        sys.path.append(str(path))
+
+
+def add_ld_library_path(path: Path | str) -> None:
+    """Add the path to LD_LIBRARY_PATH if existing."""
+    path = Path(path).expanduser().absolute()
+    existing_paths = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+    if (str(path) not in existing_paths) and path.exists():
+        if 'LD_LIBRARY_PATH' not in os.environ:
+            os.environ['LD_LIBRARY_PATH'] = str(path)
+        else:
+            os.environ['LD_LIBRARY_PATH'] += os.pathsep + str(path)
 
 
 def get_valid_filename(text: str) -> str:
@@ -202,6 +228,11 @@ def values_from_string(
     """
     conversions = (str_to_float(v) for v in re.split(delimiters, values_str))
     return [v for v in conversions if v is not None]
+
+
+def sorted_unique(indices: Iterable[T]) -> list[T]:
+    """Return a sorted list of unique indices."""
+    return sorted(set(indices))
 
 
 def str_to_float(text: str, default: float | None = None) -> float | None:

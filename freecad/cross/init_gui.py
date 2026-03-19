@@ -3,6 +3,7 @@ import FreeCADGui as fcgui
 
 from .ui import command_assembly_from_urdf  # noqa: F401
 from .ui import command_box_from_bounding_box  # noqa: F401
+from .ui import command_bring_robot_to_pose  # noqa: F401
 from .ui import command_calculate_mass_and_inertia  # noqa: F401
 from .ui import command_cylinder_from_bounding_box  # noqa: F401
 from .ui import command_duplicate_robot # noqa: F401
@@ -10,11 +11,14 @@ from .ui import command_get_planning_scene  # noqa: F401
 from .ui import command_kk_edit  # noqa: F401
 from .ui import command_new_attached_collision_object  # noqa: F401
 from .ui import command_new_joint  # noqa: F401
+from .ui import command_new_lidar2d  # noqa: F401
 from .ui import command_new_link  # noqa: F401
 from .ui import command_new_observer  # noqa: F401
 from .ui import command_new_pose  # noqa: F401
+from .ui import command_new_rgb_camera  # noqa: F401
 from .ui import command_new_robot  # noqa: F401
 from .ui import command_new_trajectory  # noqa: F401
+from .ui import command_new_ultrasound  # noqa: F401
 from .ui import command_new_workcell  # noqa: F401
 from .ui import command_new_xacro_object  # noqa: F401
 from .ui import command_reload  # Developer tool.  # noqa: F401
@@ -89,6 +93,7 @@ class CrossWorkbench(fcgui.Workbench):
                 'CylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_from_bounding_box.py.
                 'KKEdit',  # Defined in ./ui/command_kk_edit.py.
                 'DuplicateRobot',  # Defined in ./ui/command_duplicate_robot.py.
+                'BringRobotToPose',  # Defined in ./ui/command_bring_robot_to_pose.py.
                 'Separator',
                 # Mesh simplification.
                 'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
@@ -100,6 +105,9 @@ class CrossWorkbench(fcgui.Workbench):
                 'NewPose',  # Defined in ./ui/command_new_pose.py.
                 'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
                 'NewObserver',  # Defined in ./ui/command_new_observer.py.
+                'NewRgbCamera',  # Defined in ./ui/command_new_rgb_camera.py.
+                'NewLidar2d',  # Defined in ./ui/command_new_lidar2d.py.
+                'NewUltrasound',  # Defined in ./ui/command_new_ultrasound.py.
                 'SetJoints',  # Defined in ./ui/command_set_joints.py.
                 'Separator',
                 # Definition of inertial properties.

@@ -49,7 +49,6 @@ class _CalculateMassAndInertiaCommand:
 
         doc.openTransaction(tr('Calculate mass and inertia'))
         for link in robot.Proxy.get_links():
-            # print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2) # DEBUG
             if link.MaterialNotCalculate:
                 continue
             if not link.Real:

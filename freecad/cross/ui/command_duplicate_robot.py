@@ -5,8 +5,6 @@
 
 import FreeCADGui as fcgui
 
-from PySide import QtGui  # FreeCAD's PySide!
-
 # Typing hints.
 from freecad.cross.robot import Robot as CrossRobot  # A Cross::Robot, i.e. a DocumentObject with Proxy "Robot". # noqa: E501
 

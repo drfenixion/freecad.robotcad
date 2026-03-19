@@ -198,7 +198,7 @@ def cone_between_points(
 
     Parameters:
     - start_point_mm: (x, y, z), the starting point
-    - end_point_mm: (x, y, z), the end point
+    - end_point_mm: (x, y, z), the end point (with the null radius)
     - radius_mm: float, bottom radius of the cone
     - color: (r, g, b) representing the color
              (RGB values between 0 and 1).

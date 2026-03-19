@@ -119,7 +119,7 @@ def robot_from_urdf(
     # Mimic joints must be handled after creating all joints because the
     # mimicking joint can be defined before the mimicked joint in URDF.
     _define_mimic_joints(urdf_robot, joint_map)
-    _compensate_joint_placement(robot, urdf_robot, joint_map)
+    _canonicalize_joint_axis(robot, urdf_robot, joint_map)
 
     # Change the visual properties after having added all links.
     if hasattr(fc, 'GuiUp') and fc.GuiUp:
@@ -137,8 +137,9 @@ def _make_robot(
 
     Return (robot object, parts group).
 
-    The group called 'URDF Parts' is potentially created and returned. If the object
-    'URDF Parts' is not a group, a different name will be given.
+    The group called 'URDF Parts' is potentially created and returned.
+    If the object 'URDF Parts' is not a group, a different name will
+    be given.
 
     """
 
@@ -229,7 +230,8 @@ def _add_ros_link(
     _set_link_inertial(ros_link, urdf_link)
     robot.addObject(ros_link)
     link_to_visual_part = add_object(
-        parts_group, 'App::Link',
+        parts_group,
+        'App::Link',
         f'visual_{name}',
     )
     robot.Proxy.created_objects.append(link_to_visual_part)
@@ -241,7 +243,8 @@ def _add_ros_link(
     ros_link.Visual = [link_to_visual_part]
 
     link_to_collision_part = add_object(
-        parts_group, 'App::Link',
+        parts_group,
+        'App::Link',
         f'collision_{name}',
     )
     robot.Proxy.created_objects.append(link_to_collision_part)
@@ -303,7 +306,7 @@ def _add_ros_joint(
         # All attributes of `limit` are compulsory.
         ros_joint.LowerLimit = factor * urdf_joint.limit.lower
         ros_joint.UpperLimit = factor * urdf_joint.limit.upper
-        ros_joint.Effort = factor * urdf_joint.limit.effort
+        ros_joint.Effort = urdf_joint.limit.effort  # Nm or N also in CROSS.
         ros_joint.Velocity = factor * urdf_joint.limit.velocity
     return ros_joint
 
@@ -350,7 +353,7 @@ def _define_mimic_joints(
         ros_joint.Offset = offset
 
 
-def _compensate_joint_placement(
+def _canonicalize_joint_axis(
         robot: CrossRobot,
         urdf_robot: UrdfRobot,
         joint_map: dict[str, CrossJoint],
@@ -484,7 +487,7 @@ def _add_geometries(
 
     `geometries` is either `visuals` or `collisions` and the geometry itself is
     `geometries[?].geometry`.
-    If `name_linked_geom` is empty, not FC link is created in `link`.
+    If `name_linked_geom` is empty, no FC link is created in `link`.
 
     Return the list of objects representing the geometries and the list of
     FreeCAD links.

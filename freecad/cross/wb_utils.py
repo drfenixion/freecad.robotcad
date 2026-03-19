@@ -22,6 +22,7 @@ from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_sphere
 from .freecad_utils import message
+from .freecad_utils import quantity_as
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .ros.utils import get_ros_workspace_from_file
@@ -85,37 +86,42 @@ def set_workbench_param(
 
 def is_attached_collision_object(obj: DO) -> bool:
     """Return True if the object is a Cross::AttachedCollisionObject."""
-    return _has_ros_type(obj, 'Cross::AttachedCollisionObject')
+    return has_cross_type(obj, 'Cross::AttachedCollisionObject')
 
 
 def is_robot(obj: DO) -> bool:
     """Return True if the object is a Cross::Robot."""
-    return _has_ros_type(obj, 'Cross::Robot')
+    return has_cross_type(obj, 'Cross::Robot')
 
 
 def is_link(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Link')
+    return has_cross_type(obj, 'Cross::Link')
 
 
 def is_joint(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Joint')
+    return has_cross_type(obj, 'Cross::Joint')
 
 
 def is_xacro_object(obj: DO) -> bool:
     """Return True if the object is a Cross::Xacro."""
-    return _has_ros_type(obj, 'Cross::XacroObject')
+    return has_cross_type(obj, 'Cross::XacroObject')
 
 
 def is_workcell(obj: DO) -> bool:
     """Return True if the object is a Cross::Workcell."""
-    return _has_ros_type(obj, 'Cross::Workcell')
+    return has_cross_type(obj, 'Cross::Workcell')
+
+
+def is_pose(obj: DO) -> bool:
+    """Return True if the object is a Cross::Pose."""
+    return has_cross_type(obj, 'Cross::Pose')
 
 
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
-    return _has_ros_type(obj, 'Cross::PlanningScene')
+    return has_cross_type(obj, 'Cross::PlanningScene')
 
 
 def is_simple_joint(obj: DO) -> bool:
@@ -231,6 +237,44 @@ def get_chain(link: CrossLink) -> list[CrossBasicElement]:
         return subchain
     chain += subchain + [ref_joint] + [link]
     return chain
+
+
+def get_chain_from_to(
+        robot: CrossRobot,
+        from_link: str,
+        to_link: str,
+) -> list[CrossBasicElement]:
+    """Return the chain from `from_link` to `to_link`, excluded.
+
+    Return an empty list if no chain exists between the two links.
+    Return an empty list if `to_link` is closer to the base link (root link of
+    the tree structure) than `from_link`.
+    """
+    if not is_robot(robot):
+        return []
+    from_ = robot.Proxy.get_link(from_link)
+    if not from_:
+        return []
+    to = robot.Proxy.get_link(to_link)
+    if not to:
+        return []
+    if from_ is to:
+        return []
+    chains = robot.Proxy.get_chains()
+    for chain in chains:
+        try:
+            from_index = chain.index(from_)
+        except ValueError:
+            continue
+        try:
+            # Implementation note: if `to_link` is before
+            # `from_link`, this raises ValueError and eventually fallbacks to
+            # `[]` after the loop.
+            to_index = chain.index(to, from_index)
+        except ValueError:
+            continue
+        return chain[from_index:to_index]
+    return []
 
 
 def is_subchain(subchain: DOList, chain: DOList) -> bool:
@@ -437,11 +481,19 @@ def export_templates(
         output_path.write_text(txt)
 
 
-def _has_ros_type(obj: DO, type_: str) -> bool:
+def has_cross_type(obj: DO, type_: str) -> bool:
     """Return True if the object is an object from this workbench."""
     if not isinstance(obj, DO):
         return False
-    return attr_equals(obj, '_Type', type_)
+    # Old CROSS objects.
+    if attr_equals(obj, '_Type', type_):
+        return True
+    # CROSS objects created with `fpo`.
+    if not hasattr(obj, 'Proxy'):
+        return False
+    if not hasattr(obj.Proxy, 'Type'):
+        return False
+    return obj.Proxy.Type == type_
 
 
 def _has_meshes_directory(
@@ -555,3 +607,53 @@ def placement_from_pose_string(pose: str) -> fc.Placement:
         fc.Vector(x, y, z) * ros_to_freecad_factor,
         fc.Rotation(qw, qx, qy, qz),
     )
+
+
+def joint_quantities_from_si_units(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, fc.Units.Quantity]:
+    """Convert joint values in SI units to quantities.
+
+    Convert joint values in SI units (meters and radians) to quantities.
+    """
+    source_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    joint_quantities: dict[CrossJoint, fc.Units.Quantity] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, fc.Units.Quantity):
+            joint_quantities[joint] = value
+        else:
+            # A scalar value.
+            quantity = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+            joint_quantities[joint] = quantity
+    return joint_quantities
+
+
+def joint_values_si_units_from_freecad(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, float]:
+    """Convert joint values in FreeCAD units or as quantities to SI units.
+
+    Convert joint values in FreeCAD units (millimeters and degrees) or as
+    quantities to SI units (meters and radians).
+    """
+    source_units = {
+            'Length': 'mm',
+            'Angle': 'deg',
+    }
+    target_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    out_joint_values: dict[CrossJoint, float] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, float) or isinstance(value, int):
+            # Convert to Quantity first.
+            value = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+        value = quantity_as(value, target_units[unit_type])
+        out_joint_values[joint] = value
+    return out_joint_values

@@ -10,6 +10,7 @@ import FreeCAD as fc
 
 from ..utils import get_parent_by_pattern
 from ..utils import add_path_to_environment_variable
+from ..utils import add_python_path
 
 
 def warn(text: str, gui: bool = False) -> None:
@@ -94,8 +95,8 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     # Add directories from ROS_WORKSPACE before system ones.
     ros_workspace = get_ros_workspace_from_env()
     # Works only for workspace with colcon's merge install strategy.
-    _add_python_path(f'{ros_workspace}/install/lib/{python_ver}/site-packages')
-    _add_python_path(f'{ros_workspace}/install/local/lib/{python_ver}/dist-packages')
+    add_python_path(f'{ros_workspace}/install/lib/{python_ver}/site-packages')
+    add_python_path(f'{ros_workspace}/install/local/lib/{python_ver}/dist-packages')
     # On some systems (e.g. FreeCAD 0.21 on Ubuntu 20), $PYTHONPATH is not
     # taken into account in FreeCAD, add them manually.
     base = f'/opt/ros/{ros_distro}'
@@ -104,7 +105,7 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
         # Humble and later.
         Path(f'{base}/local/lib/{python_ver}/dist-packages'),
     ]:
-        _add_python_path(path)
+        add_python_path(path)
 
     add_path_to_environment_variable(f'{ros_workspace}/install/lib', 'LD_LIBRARY_PATH')
     for path in [
@@ -215,8 +216,9 @@ def get_package_and_file(file_path: Path | str) -> tuple[str, str]:
 
 def pkg_and_file_from_ros_path(
         path: str,
-) -> tuple[Optional[str], Optional[str]]:
-    """Return the tuple (package_name, relative_file_path).
+) -> tuple[str | None, str | None]:
+    """
+    Return the tuple (package_name, relative_file_path).
 
     Return (None, None) if the guessed package does not exist.
 
@@ -335,24 +337,6 @@ def split_package_path(package_path: Path | str) -> tuple[Path, str]:
     parent = package_path.parent
     package_name = package_path.name
     return parent, package_name
-
-
-def _add_python_path(path: Path | str) -> None:
-    """Add the path to sys.path if existing."""
-    path = Path(path).expanduser().absolute()
-    if path.exists() and (str(path) not in sys.path):
-        sys.path.append(str(path))
-
-
-def _add_ld_library_path(path: Path | str) -> None:
-    """Add the path to LD_LIBRARY_PATH if existing."""
-    path = Path(path).expanduser().absolute()
-    existing_paths = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
-    if path.exists() and (str(path) not in existing_paths):
-        if 'LD_LIBRARY_PATH' not in os.environ:
-            os.environ['LD_LIBRARY_PATH'] = str(path)
-        else:
-            os.environ['LD_LIBRARY_PATH'] += os.pathsep + str(path)
 
 
 def _add_ament_prefix_path(path: Path | str) -> None:
