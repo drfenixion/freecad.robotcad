@@ -1491,14 +1491,14 @@ def set_placement_fast(
         for child_joint in root_link_child_joints:
             root_link_child_joints_backup.append({'Name': child_joint.Name, 'Origin': child_joint.Origin})
 
-        parent_joint_of_child_link_origin_backup = parent_joint_of_child_link.Origin
         set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
+        child_orienteer_placement_after_set_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+        child_orienteer_placement_after_move_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
 
         if child_link_child_joints:
             for child_joint in child_link_child_joints:
-                move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
-                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_after_set_placement_backup, child_orienteer_placement_after_move_placement_backup)
         
         if parent_tree_to_child_branch:
             for child_joint in root_link_child_joints:
