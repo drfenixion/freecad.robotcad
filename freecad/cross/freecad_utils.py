@@ -761,7 +761,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     result['sub_path_str'] = '.'.join(result['sub_path'])
     return result
 
-def get_selected_shape_object(selection_obj):
+def get_selected_shape_object(selection_obj, return_linked_obj = True):
     """
     Extracts the underlying shape object (e.g., Part::Box) from a SelectionObject,
     even if a sub-element like a face, edge, or vertex was selected.
@@ -792,7 +792,7 @@ def get_selected_shape_object(selection_obj):
         shape_obj = doc.getObject(obj_name)
         # Ensure it's a valid shape-bearing object
         if shape_obj and hasattr(shape_obj, 'Shape'):
-            if is_link(shape_obj):
+            if return_linked_obj and is_link(shape_obj):
                 return shape_obj.getLinkedObject(True)
             return shape_obj
     except Exception:

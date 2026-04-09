@@ -938,6 +938,7 @@ def make_lcs_at_link_body(
     original_obj = None
     dynamic_link_of_robot_link = None
     original_obj_wrapper = None
+    link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
     try:
         # if is_fc_link(orienteer.Object):
         #     # link to object (like Part::Feature)
@@ -992,7 +993,12 @@ def make_lcs_at_link_body(
                 original_obj_wrapper = dynamic_link_of_robot_link.LinkedObject
             if is_selection_object(orienteer):
                 original_obj = get_selected_shape_object(orienteer)
-            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+                original_obj_link_candidate =  get_selected_shape_object(orienteer, return_linked_obj = False)
+                if is_fc_link(original_obj_link_candidate):
+                    # placement works only for 1 level deep link
+                    # for more deeper links need calc cumulative placement
+                    link_to_obj_placement = original_obj_link_candidate.Placement
+            
             
         # # parents_reversed = reversed(obj_for_getting_parents.Parents)
         # parents_reversed = reversed(obj_for_getting_parents.InListRecursive)
