@@ -148,10 +148,10 @@ class CrossWorkbench(fcgui.Workbench):
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'DuplicateRobot',  # Defined in ./ui/command_duplicate_robot.py.
             'Separator',
-            # CROSS sensors
-            'NewRgbCamera',  # Defined in ./ui/command_new_rgb_camera.py.
-            'NewLidar2d',  # Defined in ./ui/command_new_lidar2d.py.
-            'NewUltrasound',  # Defined in ./ui/command_new_ultrasound.py.
+            # # CROSS sensors
+            # 'NewRgbCamera',  # Defined in ./ui/command_new_rgb_camera.py.
+            # 'NewLidar2d',  # Defined in ./ui/command_new_lidar2d.py.
+            # 'NewUltrasound',  # Defined in ./ui/command_new_ultrasound.py.
             'Separator',            
             # Placement
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
