@@ -11,6 +11,7 @@
 - [ACDC4Robot](https://github.com/bionicdl-sustech/ACDC4Robot)
 - [FusionSDF](https://github.com/andreasBihlmaier/FusionSDF)
 - [fusion2urdf ROS2](https://github.com/dheena2k2/fusion2urdf-ros2), port of Fusion2URDF to ROS2.
+- [Fusion2ROS2](https://github.com/vybhav-ibr/Fusion2ROS2/tree/master)
 
 # Solidworks add-ins
 
@@ -20,7 +21,7 @@
 
 # SWORD
 
-- [ROSCon'22](https://youtu.be/mkYRL72wiPo?list=PLXUpEXjGC63zhIdE2P9yZioRTXdkW2PFX&t=1107)
+- [SwRi Workbench for Offline Robotics Development™](https://sword.swri.org/). [ROSCon'22 video](https://youtu.be/mkYRL72wiPo?list=PLXUpEXjGC63zhIdE2P9yZioRTXdkW2PFX&t=1107)
 
 # Verbotics' Cell Editor
 
@@ -50,10 +51,38 @@
 
 - [URDF Creator](https://www.roboeverything.com/), closed source
 
+# Mobile Robot URDF Maker
+
+- [Mobile Robot URDF Maker](https://github.com/ali-pahlevani/Mobile_Robot_URDF_Maker/tree/main)
+
 # Workcell Builder
 
 - [Part of Easy Manipulation Deployment](https://easy-manipulation-deployment-docs.readthedocs.io/en/latest/emd_packages/workcell_builder/workcell_builder.html)
 - Not very user-friendly
+
+# RoboSnap
+
+- [RoboSnap](https://devashishharsh.github.io/RoboSnap/index.html)
+- No installation, runs in browser
+- No import
+
+# URDF Kitchen
+
+- [URDF Kitchen](https://github.com/Ninagawa123/URDF_kitchen)
+- Web based
+
+# URDF-Studio
+
+- [URDF-Studio](https://github.com/OpenLegged/URDF-Studio)
+- Web based
+
+# LinkForge
+
+- [LinkForge](https://extensions.blender.org/add-ons/linkforge/), Blender add-on to create robot models and export them to URDF or Xacro.
+
+# Editor for URDF
+
+- [Plugin for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=morningfrog.urdf-visualizer)
 
 # Parsing xacro files
 
@@ -69,12 +98,15 @@
 - [kinpy](https://github.com/neka-nat/kinpy), read URDF, forward kinematics
 - [yourdf_py](https://github.com/clemense/yourdfpy)
 - [urdf_py](https://github.com/mmatl/urdfpy)
+- [urchin](https://github.com/fishbotics/urchin), the follower of urdfpy.
 - [MPlib](https://motion-planning-lib.readthedocs.io/latest/)
 
 # Displaying URDF files
 
 - `ros2 launch urdf_tutorial display.launch.py`
 - [Jupyterlab-urdf](https://jupyterlab-urdf.readthedocs.io/en/latest/)
+- [scikit-robot](https://scikit-robot.readthedocs.io/en/latest/)
+- [URDFly](https://github.com/Democratizing-Dexterous/URDFly), Python-base URDF viewer with modified-Denavit-Hartenberg export.
 
 # Converting URDF files
 
@@ -104,7 +136,17 @@
 - [Phobos](https://github.com/dfki-ric/phobos) allows to make kinematic, inertia, collision, etc for your robot model and export as URDF, SDF, SMURF and other formats.
 - [SDFGen](https://github.com/cole-bsmr/SDFGen)
 
+# Add-ons for MATLAB
+
+- [MATLAB URDF Builder](https://github.com/artineering/robotBuilder_matlab)
+
+# Libraries of robot models
+
+- [Robotpkg's example_robot_data](https://pypi.org/project/example-robot-data/)
+- [awesome-robot-descriptions](https://github.com/robot-descriptions/awesome-robot-descriptions)
+
 # Other links
 
 - [List of tools from official documentation](https://docs.ros.org/en/rolling/Tutorials/Intermediate/URDF/Exporting-an-URDF-File.html)
 - [Discuss: Tools and Best Practices for 3D Robot Assets (URDF, SDFormat, CAD, etc)](https://discourse.ros.org/t/discuss-tools-and-best-practices-for-3d-robot-assets-urdf-sdformat-cad-etc/36997/1)
+- [urdfz](https://github.com/EzraBrooks/urdfz), portable URDF

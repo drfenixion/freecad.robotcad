@@ -15,7 +15,6 @@ import xml.etree.ElementTree as et
 from copy import deepcopy
 
 import FreeCAD as fc
-
 from PySide.QtWidgets import QFileDialog  # FreeCAD's PySide
 from PySide.QtWidgets import QMenu
 from PySide.QtWidgets import QMessageBox
@@ -27,9 +26,9 @@ from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
 from .freecad_utils import get_valid_property_name
+from .freecad_utils import has_type
 from .freecad_utils import is_origin
 from .freecad_utils import label_or
-from .freecad_utils import quantity_as
 from .freecad_utils import warn
 from .freecad_utils import is_link as is_fc_link
 from .freecad_utils import get_first_not_assembly
@@ -43,9 +42,10 @@ from .utils import save_xml
 from .utils import save_yaml
 from .utils import save_file
 from .utils import warn_unsupported
-from .wb_utils import DYNAMIC_WORLD_GENERATOR_REPO_PATH, DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH, ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_last_link_to_assembly
+from .wb_utils import DYNAMIC_WORLD_GENERATOR_REPO_PATH, DYNAMIC_WORLD_GENERATOR_WORLDS_GAZEBO_PATH, ICON_PATH, get_chain, get_comulative_assemblies_placement, get_first_lcs_or_link, get_last_link_to_assembly, is_link
 from .wb_utils import export_templates
 from .wb_utils import get_attached_collision_objects
+from .wb_utils import get_chain_from_to
 from .wb_utils import get_chains
 from .wb_utils import get_joints
 from .wb_utils import get_links
@@ -53,13 +53,12 @@ from .wb_utils import get_controllers
 from .wb_utils import get_broadcasters
 from .wb_utils import get_rel_and_abs_path
 from .wb_utils import get_valid_urdf_name
-from .wb_utils import is_attached_collision_object
 from .wb_utils import is_joint
-from .wb_utils import is_link
 from .wb_utils import is_robot
 from .wb_utils import is_controller
 from .wb_utils import is_broadcaster
 from .wb_utils import is_controllers_template_for_param_mapping
+from .wb_utils import joint_quantities_from_si_units
 from .wb_utils import remove_ros_workspace
 from .wb_utils import ros_name
 from .wb_utils import _has_meshes_directory
@@ -436,14 +435,31 @@ class RobotProxy(ProxyBase):
     def _cleanup_group(self) -> Optional[DO]:
         """Remove the objects not supported by CROSS::Robot.
 
-        Recursion provoked by modifying `Group` will take care of removing
-        the remaining unsupported objects.
+        Actually removes only one object but recursion provoked by modifying
+        `Group` will take care of removing the remaining unsupported objects.
 
         """
+        allowed_types = [
+                'Cross::Link',
+                'Cross::Joint',
+                'Cross::AttachedCollisionObject',
+                'Cross::RgbCamera',
+                'Cross::Lidar2d',
+                'Cross::Ultrasound',
+                'Cross::Controller',
+                'Cross::Broadcaster',
+        ]
+
+        def is_allowed(o: DO) -> bool:
+            for t in allowed_types:
+                if has_type(o, t):
+                    return True
+            return False
+
         if not self.is_execute_ready():
             return None
         for o in self.robot.Group[::-1]:
-            if is_link(o) or is_joint(o) or is_controller(o) or is_broadcaster(o) or is_attached_collision_object(o):
+            if is_allowed(o):
                 # Supported.
                 continue
             warn_unsupported(o, by='CROSS::Robot', gui=True)
@@ -502,6 +518,13 @@ class RobotProxy(ProxyBase):
                 self.robot.Document.removeObject(name)
         self.created_objects.clear()
 
+    def clear_attached_collision_objects(self) -> None:
+        """Remove all attached collision objects."""
+        acos = self.get_attached_collision_objects()
+        for aco in acos:
+            aco.removeObjectsFromDocument()  # Remove children.
+            self.robot.Document.removeObject(aco.Name)
+
     def set_joint_enum(self) -> None:
         """Set the enum for Child and Parent of all joints."""
         def get_possible_parent_links(joint: CrossJoint) -> list[str]:
@@ -549,9 +572,24 @@ class RobotProxy(ProxyBase):
                 # Doesn't change the value if in the new enum.
                 joint.Child = child_links
 
+    def get_joint_values(
+            self,
+    ) -> dict[CrossJoint, fc.Units.Quantity]:
+        """Get the joint values."""
+        source_units = {
+                'Length': 'mm',
+                'Angle': 'deg',
+        }
+        joint_values: dict[CrossJoint, fc.Units.Quantity] = {}
+        for joint, var_name in self.joint_variables.items():
+            unit_type = joint.Proxy.get_unit_type()
+            quantity = fc.Units.Quantity(f'{getattr(self.robot, var_name)} {source_units[unit_type]}')
+            joint_values[joint] = quantity
+        return joint_values
+
     def set_joint_values(
             self,
-            joint_values: dict[CrossJoint, [float | fc.Units.Quantity]],
+            joint_values: dict[CrossJoint, float | fc.Units.Quantity],
     ) -> None:
         """Set the joint values from values in meters and radians.
 
@@ -559,22 +597,11 @@ class RobotProxy(ProxyBase):
         from FreeCAD's `Quantity` objects.
 
         """
-        joint_variables: dict[CrossJoint, str] = self.joint_variables
-        source_units = {
-                'Length': 'm',
-                'Angle': 'rad',
-        }
-        target_units = {
-                'Length': 'mm',
-                'Angle': 'deg',
-        }
-        for joint, value in joint_values.items():
-            var_name = joint_variables[joint]
-            unit_type = joint.Proxy.get_unit_type()
-            if isinstance(value, float):
-                value = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
-            value = quantity_as(value, target_units[unit_type])
-            self.update_prop(var_name, value)
+        joint_quantities = joint_quantities_from_si_units(joint_values)
+        for joint, quantity in joint_quantities.items():
+            if not (var_name := self.joint_variables.get(joint, '')):
+                raise RuntimeError(f'No variable for joint {joint.Name} ({joint.Label})')
+            self.update_prop(var_name, quantity.Value)
 
     def add_joint_variables(self) -> None:
         """Add a property for each actuated joint."""
@@ -603,10 +630,10 @@ class RobotProxy(ProxyBase):
         return
 
     def compute_poses(self) -> None:
-        """Set `Placement` of all joints, links, and attached collision objects.
+        """Set `Placement` of CROSS objects.
 
-        Compute and set the pose of all joints, links, and attached collision
-        objects in the same frame as the robot.
+        Compute and set the pose of all joints, links, attached collision
+        objects, and sensors in the same frame as the robot.
 
         """
         joint_cache: dict[CrossJoint, fc.Placement] = {}
@@ -643,6 +670,16 @@ class RobotProxy(ProxyBase):
             if aco.Placement != aco.Link.Placement:
                 # Avoid recursive recompute.
                 aco.Placement = aco.Link.Placement
+        for o in self.robot.Group:
+            if (not (has_type(o, 'Cross::RgbCamera')
+                    or has_type(o, 'Cross::Lidar2d')
+                    or has_type(o, 'Cross::Ultrasound'))):
+                continue
+            if not o.Link:
+                continue
+            if o.Placement != o.Link.Placement:
+                # Avoid recursive recompute.
+                o.Placement = o.Link.Placement
 
     def get_attached_collision_objects(self) -> list[CrossAttachedCollisionObject]:
         # TODO: as property.
@@ -658,7 +695,7 @@ class RobotProxy(ProxyBase):
     def get_links(self) -> list[CrossLink]:
         """Return the list of CROSS links in the order of creation."""
         # TODO: as property.
-        if self._links is not None:
+        if getattr(self, '_links', None) is not None:
             return list(self._links)  # A copy.
         if not self.is_execute_ready():
             return []
@@ -707,6 +744,30 @@ class RobotProxy(ProxyBase):
     def get_actuated_joints(self) -> list[CrossJoint]:
         """Return the list of CROSS actuated joints in the order of creation."""
         return [j for j in self.get_joints() if j.Type != 'fixed']
+
+    def get_actuated_joints_to(self, to_link: str) -> list[CrossJoint]:
+        """Return the list of actuated joints from the root link to `to_link`."""
+        root_link = self.get_root_link()
+        if not root_link:
+            return []
+        root_link_name = ros_name(root_link)
+        return self.get_actuated_joints_from_to(root_link_name, to_link)
+
+    def get_actuated_joints_from_to(
+        self,
+        from_link: str,
+        to_link: str,
+    ) -> list[CrossJoint]:
+        """Return the list of actuated joints from `from_link` to `to_link`."""
+        from_ = self.get_link(from_link)
+        if not from_:
+            return []
+        to = self.get_link(to_link)
+        if not to:
+            return []
+        chain = get_chain_from_to(self.robot, from_link, to_link)
+        actuated_joints = self.get_actuated_joints()
+        return [o for o in chain if o in actuated_joints]
 
     def get_link(self, name: str) -> Optional[CrossLink]:
         """Return the link with ROS name `name`.
@@ -837,6 +898,7 @@ class RobotProxy(ProxyBase):
                 continue
             if to not in chain:
                 continue
+            # TODO(Gaël): simplify this with chain.index() or `wb_utils.get_chain_from_to()`.
             from_or_to_found = False
             first_transform = fc.Placement()
             second_transform = fc.Placement()

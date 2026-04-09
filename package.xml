@@ -13,6 +13,13 @@
 
   <freecadmin>0.21.2</freecadmin>
 
+  <!-- https://https://github.com/stack-of-tasks/pinocchio.
+  According to pypi.org, can be installed with `conda install -c conda-forge pinocchio` or `pip install pin`.
+  However, it didn't work on Gaël's setup and was installed from robotpkg. `sys.path` is modified by code to
+  include the path to this library in /opt/robotpkg/....
+  -->
+  <!--<depend>pin</depend>-->
+
   <content>
     <workbench>
       <classname>CrossWorkbench</classname>
