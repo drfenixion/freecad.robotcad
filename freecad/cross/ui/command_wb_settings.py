@@ -37,6 +37,7 @@ class _WbSettingsCommand:
             wb_globals.g_ros_workspace = settings_getter.ros_workspace
             set_workbench_param(wb_globals.PREF_VHACD_PATH, str(settings_getter.vhacd_path))
             set_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, str(settings_getter.overcross_token))
+            set_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, settings_getter.align_z_axis_lcs)
 
 
 fcgui.addCommand('WbSettings', _WbSettingsCommand())

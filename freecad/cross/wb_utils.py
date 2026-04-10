@@ -925,6 +925,9 @@ def make_lcs_at_link_body(
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
 
+    # Get align_z_axis setting from workbench preferences
+    align_z_axis = get_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, True)
+
     # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
     #     orienteer_parents_reversed = reversed(obj.Parents)
     #     parent_obj = None
@@ -1080,8 +1083,9 @@ def make_lcs_at_link_body(
         lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
     # add placement of link of origin obj (mean in same place at face of link as at original obj)
     lcs.Placement = link_to_obj_placement * lcs.Placement
-    # fix Z rotation to 0 in frame of origin
-    lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
+    # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
+    if align_z_axis:
+        lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
     # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
     # placement = dynamic_link_of_robot_link.Placement * lcs.Placement

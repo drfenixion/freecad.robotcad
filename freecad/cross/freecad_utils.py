@@ -127,8 +127,9 @@ def set_param(
 
     if type(value) not in fun_map:
         raise ValueError('Unkown type')
-    
-    value = value.strip()
+
+    if type(value) is not bool:
+        value = value.strip()
 
     getattr(group, fun_map[type(value)])(param, value)
 

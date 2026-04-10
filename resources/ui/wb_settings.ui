@@ -86,6 +86,25 @@
     </widget>
    </item>
    <item>
+    <widget class="QWidget" name="widget_align_z_axis_lcs" native="true">
+     <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <item>
+       <widget class="QCheckBox" name="checkbox_align_z_axis_lcs">
+        <property name="toolTip">
+         <string>Affects Set Placement tools and New LCS tool. Sets the Z-axis rotation to zero when creating LCS.</string>
+        </property>
+        <property name="text">
+         <string>Align Z-axis of LCS</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="button_box">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
