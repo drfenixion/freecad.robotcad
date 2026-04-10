@@ -1021,7 +1021,7 @@ def make_lcs_at_link_body(
         pass
 
     if not original_obj_wrapper:
-        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part.', gui=True)
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part. Check you selected Real elements of links for placement.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
