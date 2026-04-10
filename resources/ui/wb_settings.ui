@@ -94,7 +94,7 @@
          <string>Affects Set Placement tools and New LCS tool. Sets the Z-axis rotation to zero when creating LCS.</string>
         </property>
         <property name="text">
-         <string>Align Z-axis of LCS</string>
+         <string>Align Z-axis of New LCS and Set Placement tools</string>
         </property>
         <property name="checked">
          <bool>true</bool>
