@@ -81,7 +81,7 @@ class _NewLCSAtRobotLinkBodyCommand:
         lcs, body_lcs_wrapper, lcs_placement = make_lcs_at_link_body(
             orienteer1,
             delete_created_objects = False,
-            deactivate_after_map_mode = False,
+            deactivate_after_map_mode = True,
         )
         doc.commitTransaction()
 
