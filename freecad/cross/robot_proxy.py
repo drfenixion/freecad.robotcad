@@ -21,7 +21,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path
+from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path, quantity_as
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
