@@ -290,10 +290,10 @@ class _BringRobotToPoseCommand:
         )
         if dialog.exec():
             robot = dialog.get_selected_object()
-        if robot:
-            self._form.robot_line_edit.setText(robot.Label)
-        else:
-            self._form.robot_line_edit.setText('')
+            if robot:
+                self._form.robot_line_edit.setText(robot.Label)
+            else:
+                self._form.robot_line_edit.setText('')
 
     def _pick_pose(self) -> None:
         from .object_selector_dialog import ObjectSelector
