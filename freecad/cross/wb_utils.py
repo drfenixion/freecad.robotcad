@@ -903,7 +903,15 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     elif is_placement(orienteer_object):
         placement = orienteer_object
     else:
-        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
+        lcs, body_lcs_wrapper, link_to_obj_placement = make_lcs_at_link_body(orienteer, False, lcs_concentric_reversed)
+        fcgui.Selection.addSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        placement = get_placement(lcs)
+        placement = link_to_obj_placement * placement
+        if hasattr(fcgui.Selection, 'removeSelection'):
+            fcgui.Selection.removeSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        if delete_created_objects:
+            fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
+            fc.ActiveDocument.removeObject(lcs.Name)
 
     return placement
 
@@ -912,7 +920,7 @@ def make_lcs_at_link_body(
         orienteer,
         delete_created_objects:bool = True,
         lcs_concentric_reversed:bool = False,
-        deactivate_after_map_mode:bool = True,
+        deactivate_after_map_mode:bool = False,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
@@ -1059,19 +1067,24 @@ def make_lcs_at_link_body(
     else:
         lcs.MapMode = 'InertialCS'
 
+    
+
     if deactivate_after_map_mode:
         # prevent automove back to InertialCS rotation
         lcs.MapMode = 'Deactivated'
 
-    # remove placement of origin obj (mean in zero point of original obj)
-    lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+    # # remove placement of origin obj (mean in zero point of original obj)
+    # lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
     # add placement of link of origin obj (mean in same place at face of link as at original obj)
-    lcs.Placement = link_to_obj_placement * lcs.Placement
-    # fix Z rotation to 0 in frame of origin
-    lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
+    # lcs.Placement = link_to_obj_placement * lcs.Placement
+    # # fix Z rotation to 0 in frame of origin
+    # lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
-    placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+    # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+    # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+
+    # add placement of link of origin obj (mean in same place at face of link as at original obj)
+    # lcs_placement = link_to_obj_placement * lcs.Placement
 
     if delete_created_objects:
         fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
@@ -1079,7 +1092,7 @@ def make_lcs_at_link_body(
 
     fc.activeDocument().recompute()
 
-    return lcs, body_lcs_wrapper, placement
+    return lcs, body_lcs_wrapper, link_to_obj_placement
 
 
 def rotate_placement(

@@ -780,16 +780,17 @@ def get_selected_shape_object(selection_obj, return_linked_obj = True):
     full_sub_name = sub_names[0]
     parsed_path = parse_freecad_path(full_sub_name, doc)
 
-    # parts = full_sub_name.split('.')
-    # if len(parts) < 2:
-    #     return None
 
     # # Reconstruct the path to the actual shape object (without the sub-element suffix)
     obj_name = parsed_path['base_name']
 
     # Retrieve the object using the reconstructed path
     try:
-        shape_obj = doc.getObject(obj_name)
+        if parsed_path['object'].TypeId != 'Part::TopoShape':
+            shape_obj = parsed_path['object']
+        else:
+            shape_obj = doc.getObject(obj_name)
+
         # Ensure it's a valid shape-bearing object
         if shape_obj and hasattr(shape_obj, 'Shape'):
             if return_linked_obj and is_link(shape_obj):
