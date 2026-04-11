@@ -2,6 +2,11 @@
 
 RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2]. RobotCAD also known as OVERCROSS.
 
+
+Poll about RobotCAD course
+https://github.com/drfenixion/freecad.robotcad/discussions/120
+
+
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank">RobotCAD 3.0.0 workflow demo</a>
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD 3.0.0 workflow video"/></a>
 
