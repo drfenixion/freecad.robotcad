@@ -266,7 +266,7 @@ def robot_from_urdf(
     QtGui.QApplication.processEvents()
     i += 2
 
-    _compensate_joint_placement(robot, urdf_robot, joint_map)
+    _canonicalize_joint_axis(robot, urdf_robot, joint_map)
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
     i += 3
@@ -298,8 +298,9 @@ def _make_robot(
 
     Return (robot object, parts group).
 
-    The group called 'URDF Parts' is potentially created and returned. If the object
-    'URDF Parts' is not a group, a different name will be given.
+    The group called 'URDF Parts' is potentially created and returned.
+    If the object 'URDF Parts' is not a group, a different name will
+    be given.
 
     """
 
@@ -473,8 +474,8 @@ def _add_ros_joint(
         # All attributes of `limit` are compulsory.
         ros_joint.LowerLimit = factor * urdf_joint.limit.lower
         ros_joint.UpperLimit = factor * urdf_joint.limit.upper
-        ros_joint.Effort = urdf_joint.limit.effort
-        ros_joint.Velocity = urdf_joint.limit.velocity
+        ros_joint.Effort = urdf_joint.limit.effort  # Nm or N also in CROSS.
+        ros_joint.Velocity = factor * urdf_joint.limit.velocity
     return ros_joint
 
 
@@ -520,7 +521,7 @@ def _define_mimic_joints(
         ros_joint.Offset = offset
 
 
-def _compensate_joint_placement(
+def _canonicalize_joint_axis(
         robot: CrossRobot,
         urdf_robot: UrdfRobot,
         joint_map: dict[str, CrossJoint],
@@ -693,7 +694,7 @@ def _add_geometries(
 
     `geometries` is either `visuals` or `collisions` and the geometry itself is
     `geometries[?].geometry`.
-    If `name_linked_geom` is empty, not FC link is created in `link`.
+    If `name_linked_geom` is empty, no FC link is created in `link`.
 
     Return the list of objects representing the geometries and the list of
     FreeCAD links.

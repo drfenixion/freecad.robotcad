@@ -11,6 +11,7 @@ def str_to_bool(s: str) -> bool:
 PREFS_CATEGORY = 'RobotCAD'  # Category in the preferences dialog.
 PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
+PREF_ALIGN_Z_AXIS_LCS = 'align_z_axis_lcs'  # Align Z-axis of LCS to zero rotation (affects Set Placement tools and New LCS tool)
 WORKBENCH_NAME = 'RobotCAD - ROS2'
 
 lcs_wrapper_prefix = "LCS wrapper "

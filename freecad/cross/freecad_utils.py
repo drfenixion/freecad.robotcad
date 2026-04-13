@@ -127,8 +127,9 @@ def set_param(
 
     if type(value) not in fun_map:
         raise ValueError('Unkown type')
-    
-    value = value.strip()
+
+    if type(value) is not bool:
+        value = value.strip()
 
     getattr(group, fun_map[type(value)])(param, value)
 
@@ -761,7 +762,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     result['sub_path_str'] = '.'.join(result['sub_path'])
     return result
 
-def get_selected_shape_object(selection_obj):
+def get_selected_shape_object(selection_obj, return_linked_obj = True):
     """
     Extracts the underlying shape object (e.g., Part::Box) from a SelectionObject,
     even if a sub-element like a face, edge, or vertex was selected.
@@ -780,19 +781,20 @@ def get_selected_shape_object(selection_obj):
     full_sub_name = sub_names[0]
     parsed_path = parse_freecad_path(full_sub_name, doc)
 
-    # parts = full_sub_name.split('.')
-    # if len(parts) < 2:
-    #     return None
 
     # # Reconstruct the path to the actual shape object (without the sub-element suffix)
     obj_name = parsed_path['base_name']
 
     # Retrieve the object using the reconstructed path
     try:
-        shape_obj = doc.getObject(obj_name)
+        if parsed_path['object'].TypeId != 'Part::TopoShape':
+            shape_obj = parsed_path['object']
+        else:
+            shape_obj = doc.getObject(obj_name)
+
         # Ensure it's a valid shape-bearing object
         if shape_obj and hasattr(shape_obj, 'Shape'):
-            if is_link(shape_obj):
+            if return_linked_obj and is_link(shape_obj):
                 return shape_obj.getLinkedObject(True)
             return shape_obj
     except Exception:
@@ -854,7 +856,7 @@ def get_local_path_in_external_assembly(reference, doc):
 def validate_types(
         objects: DOList,
         types: list[str],
-        respect_order: [bool | list[bool]] = False,
+        respect_order: bool | list[bool] = False,
         respect_count: bool = False,
 ) -> DOList:
     """Sort objects by required types.
@@ -862,10 +864,10 @@ def validate_types(
     Return a list of objects sorted by the order in `types`.
     If `respect_order` is True, the required type must be in the same order as
     the objects in the input list. If `respect_order` is a list of booleans, it
-    must have the same length as `types` and the strict order is only required if
-    the corresponding boolean is True.
-    Raises a RuntimeError if a listed type has no appropriate object in the input
-    list.
+    must have the same length as `types` and the strict order is only required
+    if the corresponding boolean is True.
+    Raises a RuntimeError if a listed type has no appropriate object in the
+    input list.
 
     If 'respect_order' is False and 'respect_count' is True then
     objects order will not controlled but count will.

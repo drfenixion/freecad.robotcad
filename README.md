@@ -2,6 +2,9 @@
 
 RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2]. RobotCAD also known as OVERCROSS.
 
+
+#### Poll about RobotCAD learning course <a href="https://github.com/drfenixion/freecad.robotcad/discussions/120" target="_blank">here</a>
+
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank">RobotCAD 3.0.0 workflow demo</a>
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD 3.0.0 workflow video"/></a>
 
@@ -81,6 +84,10 @@ cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd free
 Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
 If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manually Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
+
+# Fast install and run with FreeCAD 1.1 AppImage
+Do same as **Fast install and run** section.
+Place FreeCAD 1.1 AppImage to docker/freecad/freecad_custom_appimage_dir and do `bash run.bash -cif` (in docker dir) one time and then for regular run `bash run.bash -ci`. Dont forget to update RobotCAD before and make FreeCAD 1.1 AppImage executable.
 
 **You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
 
@@ -228,7 +235,7 @@ Compatible with ROS2.
 - Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
 - Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
-## Installation 
+## Installation
 
 You need a recent version of FreeCAD (v1 or above) with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 

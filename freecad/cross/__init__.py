@@ -95,11 +95,17 @@ try:
 except (ModuleNotFoundError, ImportError):
     pip_install('urdf_parser_py')
 
-# # Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
-# try:
-#     import xacro
-# except (ModuleNotFoundError, ImportError):
-#     pip_install('xacro')
+# # Looks like Xacro pip ver is updated. Persist warning comment for some time. 
+# Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
+try:
+    import xacro
+except (ModuleNotFoundError, ImportError):
+    pip_install('xacro')
+
+try:
+    import ament_index_python
+except (ModuleNotFoundError, ImportError):
+    pip_install('ros-ament-index-python')
 
 try:
     import xmltodict

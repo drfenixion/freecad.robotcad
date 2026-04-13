@@ -68,6 +68,8 @@ Lower priority
 - Fix CROSS complaining that V-HACD is not found on the first time it is set.
 - Do not create an extra FreeCAD link when importing a URDF since the part can be directly added to the ROS links (i.e. instead of creating a FreeCAD link and adding the FreeCAD link to the ROS link). FreeCAD links are only necessary if the parts are in a different file.
 - Add a temporary switch to allow to add a joint without Parent to a robot while avoiding the warning "Joint [...] has no parent".
+- Change from editor modes to property modes.
+- Offer the possibility to replace a mesh with a solid built from this mesh.
 
 Implementation
 --------------
@@ -75,3 +77,4 @@ Implementation
 - Use `convert_units` and `freecad_utils.unit_type` wherever possible
 - Use [tenacity](https://tenacity.readthedocs.io/en/latest/) to better manage unreliable functions.
 - Use urllib to parse filename element in URDF (cf. [rerun_urdf.py](https://github.com/rerun-io/rerun/blob/main/examples/python/ros_node/rerun_urdf.py))
+- Use `PropertyLinkListHidden` and implement an upgrade mechanism (cf. fpo.py).

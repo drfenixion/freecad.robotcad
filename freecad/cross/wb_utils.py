@@ -29,6 +29,7 @@ from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import is_link as is_fc_link
 from .freecad_utils import message
+from .freecad_utils import quantity_as
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
@@ -123,62 +124,67 @@ def set_workbench_param(
 
 def is_attached_collision_object(obj: DO) -> bool:
     """Return True if the object is a Cross::AttachedCollisionObject."""
-    return _has_ros_type(obj, 'Cross::AttachedCollisionObject')
+    return has_cross_type(obj, 'Cross::AttachedCollisionObject')
 
 
 def is_robot(obj: DO) -> bool:
     """Return True if the object is a Cross::Robot."""
-    return _has_ros_type(obj, 'Cross::Robot')
+    return has_cross_type(obj, 'Cross::Robot')
 
 
 def is_link(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Link')
+    return has_cross_type(obj, 'Cross::Link')
 
 
 def is_joint(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Joint')
+    return has_cross_type(obj, 'Cross::Joint')
 
 
 def is_xacro_object(obj: DO) -> bool:
     """Return True if the object is a Cross::Xacro."""
-    return _has_ros_type(obj, 'Cross::XacroObject')
+    return has_cross_type(obj, 'Cross::XacroObject')
 
 
 def is_workcell(obj: DO) -> bool:
     """Return True if the object is a Cross::Workcell."""
-    return _has_ros_type(obj, 'Cross::Workcell')
+    return has_cross_type(obj, 'Cross::Workcell')
+
+
+def is_pose(obj: DO) -> bool:
+    """Return True if the object is a Cross::Pose."""
+    return has_cross_type(obj, 'Cross::Pose')
 
 
 def is_controller(obj: DO) -> bool:
     """Return True if the object is a Cross::Controller."""
-    return _has_ros_type(obj, 'Cross::Controller')
+    return has_cross_type(obj, 'Cross::Controller')
 
 
 def is_broadcaster(obj: DO) -> bool:
     """Return True if the object is a Cross::Broadcaster."""
-    return _has_ros_type(obj, 'Cross::Broadcaster')
+    return has_cross_type(obj, 'Cross::Broadcaster')
 
 
 def is_sensor(obj: DO) -> bool:
     """Return True if the object is a Cross::Sensor."""
-    return is_sensor_link(obj) or is_sensor_joint(obj) or _has_ros_type(obj, 'Cross::Sensor')
+    return is_sensor_link(obj) or is_sensor_joint(obj) or has_cross_type(obj, 'Cross::Sensor')
 
 
 def is_sensor_link(obj: DO) -> bool:
     """Return True if the object is a Cross::SensorLink."""
-    return _has_ros_type(obj, 'Cross::SensorLink')
+    return has_cross_type(obj, 'Cross::SensorLink')
 
 
 def is_sensor_joint(obj: DO) -> bool:
     """Return True if the object is a Cross::SensorJoint."""
-    return _has_ros_type(obj, 'Cross::SensorJoint')
+    return has_cross_type(obj, 'Cross::SensorJoint')
 
 
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
-    return _has_ros_type(obj, 'Cross::PlanningScene')
+    return has_cross_type(obj, 'Cross::PlanningScene')
 
 
 def is_simple_joint(obj: DO) -> bool:
@@ -376,6 +382,44 @@ def get_chain(link: CrossLink) -> list[CrossBasicElement]:
         return subchain
     chain += subchain + [ref_joint] + [link]
     return chain
+
+
+def get_chain_from_to(
+        robot: CrossRobot,
+        from_link: str,
+        to_link: str,
+) -> list[CrossBasicElement]:
+    """Return the chain from `from_link` to `to_link`, excluded.
+
+    Return an empty list if no chain exists between the two links.
+    Return an empty list if `to_link` is closer to the base link (root link of
+    the tree structure) than `from_link`.
+    """
+    if not is_robot(robot):
+        return []
+    from_ = robot.Proxy.get_link(from_link)
+    if not from_:
+        return []
+    to = robot.Proxy.get_link(to_link)
+    if not to:
+        return []
+    if from_ is to:
+        return []
+    chains = robot.Proxy.get_chains()
+    for chain in chains:
+        try:
+            from_index = chain.index(from_)
+        except ValueError:
+            continue
+        try:
+            # Implementation note: if `to_link` is before
+            # `from_link`, this raises ValueError and eventually fallbacks to
+            # `[]` after the loop.
+            to_index = chain.index(to, from_index)
+        except ValueError:
+            continue
+        return chain[from_index:to_index]
+    return []
 
 
 def is_subchain(subchain: DOList, chain: DOList) -> bool:
@@ -607,11 +651,19 @@ def export_templates(
         output_path.write_text(txt)
 
 
-def _has_ros_type(obj: DO, type_: str) -> bool:
+def has_cross_type(obj: DO, type_: str) -> bool:
     """Return True if the object is an object from this workbench."""
     if not isinstance(obj, DO):
         return False
-    return attr_equals(obj, '_Type', type_)
+    # Old CROSS objects.
+    if attr_equals(obj, '_Type', type_):
+        return True
+    # CROSS objects created with `fpo`.
+    if not hasattr(obj, 'Proxy'):
+        return False
+    if not hasattr(obj.Proxy, 'Type'):
+        return False
+    return obj.Proxy.Type == type_
 
 
 def _has_meshes_directory(
@@ -851,7 +903,15 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     elif is_placement(orienteer_object):
         placement = orienteer_object
     else:
-        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
+        lcs, body_lcs_wrapper, lcs_placement = make_lcs_at_link_body(orienteer, False, lcs_concentric_reversed, True)
+        fcgui.Selection.addSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        placement = get_placement(lcs)
+        
+        if hasattr(fcgui.Selection, 'removeSelection'):
+            fcgui.Selection.removeSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        if delete_created_objects:
+            fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
+            fc.ActiveDocument.removeObject(lcs.Name)
 
     return placement
 
@@ -860,10 +920,13 @@ def make_lcs_at_link_body(
         orienteer,
         delete_created_objects:bool = True,
         lcs_concentric_reversed:bool = False,
-        deactivate_after_map_mode:bool = True,
+        deactivate_after_map_mode:bool = False,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
+
+    # Get align_z_axis setting from workbench preferences
+    align_z_axis = get_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, True)
 
     # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
     #     orienteer_parents_reversed = reversed(obj.Parents)
@@ -886,6 +949,8 @@ def make_lcs_at_link_body(
     original_obj = None
     dynamic_link_of_robot_link = None
     original_obj_wrapper = None
+    link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+    is_orienteer_link = False
     try:
         # if is_fc_link(orienteer.Object):
         #     # link to object (like Part::Feature)
@@ -940,7 +1005,13 @@ def make_lcs_at_link_body(
                 original_obj_wrapper = dynamic_link_of_robot_link.LinkedObject
             if is_selection_object(orienteer):
                 original_obj = get_selected_shape_object(orienteer)
-            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+                original_obj_link_candidate =  get_selected_shape_object(orienteer, return_linked_obj = False)
+                if is_fc_link(original_obj_link_candidate):
+                    # placement works only for 1 level deep link
+                    # for more deeper links need calc cumulative placement
+                    link_to_obj_placement = original_obj_link_candidate.Placement
+                    is_orienteer_link = True
+            
             
         # # parents_reversed = reversed(obj_for_getting_parents.Parents)
         # parents_reversed = reversed(obj_for_getting_parents.InListRecursive)
@@ -955,7 +1026,7 @@ def make_lcs_at_link_body(
         pass
 
     if not original_obj_wrapper:
-        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part.', gui=True)
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part. Check you selected Real elements of links for placement.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
@@ -1001,19 +1072,23 @@ def make_lcs_at_link_body(
     else:
         lcs.MapMode = 'InertialCS'
 
+    
+
     if deactivate_after_map_mode:
         # prevent automove back to InertialCS rotation
         lcs.MapMode = 'Deactivated'
 
     # remove placement of origin obj (mean in zero point of original obj)
-    lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+    if is_orienteer_link:
+        lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
     # add placement of link of origin obj (mean in same place at face of link as at original obj)
     lcs.Placement = link_to_obj_placement * lcs.Placement
-    # fix Z rotation to 0 in frame of origin
-    lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
+    # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
+    if align_z_axis:
+        lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
-    placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+    # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+    # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
 
     if delete_created_objects:
         fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
@@ -1021,7 +1096,7 @@ def make_lcs_at_link_body(
 
     fc.activeDocument().recompute()
 
-    return lcs, body_lcs_wrapper, placement
+    return lcs, body_lcs_wrapper, lcs.Placement
 
 
 def rotate_placement(
@@ -1433,14 +1508,14 @@ def set_placement_fast(
         for child_joint in root_link_child_joints:
             root_link_child_joints_backup.append({'Name': child_joint.Name, 'Origin': child_joint.Origin})
 
-        parent_joint_of_child_link_origin_backup = parent_joint_of_child_link.Origin
         set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
+        child_orienteer_placement_after_set_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+        child_orienteer_placement_after_move_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
 
         if child_link_child_joints:
             for child_joint in child_link_child_joints:
-                move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
-                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_after_set_placement_backup, child_orienteer_placement_after_move_placement_backup)
         
         if parent_tree_to_child_branch:
             for child_joint in root_link_child_joints:
@@ -1505,3 +1580,51 @@ def get_comulative_assemblies_placement(obj_name_list: list) -> DO | None:
             break
 
     return comulative_assemblies_placement
+def joint_quantities_from_si_units(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, fc.Units.Quantity]:
+    """Convert joint values in SI units to quantities.
+
+    Convert joint values in SI units (meters and radians) to quantities.
+    """
+    source_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    joint_quantities: dict[CrossJoint, fc.Units.Quantity] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, fc.Units.Quantity):
+            joint_quantities[joint] = value
+        else:
+            # A scalar value.
+            quantity = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+            joint_quantities[joint] = quantity
+    return joint_quantities
+
+
+def joint_values_si_units_from_freecad(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, float]:
+    """Convert joint values in FreeCAD units or as quantities to SI units.
+
+    Convert joint values in FreeCAD units (millimeters and degrees) or as
+    quantities to SI units (meters and radians).
+    """
+    source_units = {
+            'Length': 'mm',
+            'Angle': 'deg',
+    }
+    target_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    out_joint_values: dict[CrossJoint, float] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, float) or isinstance(value, int):
+            # Convert to Quantity first.
+            value = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+        value = quantity_as(value, target_units[unit_type])
+        out_joint_values[joint] = value
+    return out_joint_values

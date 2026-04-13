@@ -3,7 +3,7 @@
 # Vars
 # For using of ROS packages from inside RobotCAD, FreeCAD build must have same Python version as ROS2 OS (py3.12)
 # Some of RobotCAD tools uses ROS2 packages
-custom_fc_appimage=FreeCAD_1.0.0-conda-Linux-x86_64-py311.AppImage
+custom_fc_appimage=FreeCAD_1.1.0-Linux-x86_64-py311.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
 use_custom_command=false # set true if you want to use FreeCAD AppImage instead of system (inside docker container) FreeCAD
 # Dont forget place FC to docker/freecad/freecad_custom_appimage_dir in that case and fix $custom_fc_appimage variable value
@@ -34,7 +34,7 @@ build_data_path=$ws_path/build_data
 # Usage info
 show_help() {
 cat << EOF
-Usage: ${0##*/} [-dfbclonh]
+Usage: ${0##*/} [-dfbclonhi]
 Run RobotCAD in container and open it window at host.
 
     -h          display this help and exit
@@ -45,12 +45,12 @@ Run RobotCAD in container and open it window at host.
                 If you will came back after to stable version add -f option.
     -o          Change owner of FreeCAD share directory to current user (can fix "Segmentation fault" in some cases)
     -n          Force add Nvidia container toolkit options (--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all) (can fix "failed to create drawable" in some cases)
-    -d          debug
+    -i          Use FreeCAD AppImage. You should manually place AppImage to docker/freecad/freecad_custom_appimage_dir. For not FreeCAD 1.1 ver also required to correct run.bash.
 EOF
 }
 
 # process params of script
-while getopts dfbclonh opt; do
+while getopts dfbclonhi opt; do
     case $opt in
         h)
             show_help
@@ -84,6 +84,10 @@ while getopts dfbclonh opt; do
             ;;
         n)
             force_add_nvidia_options=true
+            echo 'Force add Nvidia container options is requested.'
+            ;;
+        i)
+            use_custom_command=true
             echo 'Force add Nvidia container options is requested.'
             ;;
         *)
@@ -282,6 +286,7 @@ else
     host_freecad_mods_path=$HOME/.local/share/FreeCAD/Mod
     host_freecad_share_path=$HOME/.local/share/FreeCAD
     cont_freecad_mods_path=$cont_user_path/.local/share/FreeCAD/Mod
+    cont_freecad_1_1_mods_path=$cont_user_path/.local/share/FreeCAD/v1-1/Mod
     cont_freecad_share_path=$cont_user_path/.local/share/FreeCAD
     host_freecad_user_config_path=$HOME/.FreeCAD
     cont_freecad_user_config_path=$cont_user_path/.FreeCAD
@@ -327,7 +332,8 @@ else
         --volume=$host_freecad_share_path:$cont_freecad_share_path \
         --volume=$host_freecad_user_config_path:$cont_freecad_user_config_path \
         --volume=$host_freecad_cache_path:$cont_freecad_cache_path \
-        --volume=$root_of_freecad_robotcad:$host_freecad_mods_path/freecad.robotcad \
+        --volume=$root_of_freecad_robotcad:$cont_freecad_mods_path/freecad.robotcad \
+        --volume=$root_of_freecad_robotcad:$cont_freecad_1_1_mods_path/freecad.robotcad \
         --volume=$root_of_freecad_robotcad/docker/freecad:$cont_path_ws/../freecad \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
         --privileged \

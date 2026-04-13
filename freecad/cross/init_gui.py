@@ -3,6 +3,7 @@ import FreeCADGui as fcgui
 
 from .ui import command_assembly_from_urdf  # noqa: F401
 from .ui import command_box_from_bounding_box  # noqa: F401
+from .ui import command_bring_robot_to_pose  # noqa: F401
 from .ui import command_calculate_mass_and_inertia  # noqa: F401
 from .ui import command_duplicate_robot # noqa: F401
 from .ui import command_get_planning_scene  # noqa: F401
@@ -51,6 +52,11 @@ from .ui import command_calculate_mass_and_inertia # noqa: F401
 from .ui import command_world_generator # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
+
+#CROSS sensors
+from .ui import command_new_lidar2d  # noqa: F401
+from .ui import command_new_rgb_camera  # noqa: F401
+from .ui import command_new_ultrasound  # noqa: F401
 
 from .wb_utils import ICON_PATH
 from . import wb_constants
@@ -290,6 +296,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
             'NewAttachedCollisionObject',  # Defined in ./ui/command_new_attached_collision_object.py.
             'NewPose',  # Defined in ./ui/command_new_pose.py.
+            'BringRobotToPose',  # Defined in ./ui/command_bring_robot_to_pose.py.
             'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
             'NewObserver',  # Defined in ./ui/command_new_observer.py.
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
