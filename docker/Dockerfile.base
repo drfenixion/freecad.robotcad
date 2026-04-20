@@ -12,11 +12,12 @@ ENV PIP_BREAK_SYSTEM_PACKAGES 1
 SHELL ["/bin/bash", "-c"]
 
 # update gpg keys
-RUN echo 'Update gpg keys...' && \
-    apt-key del F42ED6FBAB17C654 && \
+RUN echo 'Update gpg keys...'
+RUN apt-key del F42ED6FBAB17C654 && \
     curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros2-latest-archive-keyring.gpg
 
 # setup timezone
+RUN echo 'Setup timezone'
 RUN unlink /etc/localtime || true && \
     ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
     apt-get update && \
@@ -26,16 +27,16 @@ RUN unlink /etc/localtime || true && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade OS
-RUN echo 'Upgrade OS' && \
-    apt-get update -q && \
+RUN echo 'Upgrade OS'
+RUN apt-get update -q && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
     apt-get autoclean -y && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 ### Install system packages
-RUN echo 'Install system packages' && \
-    apt-get update && \
+RUN echo 'Install system packages'
+RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common \
         mesa-utils \
@@ -50,8 +51,8 @@ RUN echo 'Install system packages' && \
     rm -rf /var/lib/apt/lists/*
 
 ### Install Gazebo
-RUN echo "Install Gazebo $GZ_VERSION" && \
-    apt-get update && \
+RUN echo "Install Gazebo $GZ_VERSION"
+RUN apt-get update && \
     apt-get install -y lsb-release wget gnupg && \
     wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
@@ -62,8 +63,8 @@ RUN echo "Install Gazebo $GZ_VERSION" && \
     rm -rf /var/lib/apt/lists/*
 
 ### Install FreeCAD Daily
-RUN echo 'Install FreeCAD Daily' && \
-    add-apt-repository ppa:freecad-maintainers/freecad-daily && \
+RUN echo 'Install FreeCAD Daily'
+RUN add-apt-repository ppa:freecad-maintainers/freecad-daily && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         freecad-daily -y && \
@@ -73,8 +74,8 @@ RUN echo 'Install FreeCAD Daily' && \
 
 ### Install FreeCAD conda py3.12
 ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
-RUN echo 'Install FreeCAD conda py3.12' && \
-    mkdir -p /opt/miniconda3 && \
+RUN echo 'Install FreeCAD conda py3.12'
+RUN mkdir -p /opt/miniconda3 && \
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /opt/miniconda3/miniconda.sh && \
     bash /opt/miniconda3/miniconda.sh -b -u -p /opt/miniconda3 && \
     rm /opt/miniconda3/miniconda.sh && \
@@ -101,8 +102,8 @@ COPY --link ros2_ws/src/freecad_cross_rosdep ./freecad_cross_rosdep
 WORKDIR $PATH_TO_WS
 
 ### Install ROS deps
-RUN echo 'Install ROS dependencies...' && \
-    apt-get update -y && rosdep update && \
+RUN echo 'Install ROS dependencies...'
+RUN apt-get update -y && rosdep update && \
     PIP_BREAK_SYSTEM_PACKAGES=1 rosdep install -r -q --from-paths `colcon list --packages-up-to freecad_cross_rosdep -p` --ignore-src --rosdistro ${ROS_DISTRO} && \
     apt-get autoclean -y && \
     apt-get autoremove -y && \

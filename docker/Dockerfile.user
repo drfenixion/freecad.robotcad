@@ -21,18 +21,20 @@ SHELL ["/bin/bash", "-c"]
 
 
 ### Make path for FreeCAD mods
+RUN echo 'Make path for FreeCAD mods'
 RUN mkdir -p $HOME/.local/share/FreeCAD/Mod
 ### END Make path for FreeCAD mods
 
 WORKDIR $PATH_TO_WS
 
 ### Delete user if present with same UID as local
+RUN echo 'Delete user if present with same UID as local'
 RUN deluser --remove-home $(id -un $UID); exit 0
 ### End delete user if present with same UID as local
 
 ### Create user
-RUN echo "* enable custom user: $USER" && \
-    groupadd -g 110 render && \
+RUN echo 'Create user: $USER'
+RUN groupadd -g 110 render && \
     getent group $GROUP || groupadd --force -g $GID $GROUP && \
     useradd --create-home --shell /bin/bash --groups adm,sudo,video,render --uid $UID --gid $GID $USER && \
     echo "$USER  ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers && \
@@ -45,6 +47,7 @@ RUN echo "* enable custom user: $USER" && \
 ### End create user
 
 ### Change owner of pip and apt packages dir for install packages without sudo
+RUN echo 'Change owner of pip and apt packages dir'
 RUN chown -R $USER:$GROUP /usr/local/lib/python3.12/dist-packages && \
     chown -R $USER:$GROUP /var/cache/apt/archives/ && \
     chown -R $USER:$GROUP /var/lib/dpkg/ && \
@@ -55,8 +58,8 @@ RUN chown -R $USER:$GROUP /usr/local/lib/python3.12/dist-packages && \
 USER $USER
 
 ### Build ROS packages
-RUN echo 'Build ROS packages...' && \
-    . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install && \
+RUN echo 'Build ROS packages...'
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install && \
     echo ". /opt/ros/${ROS_DISTRO}/setup.bash" >> ${HOME}/.profile && \
     echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
 ### Build ROS packages
