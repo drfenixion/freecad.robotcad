@@ -16,7 +16,7 @@ ros_distro=jazzy
 ros_distro_assemble=desktop
 ws_dir_name=ros2_ws_with_freecad
 ros_container_name=ros2_${ros_distro}_with_freecad
-base_image=robotcad/base:latest
+base_image=ghcr.io/drfenixion/robotcad/base:latest
 image=robotcad/user:latest
 parent_dir_of_ws_dir_name=/ros2
 freecad_ros2_package_with_deps=freecad_cross_rosdep
@@ -237,7 +237,7 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo "GROUP will be used for user inside image:  $group"
 
     # build Base image
-    if [ -z "$(docker images -q $base_image 2> /dev/null)" ]; then
+    if [ "$force_build_new_base_image" = true ] && [ -z "$(docker images -q $base_image 2> /dev/null)" ]; then
         echo 'Build base image...'
         docker buildx build -t $base_image -f Dockerfile.base \
             --build-arg ROS_DISTRO_ARG=$ros_distro \
