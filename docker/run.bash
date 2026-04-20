@@ -88,7 +88,7 @@ while getopts dfbclonhi opt; do
             ;;
         i)
             use_custom_command=true
-            echo 'Force add Nvidia container options is requested.'
+            echo 'Freecad AppImage is requested.'
             ;;
         *)
             show_help >&2
