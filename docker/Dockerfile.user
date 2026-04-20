@@ -48,8 +48,8 @@ RUN echo "* enable custom user: $USER" && \
 RUN chown -R $USER:$GROUP /usr/local/lib/python3.12/dist-packages && \
     chown -R $USER:$GROUP /var/cache/apt/archives/ && \
     chown -R $USER:$GROUP /var/lib/dpkg/ && \
-    chown -R $USER:$GROUP ${PATH_TO_WS} && \
-    chown -R $USER:$GROUP ${HOME}
+    chown -R $USER:$GROUP ${HOME} && \
+    chown -R $USER:$GROUP ${PATH_TO_WS}
 ### END Change owner of pip and apt packages dir for install packages without sudo
 
 USER $USER
