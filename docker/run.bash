@@ -7,7 +7,7 @@ custom_fc_appimage=FreeCAD_1.1.0-Linux-x86_64-py311.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
 use_custom_command=false # set true if you want to use FreeCAD AppImage instead of system (inside docker container) FreeCAD
 # Dont forget place FC to docker/freecad/freecad_custom_appimage_dir in that case and fix $custom_fc_appimage variable value
-command='. /home/$USER/miniconda3/bin/activate && conda activate freecad_1_0_312 && QT_QPA_PLATFORM=xcb freecad' # py3.12 # QT_QPA_PLATFORM=xcb -for use x11
+command='. /opt/miniconda3/bin/activate && conda activate freecad_1_0_312 && QT_QPA_PLATFORM=xcb freecad' # py3.12 # QT_QPA_PLATFORM=xcb -for use x11
 # command=freecad-daily # latest dev freecad
 
 force_run_new_container=false
@@ -16,7 +16,8 @@ ros_distro=jazzy
 ros_distro_assemble=desktop
 ws_dir_name=ros2_ws_with_freecad
 ros_container_name=ros2_${ros_distro}_with_freecad
-image=osrf/ros:$ros_distro-$ros_distro_assemble-with_overcross_deps
+base_image=robotcad/base:latest
+image=robotcad/user:latest
 parent_dir_of_ws_dir_name=/ros2
 freecad_ros2_package_with_deps=freecad_cross_rosdep
 
@@ -33,13 +34,14 @@ build_data_path=$ws_path/build_data
 
 # Usage info
 show_help() {
-cat << EOF
-Usage: ${0##*/} [-dfbclonhi]
+    cat << EOF
+Usage: ${0##*/} [-dfbBclonhi]
 Run RobotCAD in container and open it window at host.
 
     -h          display this help and exit
     -f          force run new container (remove old one first if present also recreate build dirs)
     -b          force build new image and container
+    -B          force build new base image
     -c          clear old container logs (required sudo)
     -l          run last dev FreeCAD version (freecad-daily) instead of stable. Dont use if you dont know what is it.
                 If you will came back after to stable version add -f option.
@@ -50,7 +52,7 @@ EOF
 }
 
 # process params of script
-while getopts dfbclonhi opt; do
+while getopts dfbBclonhi opt; do
     case $opt in
         h)
             show_help
@@ -68,6 +70,12 @@ while getopts dfbclonhi opt; do
             force_build_new_image=true
             force_run_new_container=true
             echo 'Force build new image and run new container are requested.'
+            ;;
+        B)
+            force_build_new_base_image=true
+            force_build_new_image=true
+            force_run_new_container=true
+            echo 'Force build new base image, new image and run new container are requested.'
             ;;
         c)
             clear_old_logs=true
@@ -203,6 +211,10 @@ fi
 if [ "$force_build_new_image" = true ]; then
     echo 'Remove image.'
     docker image rm -f $image
+    if [ "$force_build_new_base_image" = true ]; then
+        echo 'Remove base image.'
+        docker image rm -f $base_image
+    fi
 fi
 
 
@@ -224,16 +236,25 @@ if [ -z "$(docker images -q $image 2> /dev/null)" ]; then
     echo "GID will be used for user inside image:  $gid"
     echo "GROUP will be used for user inside image:  $group"
 
-    # build ROS image
+    # build Base image
+    if [ -z "$(docker images -q $base_image 2> /dev/null)" ]; then
+        echo 'Build base image...'
+        docker buildx build -t $base_image -f Dockerfile.base \
+            --build-arg ROS_DISTRO_ARG=$ros_distro \
+            --build-arg ROS_DISTRO_ASSEMBLY_ARG=$ros_distro_assemble \
+            . || exit 1
+    fi
+
+    # build User image
     docker buildx build -t $image --shm-size=512m \
+        --build-arg BASE_IMAGE=$base_image \
         --build-arg USER=$USER \
         --build-arg UID=$uid \
         --build-arg GROUP=$group \
         --build-arg GID=$gid \
-        --build-arg ROS_DISTRO_ARG=$ros_distro \
-        --build-arg ROS_DISTRO_ASSEMBLY_ARG=$ros_distro_assemble \
         --build-arg CONT_PATH_WS=$cont_path_ws \
-        .
+        -f Dockerfile.user \
+        . || exit 1
 fi
 
 

@@ -1,0 +1,110 @@
+# syntax=docker/dockerfile:1.4
+ARG ROS_DISTRO_ARG=jazzy
+ARG ROS_DISTRO_ASSEMBLY_ARG=desktop
+FROM osrf/ros:${ROS_DISTRO_ARG}-${ROS_DISTRO_ASSEMBLY_ARG}
+
+ARG GZ_VERSION_ARG=harmonic
+ENV GZ_VERSION=$GZ_VERSION_ARG
+
+# fix - error: externally-managed-environment
+ENV PIP_BREAK_SYSTEM_PACKAGES 1
+
+SHELL ["/bin/bash", "-c"]
+
+# update gpg keys
+RUN echo 'Update gpg keys...' && \
+    apt-key del F42ED6FBAB17C654 && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros2-latest-archive-keyring.gpg
+
+# setup timezone
+RUN unlink /etc/localtime || true && \
+    ln -s /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
+    apt-get update && \
+    apt-get install -q -y --no-install-recommends tzdata && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade OS
+RUN echo 'Upgrade OS' && \
+    apt-get update -q && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+### Install system packages
+RUN echo 'Install system packages' && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        software-properties-common \
+        mesa-utils \
+        mesa-vulkan-drivers \
+        nano \
+        pip \
+        wget \
+        gnupg2 && \
+    pip install debugpy && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+### Install Gazebo
+RUN echo "Install Gazebo $GZ_VERSION" && \
+    apt-get update && \
+    apt-get install -y lsb-release wget gnupg && \
+    wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
+    apt-get update && \
+    apt-get install gz-${GZ_VERSION} -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+### Install FreeCAD Daily
+RUN echo 'Install FreeCAD Daily' && \
+    add-apt-repository ppa:freecad-maintainers/freecad-daily && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        freecad-daily -y && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+### Install FreeCAD conda py3.12
+ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
+RUN echo 'Install FreeCAD conda py3.12' && \
+    mkdir -p /opt/miniconda3 && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /opt/miniconda3/miniconda.sh && \
+    bash /opt/miniconda3/miniconda.sh -b -u -p /opt/miniconda3 && \
+    rm /opt/miniconda3/miniconda.sh && \
+    . /opt/miniconda3/bin/activate && \
+    conda init --all && \
+    conda config --set auto_update_conda false && \
+    conda config --set channel_priority strict && \
+    conda config --add channels conda-forge && \
+    conda config --set always_yes true && \
+    conda create -n freecad_1_0_312 freecad=1.0.0=py312h0c3bf70_4 python=3.12 && \
+    conda activate freecad_1_0_312 && \
+    conda install numpy pandas matplotlib requests qt6-wayland pycollada && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+### Copy project to image
+RUN mkdir -p $PATH_TO_WS/src
+WORKDIR $PATH_TO_WS/src
+RUN mkdir -p ./freecad_cross_rosdep
+COPY --link ros2_ws/src/freecad_cross_rosdep ./freecad_cross_rosdep
+### END copy project to image
+
+WORKDIR $PATH_TO_WS
+
+### Install ROS deps
+RUN echo 'Install ROS dependencies...' && \
+    apt-get update -y && rosdep update && \
+    PIP_BREAK_SYSTEM_PACKAGES=1 rosdep install -r -q --from-paths `colcon list --packages-up-to freecad_cross_rosdep -p` --ignore-src --rosdistro ${ROS_DISTRO} && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+### End Install ROS deps
