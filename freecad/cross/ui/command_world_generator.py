@@ -1,6 +1,7 @@
 import FreeCAD as fc
 
 import FreeCADGui as fcgui
+from freecad.cross import pip_install
 try:
     from PySide.QtWidgets import QApplication
 except:
@@ -29,6 +30,15 @@ class _WorldGeneratorCommand:
     def Activated(self):
 
         def world_generator_run_wrapper():
+            try:
+                import sip
+            except (ModuleNotFoundError, ImportError):
+                pip_install('sip') 
+            try:
+                import PyQt5
+            except (ModuleNotFoundError, ImportError):
+                pip_install('PyQt5')   
+                
             # add module path to sys.path for working local path imports in module
             DYNAMIC_WORLD_GENERATOR_MODULE_PATH_str = str(DYNAMIC_WORLD_GENERATOR_MODULE_PATH)
             if DYNAMIC_WORLD_GENERATOR_MODULE_PATH_str not in sys.path:

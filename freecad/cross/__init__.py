@@ -12,21 +12,33 @@ except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
+def add_packages_path():
+    # dynamically add module to sys.path
+    major = sys.version_info.major
+    minor = sys.version_info.minor
+    pythonPackagesPath = f'~/.local/share/FreeCAD/AdditionalPythonPackages/py{major}{minor}'
+    path = Path(pythonPackagesPath).expanduser().absolute()
+    if not os.path.exists(path):
+        os.makedirs(path)    
+    if path.exists() and (str(path) not in sys.path):
+        sys.path.append(str(path))
+
+    return path
+
+add_packages_path()
 
 def pip_install(pkg_name):
     '''Python package installer for AppImage builds. It installs python module inside AppImage'''
     # should be in __init__.py to eliminate cyrcle dependencies of installed modules
 
     import site
+    pythonPackagesPath = add_packages_path()
 
     python_exe = get_python_exe()
     print('python_exe: ', python_exe)
-    vendor_path = site.getsitepackages()[0]
-    if not os.path.exists(vendor_path):
-        os.makedirs(vendor_path)
 
     p = subprocess.Popen(
-        [python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--target", vendor_path, pkg_name],
+        [python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--target", pythonPackagesPath, pkg_name],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
 
@@ -43,15 +55,6 @@ def pip_install(pkg_name):
     p.stdout.close()
     p.stderr.close()
     p.wait(timeout=180)
-
-    # dynamically add module to sys.path
-    major = sys.version_info.major
-    minor = sys.version_info.minor
-
-    pythonPackagesPath = f'~/.local/share/FreeCAD/AdditionalPythonPackages/py{major}{minor}'
-    path = Path(pythonPackagesPath).expanduser().absolute()
-    if path.exists() and (str(path) not in sys.path):
-        sys.path.append(str(path))
 
 
 # Initialize debug with debugpy.
