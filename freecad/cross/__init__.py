@@ -56,6 +56,14 @@ def pip_install(pkg_name):
     p.stderr.close()
     p.wait(timeout=180)
 
+def check_install_package(packages_import_name, package_name = None):
+    try:
+        __import__(packages_import_name)
+    except (ModuleNotFoundError, ImportError):
+        if package_name is None:
+            pip_install(packages_import_name)
+        else:   
+            pip_install(package_name)
 
 # Initialize debug with debugpy.
 if os.environ.get('DEBUG'):
@@ -93,43 +101,17 @@ add_ros_library_path(g_ros_distro)
 
 # pip installs
 # should be after add_ros_library_path because ros package must be initialized firstly
-try:
-    import urdf_parser_py
-except (ModuleNotFoundError, ImportError):
-    pip_install('urdf_parser_py')
+check_install_package('urdf_parser_py')
 
 # # Looks like Xacro pip ver is updated. Persist warning comment for some time. 
 # Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
-try:
-    import xacro
-except (ModuleNotFoundError, ImportError):
-    pip_install('xacro')
+check_install_package('xacro')
 
-try:
-    import ament_index_python
-except (ModuleNotFoundError, ImportError):
-    pip_install('ros-ament-index-python')
-
-try:
-    import xmltodict
-except (ModuleNotFoundError, ImportError):
-    pip_install('xmltodict')
-
-try:
-    import collada
-except (ModuleNotFoundError, ImportError):
-    pip_install('pycollada')
-
-try:
-    import PyQt5
-except (ModuleNotFoundError, ImportError):
-    pip_install('PyQt5')
-
-try:
-    import lxml
-except (ModuleNotFoundError, ImportError):
-    pip_install('lxml')
-
+check_install_package('ament_index_python', 'ros-ament-index-python')
+check_install_package('xmltodict')
+check_install_package('collada', 'pycollada')
+check_install_package('PyQt5')
+check_install_package('lxml')
 
 # Must be imported after the call to `add_ros_library_path`.
 from freecad.cross.freecad_utils import warn
