@@ -41,7 +41,7 @@ class _UpdatePlanningSceneCommand:
         except RuntimeError:
             # The command is active only when a Cross::PlanningScene is active,
             # this should not happen.
-            warn('Internal error, no Cross::PlanningScene selected', true)
+            warn('Internal error, no Cross::PlanningScene selected', True)
             return
 
         fcgui.addModule('freecad.cross.ros.planning_scene')
