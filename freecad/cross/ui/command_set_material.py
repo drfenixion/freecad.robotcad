@@ -2,8 +2,8 @@ import os
 from pathlib import PurePath
 import FreeCAD as fc
 import FreeCADGui as fcgui
-from freecad.cross.vendor.fc_material_editor import MaterialEditor
-# import MaterialEditor
+from freecad.cross.vendor.fc_material_editor import MaterialEditor as MaterialEditor_1_1
+import MaterialEditor
 
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected, is_link_selected
@@ -63,7 +63,19 @@ class _SetMaterialCommand:
         #MaterialEditor.openEditor("SolidMaterial", "Material")
 
         # legacy editor
-        material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+        # Get FreeCAD version: fc.Version() returns something like ['1', '0', '0', '1.0.0']
+        fc_version = fc.Version()
+        try:
+            major = int(fc_version[0])
+            minor = int(fc_version[1])
+        except (ValueError, IndexError):
+            major = 0
+            minor = 0
+
+        if (major, minor) >= (1, 1):
+            material_editor = MaterialEditor_1_1.MaterialEditor(card_path=card_path)
+        else:
+            material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
         result = material_editor.exec_()
 
         if not result:
