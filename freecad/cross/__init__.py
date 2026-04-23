@@ -57,6 +57,7 @@ def pip_install(pkg_name):
     p.wait(timeout=180)
 
 def check_install_package(packages_import_name, package_name = None):
+    add_packages_path()
     try:
         __import__(packages_import_name)
     except (ModuleNotFoundError, ImportError):
