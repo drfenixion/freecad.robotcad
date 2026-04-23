@@ -3,7 +3,6 @@ from __future__ import annotations
 import FreeCAD as fc
 
 import FreeCADGui as fcgui
-from freecad.cross import check_install_package
 
 from ..freecad_utils import validate_types
 from ..freecad_utils import warn
@@ -32,7 +31,6 @@ class _UpdatePlanningSceneCommand:
         return is_planning_scene_selected()
 
     def Activated(self):
-        check_install_package('geometry-msgs', 'ros-geometry-msgs')
         doc = fc.activeDocument()
         try:
             cross_planning_scene, = validate_types(

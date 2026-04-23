@@ -3,7 +3,6 @@ from __future__ import annotations
 import FreeCAD as fc
 
 import FreeCADGui as fcgui
-from freecad.cross import check_install_package
 
 from ..gui_utils import tr
 
@@ -28,7 +27,6 @@ class _GetPlanningSceneCommand:
         return True
 
     def Activated(self):
-        check_install_package('geometry-msgs', 'ros-geometry-msgs')
         doc = fc.activeDocument()
         if not doc:
             doc = fc.newDocument()
