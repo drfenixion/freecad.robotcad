@@ -7,7 +7,7 @@ import MaterialEditor
 
 from ..gui_utils import tr
 from ..wb_utils import is_robot_selected, is_link_selected
-from ..freecad_utils import error
+from ..freecad_utils import error, getFreeCADversion
 
 
 def read_fcmat_file(card_path):
@@ -62,15 +62,7 @@ class _SetMaterialCommand:
         # new editor
         #MaterialEditor.openEditor("SolidMaterial", "Material")
 
-        # legacy editor
-        # Get FreeCAD version: fc.Version() returns something like ['1', '0', '0', '1.0.0']
-        fc_version = fc.Version()
-        try:
-            major = int(fc_version[0])
-            minor = int(fc_version[1])
-        except (ValueError, IndexError):
-            major = 0
-            minor = 0
+        major, minor = getFreeCADversion()
 
         if (major, minor) >= (1, 1):
             material_editor = MaterialEditor_1_1.MaterialEditor(card_path=card_path)

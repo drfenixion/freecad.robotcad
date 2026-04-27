@@ -1113,6 +1113,18 @@ class Material:
     density: Optional[fc.Units.Quantity] = None
 
 
+def getFreeCADversion():
+    # Get FreeCAD version: fc.Version() returns something like ['1', '0', '0', '1.0.0']
+    fc_version = fc.Version()
+    try:
+        major = int(fc_version[0])
+        minor = int(fc_version[1])
+    except:
+        major = 0
+        minor = 0
+    return major, minor
+
+
 def material_from_material_editor(
         card_path: str,
 ) -> Material:
@@ -1124,8 +1136,15 @@ def material_from_material_editor(
     """
     material = Material(card_path)
     material.card_path = card_path
+    from freecad.cross.vendor.fc_material_editor import MaterialEditor as MaterialEditor_1_1
     import MaterialEditor
-    material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+
+    major, minor = getFreeCADversion()
+    if (major, minor) >= (1, 1):
+        material_editor = MaterialEditor_1_1.MaterialEditor(card_path=card_path)
+    else:
+        material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+
     try:
         divider = 'Material/Resources/Materials/'
         first_key = next(iter(material_editor.cards))
