@@ -159,7 +159,13 @@ class UrdfLoader:
     def load_from_string(cls, description: [str | bytes]) -> Robot:
         """Load from an xml string."""
         return Robot.from_xml_string(description)
-
+    
+    @classmethod
+    def load_from_xacro_string(cls, description: [str | bytes]) -> Robot:
+        """Load from an xml string."""
+        return Robot.from_xml_string(
+            custom_xacro_parse(description).toxml()
+        )
     @classmethod
     def load_from_parameter_server(
         cls,

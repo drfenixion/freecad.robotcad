@@ -52,6 +52,7 @@ from .ui import command_calculate_mass_and_inertia # noqa: F401
 from .ui import command_world_generator # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
+from .ui import command_generate_robot_by_text # noqa: F401
 
 #CROSS sensors
 from .ui import command_new_lidar2d  # noqa: F401
@@ -89,6 +90,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'GenerateRobotByText',  # Defined in ./ui/command_generate_robot_by_text.py.
             'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
@@ -142,6 +144,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'GenerateRobotByText',  # Defined in ./ui/command_generate_robot_by_text.py.
             'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.

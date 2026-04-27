@@ -253,6 +253,9 @@ class WbSettingsGetter:
 
         self.form.button_box.accepted.connect(self.on_ok)
         self.form.button_box.rejected.connect(self.on_cancel)
+        
+        # Hook for subclasses to add extra connections before exec_()
+        self._on_form_loaded()
 
         if self.form.exec_():
             return True
@@ -260,6 +263,13 @@ class WbSettingsGetter:
         # FreeCAD.
         self.form.close()
         return False
+    
+    def _on_form_loaded(self):
+        """Hook method called after form is loaded but before exec_().
+        
+        Override this in subclasses to add extra UI elements or connections.
+        """
+        pass
 
     def get_ros_workspace(
         self,

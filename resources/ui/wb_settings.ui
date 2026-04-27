@@ -105,6 +105,29 @@
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="button_llm_settings">
+     <property name="text">
+      <string>LLM Provider Settings</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="vertical_spacer_llm_settings">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>15</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
     <widget class="QDialogButtonBox" name="button_box">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
