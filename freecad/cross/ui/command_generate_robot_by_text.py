@@ -14,7 +14,7 @@ class _GenerateRobotByTextCommand:
     def GetResources(self):
         return {
             'Pixmap': 'generate_robot_by_text.svg',
-            'MenuText': tr('Generate robot by text'),
+            'MenuText': tr('Generate primitive robot by text'),
             'Accel': 'G, R',
             'ToolTip': tr('Allows you to generate a robot built from primitives based on a text description.'),
         }

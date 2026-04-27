@@ -200,7 +200,7 @@ class RobotGenerationDialog(QtWidgets.QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Generate Robot by Text")
+        self.setWindowTitle("Generate Primitive Robot by Text")
         self.setModal(False)  # Modeless dialog - allows interaction with FreeCAD
         self.resize(500, 400)
         self._setup_ui()
