@@ -311,18 +311,18 @@ class MaterialEditor:
         from materialtools.cardutils import import_materials as getmats
         self.materials, self.cards, self.icons = getmats(category=self.category)
 
-        # Debug output
-        FreeCAD.Console.PrintMessage("Debug: import_materials returned:\n")
-        FreeCAD.Console.PrintMessage("  materials count: {}\n".format(len(self.materials)))
-        FreeCAD.Console.PrintMessage("  cards count: {}\n".format(len(self.cards)))
-        FreeCAD.Console.PrintMessage("  icons count: {}\n".format(len(self.icons)))
+        # # Debug output
+        # FreeCAD.Console.PrintMessage("Debug: import_materials returned:\n")
+        # FreeCAD.Console.PrintMessage("  materials count: {}\n".format(len(self.materials)))
+        # FreeCAD.Console.PrintMessage("  cards count: {}\n".format(len(self.cards)))
+        # FreeCAD.Console.PrintMessage("  icons count: {}\n".format(len(self.icons)))
         
-        # Show sample paths
-        for i, (path, name) in enumerate(list(self.cards.items())[:5]):
-            is_file = os.path.isfile(path)
-            is_dir = os.path.isdir(path)
-            FreeCAD.Console.PrintMessage("  cards[{}]: path='{}', name='{}', isfile={}, isdir={}\n".format(
-                i, path, name, is_file, is_dir))
+        # # Show sample paths
+        # for i, (path, name) in enumerate(list(self.cards.items())[:5]):
+        #     is_file = os.path.isfile(path)
+        #     is_dir = os.path.isdir(path)
+        #     FreeCAD.Console.PrintMessage("  cards[{}]: path='{}', name='{}', isfile={}, isdir={}\n".format(
+        #         i, path, name, is_file, is_dir))
 
         def find_materials_base_directory():
             """Find the base Materials directory by looking at the paths from import_materials."""
@@ -360,7 +360,7 @@ class MaterialEditor:
 
         # Find the base materials directory
         base_dir = find_materials_base_directory()
-        FreeCAD.Console.PrintMessage("Debug: Base materials directory: {}\n".format(base_dir))
+        # FreeCAD.Console.PrintMessage("Debug: Base materials directory: {}\n".format(base_dir))
         
         # Collect all .FCMat files
         card_name_list = collect_all_fcmat_files(base_dir)
@@ -377,11 +377,11 @@ class MaterialEditor:
             except Exception:
                 self.materials[card_path] = {}
 
-        # Debug: show what we're adding to combo
-        FreeCAD.Console.PrintMessage("Debug: Adding {} items to combo box\n".format(len(card_name_list)))
-        for i, mat in enumerate(card_name_list[:10]):
-            FreeCAD.Console.PrintMessage("  combo[{}]: name='{}', path='{}', isfile={}\n".format(
-                i, mat[0], mat[1], os.path.isfile(mat[1])))
+        # # Debug: show what we're adding to combo
+        # FreeCAD.Console.PrintMessage("Debug: Adding {} items to combo box\n".format(len(card_name_list)))
+        # for i, mat in enumerate(card_name_list[:10]):
+        #     FreeCAD.Console.PrintMessage("  combo[{}]: name='{}', path='{}', isfile={}\n".format(
+        #         i, mat[0], mat[1], os.path.isfile(mat[1])))
 
         card_name_list.insert(0, [None, "", ""])
         self.widget.ComboMaterial.clear()
