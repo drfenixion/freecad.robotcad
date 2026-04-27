@@ -15,6 +15,7 @@ from typing import Optional, Callable
 import FreeCAD as fc
 import FreeCADGui as fcgui
 from freecad.cross.urdf_loader import UrdfLoader
+from freecad.cross.wb_utils import MOD_PATH
 
 try:
     from PySide import QtCore, QtGui, QtWidgets
@@ -357,7 +358,7 @@ class RobotGenerationDialog(QtWidgets.QDialog):
             doc = fc.newDocument()
             fc.setActiveDocument(doc.Name)
             # import debugpy
-            # debugpy.breakpoint()
+            # debugpy.breakpoint()            
             urdf_robot = UrdfLoader.load_from_xacro_string(urdf_content)
             robot = robot_from_urdf(
                 doc,
@@ -368,6 +369,28 @@ class RobotGenerationDialog(QtWidgets.QDialog):
             
             if robot:
                 self.log_text.appendPlainText(f"Robot '{robot.Label}' created successfully")
+                
+                # Set ABS-Generic material to the robot
+                import os
+                from pathlib import Path
+                abs_material_path = MOD_PATH / 'resources' / 'materials' / 'Standard' / 'Thermoplast' / 'ABS-Generic.FCMat'
+                abs_material_path = str(abs_material_path)
+                robot.MaterialCardName = "ABS-Generic"
+                robot.MaterialCardPath = abs_material_path
+                robot.MaterialDensity = "1060 kg/m^3"
+                self.log_text.appendPlainText("Set ABS-Generic material to robot")
+                
+                self.progress_bar.setValue(90)
+                doc.recompute()
+                
+                # Select the robot and call the existing command
+                fcgui.Selection.clearSelection()
+                fcgui.Selection.addSelection(robot)
+                
+                # Calculate mass and inertia using existing command
+                self.log_text.appendPlainText("Calculating mass and inertia...")
+                fcgui.runCommand('CalculateMassAndInertia')
+                
                 self.progress_bar.setValue(100)
                 # Fit view
                 fcgui.SendMsgToActiveView('ViewFit')
