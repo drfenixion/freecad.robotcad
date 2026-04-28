@@ -950,7 +950,7 @@ def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = 
     return links
 
 
-def explode_link(orienteer:fc.DO, index:int) -> bool :
+def explode_link(orienteer: fc.DO, offset: float) -> bool:
     ''' Move link for see hiden faces (explode view)  '''
 
     if not is_link(orienteer):
@@ -962,14 +962,9 @@ def explode_link(orienteer:fc.DO, index:int) -> bool :
         # there is no parent link
         return False
 
-    explodeDistance = (index + 1) * 100
-    base = link.MountedPlacement.Base
-    link.MountedPlacement.Base.x = base.x + explodeDistance
-    link.MountedPlacement.Base.y = base.y + explodeDistance
-    link.MountedPlacement.Base.z = base.y + explodeDistance
-
-    link.ViewObject.ShowReal = False
-    link.ViewObject.ShowReal = True
-    fc.ActiveDocument.recompute()
+    link.MountedPlacement.Base.x = link.MountedPlacement.Base.x + offset
+    
+    # link.ViewObject.ShowReal = False
+    # link.ViewObject.ShowReal = True
 
     return True
