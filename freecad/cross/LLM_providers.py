@@ -161,9 +161,27 @@ def call_openrouter_api(system_prompt: str, user_prompt: str, log_callback: Opti
             headers=headers,
             timeout=300
         )
-        
+        # import debugpy; debugpy.breakpoint()
         if response.status_code == 200:
             result = response.json()
+            # Check if response has expected structure
+            if "choices" not in result:
+                # Check if it's an error response
+                error_info = result.get("error", {})
+                error_message = error_info.get("message", "Unknown error")
+                error_code = error_info.get("code", "unknown")
+                
+                # Provider error (code 524 = provider timeout/error)
+                if error_code == 524:
+                    error_detail = f"Provider error: {error_message} (code {error_code}). The model provider timed out or returned an error."
+                else:
+                    error_detail = f"API error: {error_message} (code {error_code})"
+                
+                if log_callback:
+                    log_callback(f"ERROR: {error_detail}")
+                raise RuntimeError(error_detail)
+            if not result["choices"]:
+                raise RuntimeError("OpenRouter API returned empty choices array.")
             generated_content = result["choices"][0]["message"]["content"]
             if not generated_content:
                 raise RuntimeError("OpenRouter API returned empty content.")
