@@ -387,7 +387,9 @@ class RobotGenerationDialog(QtWidgets.QDialog):
         if self._worker and not self._worker._is_cancelled:
             self._worker.cancel()
             self.status_label.setText("Cancelling...")
-        self.cancel_button.setEnabled(False)
+            self.log_text.appendPlainText("Cancellation requested by user...")
+            self.cancel_button.setEnabled(False)
+            self.generate_button.setEnabled(False)
     
     def _on_progress_updated(self, value: int):
         """Handle progress update."""
@@ -412,8 +414,12 @@ class RobotGenerationDialog(QtWidgets.QDialog):
         if success:
             self.status_label.setText("Generation completed successfully!")
             self.log_text.appendPlainText("Generation completed successfully!")
+        elif error_message == "Cancelled by user":
+            self.status_label.setText("Canceled")
+            self.log_text.appendPlainText(error_message)
         else:
             self.status_label.setText(f"Error: {error_message}")
+            self.log_text.appendPlainText(f"Error: {error_message}")
             QtWidgets.QMessageBox.critical(
                 self,
                 "Generation Failed",
@@ -525,7 +531,9 @@ class RobotGenerationDialog(QtWidgets.QDialog):
         if self._thread and self._thread.isRunning():
             if self._worker:
                 self._worker.cancel()
-            self._thread.wait()
+            # Don't block UI thread - just accept the close event
+            # The thread will be cleaned up when it finishes
+            self._thread.finished.connect(self._thread.deleteLater)
         event.accept()
 
 
