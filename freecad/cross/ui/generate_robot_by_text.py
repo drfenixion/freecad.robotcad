@@ -77,6 +77,7 @@ class RobotGenerationWorker(QtCore.QObject):
     def _run_generation(self):
         """Internal generation process with retry logic."""
         if self._is_cancelled:
+            self.generation_finished.emit(False, "Cancelled by user")
             return
         
         self.progress_updated.emit(10)
@@ -86,12 +87,14 @@ class RobotGenerationWorker(QtCore.QObject):
         
         for attempt in range(1, self.MAX_RETRIES + 1):
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             self.log_message.emit(f"Attempt {attempt}/{self.MAX_RETRIES}")
             
             # Step 1: Call LLM to generate URDF
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             self.progress_updated.emit(20)
@@ -112,6 +115,7 @@ class RobotGenerationWorker(QtCore.QObject):
                     continue
             
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             self.progress_updated.emit(60)
@@ -119,6 +123,7 @@ class RobotGenerationWorker(QtCore.QObject):
             
             # Step 2: Extract URDF from response
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             self.progress_updated.emit(70)
@@ -137,6 +142,7 @@ class RobotGenerationWorker(QtCore.QObject):
             
             # Step 3: Request robot creation in main thread via signal
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             self._urdf_content = urdf_content
@@ -156,6 +162,7 @@ class RobotGenerationWorker(QtCore.QObject):
             self._wait_for_result()
             
             if self._is_cancelled:
+                self.generation_finished.emit(False, "Cancelled by user")
                 return
             
             if self._result_success:
