@@ -24,7 +24,7 @@ except ImportError:
 
 from ..LLM_providers import call_llm_provider
 from ..robot_from_urdf import robot_from_urdf
-from ..freecadgui_utils import get_progress_bar, gui_process_events
+from ..freecadgui_utils import get_progress_bar, gui_process_events, get_report_view_text
 
 
 # System prompt for URDF generation
@@ -41,19 +41,27 @@ class RobotGenerationWorker(QtCore.QObject):
         progress_updated: Emitted when progress changes (value 0-100).
         log_message: Emitted with log message.
         generation_finished: Emitted when generation is complete (success, error_message).
-        create_robot_requested: Emitted to request robot creation in main thread (urdf_content).
+        create_robot_requested: Emitted to request robot creation in main thread (urdf_content, attempt).
+        robot_creation_result: Received from main thread with result (success, error_message).
     """
     
     progress_updated = QtCore.Signal(int)
     log_message = QtCore.Signal(str)
     generation_finished = QtCore.Signal(bool, str)
-    create_robot_requested = QtCore.Signal(str)
+    create_robot_requested = QtCore.Signal(str, int)
+    robot_creation_result = QtCore.Signal(bool, str)
+    
+    MAX_RETRIES = 5
     
     def __init__(self, user_description: str):
         super().__init__()
         self.user_description = user_description
         self._is_cancelled = False
         self._urdf_content = ""
+        self._result_received = False
+        self._result_success = False
+        self._result_message = ""
+        self._result_event = threading.Event()
     
     def cancel(self):
         """Cancel the generation process."""
@@ -61,85 +69,143 @@ class RobotGenerationWorker(QtCore.QObject):
     
     def run(self):
         """Run the generation process in background."""
-        # Attach debugpy to this worker thread for debugging
-        # try:
-        #     import debugpy
-        #     import sys
-        #     # Get the current frame's trace function from main thread
-        #     # and apply it to this thread
-        #     main_thread = __import__('threading').main_thread()
-        #     if hasattr(main_thread, '_ts'):
-        #         sys.settrace(main_thread._ts)
-        #     # Force a breakpoint to catch debugger
-        #     # debugpy.breakpoint()  # Uncomment to force breakpoint
-        # except ImportError:
-        #     pass  # debugpy not available
-        # except Exception:
-        #     pass  # ignore other errors
-        
         try:
             self._run_generation()
         except Exception as e:
             self.generation_finished.emit(False, str(e))
     
     def _run_generation(self):
-        """Internal generation process."""
+        """Internal generation process with retry logic."""
         if self._is_cancelled:
             return
         
         self.progress_updated.emit(10)
         self.log_message.emit("Starting robot generation from text description...")
         
-        # Step 1: Call LLM to generate URDF
+        last_error = ""
+        
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            if self._is_cancelled:
+                return
+            
+            self.log_message.emit(f"Attempt {attempt}/{self.MAX_RETRIES}")
+            
+            # Step 1: Call LLM to generate URDF
+            if self._is_cancelled:
+                return
+            
+            self.progress_updated.emit(20)
+            self.log_message.emit("Sending request to LLM provider...")
+            
+            try:
+                llm_response = call_llm_provider(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_prompt=self.user_description,
+                    log_callback=self._log_callback
+                )
+            except Exception as e:
+                last_error = str(e)
+                if attempt == self.MAX_RETRIES:
+                    raise RuntimeError(f"LLM generation failed: {last_error}")
+                else:
+                    self.log_message.emit(f"LLM error: {last_error}, retrying...")
+                    continue
+            
+            if self._is_cancelled:
+                return
+            
+            self.progress_updated.emit(60)
+            self.log_message.emit("Received response from LLM")
+            
+            # Step 2: Extract URDF from response
+            if self._is_cancelled:
+                return
+            
+            self.progress_updated.emit(70)
+            self.log_message.emit("Extracting URDF from response...")
+            urdf_content = extract_urdf_from_response(llm_response)
+            
+            if not validate_urdf(urdf_content):
+                last_error = "Failed to extract valid URDF from LLM response"
+                if attempt == self.MAX_RETRIES:
+                    raise RuntimeError(last_error)
+                else:
+                    self.log_message.emit("Invalid URDF extracted, retrying...")
+                    continue
+            
+            self.log_message.emit(f"URDF extracted successfully ({len(urdf_content)} characters)")
+            
+            # Step 3: Request robot creation in main thread via signal
+            if self._is_cancelled:
+                return
+            
+            self._urdf_content = urdf_content
+            self.progress_updated.emit(80)
+            self.log_message.emit("Creating Robot from URDF...")
+            
+            # Reset result state
+            self._result_received = False
+            self._result_success = False
+            self._result_message = ""
+            self._result_event.clear()
+            
+            # Emit signal to request robot creation in main thread
+            self.create_robot_requested.emit(urdf_content, attempt)
+            
+            # Wait for result from main thread
+            self._wait_for_result()
+            
+            if self._is_cancelled:
+                return
+            
+            if self._result_success:
+                # Robot created successfully, no errors in Report view
+                self.progress_updated.emit(100)
+                self.generation_finished.emit(True, "")
+                return
+            else:
+                # Errors detected in Report view, retry with new LLM call
+                last_error = self._result_message
+                self.log_message.emit(f"Robot creation had issues: {last_error}")
+                if attempt < self.MAX_RETRIES:
+                    self.log_message.emit("Closing document and retrying with new LLM call...")
+                    continue
+                else:
+                    self.generation_finished.emit(False, f"Failed after {self.MAX_RETRIES} attempts: {last_error}")
+                    return
+        
+        # Should not reach here, but just in case
+        self.generation_finished.emit(False, f"Generation failed after max retries: {last_error}")
+    
+    def _wait_for_result(self):
+        """Wait for the main thread to send the robot creation result."""
+        # Use threading.Event for proper thread synchronization
+        timeout = 300  # seconds (5 minutes for complex operations)
+        
+        # Wait for the event to be set or timeout
+        signaled = self._result_event.wait(timeout=timeout)
+        
         if self._is_cancelled:
+            self._result_received = True
+            self._result_success = False
+            self._result_message = "Cancelled by user"
             return
         
-        self.progress_updated.emit(20)
-        self.log_message.emit("Sending request to LLM provider...")
-        
-        try:
-            llm_response = call_llm_provider(
-                system_prompt=SYSTEM_PROMPT,
-                user_prompt=self.user_description,
-                log_callback=self._log_callback
-            )
-        except Exception as e:
-            raise RuntimeError(f"LLM generation failed: {str(e)}")
-        
-        if self._is_cancelled:
+        if not signaled:
+            # Timeout occurred
+            self._result_received = True
+            self._result_success = False
+            self._result_message = "Timeout waiting for robot creation result"
+            self.log_message.emit("WARNING: Timeout waiting for robot creation result")
             return
-        
-        self.progress_updated.emit(60)
-        self.log_message.emit("Received response from LLM")
-        
-        # Step 2: Extract URDF from response
-        if self._is_cancelled:
-            return
-        
-        self.progress_updated.emit(70)
-        self.log_message.emit("Extracting URDF from response...")
-        # import debugpy
-        # debugpy.breakpoint()
-        urdf_content = extract_urdf_from_response(llm_response)
-        
-        if not validate_urdf(urdf_content):
-            raise RuntimeError(
-                "Failed to extract valid URDF from LLM response. "
-                "Please check the response content."
-            )
-        
-        self.log_message.emit(f"URDF extracted successfully ({len(urdf_content)} characters)")
-        
-        # Step 3: Request robot creation in main thread via signal
-        if self._is_cancelled:
-            return
-        
-        self._urdf_content = urdf_content
-        self.progress_updated.emit(80)
-        self.log_message.emit("Creating Robot from URDF...")
-        
-        # Emit signal to request robot creation in main thread
-        self.create_robot_requested.emit(urdf_content)
+    
+    def _on_robot_creation_result(self, success: bool, error_message: str):
+        """Handle the robot creation result from main thread."""
+        self.log_message.emit(f"Received result: success={success}")
+        self._result_received = True
+        self._result_success = success
+        self._result_message = error_message
+        self._result_event.set()
     
     def _log_callback(self, message: str):
         """Log callback that emits signal."""
@@ -308,6 +374,7 @@ class RobotGenerationDialog(QtWidgets.QDialog):
         self._worker.progress_updated.connect(self._on_progress_updated)
         self._worker.log_message.connect(self._on_log_message)
         self._worker.create_robot_requested.connect(self._on_create_robot_requested)
+        self._worker.robot_creation_result.connect(self._worker._on_robot_creation_result, QtCore.Qt.DirectConnection)
         self._worker.generation_finished.connect(self._on_generation_finished)
         self._worker.generation_finished.connect(self._thread.quit)
         self._thread.finished.connect(self._on_thread_finished)
@@ -317,9 +384,9 @@ class RobotGenerationDialog(QtWidgets.QDialog):
     
     def _on_cancel(self):
         """Handle cancel button click."""
-        if self._worker:
+        if self._worker and not self._worker._is_cancelled:
             self._worker.cancel()
-        self.status_label.setText("Cancelling...")
+            self.status_label.setText("Cancelling...")
         self.cancel_button.setEnabled(False)
     
     def _on_progress_updated(self, value: int):
@@ -336,13 +403,15 @@ class RobotGenerationDialog(QtWidgets.QDialog):
     
     def _on_generation_finished(self, success: bool, error_message: str):
         """Handle generation completion."""
+        # Re-enable UI elements
+        self.text_edit.setEnabled(True)
+        self.generate_button.setEnabled(True)
+        self.cancel_button.setEnabled(False)
+        self.close_button.setEnabled(True)
+        
         if success:
             self.status_label.setText("Generation completed successfully!")
-            QtWidgets.QMessageBox.information(
-                self,
-                "Success",
-                "Robot generated successfully!"
-            )
+            self.log_text.appendPlainText("Generation completed successfully!")
         else:
             self.status_label.setText(f"Error: {error_message}")
             QtWidgets.QMessageBox.critical(
@@ -351,14 +420,16 @@ class RobotGenerationDialog(QtWidgets.QDialog):
                 f"Failed to generate robot:\n\n{error_message}"
             )
     
-    def _on_create_robot_requested(self, urdf_content: str):
-        """Handle robot creation request in main thread."""
+    def _on_create_robot_requested(self, urdf_content: str, attempt: int):
+        """Handle robot creation request in main thread with Report view comparison."""
         try:
-
             doc = fc.newDocument()
             fc.setActiveDocument(doc.Name)
-            # import debugpy
-            # debugpy.breakpoint()            
+            QtWidgets.QApplication.processEvents()
+            
+            # Capture Report view before robot_from_urdf
+            report_before = get_report_view_text()
+            
             urdf_robot = UrdfLoader.load_from_xacro_string(urdf_content)
             robot = robot_from_urdf(
                 doc,
@@ -367,7 +438,15 @@ class RobotGenerationDialog(QtWidgets.QDialog):
                 remove_solid_splitter=True
             )
             
-            if robot:
+            QtWidgets.QApplication.processEvents()
+            
+            # Capture Report view after robot_from_urdf
+            report_after = get_report_view_text()
+            
+            # Check if there's a difference (new messages appeared)
+            report_has_errors = report_before != report_after
+            
+            if robot and not report_has_errors:
                 self.log_text.appendPlainText(f"Robot '{robot.Label}' created successfully")
                 
                 # Set ABS-Generic material to the robot
@@ -387,18 +466,53 @@ class RobotGenerationDialog(QtWidgets.QDialog):
                 fcgui.Selection.clearSelection()
                 fcgui.Selection.addSelection(robot)
                 
-                # Calculate mass and inertia using existing command
+                # Send success result to worker BEFORE running potentially blocking command
+                self._worker.robot_creation_result.emit(True, "")
+                QtWidgets.QApplication.processEvents()
+                
+                # Calculate mass and inertia using existing command (may take time)
                 self.log_text.appendPlainText("Calculating mass and inertia...")
-                fcgui.runCommand('CalculateMassAndInertia')
+                try:
+                    fcgui.runCommand('CalculateMassAndInertia')
+                except Exception as e:
+                    self.log_text.appendPlainText(f"Warning: CalculateMassAndInertia failed: {e}")
                 
                 self.progress_bar.setValue(100)
                 # Fit view
                 fcgui.SendMsgToActiveView('ViewFit')
-                self._worker.generation_finished.emit(True, "")
             else:
-                self._worker.generation_finished.emit(False, "Robot creation returned None")
+                # Either robot is None or there were errors in Report view
+                if report_has_errors:
+                    # Get the new messages
+                    new_messages = report_after[len(report_before):].strip()
+                    error_msg = f"Errors during robot creation (attempt {attempt}):\n{new_messages}"
+                    # self.log_text.appendPlainText(f"Report view errors detected:\n{new_messages}")
+                else:
+                    error_msg = "Robot creation returned None"
+                    self.log_text.appendPlainText(error_msg)
+                
+                QtWidgets.QApplication.processEvents()
+                
+                # Close the document since it had errors
+                try:
+                    fc.closeDocument(doc.Name)
+                    self.log_text.appendPlainText(f"Closed document '{doc.Name}' due to errors")
+                    QtWidgets.QApplication.processEvents()
+                except Exception:
+                    pass
+                
+                # Send failure result to worker for retry
+                self._worker.robot_creation_result.emit(False, error_msg)
         except Exception as e:
-            self._worker.generation_finished.emit(False, f"Failed to create robot: {str(e)}")
+            # Close document if it was created
+            try:
+                fc.closeDocument(doc.Name)
+            except Exception:
+                pass
+            
+            error_msg = f"Failed to create robot: {str(e)}"
+            self.log_text.appendPlainText(error_msg)
+            self._worker.robot_creation_result.emit(False, error_msg)
     
     def _on_thread_finished(self):
         """Handle thread completion."""

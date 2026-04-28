@@ -359,6 +359,18 @@ def get_progress_bar(title:str = '', min: int = 0, max: int = 0, show_percents:b
     return progressBar
 
 
+def get_report_view_text() -> str:
+    """Get all console messages currently in the FreeCAD report view."""
+    try:
+        mw = fcgui.getMainWindow()
+        report_view = mw.findChild(QtWidgets.QTextEdit, "Report view")
+        if report_view:
+            return report_view.toPlainText()
+    except Exception:
+        pass
+    return ""
+
+
 def gui_process_events():
     """Use for unblock gui between ticks when sothing hard calculating"""
     QtGui.QApplication.processEvents()
