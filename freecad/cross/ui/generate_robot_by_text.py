@@ -30,6 +30,8 @@ from ..freecadgui_utils import get_progress_bar, gui_process_events, get_report_
 # System prompt for URDF generation
 SYSTEM_PROMPT = (
     "Create a URDF for the robot description provided by the user. "
+    "Use only clear URDF without any macros. "
+    "Dont use not standard tags! "
     "Return only a valid URDF in your response."
 )
 
@@ -99,6 +101,9 @@ class RobotGenerationWorker(QtCore.QObject):
             
             self.progress_updated.emit(20)
             self.log_message.emit("Sending request to LLM provider...")
+            
+            # # DEBUG BREAKPOINT for debugpy - attach debugger and this will pause
+            # import debugpy; debugpy.breakpoint()
             
             try:
                 llm_response = call_llm_provider(
