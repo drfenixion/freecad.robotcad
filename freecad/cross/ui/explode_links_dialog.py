@@ -72,6 +72,7 @@ class ExplodeLinksDialog:
             self,
         )
         self.dialog_confirmed = False
+        self._cancelling = False  # Guard against recursion in _on_cancel
 
         # Get the robot to store/load states
         self.robot = _get_robot_from_links(links)
@@ -99,6 +100,10 @@ class ExplodeLinksDialog:
         self.form.save_button.clicked.connect(self._on_save_clicked)
         self.form.button_box.accepted.connect(self._on_accept)
         self.form.button_box.rejected.connect(self._on_cancel)
+        # Also handle window close (X button) - restore original positions.
+        # rejected is emitted by reject(), but we guard against recursion
+        # by checking dialog_confirmed flag.
+        self.form.rejected.connect(self._on_cancel)
 
     def exec_(self) -> int:
         """Execute the dialog."""
@@ -286,14 +291,20 @@ class ExplodeLinksDialog:
 
     def _on_cancel(self) -> None:
         """Handle dialog cancellation."""
+        if self._cancelling:
+            # Guard against recursion: rejected signal is emitted by reject(),
+            # so calling reject() inside a rejected handler would loop.
+            return
+        self._cancelling = True
         self.dialog_confirmed = False
         # Restore original placements
         for i, link in enumerate(self.links):
-            if is_link(link):
-                link.MountedPlacement.Base = self.original_bases[i]
-                # link.ViewObject.ShowReal = False
-                # link.ViewObject.ShowReal = True
+            # if is_link(link):
+            link.MountedPlacement.Base = self.original_bases[i]
+            # link.ViewObject.ShowReal = False
+            # link.ViewObject.ShowReal = True
 
         if fc.activeDocument():
             fc.activeDocument().recompute()
         self.form.reject()
+
