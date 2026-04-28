@@ -362,6 +362,12 @@ class RobotProxy(ProxyBase):
         )
         obj.GenerateCodeForRosVersion=["jazzy", "iron"]
 
+        add_property(
+            obj, 'App::PropertyStringList', 'ExplodeViewStates', 'Internal',
+            'Saved explode view states. Each state is a JSON string with sorted link names and their MountedPlacement.Base positions.',
+        )
+        obj.setPropertyStatus('ExplodeViewStates', ['Hidden'])
+
 
         # The `Placement` is not used directly by the robot but it is used to
         # transform the pose of its links.
