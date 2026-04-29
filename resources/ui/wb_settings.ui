@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>395</width>
-    <height>136</height>
+    <height>260</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -109,6 +109,78 @@
      <property name="text">
       <string>LLM Provider Settings</string>
      </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="vertical_spacer_before_sponsorship">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>15</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="widget_sponsorship">
+     <property name="title">
+      <string>RobotCAD is sponsored by:</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_sponsorship">
+      <property name="leftMargin">
+       <number>9</number>
+      </property>
+      <property name="topMargin">
+       <number>9</number>
+      </property>
+      <property name="rightMargin">
+       <number>9</number>
+      </property>
+      <property name="bottomMargin">
+       <number>9</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="label_sponsorship_description">
+        <property name="font">
+         <font>
+          <pointsize>20</pointsize>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>Here can be your sponsorship or ads</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+        <widget class="QLabel" name="label_sponsorship_email">
+        <property name="font">
+         <font>
+          <pointsize>10</pointsize>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="textFormat">
+        <enum>Qt::RichText</enum>
+        </property>
+        <property name="textInteractionFlags">
+        <set>Qt::TextBrowserInteraction</set>
+        </property>
+        <property name="openExternalLinks">
+        <bool>true</bool>
+        </property>
+        <property name="text">
+        <string>Write to &lt;a href="mailto:it.project.devel@gmail.com"&gt;it.project.devel@gmail.com&lt;/a&gt;</string>
+        </property>
+        </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
