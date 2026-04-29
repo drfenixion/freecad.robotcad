@@ -150,7 +150,6 @@ class CrossWorkbench(fcgui.Workbench):
             'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
-            'ManageLinkDisplay',  # Defined in ./ui/command_manage_link_display.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'DuplicateRobot',  # Defined in ./ui/command_duplicate_robot.py.
             'Separator',
@@ -158,8 +157,9 @@ class CrossWorkbench(fcgui.Workbench):
             # 'NewRgbCamera',  # Defined in ./ui/command_new_rgb_camera.py.
             # 'NewLidar2d',  # Defined in ./ui/command_new_lidar2d.py.
             # 'NewUltrasound',  # Defined in ./ui/command_new_ultrasound.py.
-            'Separator',            
+            'Separator',
             # Placement
+            'ManageLinkDisplay',  # Defined in ./ui/command_manage_link_display.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
             'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.            

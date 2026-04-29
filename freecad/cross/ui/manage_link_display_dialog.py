@@ -203,6 +203,8 @@ class ManageLinkDisplayDialog:
             self._on_set_placement_mode,
         )
         self.form.button_box.accepted.connect(self._on_close)
+        # Also clean up when dialog is closed via the window X button.
+        self.form.finished.connect(self._on_close)
 
     def _on_checkbox_clicked(
             self, cb: QtGui.QCheckBox, prop: str, checked: bool,
@@ -286,6 +288,9 @@ class ManageLinkDisplayDialog:
 
     def _on_close(self) -> None:
         """Handle dialog close event."""
+        if hasattr(self, '_closed') and self._closed:
+            return
+        self._closed = True
         fcgui.Selection.removeObserver(self._observer)
         self.form.close()
 
