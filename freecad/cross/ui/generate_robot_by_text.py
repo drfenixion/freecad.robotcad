@@ -32,6 +32,7 @@ SYSTEM_PROMPT = (
     "Create a URDF for the robot description provided by the user. "
     "Use only clear URDF without any macros. "
     "Dont use not standard tags! "
+    "Dont use materials! "
     "Return only a valid URDF in your response."
 )
 
