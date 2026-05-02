@@ -30,6 +30,7 @@ Video of creating controllable models: <br />
 1. Autoinstall and run by startup script.
 1. Modeling parts (in FreeCAD).
 1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
+1. AI Generator of robot structure from primitives by text description (fast stend prototyping). 
 1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
@@ -49,6 +50,7 @@ Video of creating controllable models: <br />
 1. Sensors based on Gazebo sensors
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
+1. Explode View with adjustable offset and states memory.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF (kinematics, mass, inertia, sensors, etc.)
