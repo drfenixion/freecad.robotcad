@@ -1907,8 +1907,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     i = 0
     progressBar.setValue(i)
     QtGui.QApplication.processEvents()
-
     try:
+        is_root_link_mounted_placed = False
         for joint in joint_chain_tree:
             # prepare data
             r1, r2 =  get_assembly_reference_as_in_fc_1_0(joint['joint'])
@@ -1970,6 +1970,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
             mounted_placement = fc.Placement()
             if not joint['chain_direction'] or joint['chain_direction'] == 'forward':
                 link_assembly_placement = r1_link_assembly_placement
+                
+                if not is_root_link_mounted_placed:               
+                    parent_robot_link.MountedPlacement = assembly.Document.getObject(r2_path['base_name']).Placement
+                    is_root_link_mounted_placed = True
 
                 if is_lcs(sub_el_r1):
                     mounted_placement = sub_el_r1.Placement * o1
@@ -1982,6 +1986,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
 
             else: # reverse chain direction
                 link_assembly_placement = r2_link_assembly_placement
+
+                if not is_root_link_mounted_placed:            
+                    parent_robot_link.MountedPlacement = assembly.Document.getObject(r1_path['base_name']).Placement
+                    is_root_link_mounted_placed = True
 
                 if is_lcs(sub_el_r2):
                     mounted_placement = sub_el_r2.Placement * o2
