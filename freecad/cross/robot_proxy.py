@@ -21,7 +21,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path, quantity_as
+from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, getFreeCADversion, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path, quantity_as
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -1538,6 +1538,18 @@ def make_filled_robot(name:str = 'Robot') -> CrossRobot:
     return robot
 
 
+def get_assembly_reference_as_in_fc_1_0(assembly_joint):
+    """Construct old (fc 1.0) assembly Reference with backward compatibility. In fc 1.1+ Reference was changed."""
+    major, minor = getFreeCADversion()
+    if (major, minor) >= (1, 1):
+        r1 = assembly_joint.Reference1[0].Name + '.' + assembly_joint.Reference1[1][0]
+        r2 = assembly_joint.Reference2[0].Name + '.' + assembly_joint.Reference2[1][0]
+    else:
+        r1 = assembly_joint.Reference1[1][0]
+        r2 = assembly_joint.Reference2[1][0]
+
+    return (r1, r2)
+
 def get_assembly_elements(
         assembly:DO,
         root_grounded_joint_of_root_assembly:DO = None,
@@ -1593,11 +1605,14 @@ def get_assembly_elements(
             progressBar.setValue(i)
             QtGui.QApplication.processEvents()
         elif is_join_from_assembly_wb(el):
-            r1 = el.Reference1[1][0]
+            
+            # # construct old (fc 1.0) assembly Reference
+            r1, r2 =  get_assembly_reference_as_in_fc_1_0(el)
+
             r1_name_path = r1.split('.')
             r1_obj0_link = doc.getObject(r1_name_path[0])
-
-            r2 = el.Reference2[1][0]
+            
+            r2 = el.Reference2[0].Name + '.' + el.Reference2[1][0]
             r2_name_path = r2.split('.')
             r2_obj0_link = doc.getObject(r2_name_path[0])
 
@@ -1896,8 +1911,7 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
     try:
         for joint in joint_chain_tree:
             # prepare data
-            r1 = joint['joint'].Reference1[1][0]
-            r2 = joint['joint'].Reference2[1][0]
+            r1, r2 =  get_assembly_reference_as_in_fc_1_0(joint['joint'])
             p1 = joint['joint'].Placement1
             p2 = joint['joint'].Placement2
             o1 = joint['joint'].Offset1
@@ -2014,7 +2028,10 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 if joint_match['limits']:
                     for limit in joint_match['limits']:
                         if getattr(joint['joint'], limit['assembly_enable_param']) == True:
-                            setattr(robot_joint, limit['robotcad_value_param'], getattr(joint['joint'], limit['assembly_value_param']))
+                            try:
+                                setattr(robot_joint, limit['robotcad_value_param'], getattr(joint['joint'], limit['assembly_value_param']))
+                            except:
+                                setattr(robot_joint, limit['robotcad_value_param'], float(getattr(joint['joint'], limit['assembly_value_param'])))
             else:
                 warn('Can`t automatically match joint type ' + joint['joint'].JointType + ' of joint '+ joint['joint'].Name +' \
 to RobotCAD joint type. Set joint type manually in resulting structure or change joint type to supported by URDF in assembly.')
