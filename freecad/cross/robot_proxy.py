@@ -21,7 +21,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, getFreeCADversion, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, is_some_with_volume, parse_freecad_path, quantity_as
+from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, getFreeCADversion, is_assembly_from_assembly_wb, is_body, is_box, is_cylinder, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_mesh, is_part, is_part_feature, is_sphere, parse_freecad_path, quantity_as
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -1703,6 +1703,18 @@ def get_assembly_elements(
 
     return assembly_links, assembly_joints, grounded_joints
 
+
+def is_volumed_in_certain_types(obj: DO) -> bool:
+    """Return True if the object is in types list and has volume."""
+    if is_body(obj) or is_box(obj) or is_sphere(obj) or is_cylinder(obj) or is_mesh(obj) or is_part_feature(obj):
+        try:
+            if obj.Shape.Volume > 0:
+                return True
+        except:
+            pass
+    return False
+
+
 def get_volumed_elements_cumulative_placement(r1_name_path: list, doc):
     """cut started assembly and part paths and sum cumulative volumed elements placement.
     r1_name_path is list of paths from assembly reference."""
@@ -1717,7 +1729,7 @@ def get_volumed_elements_cumulative_placement(r1_name_path: list, doc):
         if len(r1_name_path) > 2:
             for p in r1_name_path_wo_assembly:
                 p_obj = doc.getObject(p)
-                if is_some_with_volume(p_obj):
+                if is_volumed_in_certain_types(p_obj):
                     inside_part_cumulative_plcm = inside_part_cumulative_plcm * p_obj.Placement
     return inside_part_cumulative_plcm
 

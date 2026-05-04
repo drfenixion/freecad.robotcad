@@ -372,9 +372,6 @@ def is_part_feature(obj: DO) -> bool:
     """Return True if the object is a 'Part::Feature'."""
     return is_derived_from(obj, 'Part::Feature')
 
-def is_some_with_volume(obj: DO) -> bool:
-    """Return True if the object is in types list."""
-    return is_body(obj) or is_box(obj) or is_sphere(obj) or is_cylinder(obj) or is_mesh(obj) or is_part_feature(obj)
 
 def is_part(obj: DO) -> bool:
     """Return True if the object is a 'App::Part'."""
