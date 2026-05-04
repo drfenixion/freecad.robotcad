@@ -30,6 +30,7 @@ Video of creating controllable models: <br />
 1. Autoinstall and run by startup script.
 1. Modeling parts (in FreeCAD).
 1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
+1. AI Generator of robot structure from primitives by text description (fast stend prototyping). 
 1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
@@ -49,6 +50,7 @@ Video of creating controllable models: <br />
 1. Sensors based on Gazebo sensors
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
+1. Explode View with adjustable offset and states memory.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF (kinematics, mass, inertia, sensors, etc.)
@@ -69,7 +71,30 @@ Video of creating controllable models: <br />
         1. README instruction how to use
 1. all features from CROSS workbench
 
-# Fast install and run
+# Here various installation options (choose one):
+
+## FreeCAD Addon Manager
+Open FreeCAD
+
+Click the Edit -> Preferencies -> Addon Manager Options
+
+Go to the Custom repositories block
+
+Click + button and enter the repository URL: https://github.com/drfenixion/freecad.robotcad, branch: 'main'
+
+Click OK to save the settings
+
+Go to Tools → Addon Manager
+
+Search for RobotCAD in the Addon Manager
+
+Click Install
+
+Restart FreeCAD
+
+## Fast install and run script
+_Script installs also ROS2 + Gazebo in Docker, its required for some tools. FreeCAD will be run from inside the Docker._
+
 If you have Docker (buildx, compose plugins) installed or have Ubuntu OS (Docker will be autoinstalled) just do:
 ```
 cd ~/
@@ -85,8 +110,8 @@ Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
 If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manually Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
 
-# Fast install and run with FreeCAD 1.1 AppImage
-Do same as **Fast install and run** section.
+# Fast install and run script with FreeCAD 1.1 AppImage
+Do same as **Fast install and run script** section.
 Place FreeCAD 1.1 AppImage to docker/freecad/freecad_custom_appimage_dir and do `bash run.bash -cif` (in docker dir) one time and then for regular run `bash run.bash -ci`. Dont forget to update RobotCAD before and make FreeCAD 1.1 AppImage executable.
 
 **You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
@@ -235,7 +260,7 @@ Compatible with ROS2.
 - Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
 - Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
-## Installation
+## OLD Installation
 
 You need a recent version of FreeCAD (v1 or above) with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
