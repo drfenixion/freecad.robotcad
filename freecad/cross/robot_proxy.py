@@ -21,7 +21,7 @@ from PySide.QtWidgets import QMessageBox
 from PySide import QtGui
 from freecad.cross.freecadgui_utils import ask_confirmation, get_progress_bar # FreeCAD's PySide
 
-from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, getFreeCADversion, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, parse_freecad_path, quantity_as
+from .freecad_utils import ProxyBase, get_first_not_assembly, get_local_path_in_external_assembly, getFreeCADversion, is_assembly_from_assembly_wb, is_grounded_join_from_assembly_wb, is_join_from_assembly_wb, is_lcs, is_link_to_assembly_from_assembly_wb, is_part, is_some_with_volume, parse_freecad_path, quantity_as
 from .freecad_utils import add_property
 from .freecad_utils import error
 from .freecad_utils import get_properties_of_category
@@ -1703,6 +1703,23 @@ def get_assembly_elements(
 
     return assembly_links, assembly_joints, grounded_joints
 
+def get_volumed_elements_cumulative_placement(r1_name_path: list, doc):
+    """cut started assembly and part paths and sum cumulative volumed elements placement.
+    r1_name_path is list of paths from assembly reference."""
+    inside_part_cumulative_plcm = fc.Placement()
+    if len(r1_name_path) > 2:
+        r1_name_path_wo_assembly = []
+        for p in r1_name_path:
+            p_obj = doc.getObject(p)
+            if not is_link_to_assembly_from_assembly_wb(p_obj): # and not is_part(p_obj):
+                r1_name_path_wo_assembly.append(p)
+
+        if len(r1_name_path) > 2:
+            for p in r1_name_path_wo_assembly:
+                p_obj = doc.getObject(p)
+                if is_some_with_volume(p_obj):
+                    inside_part_cumulative_plcm = inside_part_cumulative_plcm * p_obj.Placement
+    return inside_part_cumulative_plcm
 
 def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> CrossRobot:
     """Add a Cross::Robot to the current document and fill it with links and joints
@@ -1710,7 +1727,8 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
 
     if not robot:
         robot = make_robot(ros_name(assembly))
-
+    
+    doc = assembly.Document
 
     ### get assembly elements
     assembly_links, assembly_joints, grounded_joints = get_assembly_elements(assembly)
@@ -1972,13 +1990,15 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 link_assembly_placement = r1_link_assembly_placement
                 
                 if not is_root_link_mounted_placed:               
-                    parent_robot_link.MountedPlacement = assembly.Document.getObject(r2_path['base_name']).Placement
+                    parent_robot_link.MountedPlacement = doc.getObject(r2_path['base_name']).Placement
                     is_root_link_mounted_placed = True
 
+                inside_part_cumulative_plcm = get_volumed_elements_cumulative_placement(r1_name_path, doc)
+                            
                 if is_lcs(sub_el_r1):
-                    mounted_placement = sub_el_r1.Placement * o1
+                    mounted_placement = inside_part_cumulative_plcm * sub_el_r1.Placement
                 else: # face of obj case
-                    mounted_placement = p1 * o1
+                    mounted_placement = inside_part_cumulative_plcm * p1 
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
@@ -1988,13 +2008,15 @@ def make_filled_robot_from_assembly(assembly:DO, robot:CrossRobot = None) -> Cro
                 link_assembly_placement = r2_link_assembly_placement
 
                 if not is_root_link_mounted_placed:            
-                    parent_robot_link.MountedPlacement = assembly.Document.getObject(r1_path['base_name']).Placement
+                    parent_robot_link.MountedPlacement = doc.getObject(r1_path['base_name']).Placement
                     is_root_link_mounted_placed = True
 
+                inside_part_cumulative_plcm = get_volumed_elements_cumulative_placement(r2_name_path, doc)
+
                 if is_lcs(sub_el_r2):
-                    mounted_placement = sub_el_r2.Placement * o2
+                    mounted_placement = inside_part_cumulative_plcm * sub_el_r2.Placement 
                 else: # face of obj case
-                    mounted_placement = p2 * o2
+                    mounted_placement = inside_part_cumulative_plcm * p2 
 
                 child_robot_link.MountedPlacement = mounted_placement.inverse()
                 origin_mounted_placement_correction = mounted_placement
