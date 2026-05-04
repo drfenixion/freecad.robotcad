@@ -386,3 +386,19 @@ def ask_confirmation(title:str = '', text:str = '') -> bool:
     result = msg_box.exec_()
     
     return result == QMessageBox.Yes
+
+
+def show_notification(title, message):
+    # Получаем главное окно FreeCAD
+    mw = fcgui.getMainWindow()
+    
+    # Создаем окно сообщения
+    msg_box = QtWidgets.QMessageBox(mw)
+    msg_box.setIcon(QtWidgets.QMessageBox.Information) # Или Warning, Critical
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    
+    # Показываем окно
+    msg_box.exec_()
+    
