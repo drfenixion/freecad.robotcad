@@ -541,6 +541,7 @@ class RobotProxy(ProxyBase):
                     or (
                         hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
+                        and (joint.Child != link_name)
                     )):
                     links.append(link_name)
             return links
@@ -556,6 +557,7 @@ class RobotProxy(ProxyBase):
                         and link.Proxy.may_be_base_link()
                         and (not link.Proxy.is_in_chain_to_joint(joint))
                         and (joint.Parent != link_name)
+                        and (joint.Parent != '') # check parent is set
                     )):
                     links.append(link_name)
             return links
