@@ -273,7 +273,7 @@ def get_links(objs: DOList) -> list[CrossLink]:
 
 def get_joints(objs: DOList) -> list[CrossJoint]:
     """Return only the objects that are Cross::Joint instances."""
-    return [o for o in objs if is_joint(o)]
+    return [o for o in objs if is_joint(o) and o is not None and hasattr(o, 'Name')] #  and o is not None and hasattr(o, 'Name') is check obj was not removed
 
 
 def get_child_joints(link_or_joint: DO) -> list[CrossJoint] | bool:

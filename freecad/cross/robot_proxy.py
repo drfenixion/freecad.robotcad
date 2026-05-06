@@ -560,7 +560,11 @@ class RobotProxy(ProxyBase):
                     links.append(link_name)
             return links
 
-        sym_diff_joints = set(self.get_joints()).symmetric_difference(set(self.get_joints_old()))
+        joints_old = self.get_joints_old()
+        if joints_old is None:
+            joints_old = []
+        # joints_old_without_removed = [o for o in joints_old if o is not None and hasattr(o, 'Name')] #  and o is not None and hasattr(o, 'Name') is check obj was not removed
+        sym_diff_joints = set(self.get_joints()).symmetric_difference(set(joints_old))
         for joint in sym_diff_joints:
             # We add the empty string to show that the child or parent
             # was not set yet.

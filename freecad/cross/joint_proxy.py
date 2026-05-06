@@ -705,9 +705,15 @@ def make_robot_joint_filled(link1:fc.DO, link2:fc.DO, robot:CrossRobot | None = 
     if is_link(link1) and is_link(link2):
         joint = make_joint(ros_name(link1) + '__to__' + ros_name(link2), robot = robot)
         try:
+            
             joint.Parent = ros_name(link1)
             joint.Child = ros_name(link2)
         except ValueError:
+            if robot is None:
+                robot = link1.Proxy._robot
+            if robot is not None:
+                robot.Proxy._joints = None # recalculate joints
+                robot.Group.remove(joint)
             fc.ActiveDocument.removeObject(joint.Name)
             message(
                 'Links must be in robot container for joint connection. Closed links loop is not supported.',
