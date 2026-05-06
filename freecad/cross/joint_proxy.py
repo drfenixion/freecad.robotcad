@@ -250,6 +250,7 @@ class JointProxy(ProxyBase):
             )
                     and (obj.Child != new_link_name)):
                 obj.Child = new_link_name
+                obj.Document.recompute()
         if prop == 'Parent':
             if obj.Parent:
                 # No need to update if the link name is still in the enum after
@@ -269,6 +270,7 @@ class JointProxy(ProxyBase):
             )
                     and (obj.Parent != new_link_name)):
                 obj.Parent = new_link_name
+                obj.Document.recompute()
         if prop == 'JointSpecific':
             if obj.JointSpecific != 'unset':
                 obj.setPropertyStatus('JoinRotationDirection', '-Hidden')
