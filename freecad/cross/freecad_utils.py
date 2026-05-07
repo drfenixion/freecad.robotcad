@@ -633,12 +633,16 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
         
         # Step 3: Try to find the target object
         # Priority 1: Search directly in document (most reliable for datums)
-        target_name = sub_path[-1]
-        target_obj = doc.getObject(target_name)
+        # target_name = sub_path[-1]
+        # target_obj = doc.getObject(target_name)
+        # if target_obj:
+        #     return target_obj
         
-        if target_obj:
-            return target_obj
-        
+        for target_name in reversed(sub_path):
+            target_obj = doc.getObject(target_name)
+            if target_obj:
+                return target_obj
+
         # Priority 2: Try getSubObject with different retType values
         for ret_type in [3, 2, 0, None]:
             try:
@@ -787,7 +791,7 @@ def get_selected_shape_object(selection_obj, return_linked_obj = True):
 
     # Retrieve the object using the reconstructed path
     try:
-        if parsed_path['object'].TypeId != 'Part::TopoShape':
+        if parsed_path['object'] is not None and hasattr(parsed_path['object'], 'TypeId') and parsed_path['object'].TypeId != 'Part::TopoShape':
             shape_obj = parsed_path['object']
         else:
             shape_obj = doc.getObject(obj_name)
