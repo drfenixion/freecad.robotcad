@@ -243,6 +243,11 @@ class JointProxy(ProxyBase):
                     self.child_link = None
                     return
                 self.child_link = robot.Proxy.get_link(obj.Child)
+
+            robot = self.get_robot()
+            if (robot is not None):
+                robot.Proxy.set_joint_enum()
+
             new_link_name = ros_name(self.child_link) if self.child_link else obj.Child
             if ((
                 self.child_link
@@ -250,7 +255,6 @@ class JointProxy(ProxyBase):
             )
                     and (obj.Child != new_link_name)):
                 obj.Child = new_link_name
-                obj.Document.recompute()
         if prop == 'Parent':
             if obj.Parent:
                 # No need to update if the link name is still in the enum after
@@ -263,6 +267,11 @@ class JointProxy(ProxyBase):
                     self.parent_link = None
                     return
                 self.parent_link = robot.Proxy.get_link(obj.Parent)
+
+            robot = self.get_robot()
+            if (robot is not None):
+                robot.Proxy.set_joint_enum()
+
             new_link_name = ros_name(self.parent_link) if self.parent_link else obj.Parent
             if ((
                 self.parent_link
@@ -270,7 +279,6 @@ class JointProxy(ProxyBase):
             )
                     and (obj.Parent != new_link_name)):
                 obj.Parent = new_link_name
-                obj.Document.recompute()
         if prop == 'JointSpecific':
             if obj.JointSpecific != 'unset':
                 obj.setPropertyStatus('JoinRotationDirection', '-Hidden')
