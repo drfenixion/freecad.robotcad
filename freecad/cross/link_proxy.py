@@ -909,12 +909,12 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     except (KeyError, IndexError, AttributeError):
         pass
 
-    #add created part-wrapper as child to parent of object
-    if parent_of_obj:
-        if is_freecad_link(parent_of_obj):
-            parent_of_obj = parent_of_obj.getLinkedObject(True)
-        part.adjustRelativeLinks(parent_of_obj) 
-        parent_of_obj.addObject(part)
+    # #add created part-wrapper as child to parent of object
+    # if parent_of_obj:
+    #     if is_freecad_link(parent_of_obj):
+    #         parent_of_obj = parent_of_obj.getLinkedObject(True)
+    #     part.adjustRelativeLinks(parent_of_obj) 
+    #     parent_of_obj.addObject(part)
 
     link = make_link('l_' + ros_name(part))
     link.Real = part
