@@ -72,6 +72,7 @@ Video of creating controllable models: <br />
 1. all features from CROSS workbench
 
 # Here various installation options (choose one):
+Recomended FreeCAD version is 1.1.* AppImage. Dont use FreeCAD 1.2.*dev it is bugged currently.
 
 ## FreeCAD Addon Manager
 Open FreeCAD
