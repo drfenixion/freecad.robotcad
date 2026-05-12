@@ -57,8 +57,8 @@ Video of creating controllable models: <br />
     1. Meshes
     1. SDF maps created by "Custom world" tool (map editor)
     1. Controllers config (use extended generator if need all ready to use controllers code)
-1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
-    1. External code generator:
+1. Tool for use External Extended Code Generating service (startup script, docker, multicopters, all required code for controllers)
+    1. External Code Generator:
         1. all of basic code generator
         1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker). You can control robot by chat with it.
         1. Project structure
