@@ -19,7 +19,7 @@ from numpy.typing import ArrayLike
 
 from freecad.cross.placement_utils import get_cumulative_placement_top_to_down, get_obj_to_subobj_diff
 
-from .freecad_utils import get_leafs_and_subnames
+from .freecad_utils import get_leafs_and_subnames, get_random_postfix
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
 from .freecad_utils import is_group
@@ -30,7 +30,7 @@ from .freecad_utils import is_sphere
 from .freecad_utils import label_or
 from .freecad_utils import warn
 from .utils import get_valid_filename
-from .wb_utils import is_primitive
+from .wb_utils import is_primitive, ros_name
 
 
 # Typing hints.
@@ -685,7 +685,7 @@ def urdf_collision_mesh(
     return _urdf_generic_mesh(obj_label, mesh_name, package_name, 'collision', placement)
 
 
-def clean_and_unique_string(input_str: str, rando_str_len: int = 6) -> str:
+def clean_and_unique_string(input_str: str, add_random_postfix: bool = False) -> str:
     """Clean chars and add random string"""
     # Remove all characters that are not English letters, digits or a dot
     cleaned_str = re.sub(r'[^a-zA-Z0-9_\.]', '', input_str)
@@ -693,31 +693,38 @@ def clean_and_unique_string(input_str: str, rando_str_len: int = 6) -> str:
     # Replace dots with underscores
     cleaned_str = cleaned_str.replace('.', '_')
 
-    # Generate random characters (English letters and digits)
-    random_chars = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(rando_str_len))
+    if add_random_postfix:
+        # Generate random characters (English letters and digits)
+        random_chars = get_random_postfix()
 
-    # Append the random characters to the end of the string
-    result_str = cleaned_str + '_' + random_chars
+        # Append the random characters to the end of the string
+        cleaned_str = cleaned_str + '_' + random_chars
 
-    result_str = result_str.lower()
+    cleaned_str = cleaned_str.lower()
 
-    return result_str
+    return cleaned_str
 
 
-def _get_mesh_filename(obj: DO) -> str:
+def _get_mesh_filename(obj: DO, add_project_prefix:bool = False, add_random_postfix:bool = False) -> str:
     """Return the mesh filename for a FreeCAD object."""
     if hasattr(obj, 'LinkedObject'):
         linked_obj = obj.LinkedObject
     else:
         linked_obj = obj
-    label = label_or(linked_obj, 'mesh')
-    if hasattr(linked_obj, 'Document'):
-        doc_name = linked_obj.Document.Name
-    else:
-        doc_name = 'unsaved_doc'
+    # label = label_or(linked_obj, 'mesh')
+    label = ros_name(linked_obj)
 
-    name = f'{doc_name}_{label}'
-    name = clean_and_unique_string(name)
+    name = f'{label}'
+
+    if add_project_prefix:
+        if hasattr(linked_obj, 'Document'):
+            doc_name = linked_obj.Document.Name
+        else:
+            doc_name = 'unsaved_doc'
+
+        name = f'{doc_name}_{label}'
+
+    name = clean_and_unique_string(name, add_random_postfix = add_random_postfix)
     return get_valid_filename(f'{name}.dae')
 
 

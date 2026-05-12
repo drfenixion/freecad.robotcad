@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
+from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_random_postfix, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -509,13 +509,19 @@ def get_xacro_chains(
     return chains
 
 
-def ros_name(obj: DO) -> str:
+def ros_name(obj: DO, add_random_postfix_to_not_fc_obj:bool = True) -> str:
     """Return in order obj.Label2, obj.Label, obj.Name."""
     if ((
         not hasattr(obj, 'isDerivedFrom')
         or (not obj.isDerivedFrom('App::DocumentObject'))
-    )):
-        return 'not_a_FreeCAD_object'
+    )): 
+        name = 'not_a_FreeCAD_object'
+        if add_random_postfix_to_not_fc_obj:
+            # Generate random characters (English letters and digits)
+            random_chars = get_random_postfix()
+            # Append the random characters to the end of the string
+            name = name + '_' + random_chars        
+        return name
     if obj.Label:
         return obj.Label    
     if obj.Label2:

@@ -6,6 +6,7 @@ from abc import ABC
 from copy import copy
 from dataclasses import dataclass
 from itertools import dropwhile
+import random
 import string
 from typing import Any, Iterable, Optional
 from typing import Dict, List, Tuple
@@ -1388,3 +1389,8 @@ def get_compound(
     part_tmp.removeObjectsFromDocument()
     doc.removeObject(part_tmp.Name)
     return compound
+
+
+def get_random_postfix(random_str_len:int = 6):
+
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(random_str_len))
