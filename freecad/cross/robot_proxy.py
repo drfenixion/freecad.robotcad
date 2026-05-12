@@ -951,7 +951,7 @@ class RobotProxy(ProxyBase):
             return None
         if not self.robot.OutputPath:
             # TODO: ask the user for OutputPath.
-            warn('Property `OutputPath` cannot be empty', True)
+            warn('Property `OutputPath` of Robot cannot be empty', True)
             return
         # TODO: also accept OutputPath as package name in $ROS_WORKSPACE/src.
         p, output_path = get_rel_and_abs_path(self.robot.OutputPath)

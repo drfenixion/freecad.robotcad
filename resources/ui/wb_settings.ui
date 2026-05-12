@@ -75,7 +75,7 @@
          <string>You can get this token from robotcad.ru site. It will be used by external code generator.</string>
         </property>
         <property name="text">
-         <string>External code generator token (get it at robotcad.ru)</string>
+         <string>External extended code generator token (get it at robotcad.ru)</string>
         </property>
        </widget>
       </item>
@@ -154,7 +154,7 @@
          </font>
         </property>
         <property name="text">
-         <string>Here can be your sponsorship or ads</string>
+         <string>Here can be your sponsorship or ad</string>
         </property>
        </widget>
       </item>

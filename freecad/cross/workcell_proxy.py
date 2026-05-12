@@ -173,7 +173,7 @@ class WorkcellProxy(ProxyBase):
         obj: CrossWorkcell = self.workcell
         if not obj.OutputPath:
             # TODO: ask the user for OutputPath.
-            warn('Property `OutputPath` cannot be empty', True)
+            warn('Property `OutputPath` of Workcell cannot be empty', True)
             return None
 
         robot_et = et.fromstring('<robot/>')
