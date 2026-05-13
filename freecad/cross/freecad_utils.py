@@ -21,7 +21,7 @@ from . import wb_constants
 try:
     from PySide import QtCore, QtGui
 except:
-    from PySide2 import QtCore, QtGui
+    from PySide6 import QtCore, QtGui
 
 
 try:

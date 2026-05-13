@@ -8,7 +8,7 @@ import FreeCADGui as fcgui
 try:
     from PySide import QtGui, QtCore
 except:
-    from PySide2 import QtGui, QtCore  # FreeCAD's PySide!
+    from PySide6 import QtGui, QtCore  # FreeCAD's PySide!
 
 from ..freecad_utils import message
 from ..gui_utils import tr

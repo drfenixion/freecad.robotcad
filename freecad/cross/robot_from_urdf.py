@@ -16,7 +16,7 @@ from freecad.cross.urdf_loader import UrdfLoader
 try:
     from PySide import QtGui, QtCore, QtWidgets
 except:
-    from PySide2 import QtGui, QtCore, QtWidgets
+    from PySide6 import QtGui, QtCore, QtWidgets
 
 from freecad.cross.freecadgui_utils import get_progress_bar, set_collision_appearance
 from .freecad_utils import add_object

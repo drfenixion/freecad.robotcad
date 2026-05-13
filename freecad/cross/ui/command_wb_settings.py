@@ -8,7 +8,7 @@ import FreeCAD as fc
 try:
     from PySide import QtCore, QtGui, QtWidgets
 except ImportError:
-    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets
 
 from ..freecad_utils import warn
 from ..gui_utils import tr

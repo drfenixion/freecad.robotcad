@@ -5,7 +5,7 @@ from freecad.cross import check_install_package
 try:
     from PySide.QtWidgets import QApplication
 except:
-    from PySide2.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
 
 from ..gui_utils import tr
 import sys

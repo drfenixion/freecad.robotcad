@@ -20,7 +20,7 @@ from freecad.cross.wb_utils import MOD_PATH
 try:
     from PySide import QtCore, QtGui, QtWidgets
 except ImportError:
-    from PySide2 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets
 
 from ..LLM_providers import call_llm_provider
 from ..robot_from_urdf import robot_from_urdf

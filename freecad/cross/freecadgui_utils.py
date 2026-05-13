@@ -11,8 +11,8 @@ try:
     from PySide import QtWidgets, QtGui
     from PySide.QtWidgets import QMessageBox
 except:
-    from PySide2 import QtWidgets, QtGui
-    from PySide2.QtWidgets import QMessageBox
+    from PySide6 import QtWidgets, QtGui
+    from PySide6.QtWidgets import QMessageBox
 
 from .freecad_utils import copy_obj_geometry, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume

@@ -5,7 +5,7 @@ import FreeCADGui as fcgui
 try:
     from PySide import QtGui
 except:
-    from PySide2 import QtGui # FreeCAD's PySide!
+    from PySide6 import QtGui # FreeCAD's PySide!
 
 from ..freecad_utils import warn
 from ..wb_utils import ICON_PATH
