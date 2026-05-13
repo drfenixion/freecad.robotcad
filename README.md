@@ -57,10 +57,10 @@ Video of creating controllable models: <br />
     1. Meshes
     1. SDF maps created by "Custom world" tool (map editor)
     1. Controllers config (use extended generator if need all ready to use controllers code)
-1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
-    1. External code generator:
+1. Tool for use External Extended Code Generating service (startup script, docker, multicopters, all required code for controllers, AI VLM agent package)
+    1. External Code Generator:
         1. all of basic code generator
-        1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker)
+        1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker). You can control robot by chat with it.
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
@@ -74,7 +74,9 @@ Video of creating controllable models: <br />
 # Here various installation options (choose one):
 Recomended FreeCAD version is 1.1.* AppImage. Dont use FreeCAD 1.2.*dev it is bugged currently.
 
-## FreeCAD Addon Manager
+## FreeCAD Addon Manager - Recommended
+_Some tools (MoveIt integration, Gazebo map editor) will requires installed ROS2 or Gazebo, but other tools will works._
+
 Open FreeCAD
 
 Click the Edit -> Preferencies -> Addon Manager Options
@@ -111,7 +113,7 @@ Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
 If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manually Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
 
-# Fast install and run script with FreeCAD 1.1 AppImage
+## Fast install and run script with FreeCAD 1.1 AppImage - Recommended
 Do same as **Fast install and run script** section.
 Place FreeCAD 1.1 AppImage to docker/freecad/freecad_custom_appimage_dir and do `bash run.bash -cif` (in docker dir) one time and then for regular run `bash run.bash -ci`. Dont forget to update RobotCAD before and make FreeCAD 1.1 AppImage executable.
 
