@@ -1,5 +1,6 @@
 """Entry point of the RobotCAD workbench."""
 
+import importlib
 from pathlib import Path
 import subprocess
 import os
@@ -58,9 +59,7 @@ def pip_install(pkg_name):
 
 def check_install_package(packages_import_name, package_name = None):
     add_packages_path()
-    try:
-        __import__(packages_import_name)
-    except (ModuleNotFoundError, ImportError):
+    if importlib.util.find_spec(packages_import_name) is None:
         if package_name is None:
             pip_install(packages_import_name)
         else:   
