@@ -44,6 +44,12 @@ def generate_launch_description():
     use_custom_world_launch_arg = DeclareLaunchArgument('use_custom_world', default_value='true')
     gazebo_world = LaunchConfiguration('gazebo_world')
     gazebo_world_launch_arg = DeclareLaunchArgument('gazebo_world', default_value='empty.sdf')
+    use_ros2_control = LaunchConfiguration('use_ros2_control')
+    use_ros2_control_arg = DeclareLaunchArgument(
+        'use_ros2_control',
+        default_value='false',
+        description='Include ros2_control configuration in URDF'
+    )
 
     # prepare custom world
     world = os.getenv('GZ_SIM_WORLD', 'empty')
@@ -90,7 +96,10 @@ def generate_launch_description():
                 ]),
             ]),
             condition=UnlessCondition(use_rviz),  # rviz launch includes rsp.
-            launch_arguments=dict(use_sim_time=use_sim_time).items(),
+            launch_arguments=dict(
+                use_sim_time=use_sim_time,
+                use_ros2_control=use_ros2_control
+            ).items(),
     )
 
     rviz = IncludeLaunchDescription(
@@ -102,7 +111,10 @@ def generate_launch_description():
             ]),
         ]),
         condition=IfCondition(use_rviz),
-        launch_arguments=dict(use_sim_time=use_sim_time).items(),
+        launch_arguments=dict(
+            use_sim_time=use_sim_time,
+            use_ros2_control=use_ros2_control
+        ).items(),
     )
 
     gz_bridge_parameter = Node(
@@ -128,6 +140,7 @@ def generate_launch_description():
         use_rviz_arg,
         use_custom_world_launch_arg,
         gazebo_world_launch_arg,
+        use_ros2_control_arg,
         robot_state_publisher,
         rviz,
         gazebo,

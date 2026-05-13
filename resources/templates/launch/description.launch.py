@@ -15,6 +15,19 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_sim_time_launch_arg = DeclareLaunchArgument('use_sim_time', default_value='true')
+    use_ros2_control = LaunchConfiguration('use_ros2_control')
+    use_ros2_control_arg = DeclareLaunchArgument(
+        'use_ros2_control',
+        default_value='false',
+        description='Include ros2_control configuration in URDF'
+    )
+
+    xacro_cmd = Command([
+        'xacro ',
+        LaunchConfiguration('model'),
+        ' use_ros2_control:=',  # space at start is required for argument
+        use_ros2_control
+    ]) 
 
     robot_state_publisher_node = launch_ros.actions.Node(
         package='robot_state_publisher',
@@ -22,7 +35,7 @@ def generate_launch_description():
         parameters=[
             {{
                 # ParameterValue is required to avoid being interpreted as YAML.
-                'robot_description': ParameterValue(Command(['xacro ', LaunchConfiguration('model')]), value_type=str),
+                'robot_description': ParameterValue(xacro_cmd, value_type=str),
                 'use_sim_time': use_sim_time,
             }},
         ],
@@ -35,5 +48,6 @@ def generate_launch_description():
             description="Absolute path to the robot's URDF file",
         ),
         use_sim_time_launch_arg,
+        use_ros2_control_arg,
         robot_state_publisher_node,
     ])
