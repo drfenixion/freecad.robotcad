@@ -1257,7 +1257,16 @@ def matrix_of_inertia(
                 commonMatrixOfInertia += parallel_axis_theorem(solid.Volume, r, solid.MatrixOfInertia)
         return commonMatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
-        pass
+        try:
+            check_shell_exist = obj.Shape.Shells[0]
+            commonMatrixOfInertia = fc.Matrix()
+            for shell in obj.Shape.Shells:
+                if shell.Volume > 0.0:
+                    r = shell.CenterOfGravity - obj.Shape.CenterOfGravity
+                    commonMatrixOfInertia += parallel_axis_theorem(shell.Volume, r, shell.MatrixOfInertia)
+            return commonMatrixOfInertia
+        except (AttributeError, IndexError, RuntimeError):  
+            pass
     return None
 
 
