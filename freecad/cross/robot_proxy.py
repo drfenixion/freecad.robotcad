@@ -418,7 +418,8 @@ class RobotProxy(ProxyBase):
         }
 
     def dumps(self):
-        self.robot.CreatedObjects = self._created_objects
+        if self.robot.CreatedObjects != self._created_objects:
+            self.robot.CreatedObjects = self._created_objects
         # Map {ros_name: joint_variable_name}.
         var_map = {ros_name(joint): var for joint, var in self.joint_variables.items()}
         return self.Type, var_map
