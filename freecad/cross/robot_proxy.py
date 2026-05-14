@@ -1456,7 +1456,7 @@ class _ViewProviderRobot(ProxyBase):
     def setupContextMenu(self, vobj: VPDO, menu: QMenu) -> None:
         action = menu.addAction("Load trajectories from YAML...")
         action.triggered.connect(
-                lambda function=self.load_trajectories_from_yaml, argument=vobj: function(argument),
+            lambda checked=False, v=vobj: self.load_trajectories_from_yaml(v)
         )
 
     def doubleClicked(self, vobj: VPDO):
