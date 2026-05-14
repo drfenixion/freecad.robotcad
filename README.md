@@ -72,7 +72,7 @@ Video of creating controllable models: <br />
 1. all features from CROSS workbench
 
 # Here various installation options (choose one):
-Recomended FreeCAD version is 1.1.* AppImage. Dont use FreeCAD 1.2.*dev it is bugged currently.
+Recomended FreeCAD version is 1.1.* AppImage. FreeCAD 1.2.*dev also can be used.
 
 ## FreeCAD Addon Manager - Recommended
 _Some tools (MoveIt integration, Gazebo map editor) will requires installed ROS2 or Gazebo, but other tools will works._
