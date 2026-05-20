@@ -538,11 +538,13 @@ class RobotProxy(ProxyBase):
             links: list[str] = []
             for link in self.get_links():
                 link_name = ros_name(link)
-                if ((joint.Parent == link_name)
+                # backward compatability with label2 name
+                link_desc = ros_name(link, label1_first = False)
+                if ((joint.Parent in [link_name, link_desc])
                     or (
                         hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
-                        and (joint.Child != link_name)
+                        and (joint.Child not in [link_name, link_desc])
                     )):
                     links.append(link_name)
             return links
@@ -551,13 +553,15 @@ class RobotProxy(ProxyBase):
             links: list[str] = []
             for link in self.get_links():
                 link_name = ros_name(link)
-                if ((joint.Child == link_name)
+                # backward compatability with label2 name
+                link_desc = ros_name(link, label1_first = False)
+                if ((joint.Child in [link_name, link_desc])
                     or (
                         hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
                         and link.Proxy.may_be_base_link()
                         and (not link.Proxy.is_in_chain_to_joint(joint))
-                        and (joint.Parent != link_name)
+                        and (joint.Parent not in [link_name, link_desc])
                         and (joint.Parent != '') # check parent is set
                     )):
                     links.append(link_name)
@@ -578,13 +582,39 @@ class RobotProxy(ProxyBase):
             child_links += get_possible_child_links(joint)
             # Implementation note: setting to a list sets the enumeration.
             if joint.getEnumerationsOfProperty('Parent') != parent_links:
+
+                # backward compatability with label2 Parent name
+                if joint.Parent not in parent_links:
+                    joint.ParentOldTmp = ros_name(self.get_link(joint.Parent, label1_first = False))
+
                 # Avoid recursive recompute.
                 # Doesn't change the value if in the new enum.
                 joint.Parent = parent_links
+
+                # backward compatability with label2 Child name
+                if joint.ParentOldTmp != '':
+                    try:
+                        joint.Parent = joint.ParentOldTmp
+                        joint.ParentOldTmp = ''
+                    except ValueError:
+                        pass
             if joint.getEnumerationsOfProperty('Child') != child_links:
+
+                # backward compatability with label2 Child name
+                if joint.Child not in child_links and len(child_links) > 1: # len 1 is empty value - '', Child is empty if Parent not set yet
+                    joint.ChildOldTmp = ros_name(self.get_link(joint.Child, label1_first = False))
+
                 # Avoid recursive recompute.
                 # Doesn't change the value if in the new enum.
                 joint.Child = child_links
+
+                # backward compatability with label2 Child name
+                if joint.ChildOldTmp != '':
+                    try:
+                        joint.Child = joint.ChildOldTmp
+                        joint.ChildOldTmp = ''
+                    except ValueError:
+                        pass
 
     def get_joint_values(
             self,
@@ -783,7 +813,7 @@ class RobotProxy(ProxyBase):
         actuated_joints = self.get_actuated_joints()
         return [o for o in chain if o in actuated_joints]
 
-    def get_link(self, name: str) -> Optional[CrossLink]:
+    def get_link(self, name: str, label1_first:bool = True) -> Optional[CrossLink]:
         """Return the link with ROS name `name`.
 
         The ROS name is the object's description, or its label if the
@@ -794,7 +824,7 @@ class RobotProxy(ProxyBase):
             # Shortcut.
             return None
         for link in self.get_links():
-            if ros_name(link) == name:
+            if ros_name(link, label1_first) == name:
                 return link
         return None
 

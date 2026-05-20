@@ -53,6 +53,7 @@ class JointProxy(ProxyBase):
             [
                 'Group',
                 'Child',
+                'ChildOldTmp',
                 'Effort',
                 'LowerLimit',
                 'Mimic',
@@ -61,6 +62,7 @@ class JointProxy(ProxyBase):
                 'Offset',
                 'Origin',
                 'Parent',
+                'ParentOldTmp',
                 'Placement',
                 'PlacementRelTotalCenterOfMass',
                 'Position',
@@ -114,9 +116,19 @@ class JointProxy(ProxyBase):
             'Parent link (from RobotCAD)',
         )
         add_property(
+            obj, 'App::PropertyString', 'ParentOldTmp', 'Elements',
+            'Parent link (from RobotCAD) old temporary value. Used for backward compatibility with Label2 name in old version.',
+        )
+        obj.setPropertyStatus('ParentOldTmp', ['Hidden', 'ReadOnly'])
+        add_property(
             obj, 'App::PropertyEnumeration', 'Child', 'Elements',
             'Child link (from RobotCAD)',
         )
+        add_property(
+            obj, 'App::PropertyString', 'ChildOldTmp', 'Elements',
+            'Child link (from RobotCAD) old temporary value. Used for backward compatibility with Label2 name in old version.',
+        )
+        obj.setPropertyStatus('ChildOldTmp', ['Hidden', 'ReadOnly'])
         add_property(
             obj, 'App::PropertyPlacement', 'Origin', 'Elements',
             'Joint origin relative to the parent link',

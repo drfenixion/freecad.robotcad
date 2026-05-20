@@ -509,7 +509,7 @@ def get_xacro_chains(
     return chains
 
 
-def ros_name(obj: DO, add_random_postfix_to_not_fc_obj:bool = True) -> str:
+def ros_name(obj: DO, label1_first:bool = True, add_random_postfix_to_not_fc_obj:bool = True) -> str:
     """Return in order obj.Label2, obj.Label, obj.Name."""
     if ((
         not hasattr(obj, 'isDerivedFrom')
@@ -522,10 +522,16 @@ def ros_name(obj: DO, add_random_postfix_to_not_fc_obj:bool = True) -> str:
             # Append the random characters to the end of the string
             name = name + '_' + random_chars        
         return name
-    if obj.Label:
-        return obj.Label    
-    if obj.Label2:
-        return obj.Label2
+    if label1_first:
+        if obj.Label:
+            return obj.Label    
+        if obj.Label2:
+            return obj.Label2
+    else:
+        if obj.Label2:
+            return obj.Label2  
+        if obj.Label:
+            return obj.Label  
     return obj.Name
 
 
