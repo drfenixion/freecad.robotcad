@@ -538,13 +538,11 @@ class RobotProxy(ProxyBase):
             links: list[str] = []
             for link in self.get_links():
                 link_name = ros_name(link)
-                # backward compatability with label2 name
-                link_desc = ros_name(link, label1_first = False)
-                if ((joint.Parent in [link_name, link_desc])
+                if ((joint.Parent in [link_name])
                     or (
                         hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
-                        and (joint.Child not in [link_name, link_desc])
+                        and (joint.Child not in [link_name])
                     )):
                     links.append(link_name)
             return links
@@ -553,16 +551,13 @@ class RobotProxy(ProxyBase):
             links: list[str] = []
             for link in self.get_links():
                 link_name = ros_name(link)
-                # backward compatability with label2 name
-                link_desc = ros_name(link, label1_first = False)
-                if ((joint.Child in [link_name, link_desc])
+                if ((joint.Child in [link_name])
                     or (
                         hasattr(link, 'Proxy')
                         and link.Proxy.is_execute_ready()
                         and link.Proxy.may_be_base_link()
                         and (not link.Proxy.is_in_chain_to_joint(joint))
-                        and (joint.Parent not in [link_name, link_desc])
-                        and (joint.Parent != '') # check parent is set
+                        and (joint.Parent not in [link_name])
                     )):
                     links.append(link_name)
             return links
