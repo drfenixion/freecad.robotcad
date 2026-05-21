@@ -51,7 +51,23 @@
                 } 
             ],
             "justMyCode": true
-        },        
+        },
+        {
+            "name": "Python3 PX4 fly: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/chassis_new_copter3",
+                    "remoteRoot": "${userHome}/ros2/ws/src/chassis_new_copter3"
+                } 
+            ],
+            "justMyCode": true
+        },      
         {
             "name": "Python Conda Mod: Remote Attach",
             "type": "debugpy",
