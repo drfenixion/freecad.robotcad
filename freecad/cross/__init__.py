@@ -70,7 +70,6 @@ if os.environ.get('DEBUG'):
     print('DEBUG attaching...')
     # how to use:
     # DEBUG=1 command_to_run_freecad
-    # Use Ubuntu or install manually debugpy module FreeCAD python and FreeCAD python version to OS.
     # turn on Debugger in VSCODE and add breakpoints to code
     # Cf. https://github.com/FreeCAD/FreeCAD-macros/wiki/Debugging-macros-in-Visual-Studio-Code.
 
