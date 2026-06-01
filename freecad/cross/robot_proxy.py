@@ -352,15 +352,19 @@ class RobotProxy(ProxyBase):
 
         add_property(
             obj, 'App::PropertyEnumeration', 'RobotType', 'Robot',
-            'Used by extended code generator. For multicopter use ROS2 Iron code generation because PX4 does not released for Ubuntu 24.04 yet',
+            # this description will be persisted for old projects (saved in project) and will be updated only for new created Robot.
+            'Used by extended code generator. Sverk is available only for ROS2 Jazzy and upper.', 
         )
-        obj.RobotType=["nonspecific","multicopter"]
+        obj.RobotType=["nonspecific","multicopter","multicopter_sverk"]
 
         add_property(
             obj, 'App::PropertyEnumeration', 'GenerateCodeForRosVersion', 'Robot',
             'Generate code for choosed ROS version.',
         )
         obj.GenerateCodeForRosVersion=["jazzy", "iron"]
+        
+        # Initialize RobotType enum based on GenerateCodeForRosVersion
+        self._update_robot_type_enum(obj)
 
         add_property(
             obj, 'App::PropertyStringList', 'ExplodeViewStates', 'Internal',
@@ -401,6 +405,9 @@ class RobotProxy(ProxyBase):
                 obj.OutputPath = rel_path
         if prop == 'Placement':
             self.compute_poses()
+        if prop == 'GenerateCodeForRosVersion':
+            # Update RobotType enum based on GenerateCodeForRosVersion
+            self._update_robot_type_enum(obj)
 
     def onDocumentRestored(self, obj):
         """Handle the object after a document restore.
@@ -531,6 +538,24 @@ class RobotProxy(ProxyBase):
         for aco in acos:
             aco.removeObjectsFromDocument()  # Remove children.
             self.robot.Document.removeObject(aco.Name)
+
+    def _update_robot_type_enum(self, obj: CrossRobot) -> None:
+        """Update RobotType enum based on GenerateCodeForRosVersion.
+        
+        multicopter_sverk is only available when GenerateCodeForRosVersion is 'jazzy'.
+        """
+        if obj.GenerateCodeForRosVersion == 'jazzy':
+            # Include multicopter_sverk for jazzy
+            robot_types = ["nonspecific", "multicopter", "multicopter_sverk"]
+        else:
+            # Exclude multicopter_sverk for other versions
+            robot_types = ["nonspecific", "multicopter"]
+            # If current value is multicopter_sverk, reset to nonspecific
+            if obj.RobotType == "multicopter_sverk":
+                obj.RobotType = "multicopter"
+        
+        # Update the enumeration
+        obj.RobotType = robot_types
 
     def set_joint_enum(self) -> None:
         """Set the enum for Child and Parent of all joints."""
