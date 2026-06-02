@@ -470,6 +470,20 @@ class JointProxy(ProxyBase):
                 limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
                 limit_xml.attrib['effort'] = str(joint.Effort)  # Already in N or Nm.
                 joint_xml.append(limit_xml)
+            elif joint.Type == 'continuous':
+                # The URDF specification only says that the `limit` element
+                # is optional for the `continuous` joint type. However, the
+                # `urdfdom` library does not like if the `limit` element is
+                # present but not complete but the `lower` and `upper` values
+                # should not be set for the `continuous` joint type .
+                # Cf. https://github.com/ros/urdfdom/issues/180.
+                # But rqt_joint_trajectory_controller give error if continious joint
+                # with no limit tag present https://github.com/ros-controls/ros2_controllers/issues/2390
+                # therefore i add limit tag with velocity and effort
+                limit_xml = et.fromstring('<limit/>')
+                limit_xml.attrib['velocity'] = str(joint.Velocity * factor)
+                limit_xml.attrib['effort'] = str(joint.Effort)  # Already in N or Nm.
+                joint_xml.append(limit_xml)
         if joint.Mimic:
             mimic_xml = et.fromstring('<mimic/>')
             mimic_joint = ros_name(joint.MimickedJoint)
