@@ -67,7 +67,23 @@
                 } 
             ],
             "justMyCode": true
-        },      
+        },     
+        {
+            "name": "Python3 rqt_joint_trajectory_controller: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/tmp/rqt_joint_trajectory_controller",
+                    "remoteRoot": "/opt/ros/jazzy/lib/python3.12/site-packages/rqt_joint_trajectory_controller/"
+                } 
+            ],
+            "justMyCode": false
+        }, 
         {
             "name": "Python Conda Mod: Remote Attach",
             "type": "debugpy",
