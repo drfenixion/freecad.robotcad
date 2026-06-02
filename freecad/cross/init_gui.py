@@ -18,6 +18,7 @@ from .ui import command_new_observer # noqa: F401
 from .ui import command_new_pose # noqa: F401
 from .ui import command_new_robot # noqa: F401
 from .ui import command_explode_links # noqa: F401
+from .ui import command_ik_tool # noqa: F401
 from .ui import command_new_trajectory # noqa: F401
 from .ui import command_new_controller # noqa: F401
 from .ui import command_new_sensor # noqa: F401
@@ -117,6 +118,7 @@ class CrossWorkbench(fcgui.Workbench):
             # 'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
             'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
+            'IKTool',  # Defined in ./ui/command_ik_tool.py.
             'NewAttachedCollisionObject',  # Defined in ./ui/command_new_attached_collision_object.py.
             'NewPose',  # Defined in ./ui/command_new_pose.py.
             'NewTrajectory',  # Defined in ./ui/command_new_trajectory.py.
@@ -186,6 +188,7 @@ class CrossWorkbench(fcgui.Workbench):
             # "Live" debugging.
             'GetPlanningScene',  # Defined in ./ui/command_get_planning_scene.py.
             'UpdatePlanningScene',  # Defined in ./ui/command_update_planning_scene.py.
+            'IKTool',  # Defined in ./ui/command_ik_tool.py.
             'NewAttachedCollisionObject',  # Defined in ./ui/command_new_attached_collision_object.py.
             'NewPose',  # Defined in ./ui/command_new_pose.py.
             'BringRobotToPose',  # Defined in ./ui/command_bring_robot_to_pose.py.
