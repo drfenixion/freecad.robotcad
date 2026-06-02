@@ -1,19 +1,17 @@
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple, Dict
-import xml.etree.ElementTree as ET
 import numpy as np 
 
-# Data Structure Definitions.
 @dataclass
 class URDFElement:
-    """Base class for any URDF component"""
+    """Base class for any URDF component containing common structural names and poses."""
     name: str
     origin_xyz: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     origin_rpy: Tuple[float, float, float] = (0.0, 0.0, 0.0)
 
 @dataclass
 class Link(URDFElement):
-    """Represents a physical link with inertia and visual properties"""
+    """Represents a physical robot link with inertial, visual, and collision properties."""
     name: str
     mass: float = 0.0
     inertia: Dict[str, float] = field(default_factory=dict)
@@ -24,8 +22,8 @@ class Link(URDFElement):
 
 @dataclass
 class Joint(URDFElement):
-    """Represents a joint connecting two links."""
-    joint_type: str = "fixed"  # 'revolute', 'prismatic', 'continuous', 'fixed'
+    """Represents a kinematic joint connecting a parent link and a child link."""
+    joint_type: str = "fixed"  # Allowed options: 'revolute', 'prismatic', 'continuous', 'fixed'
     parent: str = ""
     child: str = ""
     axis: Tuple[float, float, float] = (0.0, 0.0, 1.0)
@@ -36,7 +34,7 @@ class Joint(URDFElement):
 
 @dataclass
 class Robot:
+    """Represents a full robot architecture extracted from a parsed URDF structure."""
     name: str
     links: List[Link] = field(default_factory=list)
     joints: List[Joint] = field(default_factory=list)
-
