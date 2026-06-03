@@ -113,7 +113,7 @@ def _placement_to_xyz_rpy(
     position_vector = placement.Base
     xyz = (position_vector.x, position_vector.y, position_vector.z)
     yaw, pitch, roll = placement.Rotation.toEuler()
-    rpy = (roll, pitch, yaw)
+    rpy = (math.radians(roll), math.radians(pitch), math.radians(yaw))
     return xyz, rpy
 
 
