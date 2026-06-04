@@ -91,7 +91,7 @@ freecad/cross/ui/command_ik_tool.py
 
 Corresponding icon
 ~~~~~~~~~~~~~~~~~~
-freecad/cross/resources/ik_solver.svg   (64 * 64 px, transparent background)
+freecad/cross/resources/robotool.svg   (64 * 64 px, transparent background)
 
 Author  : RoboTool / RobotCAD integration
 License : MIT
@@ -361,14 +361,14 @@ def _apply_joint_positions(
     The correct write path, discovered by reading robot_proxy.py, is:
 
         1. Look up the actuator property name via
-        robot_obj.Proxy.joint_variables[joint_obj]
-        e.g. returns 'Joint_base_eslabon1_deg'.
+            robot_obj.Proxy.joint_variables[joint_obj]
+            e.g. returns 'Joint_base_eslabon1_deg'.
         2. Convert the solver value (radians / mm) to the property native unit:
-        revolute / continuous  ->  degrees  (property stores degrees)
-        prismatic              ->  mm        (property stores mm)
+            revolute / continuous  ->  degrees  (property stores degrees)
+            prismatic              ->  mm        (property stores mm)
         3. setattr(robot_obj, prop_name, converted_value)
         4. doc.recompute() — FreeCAD propagates deg->rad into
-        joint.Position and redraws the 3-D viewport.
+            joint.Position and redraws the 3-D viewport.
 
     No robot_obj.touch() is needed: writing the actuator property already
     marks the robot dirty.  doc.recompute(True) must NOT be used —
@@ -459,8 +459,8 @@ class IKToolDialog(QtWidgets.QDialog):
         self._robot_obj    = robot_obj
         self._robot        = None   # RoboTool Robot for the ACTIVE sub-chain
         self._joint_objs   = []     # joint objects in the active sub-chain
-        self._q_original   = None   # captured on first Solve; never overwritten
-        self._q_solved     = None
+        self.original_joint_positions   = None   # captured on first Solve; never overwritten
+        self.solved_joint_positions     = None
 
         # Kinematic tree maps — built once, reused when EE selection changes.
         self._child_to_parent: dict[str, str] = {}
@@ -599,8 +599,8 @@ class IKToolDialog(QtWidgets.QDialog):
             return
 
         # Reset solved state — the previous solution is for a different chain.
-        self._q_original = None
-        self._q_solved   = None
+        self.original_joint_positions = None
+        self.solved_joint_positions   = None
         self._btn_apply.setEnabled(False)
         self._btn_restore.setEnabled(False)
 
@@ -671,7 +671,7 @@ class IKToolDialog(QtWidgets.QDialog):
         self._btn_solve.setEnabled(True)
         self._lbl_status.setText(
             tr(f'Chain: {n_joints} joint(s) → "{end_effector_label}". '
-            'Adjust target and press Solve IK.')
+                'Adjust target and press Solve IK.')
         )
 
     # ── Slot: Solve IK ────────────────────────────────────────
@@ -686,8 +686,8 @@ class IKToolDialog(QtWidgets.QDialog):
             q0     = np.array([float(j.Position) for j in self._joint_objs])
 
             # Capture original pose on the first solve; do NOT overwrite on re-solve.
-            if self._q_original is None:
-                self._q_original = q0.copy()
+            if self.original_joint_positions is None:
+                self.original_joint_positions = q0.copy()
                 self._btn_restore.setEnabled(True)
 
             # Capture solver stdout so it can be shown in the status label.
@@ -712,12 +712,12 @@ class IKToolDialog(QtWidgets.QDialog):
                 self._btn_apply.setEnabled(False)
                 return
 
-            self._q_solved = q_solved
+            self.solved_joint_positions = q_solved
 
             # Update table with original and solved values.
             for i in range(len(self._joint_objs)):
                 self._table.setItem(
-                    i, 1, QtWidgets.QTableWidgetItem(f'{self._q_original[i]:.4f}')
+                    i, 1, QtWidgets.QTableWidgetItem(f'{self.original_joint_positions[i]:.4f}')
                 )
                 self._table.setItem(
                     i, 2, QtWidgets.QTableWidgetItem(f'{q_solved[i]:.4f}')
@@ -750,12 +750,12 @@ class IKToolDialog(QtWidgets.QDialog):
 
     def _on_apply(self) -> None:
         """Write solved joint positions to the document and animate the model."""
-        if self._q_solved is None:
+        if self.solved_joint_positions is None:
             return
         _apply_joint_positions(
             self._robot_obj,
             self._joint_objs,
-            self._q_solved,
+            self.solved_joint_positions,
             self._doc,
             transaction_label='IK Tool – apply',
         )
@@ -767,12 +767,12 @@ class IKToolDialog(QtWidgets.QDialog):
 
     def _on_restore(self) -> None:
         """Write the original joint positions back to the document."""
-        if self._q_original is None:
+        if self.original_joint_positions is None:
             return
         _apply_joint_positions(
             self._robot_obj,
             self._joint_objs,
-            self._q_original,
+            self.original_joint_positions,
             self._doc,
             transaction_label='IK Tool – restore',
         )
@@ -791,7 +791,7 @@ class _IKToolCommand:
 
     def GetResources(self) -> dict:
         return {
-            'Pixmap'  : 'ik_solver.svg',
+            'Pixmap'  : 'robotool.svg',
             'MenuText': tr('IK Tool'),
             'Accel'   : 'I, K',
             'ToolTip' : tr(
@@ -819,12 +819,16 @@ class _IKToolCommand:
         return bool(selection) and is_robot(selection[0])
 
     def Activated(self) -> None:
-        """Open the IK Tool dialog for the selected robot."""
+        """Open the IK Tool dialog for the selected robot (non-modal)."""
         robot_obj = fcgui.Selection.getSelection()[0]
 
+        # Non-modal window: show() instead of exec_() so the user can
+        # continue interacting with RobotCAD while the dialog is open.
+        #
         # parent=None avoids the PySide2/6 type error with QMainWindow.
-        # WA_DeleteOnClose=False + self._dialog reference prevent the SEGFAULT
-        # caused by Python GC destroying the C++ object before exec_() returns.
+        # WA_DeleteOnClose=False + self._dialog reference on the command
+        # instance prevent the SEGFAULT caused by Python GC destroying the
+        # C++ Qt object while the window is still visible.
         dialog = IKToolDialog(robot_obj, parent=None)
 
         if _PYSIDE6:
@@ -833,15 +837,13 @@ class _IKToolCommand:
             _wa_del = QtCore.Qt.WA_DeleteOnClose
         dialog.setAttribute(_wa_del, False)
 
-        # Store reference on the command instance to prevent GC during exec_().
+        # Keep a strong Python reference so GC never collects the dialog.
         self._dialog = dialog
-        dialog.exec_()
+        dialog.show()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Registration
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _register() -> None:
-    """Register the IKTool Gui command with FreeCAD."""
 fcgui.addCommand('IKTool', _IKToolCommand())
