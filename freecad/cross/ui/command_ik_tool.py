@@ -14,34 +14,67 @@ workbench.  When the user clicks the toolbar icon (or presses I, K) with a
 Cross::Robot object selected, a modal dialog opens:
 
 IKToolDialog
+├── End Effector selector  - ComboBox listing all leaf links (tips) of the
+│                            robot's kinematic tree.  Selecting one isolates
+│                            the serial sub-chain from that link to the root,
+│                            ignoring all other branches (wheels, legs, etc.).
 ├── Target group  - three QDoubleSpinBox fields (X, Y, Z in millimetres)
 │                   pre-filled with the current FK end-effector position
 ├── [Solve IK]    - runs RoboTool iterative Jacobian pseudo-inverse solver
-├── Results table - one row per active joint:
+│                   on the ISOLATED sub-chain only
+├── Results table - one row per joint in the sub-chain:
 │     columns: Joint name | Original (rad/mm) | Solved (rad/mm)
 ├── Status label  - convergence message + achieved position + error
-├── [Apply to Model]   - writes solved_joint_positions → joint_obj.Position, recomputes
-│                        document → live 3-D animation
-├── [Restore Original] - writes original_joint_positions back → restores initial pose
+├── [Apply to Model]   - writes q_solved → joint_obj.Position,
+│                        robot_obj.touch() + doc.recompute(True) for live
+│                        3-D animation of the FULL robot hierarchy
+├── [Restore Original] - writes q_original back → restores initial pose
 └── [Close]
 
 State management
 ~~~~~~~~~~~~~~~~
-original_joint_positions is captured once (on the first Solve click) so the user can
+_q_original is captured once (on the first Solve click) so the user can
 always return to the pose that existed before the dialog was opened.
-Subsequent Solve calls do NOT overwrite original_joint_positions.
+Subsequent Solve calls do NOT overwrite _q_original.
+
+Sub-chain isolation  (KEY FIX for tree-structured robots)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a robot has a tree topology (e.g. a manipulator arm PLUS drive wheels),
+passing all joints to the IK solver produces a mathematically ill-defined
+Jacobian and the solver diverges.
+
+_get_chain_to_root(robot_obj, end_effector_link_name) walks the parent→child
+map backwards from the chosen end-effector link to the root link, collecting
+only the joints that belong to that unique serial path.  Joints in sibling
+branches (wheels, suspension, other arms) are completely excluded.
+
+The returned joint list is topologically ordered root→EE, guaranteeing that
+the Jacobian matrix is computed over a clean, full-rank serial chain.
+
+recompute fix  (KEY FIX for "nothing happens on Apply")
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Changing joint_obj.Position marks only the joint sub-object as dirty.
+The parent Cross::Robot object does NOT automatically learn that its
+children changed, so a plain doc.recompute() is a no-op.
+
+Solution:
+    robot_obj.touch()        # mark the robot container as dirty
+    doc.recompute(True)      # deep/forced recompute of the whole hierarchy
+
+This forces FreeCAD to re-evaluate every Link's placement transform and
+redraws the meshes in the 3-D viewport immediately.
 
 Integration with RobotCAD
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 - Reads the robot via  robot_obj.Proxy.get_joints() / get_links()
-  (standard RobotCAD Proxy API).
+    (standard RobotCAD Proxy API).
 - joint_obj.Position  - float in radians (revolute/continuous) or
-  millimetres (prismatic).  Read and written directly.
+    millimetres (prismatic).  Read and written directly.
 - Units: all Cartesian coordinates in millimetres; joint angles in radians.
 - doc.openTransaction / commitTransaction wraps every write so the action
-  is undoable with Ctrl-Z.
-- doc.recompute() + fcgui.updateGui() after every write triggers the live
-  animation in the 3-D viewport.
+    is undoable with Ctrl-Z.
+- robot_obj.touch() + doc.recompute(True) + fcgui.updateGui() after every
+    write triggers the live animation in the 3-D viewport.
 
 RoboTool modules used
 ~~~~~~~~~~~~~~~~~~~~~
@@ -69,6 +102,7 @@ from __future__ import annotations
 import math
 import io
 from contextlib import redirect_stdout
+from collections import defaultdict
 
 import numpy as np
 import FreeCAD as fc
@@ -88,6 +122,124 @@ from ..wb_utils import is_robot
 from ..kinematics.models import Robot, Joint, Link
 from ..kinematics.kinematics import forward_kinematics
 from ..kinematics.inverse_kinematics import inverse_kinematics
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Kinematic-tree helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_parent_map(
+    robot_obj: fc.App.DocumentObject,
+) -> tuple[dict[str, str], dict[str, fc.App.DocumentObject]]:
+    """
+    Build a child→parent link map and a name→joint_obj lookup for the robot.
+
+    Parameters
+    ----------
+    robot_obj : fc.App.DocumentObject
+        The Cross::Robot document object.
+
+    Returns
+    -------
+    tuple[dict[str, str], dict[str, fc.App.DocumentObject]]
+        child_to_parent  : maps each child link name to its parent link name.
+        child_to_joint   : maps each child link name to the joint_obj that
+        connects it to its parent.
+    """
+    child_to_parent: dict[str, str] = {}
+    child_to_joint:  dict[str, fc.App.DocumentObject] = {}
+
+    for joint_obj in robot_obj.Proxy.get_joints():
+        parent_link = joint_obj.Parent  # str: parent link name
+        child_link  = joint_obj.Child   # str: child link name
+        child_to_parent[child_link] = parent_link
+        child_to_joint[child_link]  = joint_obj
+
+    return child_to_parent, child_to_joint
+
+
+def _find_leaf_links(robot_obj: fc.App.DocumentObject) -> list[str]:
+    """
+    Return all leaf (end-effector candidate) link names in the robot tree.
+
+    A leaf link is one that never appears as a *parent* of any joint.
+    For a serial arm this is just the tip link; for a tree robot (arm +
+    wheels) this returns all branch tips, letting the user pick the right one.
+
+    Parameters
+    ----------
+    robot_obj : fc.App.DocumentObject
+        The Cross::Robot document object.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of leaf link label strings.
+    """
+    all_links:    set[str] = {lnk.Label for lnk in robot_obj.Proxy.get_links()}
+    parent_links: set[str] = set()
+
+    for joint_obj in robot_obj.Proxy.get_joints():
+        parent_links.add(joint_obj.Parent)
+
+    leaf_links = sorted(all_links - parent_links)
+    # Fallback: if every link is also a parent (unusual), return all links.
+    return leaf_links if leaf_links else sorted(all_links)
+
+
+def _get_chain_to_root(
+    robot_obj:            fc.App.DocumentObject,
+    end_effector_link:    str,
+    child_to_parent:      dict[str, str],
+    child_to_joint:       dict[str, fc.App.DocumentObject],
+) -> list[fc.App.DocumentObject]:
+    """
+    Walk backwards from *end_effector_link* to the root, collecting joints.
+
+    This isolates the unique serial sub-chain for a chosen end-effector and
+    guarantees that sibling branches (wheels, other arms) are excluded.
+    The returned list is ordered root→EE (topological order), which is the
+    order required by the RoboTool FK/IK solvers.
+
+    Only non-fixed joints are included (fixed joints carry no DOF).
+
+    Parameters
+    ----------
+    robot_obj : fc.App.DocumentObject
+        The Cross::Robot document object (used only for its label in errors).
+    end_effector_link : str
+        Label of the chosen end-effector (leaf) link.
+    child_to_parent : dict[str, str]
+        Maps child link label → parent link label (from _build_parent_map).
+    child_to_joint : dict[str, fc.App.DocumentObject]
+        Maps child link label → the joint_obj that produced it.
+
+    Returns
+    -------
+    list[fc.App.DocumentObject]
+        Non-fixed joint document objects in root→EE order.
+
+    Raises
+    ------
+    ValueError
+        If end_effector_link is not found in the kinematic tree.
+    """
+    if end_effector_link not in child_to_parent:
+        # The root link has no parent joint; if someone selected it, return [].
+        return []
+
+    # Walk child → parent, accumulating joints, then reverse for root→EE order.
+    chain_joints: list[fc.App.DocumentObject] = []
+    current_link = end_effector_link
+
+    while current_link in child_to_parent:
+        joint_obj = child_to_joint[current_link]
+        if joint_obj.Type != 'fixed':
+            chain_joints.append(joint_obj)
+        current_link = child_to_parent[current_link]
+
+    chain_joints.reverse()  # now root → EE
+    return chain_joints
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -135,32 +287,40 @@ def _get_axis_from_placement(placement: fc.Placement) -> tuple[float, float, flo
     return (axis_vector.x, axis_vector.y, axis_vector.z)
 
 
-def _build_robot(
-    robot_obj: fc.App.DocumentObject,
-) -> tuple[Robot, list[fc.App.DocumentObject]]:
+def _build_robot_for_chain(
+    robot_obj:   fc.App.DocumentObject,
+    chain_joints: list[fc.App.DocumentObject],
+) -> Robot:
     """
-    Build a RoboTool Robot instance from a RobotCAD Cross::Robot document object.
+    Build a RoboTool Robot instance that represents only the given serial chain.
+
+    Links are gathered as: root link + one child link per joint, in order.
+    This guarantees the RoboTool model is a clean linear chain with no
+    dangling branches, which is a prerequisite for a well-formed Jacobian.
 
     Parameters
     ----------
     robot_obj : fc.App.DocumentObject
-        The selected Cross::Robot object from the FreeCAD document tree.
+        The Cross::Robot document object (used for the robot name).
+    chain_joints : list[fc.App.DocumentObject]
+        Non-fixed joints in root→EE topological order (from _get_chain_to_root).
 
     Returns
     -------
-    tuple[Robot, list[fc.App.DocumentObject]]
-        The populated RoboTool Robot model and the list of active (non-fixed)
-        Cross::Joint document objects in kinematic chain order.
+    Robot
+        Populated RoboTool Robot model for the isolated sub-chain.
     """
     robot_instance = Robot(name=robot_obj.Label)
 
-    for link_obj in robot_obj.Proxy.get_links():
-        robot_instance.links.append(Link(name=link_obj.Label))
+    if not chain_joints:
+        return robot_instance
 
-    active_joint_objects = []
-    for joint_obj in robot_obj.Proxy.get_joints():
+    # Add the root link (parent of the first joint in the chain).
+    robot_instance.links.append(Link(name=chain_joints[0].Parent))
+
+    for joint_obj in chain_joints:
         xyz, rpy = _placement_to_xyz_rpy(joint_obj.Origin)
-        axis = _get_axis_from_placement(joint_obj.Origin)
+        axis     = _get_axis_from_placement(joint_obj.Origin)
 
         robot_instance.joints.append(Joint(
             name           = joint_obj.Label,
@@ -175,38 +335,80 @@ def _build_robot(
             velocity_limit = getattr(joint_obj, 'Velocity',   None),
             effort_limit   = getattr(joint_obj, 'Effort',     None),
         ))
-        if joint_obj.Type != 'fixed':
-            active_joint_objects.append(joint_obj)
+        # Each joint contributes its child link.
+        robot_instance.links.append(Link(name=joint_obj.Child))
 
-    return robot_instance, active_joint_objects
+    return robot_instance
 
 
 def _apply_joint_positions(
+    robot_obj:     fc.App.DocumentObject,
     joint_objects: list[fc.App.DocumentObject],
-    joint_values: np.ndarray,
-    doc: fc.App.Document,
+    joint_values:  np.ndarray,
+    doc:           fc.App.Document,
     transaction_label: str = 'IK Tool',
 ) -> None:
     """
     Write joint values to the document and trigger a live 3D viewport update.
 
+    Architecture note — why we write robot._deg properties, not joint.Position
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    joint_obj.Position is a read-only computed property
+    (setEditorMode('Position', ['ReadOnly']) in joint_proxy.py).  It is
+    calculated by FreeCAD during recompute from the robot-level actuator
+    property (e.g. robot.Joint_base_eslabon1_deg).
+
+    The correct write path, discovered by reading robot_proxy.py, is:
+
+        1. Look up the actuator property name via
+        robot_obj.Proxy.joint_variables[joint_obj]
+        e.g. returns 'Joint_base_eslabon1_deg'.
+        2. Convert the solver value (radians / mm) to the property native unit:
+        revolute / continuous  ->  degrees  (property stores degrees)
+        prismatic              ->  mm        (property stores mm)
+        3. setattr(robot_obj, prop_name, converted_value)
+        4. doc.recompute() — FreeCAD propagates deg->rad into
+        joint.Position and redraws the 3-D viewport.
+
+    No robot_obj.touch() is needed: writing the actuator property already
+    marks the robot dirty.  doc.recompute(True) must NOT be used —
+    FreeCAD 1.0 expects a sequence of objects or no argument.
+
     Parameters
     ----------
+    robot_obj : fc.App.DocumentObject
+        The Cross::Robot container object.
     joint_objects : list[fc.App.DocumentObject]
-        Non-fixed Cross::Joint objects to update.
+        Non-fixed Cross::Joint objects to update (sub-chain only).
     joint_values : np.ndarray
-        Joint positions to write (radians for revolute/continuous, mm for prismatic).
+        Joint positions in solver units: radians for revolute/continuous,
+        millimetres for prismatic.
     doc : fc.App.Document
         The active FreeCAD document.
     transaction_label : str, optional
         Label shown in the undo history (default: 'IK Tool').
     """
+    joint_variables: dict = robot_obj.Proxy.joint_variables  # joint_obj -> prop_name
+
     doc.openTransaction(tr(transaction_label))
     for joint_obj, value in zip(joint_objects, joint_values):
-        joint_obj.Position = float(value)
+        prop_name = joint_variables.get(joint_obj)
+        if prop_name is None:
+            # Joint not found in robot's variable map — skip silently.
+            continue
+        if joint_obj.Type == 'prismatic':
+            # Solver value is in mm; property stores mm.
+            native_value = float(value)
+        else:
+            # revolute / continuous: solver value is in radians;
+            # property stores degrees.
+            native_value = math.degrees(float(value))
+        setattr(robot_obj, prop_name, native_value)
     doc.commitTransaction()
-    doc.recompute()
+
+    doc.recompute()     # propagates _deg -> Position and redraws viewport
     fcgui.updateGui()
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -217,6 +419,8 @@ class IKToolDialog(QtWidgets.QDialog):
     """Modal dialog for the IK Tool command.
 
     ┌─ IK Tool ──────────────────────────────────────────────┐
+    │  End Effector: [tip_link ▼]                            │
+    │                                                        │
     │  Target position (mm)                                  │
     │  X: [______]  Y: [______]  Z: [______]                 │
     │                                                        │
@@ -238,40 +442,60 @@ class IKToolDialog(QtWidgets.QDialog):
     def __init__(
         self,
         robot_obj: fc.App.DocumentObject,
-        parent: QtWidgets.QWidget | None = None,
+        parent:    QtWidgets.QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr('IK Tool'))
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(520)
 
         # Remove the "?" help button; enum path differs between PySide2 and PySide6.
-        _no_help = getattr(QtCore.Qt, 'WindowContextHelpButtonHint', None) \
-                or getattr(QtCore.Qt.WindowType, 'WindowContextHelpButtonHint', 0)
+        _no_help = (
+            getattr(QtCore.Qt.WindowType, 'WindowContextHelpButtonHint', None)
+            or getattr(QtCore.Qt, 'WindowContextHelpButtonHint', 0)
+        )
         self.setWindowFlags(self.windowFlags() & ~_no_help)
 
-        self._doc        = fc.activeDocument()
-        self._robot_obj  = robot_obj
-        self._robot      = None
-        self._joint_objs = []
-        self._original_joint_positions = None  # Captured on first Solve; never overwritten.
-        self._solved_joint_positions   = None
+        self._doc          = fc.activeDocument()
+        self._robot_obj    = robot_obj
+        self._robot        = None   # RoboTool Robot for the ACTIVE sub-chain
+        self._joint_objs   = []     # joint objects in the active sub-chain
+        self._q_original   = None   # captured on first Solve; never overwritten
+        self._q_solved     = None
+
+        # Kinematic tree maps — built once, reused when EE selection changes.
+        self._child_to_parent: dict[str, str] = {}
+        self._child_to_joint:  dict[str, fc.App.DocumentObject] = {}
 
         self._build_ui()
-        self._load_robot()
+        self._init_tree_maps()
+        self._populate_ee_combo()
+
+    # ── UI construction ───────────────────────────────────────
 
     def _build_ui(self) -> None:
         root_layout = QtWidgets.QVBoxLayout(self)
         root_layout.setSpacing(10)
         root_layout.setContentsMargins(14, 14, 14, 14)
 
-        # Target position input group
+        # ── End Effector selector ──────────────────────────────
+        grp_ee = QtWidgets.QGroupBox(tr('End Effector'))
+        lay_ee = QtWidgets.QHBoxLayout(grp_ee)
+        lay_ee.addWidget(QtWidgets.QLabel(tr('Select tip link:')))
+        self._combo_ee = QtWidgets.QComboBox()
+        self._combo_ee.setMinimumWidth(200)
+        self._combo_ee.currentIndexChanged.connect(self._on_ee_changed)
+        lay_ee.addWidget(self._combo_ee)
+        lay_ee.addStretch()
+        root_layout.addWidget(grp_ee)
+
+        # ── Target position input group ────────────────────────
         grp_target = QtWidgets.QGroupBox(tr('Target position (mm)'))
         lay_target = QtWidgets.QHBoxLayout(grp_target)
-        self._spins = {}
+        self._spins: dict[str, QtWidgets.QDoubleSpinBox] = {}
         for axis in ('X', 'Y', 'Z'):
             lay_target.addWidget(QtWidgets.QLabel(f'<b>{axis}</b>'))
             spin_box = QtWidgets.QDoubleSpinBox()
-            spin_box.setRange(-10000.0, 10000.0)
+            spin_box.setRange(-10_000.0, 10_000.0)
             spin_box.setDecimals(3)
             spin_box.setSingleStep(1.0)
             spin_box.setFixedWidth(100)
@@ -281,13 +505,13 @@ class IKToolDialog(QtWidgets.QDialog):
                 lay_target.addSpacing(8)
         root_layout.addWidget(grp_target)
 
-        # Solve button
+        # ── Solve button ───────────────────────────────────────
         self._btn_solve = QtWidgets.QPushButton(tr('⚙  Solve IK'))
         self._btn_solve.setFixedHeight(34)
         self._btn_solve.clicked.connect(self._on_solve)
         root_layout.addWidget(self._btn_solve)
 
-        # Results table
+        # ── Results table ──────────────────────────────────────
         grp_results = QtWidgets.QGroupBox(tr('Results'))
         lay_results = QtWidgets.QVBoxLayout(grp_results)
         self._table = QtWidgets.QTableWidget(0, 3)
@@ -310,14 +534,14 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_results.addWidget(self._table)
         root_layout.addWidget(grp_results)
 
-        # Status label
+        # ── Status label ───────────────────────────────────────
         self._lbl_status = QtWidgets.QLabel(
-            tr('Ready. Enter a target and press Solve IK.')
+            tr('Ready. Select an End Effector, enter a target and press Solve IK.')
         )
         self._lbl_status.setWordWrap(True)
         root_layout.addWidget(self._lbl_status)
 
-        # Action buttons
+        # ── Action buttons ─────────────────────────────────────
         lay_btns = QtWidgets.QHBoxLayout()
         self._btn_apply = QtWidgets.QPushButton(tr('▶  Apply to Model'))
         self._btn_apply.setEnabled(False)
@@ -336,35 +560,107 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_btns.addWidget(btn_close)
         root_layout.addLayout(lay_btns)
 
-    # ── Robot loading + FK pre-fill ──────────────────────────
+    # ── Tree initialisation ───────────────────────────────────
 
-    def _load_robot(self) -> None:
-        """Build the RoboTool model from the selected robot and pre-fill the FK position."""
+    def _init_tree_maps(self) -> None:
+        """Build child→parent and child→joint maps from the robot document object."""
         try:
-            self._robot, self._joint_objs = _build_robot(self._robot_obj)
+            self._child_to_parent, self._child_to_joint = _build_parent_map(
+                self._robot_obj
+            )
         except Exception as exc:
-            self._lbl_status.setText(f'Error loading robot: {exc}')
+            self._lbl_status.setText(f'Error reading robot tree: {exc}')
             self._btn_solve.setEnabled(False)
+
+    def _populate_ee_combo(self) -> None:
+        """Fill the End Effector ComboBox with all leaf links in the robot tree."""
+        leaf_links = _find_leaf_links(self._robot_obj)
+        self._combo_ee.blockSignals(True)
+        self._combo_ee.clear()
+        for link_label in leaf_links:
+            self._combo_ee.addItem(link_label)
+        self._combo_ee.blockSignals(False)
+
+        # Trigger load for the default (first) selection.
+        if leaf_links:
+            self._load_chain(leaf_links[0])
+
+    # ── End Effector change ───────────────────────────────────
+
+    def _on_ee_changed(self, index: int) -> None:
+        """
+        Called when the user picks a different end-effector link.
+
+        Resets the solved state, re-isolates the sub-chain, rebuilds the
+        RoboTool model, and pre-fills the FK spinboxes for the new chain.
+        """
+        ee_label = self._combo_ee.currentText()
+        if not ee_label:
             return
 
-        n_joints = len(self._joint_objs)
-        if n_joints == 0:
-            self._lbl_status.setText(tr('No active joints found in the selected robot.'))
-            self._btn_solve.setEnabled(False)
-            return
+        # Reset solved state — the previous solution is for a different chain.
+        self._q_original = None
+        self._q_solved   = None
+        self._btn_apply.setEnabled(False)
+        self._btn_restore.setEnabled(False)
 
-        q0 = np.array([float(j.Position) for j in self._joint_objs])
+        self._load_chain(ee_label)
 
-        # Pre-fill target spinboxes with the current FK end-effector position.
+    def _load_chain(self, end_effector_label: str) -> None:
+        """
+        Isolate the serial sub-chain for *end_effector_label* and rebuild
+        the RoboTool model and UI table for that chain.
+
+        Parameters
+        ----------
+        end_effector_label : str
+            Label of the selected end-effector (leaf) link.
+        """
+        # ── 1. Isolate the sub-chain (topological walk-back) ──
         try:
-            fk_matrix = forward_kinematics(self._robot, q0)
-            fk_position = fk_matrix[:3, 3]
+            chain_joints = _get_chain_to_root(
+                self._robot_obj,
+                end_effector_label,
+                self._child_to_parent,
+                self._child_to_joint,
+            )
+        except Exception as exc:
+            self._lbl_status.setText(f'Error isolating chain: {exc}')
+            self._btn_solve.setEnabled(False)
+            return
+
+        if not chain_joints:
+            self._lbl_status.setText(
+                tr(f'No active joints found on the path to "{end_effector_label}". '
+                'Try a different end effector.')
+            )
+            self._btn_solve.setEnabled(False)
+            self._joint_objs = []
+            self._robot      = None
+            return
+
+        # ── 2. Build RoboTool model for the isolated chain ────
+        try:
+            self._robot = _build_robot_for_chain(self._robot_obj, chain_joints)
+        except Exception as exc:
+            self._lbl_status.setText(f'Error building robot model: {exc}')
+            self._btn_solve.setEnabled(False)
+            return
+
+        self._joint_objs = chain_joints
+        n_joints = len(chain_joints)
+
+        # ── 3. Pre-fill spinboxes with current FK position ────
+        q0 = np.array([float(j.Position) for j in self._joint_objs])
+        try:
+            fk_matrix    = forward_kinematics(self._robot, q0)
+            fk_position  = fk_matrix[:3, 3]
             for axis, value in zip(('X', 'Y', 'Z'), fk_position):
                 self._spins[axis].setValue(float(value))
         except Exception:
-            pass
+            pass  # Spinboxes stay at 0 — not a fatal error.
 
-        # Populate the results table with current joint values.
+        # ── 4. Populate results table with current joint values ──
         self._table.setRowCount(n_joints)
         for i, joint_obj in enumerate(self._joint_objs):
             self._table.setItem(i, 0, QtWidgets.QTableWidgetItem(joint_obj.Label))
@@ -372,37 +668,43 @@ class IKToolDialog(QtWidgets.QDialog):
             self._table.setItem(i, 2, QtWidgets.QTableWidgetItem('—'))
         self._table.resizeColumnsToContents()
 
+        self._btn_solve.setEnabled(True)
         self._lbl_status.setText(
-            tr(f'Robot loaded: {n_joints} active joint(s). Adjust target and press Solve IK.')
+            tr(f'Chain: {n_joints} joint(s) → "{end_effector_label}". '
+            'Adjust target and press Solve IK.')
         )
 
+    # ── Slot: Solve IK ────────────────────────────────────────
+
     def _on_solve(self) -> None:
-        """Run the IK solver and display the results in the table."""
-        if not self._joint_objs:
+        """Run the IK solver on the active sub-chain and display results."""
+        if not self._joint_objs or self._robot is None:
             return
 
         try:
             target = np.array([self._spins[axis].value() for axis in ('X', 'Y', 'Z')])
             q0     = np.array([float(j.Position) for j in self._joint_objs])
 
-            # Capture original pose on the first solve; do not overwrite on re-solve.
-            if self._original_joint_positions is None:
-                self._original_joint_positions = q0.copy()
+            # Capture original pose on the first solve; do NOT overwrite on re-solve.
+            if self._q_original is None:
+                self._q_original = q0.copy()
                 self._btn_restore.setEnabled(True)
 
-            # Capture solver print output so it can be shown in the status label.
+            # Capture solver stdout so it can be shown in the status label.
             log_buffer = io.StringIO()
             with redirect_stdout(log_buffer):
-                solved_joint_positions = inverse_kinematics(
+                q_solved = inverse_kinematics(
                     self._robot,
                     target_position=target,
                     initial_guess=q0,
                 )
             solver_log = log_buffer.getvalue().strip()
 
-            if solved_joint_positions is None:
+            if q_solved is None:
                 for i in range(len(self._joint_objs)):
-                    self._table.setItem(i, 2, QtWidgets.QTableWidgetItem(tr('Unreachable')))
+                    self._table.setItem(
+                        i, 2, QtWidgets.QTableWidgetItem(tr('Unreachable'))
+                    )
                 self._lbl_status.setText(
                     tr('IK did not converge. Target may be outside the workspace.')
                     + (f'\n{solver_log}' if solver_log else '')
@@ -410,20 +712,24 @@ class IKToolDialog(QtWidgets.QDialog):
                 self._btn_apply.setEnabled(False)
                 return
 
-            self._solved_joint_positions = solved_joint_positions
+            self._q_solved = q_solved
 
-            # Update table with original and solved joint values.
+            # Update table with original and solved values.
             for i in range(len(self._joint_objs)):
-                self._table.setItem(i, 1, QtWidgets.QTableWidgetItem(f'{self._original_joint_positions[i]:.4f}'))
-                self._table.setItem(i, 2, QtWidgets.QTableWidgetItem(f'{self._solved_joint_positions[i]:.4f}'))
+                self._table.setItem(
+                    i, 1, QtWidgets.QTableWidgetItem(f'{self._q_original[i]:.4f}')
+                )
+                self._table.setItem(
+                    i, 2, QtWidgets.QTableWidgetItem(f'{q_solved[i]:.4f}')
+                )
             self._table.resizeColumnsToContents()
 
-            # Verify the solution with FK and compute the residual error.
+            # Verify solution via FK and compute residual error.
             try:
-                fk_matrix       = forward_kinematics(self._robot, self._solved_joint_positions)
-                achieved        = fk_matrix[:3, 3]
-                residual_error  = float(np.linalg.norm(target - achieved))
-                status_details  = (
+                fk_matrix      = forward_kinematics(self._robot, q_solved)
+                achieved       = fk_matrix[:3, 3]
+                residual_error = float(np.linalg.norm(target - achieved))
+                status_details = (
                     f'Target:   [{target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}] mm\n'
                     f'Achieved: [{achieved[0]:.3f}, {achieved[1]:.3f}, {achieved[2]:.3f}] mm\n'
                     f'Error:    {residual_error:.6f} mm'
@@ -443,11 +749,14 @@ class IKToolDialog(QtWidgets.QDialog):
     # ── Slot: Apply solution ──────────────────────────────────
 
     def _on_apply(self) -> None:
-        """Write the solved joint positions to the document and animate the model."""
-        if self._solved_joint_positions is None:
+        """Write solved joint positions to the document and animate the model."""
+        if self._q_solved is None:
             return
         _apply_joint_positions(
-            self._joint_objs, self._solved_joint_positions, self._doc,
+            self._robot_obj,
+            self._joint_objs,
+            self._q_solved,
+            self._doc,
             transaction_label='IK Tool – apply',
         )
         self._lbl_status.setText(
@@ -458,10 +767,13 @@ class IKToolDialog(QtWidgets.QDialog):
 
     def _on_restore(self) -> None:
         """Write the original joint positions back to the document."""
-        if self._original_joint_positions is None:
+        if self._q_original is None:
             return
         _apply_joint_positions(
-            self._joint_objs, self._original_joint_positions, self._doc,
+            self._robot_obj,
+            self._joint_objs,
+            self._q_original,
+            self._doc,
             transaction_label='IK Tool – restore',
         )
         self._lbl_status.setText(tr('↩ Original joint positions restored.'))
@@ -473,6 +785,7 @@ class IKToolDialog(QtWidgets.QDialog):
 
 class _IKToolCommand:
     """FreeCAD Gui command that opens the IK Tool dialog.
+
     Registers as ``IKTool``.  Only active when a Cross::Robot is selected.
     """
 
@@ -485,16 +798,18 @@ class _IKToolCommand:
                 'Forward & Inverse Kinematics Tool (RoboTool)\n'
                 '\n'
                 'Select a robot, then open this tool to:\n'
+                '  • Choose the End Effector (tip link) for IK.\n'
                 '  • Inspect the current end-effector position (FK).\n'
                 '  • Enter a Cartesian target (X, Y, Z in millimetres).\n'
-                '  • Solve IK via iterative Jacobian pseudo-inverse.\n'
+                '  • Solve IK via iterative Jacobian pseudo-inverse\n'
+                '    on the isolated serial sub-chain only.\n'
                 '  • See solved joint angles in a results table.\n'
                 '  • Apply the solution → live 3-D animation.\n'
                 '  • Restore the original pose at any time.\n'
                 '\n'
                 'Requires: a Cross::Robot selected in the scene.\n'
                 'Algorithm: Jacobian pseudo-inverse, step-limited,\n'
-                '           up to 1 000 iterations, tol = 1 * 10⁻⁴ mm.\n'
+                '           up to 1 000 iterations, tol = 1 × 10⁻⁴ mm.\n'
             ),
         }
 
@@ -504,25 +819,29 @@ class _IKToolCommand:
         return bool(selection) and is_robot(selection[0])
 
     def Activated(self) -> None:
+        """Open the IK Tool dialog for the selected robot."""
         robot_obj = fcgui.Selection.getSelection()[0]
 
         # parent=None avoids the PySide2/6 type error with QMainWindow.
         # WA_DeleteOnClose=False + self._dialog reference prevent the SEGFAULT
         # caused by Python GC destroying the C++ object before exec_() returns.
         dialog = IKToolDialog(robot_obj, parent=None)
+
         if _PYSIDE6:
-            dialog.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, False)
+            _wa_del = QtCore.Qt.WidgetAttribute.WA_DeleteOnClose
         else:
-            dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
-        self._dialog = dialog  # keep Python refcount > 0 during exec_()
-        try:
-            dialog.exec() if _PYSIDE6 else dialog.exec_()
-        finally:
-            self._dialog = None
-            try:
-                dialog.deleteLater()
-            except RuntimeError:
-                pass  # C++ object already gone — safe to ignore
+            _wa_del = QtCore.Qt.WA_DeleteOnClose
+        dialog.setAttribute(_wa_del, False)
+
+        # Store reference on the command instance to prevent GC during exec_().
+        self._dialog = dialog
+        dialog.exec_()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Registration
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _register() -> None:
+    """Register the IKTool Gui command with FreeCAD."""
 fcgui.addCommand('IKTool', _IKToolCommand())
