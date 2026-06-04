@@ -49,6 +49,6 @@
         stroke="#e05252" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>
 
   <!-- ── Small "IK" text label ── -->
-  <text x="4" y="62" font-family="monospace,sans-serif" font-size="14"
+  <text x="0" y="62" font-family="monospace,sans-serif" font-size="18"
         font-weight="bold" fill="#4a90d9" opacity="0.9">IK</text>
 </svg>
