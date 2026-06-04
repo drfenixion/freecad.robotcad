@@ -91,7 +91,7 @@ freecad/cross/ui/command_ik_tool.py
 
 Corresponding icon
 ~~~~~~~~~~~~~~~~~~
-freecad/cross/resources/robotool.svg   (64 * 64 px, transparent background)
+freecad/cross/resources/ik_solver.svg   (64 * 64 px, transparent background)
 
 Author  : RoboTool / RobotCAD integration
 License : MIT
@@ -791,7 +791,7 @@ class _IKToolCommand:
 
     def GetResources(self) -> dict:
         return {
-            'Pixmap'  : 'robotool.svg',
+            'Pixmap'  : 'ik_solver.svg',
             'MenuText': tr('IK Tool'),
             'Accel'   : 'I, K',
             'ToolTip' : tr(
