@@ -895,19 +895,11 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     fc_link_to_obj.adjustRelativeLinks(part)
     part.addObject(fc_link_to_obj)
 
-    if create_parts_group:
-        container = fc.ActiveDocument.getObject('robot_parts')
-        if not container:
-            container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', 'robot_parts')
-            container.Visibility = False
-        part.Visibility = False
-        container.addObject(part)
-
-    parent_of_obj = None
-    try:
-        parent_of_obj = obj.Parents[0][0]
-    except (KeyError, IndexError, AttributeError):
-        pass
+    # parent_of_obj = None
+    # try:
+    #     parent_of_obj = obj.Parents[0][0]
+    # except (KeyError, IndexError, AttributeError):
+    #     pass
 
     # #add created part-wrapper as child to parent of object
     # if parent_of_obj:
@@ -921,15 +913,23 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     link.Visual = part
     if assembly_reference:
         link.AssemblyReference = assembly_reference
-
     link.ViewObject.ShowReal = False
     link.ViewObject.ShowReal = True
+
+    if create_parts_group:
+        container = fc.ActiveDocument.getObject('robot_parts')
+        if not container:
+            container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', 'robot_parts')
+            container.Visibility = False
+        part.Visibility = False
+        container.addObject(part)
+
     fc.ActiveDocument.recompute()
 
     return link
 
 
-def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = None) -> list[CrossLink] | False :
+def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = None, create_parts_group:bool = True) -> list[CrossLink] | False :
     ''' Make robot links and fill Real and Visual of it by selected objects  '''
 
     if len(objects):
@@ -939,14 +939,23 @@ def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = 
 
     links:list[CrossLink] = []
     for el in selection:
-        res = make_robot_link_filled(el)
+        res = make_robot_link_filled(el, create_parts_group)
         if is_link(res):
             link = res
             links.append(link)
+            el.Visibility = False
+            
             if robot:
                 link.adjustRelativeLinks(robot)
                 robot.addObject(link)
 
+            if create_parts_group:
+                folder = 'robot_parts_origins'
+                container = fc.ActiveDocument.getObject(folder)
+                if not container:
+                    container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', folder)
+                    container.Visibility = False
+                container.addObject(el)
     return links
 
 
