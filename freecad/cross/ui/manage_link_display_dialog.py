@@ -103,19 +103,11 @@ class ManageLinkDisplayDialog:
         if not self.links:
             return
 
-        all_has_real = all(
-            bool(link.Real) for link in self.links if is_link(link)
-        )
-        all_has_visual = all(
-            bool(link.Visual) for link in self.links if is_link(link)
-        )
-        all_has_collision = all(
-            bool(link.Collision) for link in self.links if is_link(link)
-        )
-
-        self.form.check_real.setEnabled(all_has_real)
-        self.form.check_visual.setEnabled(all_has_visual)
-        self.form.check_collision.setEnabled(all_has_collision)
+        # Always enable all checkboxes so the user can toggle visibility
+        # regardless of whether a link has attached Collision/Visual/Real objects.
+        self.form.check_real.setEnabled(True)
+        self.form.check_visual.setEnabled(True)
+        self.form.check_collision.setEnabled(True)
 
         # Block signals during initial setup.
         for cb in (self.form.check_collision, self.form.check_visual,
