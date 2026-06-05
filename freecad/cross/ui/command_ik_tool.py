@@ -18,24 +18,42 @@ IKToolDialog
 │                            robot's kinematic tree.  Selecting one isolates
 │                            the serial sub-chain from that link to the root,
 │                            ignoring all other branches (wheels, legs, etc.).
-├── Target group  - three QDoubleSpinBox fields (X, Y, Z in millimetres)
-│                   pre-filled with the current FK end-effector position
+├── Target position group  - three QDoubleSpinBox fields (X, Y, Z in mm)
+│                            pre-filled with the current FK end-effector position
+├── Target orientation group - three QDoubleSpinBox fields (Roll, Pitch, Yaw in deg)
+│                              defaults to zero (identity orientation)
 ├── [Solve IK]    - runs RoboTool iterative Jacobian pseudo-inverse solver
-│                   on the ISOLATED sub-chain only
+│                   on the ISOLATED sub-chain only (6-DOF: position + orientation)
 ├── Results table - one row per joint in the sub-chain:
 │     columns: Joint name | Original (rad/mm) | Solved (rad/mm)
-├── Status label  - convergence message + achieved position + error
+├── Status label  - convergence message + achieved position + errors
+│                   (position error in mm, orientation error in deg)
 ├── [Apply to Model]   - writes q_solved → joint_obj.Position,
 │                        robot_obj.touch() + doc.recompute(True) for live
 │                        3-D animation of the FULL robot hierarchy
 ├── [Restore Original] - writes q_original back → restores initial pose
 └── [Close]
 
+IK algorithm
+~~~~~~~~~~~~
+6-DOF Damped Least Squares (DLS / Levenberg-Marquardt):
+
+    full_error = [w_pos * Δp,  w_ori * Δω]      shape (6,)
+    J          = compute_jacobian(robot, q)       shape (6, N)
+    Δq         = Jᵀ (J Jᵀ + λ²I₆)⁻¹ · full_error
+
+    Δp  = target_position  - current_position     (mm)
+    Δω  = rotation_error(R_current, R_target)     (rad, axial vector)
+        = 0.5 · skew_vex(R_currentᵀ · R_target)
+
+When target_rotation is None the solver falls back to 3-DOF position-only
+mode (original behaviour, fully backward-compatible).
+
 State management
 ~~~~~~~~~~~~~~~~
-_q_original is captured once (on the first Solve click) so the user can
-always return to the pose that existed before the dialog was opened.
-Subsequent Solve calls do NOT overwrite _q_original.
+original_joint_positions is captured once (on the first Solve click) so the
+user can always return to the pose that existed before the dialog was opened.
+Subsequent Solve calls do NOT overwrite original_joint_positions.
 
 Sub-chain isolation  (KEY FIX for tree-structured robots)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,6 +102,35 @@ from ..kinematics.inverse_kinematics import inverse_kinematics
 
 These must live under  freecad/cross/kinematics/  (i.e. your RoboTool
 engine packaged inside RobotCAD).
+
+Dialog layout
+~~~~~~~~~~~~~
+┌─ IK Tool ──────────────────────────────────────────────┐
+│  End Effector: [tip_link ▼]                            │
+│                                                        │
+│  Target position (mm)                                  │
+│  X: [______]  Y: [______]  Z: [______]                 │
+│                                                        │
+│  Target orientation (deg)                              │
+│  R: [______]  P: [______]  Y: [______]                 │
+│                                                        │
+│               [  ⚙  Solve IK  ]                        │
+│                                                        │
+│  Results ──────────────────────────────────────────────│
+│  ┌─────────────┬──────────────┬──────────────┐         │
+│  │ Joint       │ Original     │ Solved       │         │
+│  ├─────────────┼──────────────┼──────────────┤         │
+│  │ joint_1     │  0.0000 rad  │  1.2345 rad  │         │
+│  └─────────────┴──────────────┴──────────────┘         │
+│                                                        │
+│  Status: Converged in N iterations.                    │
+│  Target:   [x, y, z] mm                                │
+│  Achieved: [x, y, z] mm                                │
+│  Error:    0.000001 mm                                 │
+│  Error orientation: 0.42 deg                           │
+│                                                        │
+│  [ ▶ Apply to Model ]  [ ↩ Restore Original ]  [Close] │
+└────────────────────────────────────────────────────────┘
 
 File location (suggested)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -410,34 +457,12 @@ def _apply_joint_positions(
     fcgui.updateGui()
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Qt Dialog
 # ─────────────────────────────────────────────────────────────────────────────
 
 class IKToolDialog(QtWidgets.QDialog):
-    """Modal dialog for the IK Tool command.
-
-    ┌─ IK Tool ──────────────────────────────────────────────┐
-    │  End Effector: [tip_link ▼]                            │
-    │                                                        │
-    │  Target position (mm)                                  │
-    │  X: [______]  Y: [______]  Z: [______]                 │
-    │                                                        │
-    │               [  ⚙  Solve IK  ]                        │
-    │                                                        │
-    │  Results ──────────────────────────────────────────────│
-    │  ┌─────────────┬──────────────┬──────────────┐         │
-    │  │ Joint       │ Original     │ Solved       │         │
-    │  ├─────────────┼──────────────┼──────────────┤         │
-    │  │ joint_1     │  0.0000 rad  │  1.2345 rad  │         │
-    │  └─────────────┴──────────────┴──────────────┘         │
-    │                                                        │
-    │  Status: Converged. Error: 0.000000 mm                 │
-    │                                                        │
-    │  [ ▶ Apply to Model ]  [ ↩ Restore Original ]  [Close] │
-    └────────────────────────────────────────────────────────┘
-    """
+    """Modal dialog for the IK Tool command — see module docstring for layout."""
 
     def __init__(
         self,
@@ -459,8 +484,8 @@ class IKToolDialog(QtWidgets.QDialog):
         self._robot_obj    = robot_obj
         self._robot        = None   # RoboTool Robot for the ACTIVE sub-chain
         self._joint_objs   = []     # joint objects in the active sub-chain
-        self.original_joint_positions   = None   # captured on first Solve; never overwritten
-        self.solved_joint_positions     = None
+        self.original_joint_positions = None   # captured on first Solve; never overwritten
+        self.solved_joint_positions   = None
 
         # Kinematic tree maps — built once, reused when EE selection changes.
         self._child_to_parent: dict[str, str] = {}
@@ -504,6 +529,22 @@ class IKToolDialog(QtWidgets.QDialog):
             if axis != 'Z':
                 lay_target.addSpacing(8)
         root_layout.addWidget(grp_target)
+
+        # ── Target orientation RPY ─────────────────────────────
+        grp_rotation = QtWidgets.QGroupBox(tr('Target orientation (deg)'))
+        lay_rotation = QtWidgets.QHBoxLayout(grp_rotation)
+        for axis in ('Roll', 'Pitch', 'Yaw'):
+            lay_rotation.addWidget(QtWidgets.QLabel(f'<b>{axis[0]}</b>'))
+            spin_box = QtWidgets.QDoubleSpinBox()
+            spin_box.setRange(-180.0, 180.0)
+            spin_box.setDecimals(2)
+            spin_box.setSingleStep(1.0)
+            spin_box.setFixedWidth(100)
+            self._spins[axis] = spin_box
+            lay_rotation.addWidget(spin_box)
+            if axis != 'Yaw':
+                lay_rotation.addSpacing(8)
+        root_layout.addWidget(grp_rotation)
 
         # ── Solve button ───────────────────────────────────────
         self._btn_solve = QtWidgets.QPushButton(tr('⚙  Solve IK'))
@@ -653,8 +694,8 @@ class IKToolDialog(QtWidgets.QDialog):
         # ── 3. Pre-fill spinboxes with current FK position ────
         q0 = np.array([float(j.Position) for j in self._joint_objs])
         try:
-            fk_matrix    = forward_kinematics(self._robot, q0)
-            fk_position  = fk_matrix[:3, 3]
+            fk_matrix   = forward_kinematics(self._robot, q0)
+            fk_position = fk_matrix[:3, 3]
             for axis, value in zip(('X', 'Y', 'Z'), fk_position):
                 self._spins[axis].setValue(float(value))
         except Exception:
@@ -671,17 +712,40 @@ class IKToolDialog(QtWidgets.QDialog):
         self._btn_solve.setEnabled(True)
         self._lbl_status.setText(
             tr(f'Chain: {n_joints} joint(s) → "{end_effector_label}". '
-                'Adjust target and press Solve IK.')
+            'Adjust target and press Solve IK.')
         )
 
     # ── Slot: Solve IK ────────────────────────────────────────
 
     def _on_solve(self) -> None:
-        """Run the IK solver on the active sub-chain and display results."""
+        """Run the 6-DOF IK solver on the active sub-chain and display results."""
         if not self._joint_objs or self._robot is None:
             return
 
         try:
+            # ── Build R_target from RPY spinboxes ──────────────
+            roll  = np.deg2rad(self._spins['Roll'].value())
+            pitch = np.deg2rad(self._spins['Pitch'].value())
+            yaw   = np.deg2rad(self._spins['Yaw'].value())
+
+            Rotation_x = np.array([
+                [1, 0,           0          ],
+                [0, np.cos(roll), -np.sin(roll)],
+                [0, np.sin(roll),  np.cos(roll)],
+            ])
+            Rotation_y = np.array([
+                [ np.cos(pitch), 0, np.sin(pitch)],
+                [ 0,             1, 0            ],
+                [-np.sin(pitch), 0, np.cos(pitch)],
+            ])
+            Rotation_z = np.array([
+                [np.cos(yaw), -np.sin(yaw), 0],
+                [np.sin(yaw),  np.cos(yaw), 0],
+                [0,            0,           1],
+            ])
+            Rotation_target = Rotation_z @ Rotation_y @ Rotation_x
+
+            # ── Read Cartesian target ──────────────────────────
             target = np.array([self._spins[axis].value() for axis in ('X', 'Y', 'Z')])
             q0     = np.array([float(j.Position) for j in self._joint_objs])
 
@@ -690,13 +754,14 @@ class IKToolDialog(QtWidgets.QDialog):
                 self.original_joint_positions = q0.copy()
                 self._btn_restore.setEnabled(True)
 
-            # Capture solver stdout so it can be shown in the status label.
+            # ── Run solver (capture stdout for status label) ───
             log_buffer = io.StringIO()
             with redirect_stdout(log_buffer):
                 q_solved = inverse_kinematics(
                     self._robot,
                     target_position=target,
                     initial_guess=q0,
+                    target_rotation=Rotation_target,
                 )
             solver_log = log_buffer.getvalue().strip()
 
@@ -714,7 +779,7 @@ class IKToolDialog(QtWidgets.QDialog):
 
             self.solved_joint_positions = q_solved
 
-            # Update table with original and solved values.
+            # ── Update results table ───────────────────────────
             for i in range(len(self._joint_objs)):
                 self._table.setItem(
                     i, 1, QtWidgets.QTableWidgetItem(f'{self.original_joint_positions[i]:.4f}')
@@ -724,15 +789,20 @@ class IKToolDialog(QtWidgets.QDialog):
                 )
             self._table.resizeColumnsToContents()
 
-            # Verify solution via FK and compute residual error.
+            # ── FK verification + residual errors ─────────────
             try:
                 fk_matrix      = forward_kinematics(self._robot, q_solved)
                 achieved       = fk_matrix[:3, 3]
                 residual_error = float(np.linalg.norm(target - achieved))
+                cos_angle      = np.clip(
+                    (np.trace(fk_matrix[:3, :3].T @ Rotation_target) - 1) / 2,
+                    -1.0, 1.0
+                )
                 status_details = (
                     f'Target:   [{target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}] mm\n'
                     f'Achieved: [{achieved[0]:.3f}, {achieved[1]:.3f}, {achieved[2]:.3f}] mm\n'
-                    f'Error:    {residual_error:.6f} mm'
+                    f'Error:    {residual_error:.6f} mm\n'
+                    f'Error orientation: {np.rad2deg(np.arccos(cos_angle)):.2f} deg'
                 )
             except Exception as exc:
                 status_details = f'(FK verification failed: {exc})'
@@ -800,15 +870,16 @@ class _IKToolCommand:
                 'Select a robot, then open this tool to:\n'
                 '  • Choose the End Effector (tip link) for IK.\n'
                 '  • Inspect the current end-effector position (FK).\n'
-                '  • Enter a Cartesian target (X, Y, Z in millimetres).\n'
-                '  • Solve IK via iterative Jacobian pseudo-inverse\n'
+                '  • Enter a Cartesian target (X, Y, Z in mm) and\n'
+                '    orientation (Roll, Pitch, Yaw in degrees).\n'
+                '  • Solve 6-DOF IK via iterative Jacobian DLS\n'
                 '    on the isolated serial sub-chain only.\n'
                 '  • See solved joint angles in a results table.\n'
                 '  • Apply the solution → live 3-D animation.\n'
                 '  • Restore the original pose at any time.\n'
                 '\n'
                 'Requires: a Cross::Robot selected in the scene.\n'
-                'Algorithm: Jacobian pseudo-inverse, step-limited,\n'
+                'Algorithm: Damped Least Squares (DLS), 6-DOF,\n'
                 '           up to 1 000 iterations, tol = 1 × 10⁻⁴ mm.\n'
             ),
         }
