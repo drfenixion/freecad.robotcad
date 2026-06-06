@@ -371,7 +371,7 @@ def get_chain(link: CrossLink) -> list[CrossBasicElement]:
         # A root link.
         return [link]
     if not ref_joint.Parent:
-        warn(f'Joint `{ros_name(ref_joint)}` has no parent', False)
+        # warn(f'Joint `{ros_name(ref_joint)}` has no parent', False) # too many notifies when changes Parent/Child
         # Return only ref_joint to indicate an error.
         return [ref_joint]
     robot = ref_joint.Proxy.get_robot()
