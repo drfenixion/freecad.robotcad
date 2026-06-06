@@ -355,14 +355,32 @@ class LinkProxy(ProxyBase):
             self._cleanup_children()
         if prop in ('Label', 'Label2'):
             robot = self.get_robot()
+            
             if robot and hasattr(robot, 'Proxy'):
                 robot.Proxy.set_joint_enum()
+
             if (
                 robot
                 and is_name_used(obj, robot)
                 and getattr(obj, prop) != self.old_ros_name
             ):
                 setattr(obj, prop, self.old_ros_name)
+            else:
+                # Update Parent and Child joints that reference the old Label
+                if robot and self.old_ros_name:
+                    old_label = self.old_ros_name
+                    new_label = getattr(obj, prop)
+                    joints = get_joints(robot.Group)
+                    for joint in joints:
+                        # Update Parent if it matches old Label
+                        if hasattr(joint, 'Parent'):
+                            if joint.Parent == old_label:
+                                joint.Parent = new_label
+                        # Update Child if it matches old Label
+                        if hasattr(joint, 'Child'):
+                            if joint.Child == old_label:
+                                joint.Child = new_label
+
         if prop == 'Placement':
             if not self.is_execute_ready():
                 return

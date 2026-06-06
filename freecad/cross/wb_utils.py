@@ -376,6 +376,9 @@ def get_chain(link: CrossLink) -> list[CrossBasicElement]:
         return [ref_joint]
     robot = ref_joint.Proxy.get_robot()
     parent_link = robot.Proxy.get_link(ref_joint.Parent)
+    if parent_link is None:
+        # Return only ref_joint to indicate an error.
+        return [ref_joint]
     subchain = get_chain(parent_link)
     if subchain and is_joint(subchain[0]):
         # Propagate the error of missing joint.Parent.
