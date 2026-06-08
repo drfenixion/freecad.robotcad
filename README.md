@@ -328,7 +328,7 @@ If you want to work on this workbench you have the following options (choose one
 ```
 git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
-bash run.bash -d
+bash run.bash -dfc
 ```
 - Install RobotCAD manually via Conda, see installation section. Run FreeCAD with DEBUG=1 env.
 ```
