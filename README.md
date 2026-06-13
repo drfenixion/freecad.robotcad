@@ -93,6 +93,8 @@ Click Install
 
 Restart FreeCAD
 
+<img width="2560" height="1576" alt="addon_manager" src="https://github.com/user-attachments/assets/9530e6e9-aa07-47b8-bb73-35971f3b2520" />
+
 ## Fast install and run script
 _Script installs also ROS2 + Gazebo in Docker, its required for some tools. FreeCAD will be run from inside the Docker._
 
