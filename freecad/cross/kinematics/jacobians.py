@@ -1,6 +1,6 @@
 import numpy as np
 from .models import Robot
-from .kinematics import compute_forward_kinematics_full
+from .kinematics import compute_forward_kinematics_full, joint_to_matrix
 
 def compute_jacobian(robot: Robot, joint_positions: np.ndarray) -> np.ndarray:
     """
@@ -29,21 +29,23 @@ def compute_jacobian(robot: Robot, joint_positions: np.ndarray) -> np.ndarray:
         if joint.joint_type == "fixed":
             continue
 
-        # Frame BEFORE applying this joint:
-        # all_transforms layout: [base, after_joint0, after_joint1, ...]
-        current_frame_transform = all_transforms[i + 1]
-        joint_frame_position = current_frame_transform[:3, 3]
-        joint_frame_rotation = current_frame_transform[:3, :3]
-
-        joint_axis_local = np.array(joint.axis) / np.linalg.norm(joint.axis)
-        transformed_axis_z = joint_frame_rotation @ joint_axis_local
+        # Frame of the parent link (before the URDF offset of this joint)
+        T_parent = all_transforms[i]  # all_transforms[0] is base, [1] is after joint 0, etc.
+        # Fixed URDF transform for this joint
+        T_urdf = joint_to_matrix(joint)
+        # Frame of the joint BEFORE the motion (includes fixed offset, excludes q[i])
+        T_frame_articulation = T_parent @ T_urdf
+        position_frame_articulation = T_frame_articulation[:3, 3]
+        rotation_frame_articulation = T_frame_articulation[:3, :3]
+        axis_joint_local = np.array(joint.axis) / np.linalg.norm(joint.axis)
+        axis_z_transformed = rotation_frame_articulation @ axis_joint_local
 
         if joint.joint_type in ["revolute", "continuous"]:
-            position_vector_difference = end_effector_position - joint_frame_position
-            jacobian_matrix[:3, current_column] = np.cross(transformed_axis_z, position_vector_difference)
-            jacobian_matrix[3:, current_column] = transformed_axis_z
+            vector_difference_position = end_effector_position - position_frame_articulation
+            jacobian_matrix[:3, current_column] = np.cross(axis_z_transformed, vector_difference_position)
+            jacobian_matrix[3:, current_column] = axis_z_transformed
         elif joint.joint_type == "prismatic":
-            jacobian_matrix[:3, current_column] = transformed_axis_z
+            jacobian_matrix[:3, current_column] = axis_z_transformed
             jacobian_matrix[3:, current_column] = np.zeros(3)
 
         current_column += 1

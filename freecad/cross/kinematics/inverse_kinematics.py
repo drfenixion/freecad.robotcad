@@ -22,12 +22,22 @@ def rotation_error(Rotation_current: np.ndarray, Rotation_target: np.ndarray) ->
     np.ndarray
         Angular error vector of shape (3,) in the world frame.
     """
-    Rotation_error = Rotation_current.T @ Rotation_target
-    return 0.5 * np.array([
-        Rotation_error[2, 1] - Rotation_error[1, 2],
-        Rotation_error[0, 2] - Rotation_error[2, 0],
-        Rotation_error[1, 0] - Rotation_error[0, 1]
-    ])
+    R_err = Rotation_target @ Rotation_current.T
+    theta = np.arccos(np.clip((np.trace(R_err) - 1) / 2.0, -1.0, 1.0))
+    
+    if theta < 1e-9:
+        return np.zeros(3)
+    
+    # Axial vector: (R_err - R_err.T) / (2*sin(theta)) is the unit axis u
+    # The necessary angular velocity is theta * u
+    w = np.array([
+        R_err[2, 1] - R_err[1, 2],
+        R_err[0, 2] - R_err[2, 0],
+        R_err[1, 0] - R_err[0, 1]
+    ]) / (2.0 * np.sin(theta))
+    
+    return theta * w
+
 
 
 def inverse_kinematics(
@@ -47,6 +57,18 @@ def inverse_kinematics(
 
     Supports both 3-DOF (position only) and 6-DOF (position + orientation) control.
     When target_rotation is None, the solver operates in position-only mode (original behavior).
+
+    DLS formulation:
+        full_error = [w_pos * Δp,  w_ori * Δω]      shape (3,) or (6,)
+        J          = compute_jacobian(robot, q)       shape (3,N) or (6,N)
+        Δq         = Jᵀ (J Jᵀ + λ²I)⁻¹ · full_error
+
+    Step size is adaptive: max_step = clip(0.05 * error_norm, 0.05, 0.5).
+    This allows large steps far from the target and fine steps near convergence.
+
+    Singularity detection: if the initial configuration has manipulability
+    w = sqrt(det(J[:3] J[:3]ᵀ)) < 1e-3, a random perturbation is applied
+    before the first iteration to escape the degenerate configuration.
 
     Parameters:
     -----------
@@ -84,12 +106,22 @@ def inverse_kinematics(
     for restart_index in range(max_restarts):
         if restart_index == 0:
             current_joint_positions = initial_guess.copy()
+            # Detect singular initial configuration and perturb to escape it.
+            # w = sqrt(det(J_linear @ J_linear.T)) — Yoshikawa manipulability index.
+            # w ≈ 0 means the robot is at or near a kinematic singularity where
+            # the DLS step collapses to zero and the solver stalls immediately.
+            J0 = compute_jacobian(robot, current_joint_positions)
+            w0 = np.sqrt(max(0.0, np.linalg.det(J0[:3, :] @ J0[:3, :].T)))
+            if w0 < 1e-3:
+                current_joint_positions += np.random.uniform(-0.5, 0.5, size=len(current_joint_positions))
+                print(f"Singular initial config detected (w={w0:.2e}), applying perturbation.")
         else:
+            # Random restart to escape local minima or stall regions.
             current_joint_positions = initial_guess.copy()
-            current_joint_positions += np.random.uniform(-0.3, 0.3, size=len(current_joint_positions))
+            current_joint_positions += np.random.uniform(-1.0, 1.0, size=len(current_joint_positions))
             print(f"IK restart {restart_index} with perturbed joint positions = {np.round(current_joint_positions, 3)}")
 
-        # Boolean mask to isolate joints subject to angular wrapping controls
+        # Boolean mask to isolate joints subject to angular wrapping controls.
         revolute_joint_mask = np.array([
             joint.joint_type in ["revolute", "continuous"]
             for joint in robot.joints
@@ -110,19 +142,19 @@ def inverse_kinematics(
                 orientation_error = rotation_error(current_rotation, target_rotation)  # shape (3,)
                 full_error = np.concatenate([
                     weight_position    * position_error,
-                    weight_orientation * orientation_error
+                    weight_orientation * orientation_error,
                 ])  # shape (6,)
             else:
                 full_error = position_error  # shape (3,) — original behavior
 
             current_error_norm = np.linalg.norm(full_error)
 
-            # Check convergence criteria
+            # Check convergence criteria.
             if current_error_norm < tolerance:
                 print(f"Converged in {iteration} iterations (restart {restart_index}).")
                 return current_joint_positions
 
-            # Stall detection
+            # Stall detection — exit inner loop to trigger a new restart.
             if abs(previous_error_norm - current_error_norm) < 1e-10:
                 stall_counter += 1
             else:
@@ -133,25 +165,39 @@ def inverse_kinematics(
                 print(f"Stalled at iteration {iteration}, error = {current_error_norm:.6f}. Triggering restart.")
                 break
 
-            # Select Jacobian rows based on mode
+            # Select Jacobian rows based on mode: full 6×N or linear-only 3×N.
             full_jacobian = compute_jacobian(robot, current_joint_positions)
-            Jacobian = full_jacobian if use_orientation else full_jacobian[:3, :]  # (6,N) or (3,N)
+            Jacobian = full_jacobian if use_orientation else full_jacobian[:3, :]
 
-            # Damped Least Squares: Δq = Jᵀ(JJᵀ + λ²I)⁻¹ · error
-            damping_lambda = 0.01
-            damping_identity = (damping_lambda ** 2) * np.eye(error_dim)
-            coefficient_matrix = Jacobian @ Jacobian.T + damping_identity
-            joint_delta_step = Jacobian.T @ np.linalg.solve(coefficient_matrix, full_error)
+            # SVD for damping factor calculation and pseudo-inverse stability.
+            U, S, Vh = np.linalg.svd(Jacobian, full_matrices=False)
 
-            # Clamp step size for stability
+            # Damping factor λ selection based on condition number of the Jacobian.
+            sigma_min = S[-1]
+            sigma_max = S[0]
+            condition_number = sigma_max / sigma_min if sigma_min > 1e-12 else np.inf
+            if condition_number > 100:
+                damping_lambda = 0.1
+            elif condition_number > 10:
+                damping_lambda = 0.01
+            else:
+                damping_lambda = 0.001
+
+            # Factor damped
+            damped_factors = S / (S**2 + damping_lambda**2)  # shape (error_dim,)
+
+            # Calulation for Δq = Vhᵀ @ diag(σ/(σ²+λ²)) @ Uᵀ @ error
+            joint_delta_step = Vh.T @ (damped_factors * (U.T @ full_error))
+
+            # Clamp and wrapping 
             step_norm = np.linalg.norm(joint_delta_step)
-            if step_norm > 0.1:
-                joint_delta_step = joint_delta_step * (0.1 / step_norm)
+            max_step = np.clip(current_error_norm * 0.1, 0.001, 0.5)
+            if step_norm > max_step:
+                joint_delta_step = joint_delta_step * (max_step / step_norm)
 
-            # Update joint positions and wrap revolute joints to [-π, π]
             current_joint_positions += joint_delta_step
             current_joint_positions[revolute_joint_mask] = (
-                np.mod(current_joint_positions[revolute_joint_mask] + np.pi, 2 * np.pi) - np.pi
+            np.mod(current_joint_positions[revolute_joint_mask] + np.pi, 2 * np.pi) - np.pi
             )
 
     print(f"IK did not converge after {max_restarts} restarts.")

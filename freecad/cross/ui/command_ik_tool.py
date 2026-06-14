@@ -20,8 +20,10 @@ IKToolDialog
 │                            ignoring all other branches (wheels, legs, etc.).
 ├── Target position group  - three QDoubleSpinBox fields (X, Y, Z in mm)
 │                            pre-filled with the current FK end-effector position
+│                            expressed in WORLD (global) coordinates.
 ├── Target orientation group - three QDoubleSpinBox fields (Roll, Pitch, Yaw in deg)
-│                              defaults to zero (identity orientation)
+│                              expressed in WORLD coordinates; pre-filled with the
+│                              current end-effector orientation (FK result).
 ├── [Solve IK]    - runs RoboTool iterative Jacobian pseudo-inverse solver
 │                   on the ISOLATED sub-chain only (6-DOF: position + orientation)
 ├── Results table - one row per joint in the sub-chain:
@@ -34,6 +36,29 @@ IKToolDialog
 ├── [Restore Original] - writes q_original back → restores initial pose
 └── [Close]
 
+Coordinate system convention
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All spinbox values (target position + orientation) are expressed in the
+WORLD (global) FreeCAD coordinate system.
+
+RoboTool's FK/IK solver, however, operates in the robot's LOCAL frame
+(relative to the robot's base Placement).  Two conversion steps are applied:
+
+1.  Pre-fill  (FK local → world):
+        T_world_ee = T_world_robot @ T_robot_ee
+        spinbox ← T_world_ee[:3, 3]
+
+2.  Solve  (world target → local, then IK, result stays in joint space):
+        p_local      = R_world^T @ (p_world_target  − p_world_robot_base)
+        R_tgt_local  = R_world^T @ R_tgt_world
+        q_solved ← IK(p_local, R_tgt_local)
+
+The FK verification after solving converts back to world for the status label:
+        T_world_achieved = T_world_robot @ FK(q_solved)
+
+This means the tool works correctly regardless of where the robot is placed
+in the FreeCAD scene or how it is oriented.
+
 IK algorithm
 ~~~~~~~~~~~~
 6-DOF Damped Least Squares (DLS / Levenberg-Marquardt):
@@ -42,8 +67,8 @@ IK algorithm
     J          = compute_jacobian(robot, q)       shape (6, N)
     Δq         = Jᵀ (J Jᵀ + λ²I₆)⁻¹ · full_error
 
-    Δp  = target_position  - current_position     (mm)
-    Δω  = rotation_error(R_current, R_target)     (rad, axial vector)
+    Δp  = target_position  - current_position     (mm, local frame)
+    Δω  = rotation_error(R_current, R_target)     (rad, axial vector, local frame)
         = 0.5 · skew_vex(R_currentᵀ · R_target)
 
 When target_rotation is None the solver falls back to 3-DOF position-only
@@ -108,10 +133,10 @@ Dialog layout
 ┌─ IK Tool ──────────────────────────────────────────────┐
 │  End Effector: [tip_link ▼]                            │
 │                                                        │
-│  Target position (mm)                                  │
+│  Target position (mm) [world frame]                    │
 │  X: [______]  Y: [______]  Z: [______]                 │
 │                                                        │
-│  Target orientation (deg)                              │
+│  Target orientation (deg) [world frame]                │
 │  R: [______]  P: [______]  Y: [______]                 │
 │                                                        │
 │               [  ⚙  Solve IK  ]                        │
@@ -124,8 +149,8 @@ Dialog layout
 │  └─────────────┴──────────────┴──────────────┘         │
 │                                                        │
 │  Status: Converged in N iterations.                    │
-│  Target:   [x, y, z] mm                                │
-│  Achieved: [x, y, z] mm                                │
+│  Target:   [x, y, z] mm  (world)                       │
+│  Achieved: [x, y, z] mm  (world)                       │
 │  Error:    0.000001 mm                                 │
 │  Error orientation: 0.42 deg                           │
 │                                                        │
@@ -310,10 +335,10 @@ def _placement_to_xyz_rpy(
         Position (x, y, z) in mm and orientation (roll, pitch, yaw) in radians.
     """
     position_vector = placement.Base
-    xyz = (position_vector.x, position_vector.y, position_vector.z)
+    coordinate_xyz = (position_vector.x, position_vector.y, position_vector.z)
     yaw, pitch, roll = placement.Rotation.toEuler()
     rpy = (math.radians(roll), math.radians(pitch), math.radians(yaw))
-    return xyz, rpy
+    return coordinate_xyz, rpy
 
 
 def _get_axis_from_placement(placement: fc.Placement) -> tuple[float, float, float]:
@@ -386,6 +411,50 @@ def _build_robot_for_chain(
         robot_instance.links.append(Link(name=joint_obj.Child))
 
     return robot_instance
+
+
+def _get_robot_global_transform(robot_obj: fc.App.DocumentObject) -> np.ndarray:
+    """
+    Return the 4×4 homogeneous transform of the robot's base in world coordinates.
+
+    RoboTool's FK/IK solver operates entirely in the robot's LOCAL frame
+    (i.e. relative to the robot's base Placement).  This function extracts
+    T_world_robot so that we can convert between local and world frames:
+
+        p_world = T_world_robot @ [p_local; 1]
+        p_local = T_world_robot^{-1} @ [p_world; 1]
+                = [R^T @ (p_world - t);  1]          (since T is rigid)
+
+    Uses getGlobalPlacement() (FreeCAD 1.0+) when available to handle nested
+    assemblies; falls back to Placement for older builds.
+
+    Parameters
+    ----------
+    robot_obj : fc.App.DocumentObject
+        The Cross::Robot container object.
+
+    Returns
+    -------
+    np.ndarray
+        4×4 float64 array: T_world_robot.
+    """
+    placement = (
+        robot_obj.getGlobalPlacement()
+        if hasattr(robot_obj, 'getGlobalPlacement')
+        else robot_obj.Placement
+    )
+
+    p = placement.Base              # FreeCAD.Vector  (mm)
+    m = placement.Rotation.toMatrix()   # FreeCAD.Matrix  (stored as 4×4 but only 3×3 rotation)
+
+    T = np.eye(4)
+    # Rotation part — FreeCAD Matrix stores elements as A{row}{col}, 1-indexed.
+    T[0, 0] = m.A11;  T[0, 1] = m.A12;  T[0, 2] = m.A13
+    T[1, 0] = m.A21;  T[1, 1] = m.A22;  T[1, 2] = m.A23
+    T[2, 0] = m.A31;  T[2, 1] = m.A32;  T[2, 2] = m.A33
+    # Translation part (mm).
+    T[0, 3] = p.x;  T[1, 3] = p.y;  T[2, 3] = p.z
+    return T
 
 
 def _apply_joint_positions(
@@ -462,7 +531,7 @@ def _apply_joint_positions(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class IKToolDialog(QtWidgets.QDialog):
-    """Modal dialog for the IK Tool command — see module docstring for layout."""
+    """Non-modal dialog for the IK Tool command — see module docstring for layout."""
 
     def __init__(
         self,
@@ -514,7 +583,7 @@ class IKToolDialog(QtWidgets.QDialog):
         root_layout.addWidget(grp_ee)
 
         # ── Target position input group ────────────────────────
-        grp_target = QtWidgets.QGroupBox(tr('Target position (mm)'))
+        grp_target = QtWidgets.QGroupBox(tr('Target position (mm) — world frame'))
         lay_target = QtWidgets.QHBoxLayout(grp_target)
         self._spins: dict[str, QtWidgets.QDoubleSpinBox] = {}
         for axis in ('X', 'Y', 'Z'):
@@ -531,7 +600,7 @@ class IKToolDialog(QtWidgets.QDialog):
         root_layout.addWidget(grp_target)
 
         # ── Target orientation RPY ─────────────────────────────
-        grp_rotation = QtWidgets.QGroupBox(tr('Target orientation (deg)'))
+        grp_rotation = QtWidgets.QGroupBox(tr('Target orientation (deg) — world frame'))
         lay_rotation = QtWidgets.QHBoxLayout(grp_rotation)
         for axis in ('Roll', 'Pitch', 'Yaw'):
             lay_rotation.addWidget(QtWidgets.QLabel(f'<b>{axis[0]}</b>'))
@@ -652,6 +721,9 @@ class IKToolDialog(QtWidgets.QDialog):
         Isolate the serial sub-chain for *end_effector_label* and rebuild
         the RoboTool model and UI table for that chain.
 
+        Spinboxes are pre-filled with the current end-effector pose expressed
+        in the WORLD coordinate system (T_world_robot @ FK_local).
+
         Parameters
         ----------
         end_effector_label : str
@@ -691,17 +763,41 @@ class IKToolDialog(QtWidgets.QDialog):
         self._joint_objs = chain_joints
         n_joints = len(chain_joints)
 
-        # ── 3. Pre-fill spinboxes with current FK position ────
-        q0 = np.array([float(j.Position) for j in self._joint_objs])
+        # ── 3. Read current joint positions (guard against deleted objects) ──
         try:
-            fk_matrix   = forward_kinematics(self._robot, q0)
-            fk_position = fk_matrix[:3, 3]
+            q0 = np.array([float(j.Position) for j in self._joint_objs])
+        except Exception:
+            self._lbl_status.setText(
+                tr("Solver error: Cannot access attribute 'Position' of deleted object. "
+                "Please close and reopen the IK Tool after reloading the project.")
+            )
+            self._joint_objs = []
+            self._robot = None
+            self._btn_solve.setEnabled(False)
+            return
+
+        # ── 4. Pre-fill spinboxes with FK position in WORLD frame ──
+        # RoboTool FK returns T_robot_ee (end-effector in robot-local frame).
+        # Multiply by T_world_robot to get T_world_ee (end-effector in world frame).
+        try:
+            T_robot_ee  = forward_kinematics(self._robot, q0)
+            T_world     = _get_robot_global_transform(self._robot_obj)
+            T_world_ee  = T_world @ T_robot_ee
+            fk_position = T_world_ee[:3, 3]
+            fk_rotation = T_world_ee[:3, :3]
             for axis, value in zip(('X', 'Y', 'Z'), fk_position):
                 self._spins[axis].setValue(float(value))
+            sy    = math.sqrt(fk_rotation[0,0]**2 + fk_rotation[1,0]**2)
+            roll  = math.atan2(fk_rotation[2,1], fk_rotation[2,2])
+            pitch = math.atan2(-fk_rotation[2,0], sy)
+            yaw   = math.atan2(fk_rotation[1,0], fk_rotation[0,0])
+            self._spins['Roll'].setValue(math.degrees(roll))
+            self._spins['Pitch'].setValue(math.degrees(pitch))
+            self._spins['Yaw'].setValue(math.degrees(yaw))
         except Exception:
             pass  # Spinboxes stay at 0 — not a fatal error.
 
-        # ── 4. Populate results table with current joint values ──
+        # ── 5. Populate results table with current joint values ──
         self._table.setRowCount(n_joints)
         for i, joint_obj in enumerate(self._joint_objs):
             self._table.setItem(i, 0, QtWidgets.QTableWidgetItem(joint_obj.Label))
@@ -723,13 +819,14 @@ class IKToolDialog(QtWidgets.QDialog):
             return
 
         try:
-            # ── Build R_target from RPY spinboxes ──────────────
+            # ── Build R_target_world from RPY spinboxes ────────
+            # The spinboxes represent orientation in the WORLD frame.
             roll  = np.deg2rad(self._spins['Roll'].value())
             pitch = np.deg2rad(self._spins['Pitch'].value())
             yaw   = np.deg2rad(self._spins['Yaw'].value())
 
             Rotation_x = np.array([
-                [1, 0,           0          ],
+                [1, 0,            0           ],
                 [0, np.cos(roll), -np.sin(roll)],
                 [0, np.sin(roll),  np.cos(roll)],
             ])
@@ -743,25 +840,48 @@ class IKToolDialog(QtWidgets.QDialog):
                 [np.sin(yaw),  np.cos(yaw), 0],
                 [0,            0,           1],
             ])
-            Rotation_target = Rotation_z @ Rotation_y @ Rotation_x
+            R_target_world = Rotation_z @ Rotation_y @ Rotation_x
 
-            # ── Read Cartesian target ──────────────────────────
-            target = np.array([self._spins[axis].value() for axis in ('X', 'Y', 'Z')])
-            q0     = np.array([float(j.Position) for j in self._joint_objs])
+            # ── Read target position in WORLD frame ────────────
+            target_world = np.array([self._spins[axis].value() for axis in ('X', 'Y', 'Z')])
+
+            # ── Guard: re-read joint positions safely ──────────
+            try:
+                q0 = np.array([float(j.Position) for j in self._joint_objs])
+            except Exception:
+                self._lbl_status.setText(
+                    tr("Solver error: Cannot access attribute 'Position' of deleted object. "
+                    "Please close and reopen the IK Tool after reloading the project.")
+                )
+                return
 
             # Capture original pose on the first solve; do NOT overwrite on re-solve.
             if self.original_joint_positions is None:
                 self.original_joint_positions = q0.copy()
                 self._btn_restore.setEnabled(True)
 
+            # ── Convert world-frame target → robot-local frame ─
+            # RoboTool FK/IK operates in the robot's LOCAL coordinate system.
+            # T_world_robot decomposes as [R_world | p_world_base].
+            # Inverse (rigid body): R^T @ (p_world_target - p_world_base).
+            T_world   = _get_robot_global_transform(self._robot_obj)
+            R_world   = T_world[:3, :3]   # rotation of robot base in world
+            p_world   = T_world[:3, 3]    # position of robot base in world (mm)
+
+            # p_local = R_world^T @ (p_world_target - p_world_robot_base)
+            target_local = R_world.T @ (target_world - p_world)
+
+            # R_target_local = R_world^T @ R_target_world
+            R_target_local = R_world.T @ R_target_world
+
             # ── Run solver (capture stdout for status label) ───
             log_buffer = io.StringIO()
             with redirect_stdout(log_buffer):
                 q_solved = inverse_kinematics(
                     self._robot,
-                    target_position=target,
+                    target_position=target_local,
                     initial_guess=q0,
-                    target_rotation=Rotation_target,
+                    target_rotation=R_target_local,
                 )
             solver_log = log_buffer.getvalue().strip()
 
@@ -789,19 +909,24 @@ class IKToolDialog(QtWidgets.QDialog):
                 )
             self._table.resizeColumnsToContents()
 
-            # ── FK verification + residual errors ─────────────
+            # ── FK verification — convert achieved pose back to WORLD frame ──
+            # This ensures the status label reports world-frame coordinates,
+            # consistent with what the user entered in the spinboxes.
             try:
-                fk_matrix      = forward_kinematics(self._robot, q_solved)
-                achieved       = fk_matrix[:3, 3]
-                residual_error = float(np.linalg.norm(target - achieved))
-                cos_angle      = np.clip(
-                    (np.trace(fk_matrix[:3, :3].T @ Rotation_target) - 1) / 2,
+                T_robot_ee_solved = forward_kinematics(self._robot, q_solved)
+                T_world_ee_solved = T_world @ T_robot_ee_solved
+                achieved_world    = T_world_ee_solved[:3, 3]
+                R_achieved_world  = T_world_ee_solved[:3, :3]
+
+                residual_pos_error = float(np.linalg.norm(target_world - achieved_world))
+                cos_angle = np.clip(
+                    (np.trace(R_achieved_world.T @ R_target_world) - 1) / 2,
                     -1.0, 1.0
                 )
                 status_details = (
-                    f'Target:   [{target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}] mm\n'
-                    f'Achieved: [{achieved[0]:.3f}, {achieved[1]:.3f}, {achieved[2]:.3f}] mm\n'
-                    f'Error:    {residual_error:.6f} mm\n'
+                    f'Target:   [{target_world[0]:.3f}, {target_world[1]:.3f}, {target_world[2]:.3f}] mm  (world)\n'
+                    f'Achieved: [{achieved_world[0]:.3f}, {achieved_world[1]:.3f}, {achieved_world[2]:.3f}] mm  (world)\n'
+                    f'Error:    {residual_pos_error:.6f} mm\n'
                     f'Error orientation: {np.rad2deg(np.arccos(cos_angle)):.2f} deg'
                 )
             except Exception as exc:
@@ -869,9 +994,11 @@ class _IKToolCommand:
                 '\n'
                 'Select a robot, then open this tool to:\n'
                 '  • Choose the End Effector (tip link) for IK.\n'
-                '  • Inspect the current end-effector position (FK).\n'
+                '  • Inspect the current end-effector position (FK)\n'
+                '    expressed in WORLD (global) coordinates.\n'
                 '  • Enter a Cartesian target (X, Y, Z in mm) and\n'
-                '    orientation (Roll, Pitch, Yaw in degrees).\n'
+                '    orientation (Roll, Pitch, Yaw in degrees),\n'
+                '    both in WORLD coordinates.\n'
                 '  • Solve 6-DOF IK via iterative Jacobian DLS\n'
                 '    on the isolated serial sub-chain only.\n'
                 '  • See solved joint angles in a results table.\n'
