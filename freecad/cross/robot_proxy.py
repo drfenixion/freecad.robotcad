@@ -1027,6 +1027,7 @@ class RobotProxy(ProxyBase):
                 'meshes/',
                 'urdf/',
                 'worlds/',
+                'config/',
         ]
 
         if interactive and fc.GuiUp:
@@ -1105,6 +1106,7 @@ class RobotProxy(ProxyBase):
 
         robot_controllers_yaml = self.get_robot_controllers_yaml()
         save_yaml(robot_controllers_yaml, output_path / f'overcross/{controllers_config_file_name}')
+        save_yaml(robot_controllers_yaml, description_package_path / 'config' / f'{controllers_config_file_name}')
 
         save_xml(xml, urdf_path)
         export_templates(
