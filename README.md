@@ -48,7 +48,6 @@ Video of creating controllable models: <br />
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
 1. Explode View with adjustable offset and states memory.
-1. Forward and Inverse Kinematics tool.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz
     1. URDF (kinematics, mass, inertia, sensors, etc.)
