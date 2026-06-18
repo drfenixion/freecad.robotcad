@@ -123,6 +123,35 @@
                 } 
             ],
             "justMyCode": false
+        },
+        {
+            "name": "C++: pipeTransport Attach gz-sim (vacuum_gripper_plugin)",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/bin/sh",
+            "processId": "${command:pickRemoteProcess}", // pick 'gz sim server'
+            "sourceFileMap": {
+                "${userHome}/ros2/ws/src": "${workspaceFolder}/docker/ros2_ws/src",
+            },
+            "MIMode": "gdb",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "ros2_jazzy_desktop_px4_air3", "bash", "-c"],
+                "debuggerPath": "gdb"
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Wait for library to load",
+                    "text": "set stop-on-solib-events 1",
+                    "ignoreFailures": false
+                }
+            ],
         }
-    ]
+    ],
 }
