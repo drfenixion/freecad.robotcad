@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M 0 0 L 6 3 L 0 6 Z" style="fill: rgb(0, 100, 200);"/>
+    </marker>
+  </defs>
+
+  <!-- Vacuum suction cup body (bell-shaped nozzle) -->
+  <path d="M 20 42 L 18 42 C 14 42 12 40 12 36 L 12 30 C 12 28 13 27 15 27 L 49 27 C 51 27 52 28 52 30 L 52 36 C 52 40 50 42 46 42 L 44 42 Z"
+        style="fill: rgb(200, 200, 200); stroke: rgb(0, 0, 0); stroke-width: 1.5; stroke-linejoin: round;"/>
+
+  <!-- Hose/pipe going up from the nozzle -->
+  <rect x="28" y="8" width="8" height="19" rx="2" ry="2"
+        style="fill: rgb(180, 180, 180); stroke: rgb(0, 0, 0); stroke-width: 1.5;"/>
+
+  <!-- Hose ridges -->
+  <line x1="28" y1="14" x2="36" y2="14" style="stroke: rgb(100, 100, 100); stroke-width: 0.8;"/>
+  <line x1="28" y1="18" x2="36" y2="18" style="stroke: rgb(100, 100, 100); stroke-width: 0.8;"/>
+  <line x1="28" y1="22" x2="36" y2="22" style="stroke: rgb(100, 100, 100); stroke-width: 0.8;"/>
+
+  <!-- Air flow lines being sucked upward from below into the nozzle -->
+  <path d="M 10 56 Q 12 48 18 44" style="fill: none; stroke: rgb(0, 100, 200); stroke-width: 1.5; stroke-linecap: round;" marker-end="url(#arrow)"/>
+  <path d="M 20 58 Q 22 49 26 44" style="fill: none; stroke: rgb(0, 100, 200); stroke-width: 1.5; stroke-linecap: round;" marker-end="url(#arrow)"/>
+  <path d="M 32 60 L 32 46" style="fill: none; stroke: rgb(0, 100, 200); stroke-width: 1.5; stroke-linecap: round;" marker-end="url(#arrow)"/>
+  <path d="M 44 58 Q 42 49 38 44" style="fill: none; stroke: rgb(0, 100, 200); stroke-width: 1.5; stroke-linecap: round;" marker-end="url(#arrow)"/>
+  <path d="M 54 56 Q 52 48 46 44" style="fill: none; stroke: rgb(0, 100, 200); stroke-width: 1.5; stroke-linecap: round;" marker-end="url(#arrow)"/>
+
+  <!-- Suction opening indicator at bottom of nozzle -->
+  <ellipse cx="32" cy="42" rx="12" ry="2" style="fill: rgb(60, 60, 60); stroke: rgb(0, 0, 0); stroke-width: 1;"/>
+</svg>

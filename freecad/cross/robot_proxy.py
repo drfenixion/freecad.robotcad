@@ -53,6 +53,7 @@ from .wb_utils import get_controllers
 from .wb_utils import get_broadcasters
 from .wb_utils import get_rel_and_abs_path
 from .wb_utils import get_valid_urdf_name
+from .wb_utils import get_vacuum_grippers
 from .wb_utils import is_joint
 from .wb_utils import is_robot
 from .wb_utils import is_controller
@@ -1117,7 +1118,8 @@ class RobotProxy(ProxyBase):
             sensors_file=sensors_file,
             sensors_urdf=sensors_urdf,
             robot_name=robot_name,
-            cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera'])
+            cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera']),
+            vacuum_gripper_plugins=self.get_vacuum_gripper_plugins_xml(),
         )
 
         self.copy_custom_worlds(description_package_path / 'worlds')
@@ -1191,6 +1193,19 @@ class RobotProxy(ProxyBase):
             sensors_xml += '\n\n' + sdf_dict_to_xml(sensor_xml_as_dict, full_document = False, pretty = True)
 
         return sensors_xml
+
+    def get_vacuum_gripper_plugins_xml(self) -> str:
+        """Return the SDF XML for all vacuum gripper plugins on links."""
+        from .vacuum_gripper_proxy import get_vacuum_gripper_plugin_xml
+
+        plugins_xml = ''
+        for link in self.get_links():
+            for vg in link.Proxy.get_vacuum_grippers():
+                link_urdf_name = get_valid_urdf_name(ros_name(link))
+                plugins_xml += '\n' + get_vacuum_gripper_plugin_xml(vg, link_urdf_name)
+                plugins_xml += '\n'
+
+        return plugins_xml
     
     def get_sensors_topics_by_types(self, sensor_types: list) -> str:
         """Return comma separated sensors topics by sensors type"""
@@ -1419,6 +1434,20 @@ class RobotProxy(ProxyBase):
         robotMetaXmlDoc = parseString(robotMetaXml)
         jointsXmlDoc = parseString(jointsXml)
         robotMetaXmlDoc.getElementsByTagName("robotMeta").item(0).appendChild(jointsXmlDoc.getElementsByTagName("joints").item(0))
+
+        # Reuse get_vacuum_gripper_plugins_xml() to avoid duplicating iteration logic.
+        vacuum_gripper_plugins = self.get_vacuum_gripper_plugins_xml()
+        if vacuum_gripper_plugins.strip():
+            vacuum_grippers_xml = f"""<?xml version="1.0" ?>
+    <vacuum_grippers>
+{vacuum_gripper_plugins}
+    </vacuum_grippers>
+            """
+            vacuum_grippers_xml_doc = parseString(vacuum_grippers_xml)
+            robotMetaXmlDoc.getElementsByTagName("robotMeta").item(0).appendChild(
+                vacuum_grippers_xml_doc.getElementsByTagName("vacuum_grippers").item(0),
+            )
+
         robotMetaXml = robotMetaXmlDoc.toprettyxml(indent=' ', newl='\n', encoding=None, standalone=None)
 
         return robotMetaXml

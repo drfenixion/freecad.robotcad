@@ -55,6 +55,7 @@ from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a Doc
 DO = fc.DocumentObject
 CrossBasicElement = Union[CrossJoint, CrossLink]
 CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
+CrossVacuumGripper = DO  # A Cross::VacuumGripper, i.e. a DocumentObject with Proxy "VacuumGripperProxy".
 DOList = List[DO]
 
 # /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
@@ -182,6 +183,11 @@ def is_sensor_joint(obj: DO) -> bool:
     return has_cross_type(obj, 'Cross::SensorJoint')
 
 
+def is_vacuum_gripper(obj: DO) -> bool:
+    """Return True if the object is a Cross::VacuumGripper."""
+    return has_cross_type(obj, 'Cross::VacuumGripper')
+
+
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
     return has_cross_type(obj, 'Cross::PlanningScene')
@@ -256,6 +262,11 @@ def is_workcell_selected() -> bool:
     return is_selected_from_lambda(is_workcell)
 
 
+def is_vacuum_gripper_selected() -> bool:
+    """Return True if the first selected object is a Cross::VacuumGripper."""
+    return is_selected_from_lambda(is_vacuum_gripper)
+
+
 def is_planning_scene_selected() -> bool:
     """Return True if the first selected object is a Cross::PlanningScene."""
     return is_selected_from_lambda(is_planning_scene)
@@ -303,6 +314,11 @@ def get_link_sensors(objs: DOList) -> list[CrossSensor]:
 def get_joint_sensors(objs: DOList) -> list[CrossSensor]:
     """Return only the objects that are Cross::SensorJoint instances."""
     return [o for o in objs if is_sensor_joint(o)]
+
+
+def get_vacuum_grippers(objs: DOList) -> list[CrossVacuumGripper]:
+    """Return only the objects that are Cross::VacuumGripper instances."""
+    return [o for o in objs if is_vacuum_gripper(o)]
 
 
 def get_controllers(objs: DOList) -> list[CrossController]:

@@ -61,6 +61,9 @@ from .ui import command_new_lidar2d  # noqa: F401
 from .ui import command_new_rgb_camera  # noqa: F401
 from .ui import command_new_ultrasound  # noqa: F401
 
+#CROSS vacuum gripper
+from .ui import command_new_vacuum_gripper  # noqa: F401
+
 from .wb_utils import ICON_PATH
 from . import wb_constants
 
@@ -92,6 +95,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'NewVacuumGripper',  # Defined in ./ui/command_new_vacuum_gripper.py.
             'GenerateRobotByText',  # Defined in ./ui/command_generate_robot_by_text.py.
             'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.
@@ -148,6 +152,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewJointsFilledSpider',  # Defined in ./ui/command_new_joints_filled_spider_connect.py.
             'NewController',  # Defined in ./ui/command_new_controller.py.
             'NewSensor',  # Defined in ./ui/command_new_sensor.py.
+            'NewVacuumGripper',  # Defined in ./ui/command_new_vacuum_gripper.py.
             'GenerateRobotByText',  # Defined in ./ui/command_generate_robot_by_text.py.
             'OpenModelsLibrary',  # Defined in ./ui/command_open_models_library.py.
             'NewWorkcell',  # Defined in ./ui/command_new_workcell.py.

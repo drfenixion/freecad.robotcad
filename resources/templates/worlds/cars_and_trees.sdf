@@ -30,6 +30,8 @@
       name="gz::sim::systems::Contact">
     </plugin>
 
+{vacuum_gripper_plugins}
+
     <gui fullscreen="0">
 
       <!-- 3D scene -->
