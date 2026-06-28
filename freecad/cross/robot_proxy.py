@@ -459,6 +459,7 @@ class RobotProxy(ProxyBase):
                 'Cross::Joint',
                 'Cross::AttachedCollisionObject',
                 'Cross::RgbCamera',
+                'Cross::rgbd_camera',                
                 'Cross::Lidar2d',
                 'Cross::Ultrasound',
                 'Cross::Controller',
