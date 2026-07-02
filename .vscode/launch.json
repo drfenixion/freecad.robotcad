@@ -152,6 +152,22 @@
                     "ignoreFailures": false
                 }
             ],
-        }
+        },
+        {
+            "name": "Python3: Mission packager Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/mission",
+                    "remoteRoot": "${userHome}/ros2/ws/src/mission"
+                }
+            ],
+            "justMyCode": true
+        },
     ],
 }
