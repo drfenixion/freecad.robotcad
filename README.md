@@ -49,7 +49,7 @@ Video of creating controllable models: <br />
 1. Integrated ready to use models library
 1. Explode View with adjustable offset and states memory.
 1. Basic code generator:
-    1. ROS2 package with launchers for Gazebo, RViz, Multicopter (PX4, Sverk)
+    1. ROS2 package with launchers for Gazebo, RViz, PX4, Sverk
     1. URDF (kinematics, mass, inertia, sensors, etc.)
     1. Meshes
     1. SDF maps created by "Custom world" tool (map editor)
@@ -63,7 +63,7 @@ Video of creating controllable models: <br />
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
         1. ros2_controllers (integrated in your package with ros2_control launcher)
-        1. Multicopter - PX4 or Sverk (PX4 based) + Gazebo + ROS2, all required code for custom model and dependencies.
+        1. Multicopter - PX4 or Sverk (PX4 based) + Gazebo + ROS2, all required code for your custom model and dependencies.
         1. Nvidia video cards container support
         1. README instruction how to use
 1. all features from CROSS workbench
