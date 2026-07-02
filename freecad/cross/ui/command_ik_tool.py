@@ -24,10 +24,10 @@ IKToolDialog
 ├── Target orientation group - three QDoubleSpinBox fields (Roll, Pitch, Yaw in deg)
 │                              expressed in WORLD coordinates; pre-filled with the
 │                              current end-effector orientation (FK result).
-├── [Solve IK]    - runs RoboTool iterative Jacobian DLS solver using
-│                   INCREMENTAL interpolation (N_STEPS intermediate targets)
-│                   to guarantee smooth, continuous motion in the viewport.
-│                   Each intermediate step is applied to the model in real time.
+├── [Solve IK]    - runs incremental IK: N_STEPS intermediate targets are
+│                   interpolated (position: linear, orientation: SLERP) between
+│                   the current EF pose and the desired target.  Each step is
+│                   applied to the model in real time → smooth viewport animation.
 ├── Results table - one row per joint in the sub-chain:
 │     columns: Joint name | Original (rad/mm) | Solved (rad/mm)
 ├── Status label  - convergence message + achieved position + errors
@@ -37,19 +37,27 @@ IKToolDialog
 ├── [Restore Original] - writes q_original back → restores initial pose
 └── [Close]
 
-Incremental IK (smooth motion)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Incremental IK with SLERP orientation interpolation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Instead of solving IK once for the full target displacement, the solver
-interpolates N_STEPS = 20 intermediate targets between the current EF
-position and the desired target, applying each step to the model in real
-time.  This guarantees:
+interpolates N_STEPS = 20 intermediate targets:
 
-- Continuous, smooth motion in the 3D viewport (no large jumps)
-- Configuration continuity: each step uses the previous step's joint
-    positions as the initial guess, keeping the robot on the same
-    kinematic branch
-- Graceful degradation: if any intermediate step fails to converge,
-    the robot stops at the last valid configuration
+  Position:    linear interpolation
+      p(α) = p_start + α · (p_target − p_start)
+
+  Orientation: SLERP via Rodrigues rotation formula
+      R_rel    = R_start^T · R_target
+      θ        = arccos(clip((trace(R_rel)−1)/2, −1, 1))
+      axis     = skew_vex(R_rel) / (2·sin(θ))
+      R_step   = I + sin(αθ)·[axis]× + (1−cos(αθ))·[axis]×²
+      R(α)     = R_start · R_step
+
+Each step uses the previous step's joint configuration as the IK initial
+guess, keeping the robot on the same kinematic branch and guaranteeing:
+  - Smooth, continuous motion in the 3D viewport (no large jumps)
+  - Configuration continuity across the full trajectory
+  - Graceful degradation: robot stops at last valid step if target
+    becomes unreachable mid-trajectory
 
 Coordinate system convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -57,32 +65,25 @@ All spinbox values (target position + orientation) are expressed in the
 WORLD (global) FreeCAD coordinate system.
 
 RoboTool's FK/IK solver operates in the robot's LOCAL frame.
-Two conversion steps are applied:
-
-1.  Pre-fill  (FK local → world):
-        T_world_ee = T_world_robot @ T_robot_ee
-        spinbox ← T_world_ee[:3, 3]   (position)
-        spinbox ← RPY(T_world_ee[:3,:3])  (orientation)
-
-2.  Solve  (world target → local per step, IK, result in joint space):
-        p_local      = R_world^T @ (p_world_target − p_world_robot_base)
-        R_tgt_local  = R_world^T @ R_tgt_world
-        q_solved ← IK(p_local_interp, R_tgt_local)
+Conversions:
+  Pre-fill:  T_world_ee = T_world_robot @ FK(q)
+  Solve:     p_local = R_world^T @ (p_world − p_base)
+             R_local = R_world^T @ R_world_target
 
 IK algorithm
 ~~~~~~~~~~~~
 6-DOF Damped Least Squares (DLS) with SVD-based adaptive damping:
 
-    full_error = [w_pos * Δp,  w_ori * Δω]      shape (6,)
-    J          = compute_jacobian(robot, q)       shape (6, N)
+    full_error = [w_pos·Δp,  w_ori·Δω]      shape (6,)
+    J          = compute_jacobian(robot, q)   shape (6, N)
     Δq         = Vᵀ diag(σ/(σ²+λ²)) Uᵀ · full_error
 
     λ selected based on condition number κ(J):
         κ > 100 → λ = 0.1  (near singularity)
         κ > 10  → λ = 0.01
-        κ ≤ 10  → λ = 0.001 (well-conditioned)
+        κ ≤ 10  → λ = 0.001
 
-Singularity detection: Yoshikawa index w = sqrt(det(J J^T)) < 1e-3
+Singularity detection: Yoshikawa index w = sqrt(det(J[:3] J[:3]^T)) < 1e-3
 triggers automatic perturbation of the initial configuration.
 
 Dialog layout
@@ -105,7 +106,7 @@ Dialog layout
 │  │ joint_1     │  0.0000 rad  │  1.2345 rad  │         │
 │  └─────────────┴──────────────┴──────────────┘         │
 │                                                        │
-│  Status: Converged. 20/20 steps.                       │
+│  Converged (20/20 steps)                               │
 │  Target:   [x, y, z] mm  (world)                       │
 │  Achieved: [x, y, z] mm  (world)                       │
 │  Error:    0.000001 mm                                 │
@@ -142,7 +143,6 @@ from ..kinematics.kinematics import forward_kinematics
 from ..kinematics.inverse_kinematics import inverse_kinematics
 
 # Number of interpolation steps for smooth incremental motion.
-# Higher = smoother but slower per Solve click.
 _N_STEPS = 20
 
 
@@ -256,6 +256,55 @@ def _get_robot_global_transform(robot_obj: fc.App.DocumentObject) -> np.ndarray:
     T[2, 0] = m.A31;  T[2, 1] = m.A32;  T[2, 2] = m.A33
     T[0, 3] = p.x;    T[1, 3] = p.y;    T[2, 3] = p.z
     return T
+
+
+def _slerp_rotation(
+    R_start: np.ndarray,
+    R_target: np.ndarray,
+    alpha: float,
+) -> np.ndarray:
+    """
+    Spherical Linear Interpolation (SLERP) between two rotation matrices.
+
+    Computes R(α) = R_start · exp(α · log(R_start^T · R_target))
+    using the Rodrigues rotation formula.
+
+    Parameters
+    ----------
+    R_start  : (3,3) rotation matrix — starting orientation
+    R_target : (3,3) rotation matrix — target orientation
+    alpha    : interpolation parameter in [0, 1]
+
+    Returns
+    -------
+    (3,3) interpolated rotation matrix
+    """
+    R_rel = R_start.T @ R_target
+    theta = np.arccos(np.clip((np.trace(R_rel) - 1) / 2.0, -1.0, 1.0))
+
+    if theta < 1e-9:
+        # Rotations are identical — return target directly.
+        return R_target.copy()
+
+    # Axial vector of the relative rotation.
+    axis = np.array([
+        R_rel[2, 1] - R_rel[1, 2],
+        R_rel[0, 2] - R_rel[2, 0],
+        R_rel[1, 0] - R_rel[0, 1],
+    ]) / (2.0 * np.sin(theta))
+
+    # Skew-symmetric cross-product matrix of the axis.
+    K = np.array([
+        [ 0,        -axis[2],  axis[1]],
+        [ axis[2],   0,       -axis[0]],
+        [-axis[1],   axis[0],  0      ],
+    ])
+
+    # Rodrigues formula for fractional rotation alpha*theta around axis.
+    a = alpha * theta
+    R_step = np.eye(3) + np.sin(a) * K + (1.0 - np.cos(a)) * (K @ K)
+
+    return R_start @ R_step
 
 
 def _apply_joint_positions(
@@ -460,9 +509,8 @@ class IKToolDialog(QtWidgets.QDialog):
     def _load_chain(self, end_effector_label: str) -> None:
         """
         Isolate the serial sub-chain and rebuild the RoboTool model.
-        Pre-fills both XYZ and RPY spinboxes with the current EF pose
-        in world coordinates, ensuring orientation is preserved on
-        position-only moves.
+        Pre-fills XYZ and RPY spinboxes from the current FK pose in world
+        coordinates so that orientation is preserved on position-only moves.
         """
         try:
             chain_joints = _get_chain_to_root(
@@ -477,7 +525,7 @@ class IKToolDialog(QtWidgets.QDialog):
         if not chain_joints:
             self._lbl_status.setText(
                 tr(f'No active joints found on the path to "{end_effector_label}". '
-                'Try a different end effector.')
+                   'Try a different end effector.')
             )
             self._btn_solve.setEnabled(False)
             self._joint_objs = []
@@ -499,7 +547,7 @@ class IKToolDialog(QtWidgets.QDialog):
         except Exception:
             self._lbl_status.setText(
                 tr("Solver error: Cannot access 'Position' of deleted object. "
-                "Please close and reopen the IK Tool.")
+                   "Please close and reopen the IK Tool.")
             )
             self._joint_objs = []
             self._robot = None
@@ -507,7 +555,6 @@ class IKToolDialog(QtWidgets.QDialog):
             return
 
         # Pre-fill XYZ and RPY from current FK pose in world frame.
-        # Pre-filling RPY prevents orientation drift on position-only moves.
         try:
             T_robot_ee  = forward_kinematics(self._robot, q0)
             T_world     = _get_robot_global_transform(self._robot_obj)
@@ -538,17 +585,23 @@ class IKToolDialog(QtWidgets.QDialog):
         self._btn_solve.setEnabled(True)
         self._lbl_status.setText(
             tr(f'Chain: {n_joints} joint(s) → "{end_effector_label}". '
-            'Adjust target and press Solve IK.')
+               'Adjust target and press Solve IK.')
         )
 
-    # ── Slot: Solve IK (incremental) ─────────────────────────
+    # ── Slot: Solve IK (incremental with SLERP) ──────────────
 
     def _on_solve(self) -> None:
         """
-        Run incremental IK: interpolate N_STEPS targets between the current
-        EF position and the desired target, applying each step to the model
-        in real time.  This produces smooth, continuous motion and prevents
-        large joint-space jumps between kinematic branches.
+        Run incremental IK with SLERP orientation interpolation.
+
+        Interpolates N_STEPS intermediate targets between the current EF
+        pose and the desired target:
+          - Position: linear interpolation
+          - Orientation: SLERP via Rodrigues rotation formula
+
+        Each step uses the previous step's q as initial guess, keeping the
+        robot on the same kinematic branch and producing smooth, continuous
+        motion in the viewport.
         """
         if not self._joint_objs or self._robot is None:
             return
@@ -587,7 +640,7 @@ class IKToolDialog(QtWidgets.QDialog):
             except Exception:
                 self._lbl_status.setText(
                     tr("Solver error: Cannot access 'Position' of deleted object. "
-                    "Please close and reopen the IK Tool.")
+                       "Please close and reopen the IK Tool.")
                 )
                 return
 
@@ -596,27 +649,32 @@ class IKToolDialog(QtWidgets.QDialog):
                 self._btn_restore.setEnabled(True)
 
             # ── World → local frame conversion ─────────────────
-            T_world  = _get_robot_global_transform(self._robot_obj)
-            R_world  = T_world[:3, :3]
-            p_world  = T_world[:3, 3]
-
+            T_world        = _get_robot_global_transform(self._robot_obj)
+            R_world        = T_world[:3, :3]
+            p_world        = T_world[:3, 3]
             target_local   = R_world.T @ (target_world - p_world)
             R_target_local = R_world.T @ R_target_world
 
-            # ── Incremental IK: interpolate N_STEPS sub-targets ─
-            # Each step uses the previous step's q as initial guess,
-            # keeping the robot on the same kinematic branch and
-            # producing smooth, continuous motion in the viewport.
+            # ── Read current EF pose in local frame ────────────
             T_ee_start = forward_kinematics(self._robot, q0)
             pos_start  = T_ee_start[:3, 3]   # current EF position (local)
+            R_start    = T_ee_start[:3, :3]  # current EF orientation (local)
 
-            q_current   = q0.copy()
-            q_final     = None
-            steps_done  = 0
+            # ── Incremental IK with SLERP ──────────────────────
+            # Position:    p(α) = p_start + α·(p_target − p_start)
+            # Orientation: R(α) = SLERP(R_start, R_target_local, α)
+            q_current  = q0.copy()
+            q_final    = None
+            steps_done = 0
 
             for step in range(_N_STEPS):
-                alpha     = (step + 1) / _N_STEPS
+                alpha = (step + 1) / _N_STEPS
+
+                # Linear position interpolation
                 pos_interp = pos_start + alpha * (target_local - pos_start)
+
+                # SLERP orientation interpolation
+                R_interp = _slerp_rotation(R_start, R_target_local, alpha)
 
                 log_buf = io.StringIO()
                 with redirect_stdout(log_buf):
@@ -624,17 +682,17 @@ class IKToolDialog(QtWidgets.QDialog):
                         self._robot,
                         target_position=pos_interp,
                         initial_guess=q_current,
-                        target_rotation=R_target_local,
+                        target_rotation=R_interp,
                     )
 
                 if q_new is None:
-                    # Stop at last valid configuration — don't revert.
+                    # Stop at last valid configuration — do not revert.
                     break
 
-                # Apply this step to the model immediately (live animation).
+                # Apply step immediately for live viewport animation.
                 _apply_joint_positions(
                     self._robot_obj, self._joint_objs, q_new, self._doc,
-                    transaction_label='IK Tool – step'
+                    transaction_label='IK Tool – step',
                 )
                 q_current  = q_new
                 q_final    = q_new
@@ -643,7 +701,7 @@ class IKToolDialog(QtWidgets.QDialog):
             if q_final is None:
                 self._lbl_status.setText(
                     tr('IK did not converge on first step. '
-                    'Target may be outside the workspace.')
+                       'Target may be outside the workspace.')
                 )
                 self._btn_apply.setEnabled(False)
                 return
@@ -664,7 +722,7 @@ class IKToolDialog(QtWidgets.QDialog):
 
             # ── FK verification in world frame ─────────────────
             try:
-                T_solved      = forward_kinematics(self._robot, q_final)
+                T_solved       = forward_kinematics(self._robot, q_final)
                 T_world_solved = T_world @ T_solved
                 achieved_world = T_world_solved[:3, 3]
                 R_achieved     = T_world_solved[:3, :3]
@@ -674,12 +732,13 @@ class IKToolDialog(QtWidgets.QDialog):
                     (np.trace(R_achieved.T @ R_target_world) - 1) / 2,
                     -1.0, 1.0
                 )
-                partial = (
-                    f' (partial: {steps_done}/{_N_STEPS} steps)'
-                    if steps_done < _N_STEPS else f' ({steps_done}/{_N_STEPS} steps)'
+                step_info = (
+                    f'partial: {steps_done}/{_N_STEPS} steps'
+                    if steps_done < _N_STEPS
+                    else f'{steps_done}/{_N_STEPS} steps'
                 )
                 status_details = (
-                    f'Converged{partial}\n'
+                    f'Converged ({step_info})\n'
                     f'Target:   [{target_world[0]:.3f}, {target_world[1]:.3f}, {target_world[2]:.3f}] mm\n'
                     f'Achieved: [{achieved_world[0]:.3f}, {achieved_world[1]:.3f}, {achieved_world[2]:.3f}] mm\n'
                     f'Error:    {pos_error:.6f} mm\n'
@@ -743,15 +802,15 @@ class _IKToolCommand:
                 '    in WORLD coordinates (position + orientation).\n'
                 '  • Enter a Cartesian target (X, Y, Z in mm) and\n'
                 '    orientation (Roll, Pitch, Yaw in degrees).\n'
-                '  • Solve IK with smooth incremental motion —\n'
-                '    the robot moves continuously to the target\n'
-                '    without large joint-space jumps.\n'
+                '  • Solve IK with smooth incremental motion:\n'
+                '    position interpolated linearly, orientation\n'
+                '    interpolated with SLERP — no abrupt jumps.\n'
                 '  • Apply the solution → live 3-D animation.\n'
                 '  • Restore the original pose at any time.\n'
                 '\n'
                 'Requires: a Cross::Robot selected in the scene.\n'
                 'Algorithm: Damped Least Squares (DLS), 6-DOF,\n'
-                f'           {_N_STEPS} interpolation steps per solve.\n'
+                f'           {_N_STEPS} SLERP-interpolated steps.\n'
             ),
         }
 
