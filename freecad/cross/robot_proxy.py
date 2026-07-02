@@ -1122,6 +1122,8 @@ class RobotProxy(ProxyBase):
             sensors_urdf=sensors_urdf,
             robot_name=robot_name,
             cameras_topics_comma_sep=self.get_sensors_topics_by_types(sensor_types = ['camera','depth_camera','wideanglecamera','rgbd_camera']),
+            sensors_bridge_args=self.get_sensors_bridge_args(),
+            px4AirframeId=self.get_px4_airframe_id(),
             vacuum_gripper_plugins=self.get_vacuum_gripper_plugins_xml(),
         )
 
@@ -1229,6 +1231,55 @@ class RobotProxy(ProxyBase):
                     pass                    
 
         return ','.join(topics)
+
+    def get_px4_airframe_id(self) -> str:
+        """Return PX4 airframe ID.
+        """
+        return '104001'
+
+    def get_sensors_bridge_args(self) -> str:
+        """Return comma-separated parameter_bridge arguments for all non-camera sensors.
+
+        Maps Gz sensor topics to ROS2 topics with correct message types for
+        parameter_bridge node. Camera-type sensors are handled separately by
+        image_bridge.
+
+        Each argument follows the format: /topic@ROS2_MSG_TYPE[ignition.msgs.GZ_MSG_TYPE
+        where '[' indicates Gz-to-ROS2 direction.
+        """
+        # Mapping of Gz sensor types to (ROS2 msg type, Gz msg type).
+        sensor_bridge_mapping = {
+            'gpu_lidar': ('sensor_msgs/msg/LaserScan', 'ignition.msgs.LaserScan'),
+            'gpu_ray': ('sensor_msgs/msg/LaserScan', 'ignition.msgs.LaserScan'),
+            'imu': ('sensor_msgs/msg/Imu', 'ignition.msgs.IMU'),
+            'magnetometer': ('sensor_msgs/msg/MagneticField', 'ignition.msgs.Magnetometer'),
+            'navsat': ('sensor_msgs/msg/NavSatFix', 'ignition.msgs.NavSat'),
+            'altimeter': ('sensor_msgs/msg/Altimeter', 'ignition.msgs.Altimeter'),
+            'contact': ('ros_gz_interfaces/msg/Contacts', 'ignition.msgs.Contacts'),
+            'force_torque': ('geometry_msgs/msg/WrenchStamped', 'ignition.msgs.Wrench'),
+            'air_pressure': ('sensor_msgs/msg/FluidPressure', 'ignition.msgs.FluidPressure'),
+        }
+
+        # Camera types handled by image_bridge.
+        camera_types = ['camera', 'depth_camera', 'wideanglecamera', 'rgbd_camera']
+
+        args = []
+        for sensor_xml_as_dict in self.get_sensors_data().values():
+            try:
+                sensor_type = sensor_xml_as_dict['gazebo']['sensor']['@type']
+                topic = sensor_xml_as_dict['gazebo']['sensor']['topic']
+
+                # Skip camera types (handled by image_bridge).
+                if sensor_type in camera_types:
+                    continue
+
+                if sensor_type in sensor_bridge_mapping:
+                    ros_msg, gz_msg = sensor_bridge_mapping[sensor_type]
+                    args.append(f"'{topic}@{ros_msg}[{gz_msg}'")
+            except KeyError:
+                pass
+
+        return ','.join(args)
 
     def get_sensors_data(self, parameter_full_name_glue: str = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE) -> dict:
         """Get sensors data as sensors dictionaries from all elements (links, joints) of robot"""
