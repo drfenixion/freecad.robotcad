@@ -151,6 +151,10 @@ def save_yaml(
         filename: [Path | str],
 ) -> None:
     """Save the yaml content into a file."""
+
+    file_path = Path(filename)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    
     with open(filename, 'w') as outfile:
         yaml.dump(content, outfile, default_flow_style=False, sort_keys=False)
 
