@@ -5,7 +5,7 @@ from .jacobians import compute_jacobian
 from .models import Robot
 
 
-def rotation_error(current_rotation: np.ndarray,target_rotation: np.ndarray,) -> np.ndarray:
+def rotation_error(current_rotation: np.ndarray, target_rotation: np.ndarray) -> np.ndarray:
     """
     Angular error vector between two rotation matrices.
     R_err = R_target · R_current^T  →  axial vector scaled by angle.
@@ -43,13 +43,17 @@ def _escape_singularity(
     For robots with structurally coaxial joints the home configuration
     always has w ≈ 0. A single small perturbation is not enough — we try
     up to max_tries random perturbations of ±scale rad and keep the best.
+
+    Joint wrapping is intentionally omitted here — for robots with
+    negative-axis joints (axis=-Z, axis=-Y), wrapping to [-π, π] maps
+    valid configurations to their physical opposite and corrupts the
+    escape search.
     """
     best_q = q.copy()
     best_manipulability = _manipulability(compute_jacobian(robot, q))
 
     for _ in range(max_tries):
         q_try = q + np.random.uniform(-scale, scale, size=len(q))
-        q_try[revolute_mask] = np.mod(q_try[revolute_mask] + np.pi, 2 * np.pi) - np.pi
         manipulability = _manipulability(compute_jacobian(robot, q_try))
         if manipulability > best_manipulability:
             best_manipulability = manipulability
@@ -73,6 +77,7 @@ def inverse_kinematics(
     tolerance: float = 1e-3,
     max_restarts: int = 5,
     verbose: bool = False,
+    wrap_joints: bool = False,
 ) -> Optional[np.ndarray]:
     """
     Numerical Inverse Kinematics via Damped Least Squares (DLS).
@@ -88,6 +93,14 @@ def inverse_kinematics(
     _escape_singularity() tries up to 20 random perturbations of ±1.5 rad
     and picks the configuration with highest manipulability before DLS.
 
+    Joint wrapping (wrap_joints)
+    ----------------------------
+    Disabled by default. Wrapping revolute joints to [-π, π] causes
+    incorrect solutions for robots with negative-axis joints (axis=-Z,
+    axis=-Y): a valid angle such as 1.57 rad becomes -1.57 rad after
+    wrapping, which is the physically opposite rotation. Only enable for
+    robots with real joint limits where all rotation axes are positive.
+
     Parameters
     ----------
     robot              : Robot model.
@@ -100,6 +113,8 @@ def inverse_kinematics(
     tolerance          : position convergence threshold [mm] (default 1e-3).
     max_restarts       : random restarts on stall (default 5).
     verbose            : print convergence/restart info (default False).
+    wrap_joints        : wrap revolute joints to [-π, π] after each step
+                         (default False — see note above).
 
     Returns
     -------
@@ -119,7 +134,6 @@ def inverse_kinematics(
         else:
             joint_positions = initial_guess.copy()
             joint_positions += np.random.uniform(-1.5, 1.5, size=len(joint_positions))
-            joint_positions[revolute_mask] = np.mod(joint_positions[revolute_mask] + np.pi, 2 * np.pi) - np.pi
             if verbose:
                 print(f"IK restart {restart}, q={np.round(joint_positions, 3)}")
 
@@ -135,24 +149,24 @@ def inverse_kinematics(
             )
 
         previous_position_error = float("inf")
-        stall_count  = 0
+        stall_count = 0
 
         for iteration in range(max_iterations):
-            all_transforms    = compute_forward_kinematics_full(robot, joint_positions)
-            current_position  = all_transforms[-1][:3, 3]
-            current_rotation  = all_transforms[-1][:3, :3]
+            all_transforms      = compute_forward_kinematics_full(robot, joint_positions)
+            current_position    = all_transforms[-1][:3, 3]
+            current_rotation    = all_transforms[-1][:3, :3]
 
-            position_error    = target_position - current_position
+            position_error      = target_position - current_position
             position_error_norm = float(np.linalg.norm(position_error))
 
             if position_error_norm < tolerance:
                 if verbose:
                     print(f"Converged in {iteration} iters (restart {restart}), "
-                        f"position_error={position_error_norm:.4f} mm.")
+                          f"position_error={position_error_norm:.4f} mm.")
                 return joint_positions
 
             if use_orientation:
-                orientation_error  = rotation_error(current_rotation, target_rotation)
+                orientation_error = rotation_error(current_rotation, target_rotation)
                 task_error = np.concatenate([
                     weight_position    * position_error,
                     weight_orientation * orientation_error,
@@ -172,12 +186,10 @@ def inverse_kinematics(
             J = full_jacobian if use_orientation else full_jacobian[:3, :]
             U, S, Vh = np.linalg.svd(J, full_matrices=False)
 
-            condition_number = (S[0] / S[-1]) if S[-1] > 1e-12 else np.inf
-            damping_lambda  = 0.1 if condition_number > 100 else (0.01 if condition_number > 10 else 0.001)
-
-            # Damped Least Squares singular value scaling.
+            condition_number       = (S[0] / S[-1]) if S[-1] > 1e-12 else np.inf
+            damping_lambda         = 0.1 if condition_number > 100 else (0.01 if condition_number > 10 else 0.001)
             damped_singular_values = S / (S ** 2 + damping_lambda ** 2)
-            joint_delta     = Vh.T @ (damped_singular_values * (U.T @ task_error))
+            joint_delta            = Vh.T @ (damped_singular_values * (U.T @ task_error))
 
             step_norm = np.linalg.norm(joint_delta)
             max_step  = np.clip(position_error_norm * 0.05, 0.001, 0.3)
@@ -185,9 +197,10 @@ def inverse_kinematics(
                 joint_delta = joint_delta * (max_step / step_norm)
 
             joint_positions += joint_delta
-            joint_positions[revolute_mask] = (
-                np.mod(joint_positions[revolute_mask] + np.pi, 2 * np.pi) - np.pi
-            )
+            if wrap_joints:
+                joint_positions[revolute_mask] = (
+                    np.mod(joint_positions[revolute_mask] + np.pi, 2 * np.pi) - np.pi
+                )
 
     if verbose:
         print(f"IK did not converge after {max_restarts} restarts.")

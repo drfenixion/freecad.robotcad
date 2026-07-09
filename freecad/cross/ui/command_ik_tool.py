@@ -1028,6 +1028,7 @@ class IKToolDialog(QtWidgets.QDialog):
                         tolerance          = np.linalg.norm(target_local - pos_start) * 0.005,
                         max_restarts       = restarts,
                         verbose            = verbose,
+                        wrap_joints        = False,
                     )
                     if q_warm is not None:
                         q_current = q_warm
@@ -1056,6 +1057,7 @@ class IKToolDialog(QtWidgets.QDialog):
                         tolerance          = tolerance,
                         max_restarts       = restarts,
                         verbose            = verbose,
+                        wrap_joints        = False,
                     )
                 except Exception as solver_exc:
                     self._lbl_status.setText(f'Solver exception at step {step+1}: {solver_exc}')
