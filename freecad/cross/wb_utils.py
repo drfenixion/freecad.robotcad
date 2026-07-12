@@ -34,6 +34,7 @@ from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
 from .freecadgui_utils import get_placement, get_progress_bar, gui_process_events
+from .ros.utils import _add_robotcad_venv_to_sys_path
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals, calc_md5
@@ -58,14 +59,7 @@ CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWo
 CrossVacuumGripper = DO  # A Cross::VacuumGripper, i.e. a DocumentObject with Proxy "VacuumGripperProxy".
 DOList = List[DO]
 
-# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
-MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
-# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
-MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad' 
-if os.path.exists(MOD_PATH_IN_USER_SHARE_DIR):
-    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
-else:
-    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
+from .wb_constants import MOD_PATH
 
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
@@ -1296,41 +1290,128 @@ def git_init_submodules(
 
     def git_deinit_submodules():
         message('Deinit git submodules.')
-        p = subprocess.run(
+        progressBar.setValue(5)
+        gui_process_events()
+        p = subprocess.Popen(
             ["git submodule deinit -f ."],
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=MOD_PATH,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
 
 
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
-        p = subprocess.run(
+        if not (MOD_PATH / '.git').exists():
+            progressBar.setValue(10)
+            gui_process_events()
+            message('Git directory not found. Cloning repository to get .git.')
+            import tempfile
+            import shutil
+            repo_url = 'https://github.com/drfenixion/freecad.robotcad'
+            tmp_parent = Path(tempfile.gettempdir()) / 'robotcad_git_clone'
+            tmp_parent.mkdir(parents=True, exist_ok=True)
+            clone_dest = tmp_parent / 'freecad.robotcad'
+            if clone_dest.exists():
+                shutil.rmtree(clone_dest)
+            p = subprocess.Popen(
+                ["git clone --depth 1 " + repo_url + ' ' + str(clone_dest)],
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(tmp_parent),
+                text=True,
+            )
+            for line in p.stdout:
+                print(line, end='')
+            p.wait()
+            shutil.copytree(
+                clone_dest / '.git',
+                MOD_PATH / '.git',
+                dirs_exist_ok=True,
+            )
+            shutil.rmtree(tmp_parent)
+            message('.git directory copied from cloned repository.')
+        progressBar.setValue(25)
+        gui_process_events()
+
+        message('Updating git submodules...')
+        p = subprocess.Popen(
             ["git submodule update --init " + update_from_remote_branch_param],
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=MOD_PATH,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
+        progressBar.setValue(45)
+        gui_process_events()
 
-        for pip_deps_installmodule_path in pip_deps_install_submodule_paths:
+        total_pip = len(pip_deps_install_submodule_paths)
+        for i, pip_deps_installmodule_path in enumerate(pip_deps_install_submodule_paths):
             pip_install_dependencies_of_module(pip_deps_installmodule_path)
+            if total_pip > 0:
+                pip_progress = 45 + int((i + 1) / total_pip * 45)
+                progressBar.setValue(pip_progress)
+                gui_process_events()
 
 
     def pip_install_dependencies_of_module(target_module_path: str):
         message('Pip install dependencies of module.')
-        p = subprocess.run(
-            ["pip install ."],
-            shell=True,
-            capture_output=True,
+        import sys as fc_sys
+        python_exe = fc_sys.executable
+        if not os.path.basename(python_exe).startswith('python'):
+            python_exe = os.path.join(fc_sys.base_prefix, 'bin', 'python')
+        # Shared virtual environment at the root of freecad.robotcad.
+        venv_path = MOD_PATH / '.venv'
+        venv_bin = str(venv_path / 'bin')
+        venv_python = str(venv_path / 'bin' / 'python')
+        if not os.path.exists(venv_python):
+            message('Creating shared virtual environment at MOD_PATH/.venv.')
+            try:
+                p = subprocess.run(
+                    [python_exe, '-m', 'venv', str(venv_path)],
+                    shell=False,
+                    capture_output=True,
+                    cwd=MOD_PATH,
+                    check=False,
+                )
+                if p.returncode != 0:
+                    raise subprocess.CalledProcessError(p.returncode, p.args)
+                print(p.stdout.decode() if p.stdout else '')
+                print(p.stderr.decode() if p.stderr else '')
+            except subprocess.CalledProcessError:
+                message('virtualenv not available, creating minimal venv manually.')
+                os.makedirs(venv_bin, exist_ok=True)
+                os.makedirs(str(venv_path / 'lib' / 'python'), exist_ok=True)
+                try:
+                    os.symlink(python_exe, venv_python)
+                except FileExistsError:
+                    pass
+
+        # Always run pip install --target to install/update packages,
+        # regardless of whether the venv already existed or was just created.
+        message(f'Running pip install in {target_module_path}...')
+        p = subprocess.Popen(
+            [python_exe, '-m', 'pip', 'install', '--target', str(venv_path / 'lib' / 'python' / 'site-packages'), '.'],
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=target_module_path,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
+        _add_robotcad_venv_to_sys_path()
 
 
     progressBar = get_progress_bar(
@@ -1340,7 +1421,7 @@ def git_init_submodules(
         show_percents = False,
     )
     progressBar.show()
-    progressBar.setValue(0)
+    progressBar.setValue(10)
     gui_process_events()
 
 

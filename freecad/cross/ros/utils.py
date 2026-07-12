@@ -50,6 +50,14 @@ def is_ros_found() -> bool:
     return get_ros_distro_from_env_or_default() != ''
 
 
+def _add_robotcad_venv_to_sys_path() -> None:
+    """Add the shared .venv site-packages (MOD_PATH/.venv) to sys.path."""
+    from ..wb_constants import MOD_PATH
+    venv_site_packages = MOD_PATH / '.venv' / 'lib' / f'python{sys.version_info.major}.{sys.version_info.minor}' / 'site-packages'
+    if venv_site_packages.exists() and str(venv_site_packages) not in sys.path:
+        sys.path.insert(0, str(venv_site_packages))
+
+
 def add_ros_library_path(ros_distro: str = '') -> bool:
     """Add necessary paths to sys.path and os.environ['LD_LIBRARY_PATH'].
 
@@ -66,6 +74,8 @@ def add_ros_library_path(ros_distro: str = '') -> bool:
     Return true if a ROS installation may have been found, false otherwise.
 
     """
+
+    _add_robotcad_venv_to_sys_path()
 
     if not ros_distro:
         ros_distro = get_ros_distro_from_env_or_default()

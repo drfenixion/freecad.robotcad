@@ -1,6 +1,18 @@
 """Global workbench constants. Excluded from wb_globals.py with reason eliminate circular dependency"""
 
+from pathlib import Path
 import FreeCAD as fc
+
+
+# Paths.
+# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
+MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
+MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad'
+if MOD_PATH_IN_USER_SHARE_DIR.exists():
+    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
+else:
+    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
 
 
 def str_to_bool(s: str) -> bool:
