@@ -164,8 +164,23 @@ def _placement_to_xyz_rpy(
 
 
 def _get_axis_from_placement(placement: fc.Placement) -> tuple[float, float, float]:
-    v = placement.Rotation.multVec(fc.Vector(0, 0, 1))
-    return (v.x, v.y, v.z)
+    """
+    Return the joint rotation axis for the kinematic solver.
+
+    RobotCAD's get_actuation_placement() always rotates around the local Z
+    axis of the joint frame (fc.Vector(0,0,1)), regardless of the axis
+    defined in the URDF. The joint's Origin RPY already encodes the
+    transformation that maps local Z to the intended physical axis.
+
+    Using the URDF axis vector directly (e.g. rotating the Z vector by the
+    joint's Origin rotation) causes FK divergence for joints whose physical
+    axis is not Z in the parent frame (e.g. axis=Y, axis=-Z), because the
+    solver then applies the joint rotation around a different axis than
+    RobotCAD does internally.
+
+    Fix: always return (0, 0, 1) so the solver's FK matches RobotCAD exactly.
+    """
+    return (0.0, 0.0, 1.0)
 
 
 def _build_robot_for_chain(
@@ -246,10 +261,10 @@ def _slerp_rotation(
     Edge cases handled:
     - theta ≈ 0   (nearly identical orientations): returns R_target directly.
     - theta ≈ π   (nearly opposite orientations): sin(theta) → 0, axis is
-                  ill-defined by this formula. Returns R_start for alpha < 1,
-                  R_target for alpha >= 1 to avoid NaN/inf in the axis vector.
-                  A full antipodal SLERP would require quaternions; this is a
-                  safe conservative fallback for the incremental-IK use case.
+                ill-defined by this formula. Returns R_start for alpha < 1,
+                R_target for alpha >= 1 to avoid NaN/inf in the axis vector.
+                A full antipodal SLERP would require quaternions; this is a
+                safe conservative fallback for the incremental-IK use case.
     """
     R_rel = R_start.T @ R_target
     theta = np.arccos(np.clip((np.trace(R_rel) - 1) / 2.0, -1.0, 1.0))
@@ -282,8 +297,8 @@ def _read_joint_positions(
 ) -> np.ndarray:
     """
     Read current joint positions from FreeCAD and return them in solver units:
-      - revolute  → radians  (FreeCAD stores degrees, convert with math.radians)
-      - prismatic → mm       (FreeCAD stores mm, pass through as-is)
+    - revolute  → radians  (FreeCAD stores degrees, convert with math.radians)
+    - prismatic → mm       (FreeCAD stores mm, pass through as-is)
 
     This is the inverse of the conversion done in _apply_joint_positions, which
     calls math.degrees() before writing revolute values back to the document.
@@ -348,6 +363,37 @@ def _apply_joint_positions(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FreeCAD document observer — real-time EF pose display
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _EFPoseObserver:
+    """
+    FreeCAD document observer that updates the IK Tool's EF pose display
+    whenever the document is recomputed (e.g. after manually moving a joint
+    slider or after the IK solver applies a solution).
+
+    Uses fc.addDocumentObserver() instead of a QTimer so it fires only on
+    actual document changes — zero polling overhead, no interference with
+    FreeCAD's recompute loop.
+    """
+
+    def __init__(self, dialog: 'IKToolDialog') -> None:
+        self._dialog = dialog
+        self._solving = False   # guard: skip updates while Solve IK is running
+
+    def slotRecomputedDocument(self, doc: fc.App.Document) -> None:
+        """Called by FreeCAD after every document recompute."""
+        if self._solving:
+            return
+        if not self._dialog or not self._dialog.isVisible():
+            return
+        try:
+            self._dialog._update_pose_display_from_model()
+        except Exception:
+            pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Qt Dialog
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -386,6 +432,13 @@ class IKToolDialog(QtWidgets.QDialog):
         self._build_ui()
         self._init_tree_maps()
         self._populate_ee_combo()
+
+        # Document observer — updates the EF pose display whenever FreeCAD
+        # recomputes the document (e.g. after manually moving a joint).
+        # Uses FreeCAD's native notification system instead of a timer,
+        # so it only fires on actual changes with zero polling overhead.
+        self._observer = _EFPoseObserver(self)
+        fc.addDocumentObserver(self._observer)
 
     # ── EE marker ────────────────────────────────────────────
 
@@ -444,12 +497,14 @@ class IKToolDialog(QtWidgets.QDialog):
             self._ee_marker = None
 
     def closeEvent(self, event) -> None:
-        """Remove the EE marker when the dialog is closed."""
+        """Remove the EE marker and observer when the dialog is closed."""
+        fc.removeDocumentObserver(self._observer)
         self._remove_ee_marker()
         super().closeEvent(event)
 
     def reject(self) -> None:
-        """Handle Close button — remove marker then close."""
+        """Handle Close button — remove observer and marker, then close."""
+        fc.removeDocumentObserver(self._observer)
         self._remove_ee_marker()
         super().reject()
 
@@ -767,8 +822,8 @@ class IKToolDialog(QtWidgets.QDialog):
     def _update_pose_display_from_model(self) -> None:
         """
         Read current joint positions, run FK, and update ONLY:
-          - The EF pose display panel (X/Y/Z/Roll/Pitch/Yaw labels).
-          - The IK_EE_Marker position in the viewport.
+        - The EF pose display panel (X/Y/Z/Roll/Pitch/Yaw labels).
+        - The IK_EE_Marker position in the viewport.
 
         Does NOT touch the target spinboxes — used after Solve so the
         user's intended target values are preserved for the next Solve.
@@ -788,13 +843,13 @@ class IKToolDialog(QtWidgets.QDialog):
     def _refresh_ef_pose(self) -> None:
         """
         Read current joint positions, run FK, and update BOTH:
-          - The EF pose display panel.
-          - The target spinboxes (syncs them to the current robot pose).
+        - The EF pose display panel.
+        - The target spinboxes (syncs them to the current robot pose).
 
         Called when the user explicitly requests a pose sync:
-          - When a chain is loaded (_load_chain).
-          - After Restore Original (_on_restore).
-          - When the user presses the ↺ Read current pose button.
+        - When a chain is loaded (_load_chain).
+        - After Restore Original (_on_restore).
+        - When the user presses the ↺ Read current pose button.
 
         NOT called after Solve — use _update_pose_display_from_model() instead
         so the target spinboxes keep the user's intended target values.
@@ -1038,6 +1093,7 @@ class IKToolDialog(QtWidgets.QDialog):
             # Single transaction for the whole Solve — one undo entry, no
             # partial revert between steps that was causing the robot to
             # reset to home when starting a second Solve.
+            self._observer._solving = True
             self._doc.openTransaction(tr('IK Tool – solve'))
 
             for step in range(n_steps):
@@ -1077,6 +1133,7 @@ class IKToolDialog(QtWidgets.QDialog):
                 steps_done += 1
 
             self._doc.commitTransaction()
+            self._observer._solving = False
 
             if q_final is None:
                 self._lbl_status.setText(
@@ -1159,6 +1216,7 @@ class IKToolDialog(QtWidgets.QDialog):
             self._btn_apply.setEnabled(True)
 
         except Exception as exc:
+            self._observer._solving = False
             self._lbl_status.setText(f'Solver error: {exc}')
             self._btn_apply.setEnabled(False)
 
