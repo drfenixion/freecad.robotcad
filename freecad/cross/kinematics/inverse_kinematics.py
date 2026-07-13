@@ -4,105 +4,204 @@ from .kinematics import compute_forward_kinematics_full
 from .jacobians import compute_jacobian
 from .models import Robot
 
+
+def rotation_error(current_rotation: np.ndarray, target_rotation: np.ndarray) -> np.ndarray:
+    """
+    Angular error vector between two rotation matrices.
+    R_err = R_target · R_current^T  →  axial vector scaled by angle.
+    """
+    rotation_error_matrix = target_rotation @ current_rotation.T
+    theta = np.arccos(np.clip((np.trace(rotation_error_matrix) - 1) / 2.0, -1.0, 1.0))
+    if theta < 1e-9:
+        return np.zeros(3)
+    manipulability = np.array([
+        rotation_error_matrix[2, 1] - rotation_error_matrix[1, 2],
+        rotation_error_matrix[0, 2] - rotation_error_matrix[2, 0],
+        rotation_error_matrix[1, 0] - rotation_error_matrix[0, 1],
+    ]) / (2.0 * np.sin(theta))
+    return theta * manipulability
+
+
+def _manipulability(jacobian: np.ndarray) -> float:
+    """Yoshikawa manipulability index on the linear (position) rows."""
+    linear_jacobian = jacobian[:3, :]
+    return float(np.sqrt(max(0.0, np.linalg.det(linear_jacobian @ linear_jacobian.T))))
+
+
+def _escape_singularity(
+    q: np.ndarray,
+    robot: Robot,
+    revolute_mask: np.ndarray,
+    threshold: float = 1e-4,
+    max_tries: int = 20,
+    scale: float = 1.5,
+    verbose: bool = False,
+) -> np.ndarray:
+    """
+    Randomly perturb q until manipulability exceeds threshold.
+
+    For robots with structurally coaxial joints the home configuration
+    always has w ≈ 0. A single small perturbation is not enough — we try
+    up to max_tries random perturbations of ±scale rad and keep the best.
+
+    Joint wrapping is intentionally omitted here — for robots with
+    negative-axis joints (axis=-Z, axis=-Y), wrapping to [-π, π] maps
+    valid configurations to their physical opposite and corrupts the
+    escape search.
+    """
+    best_q = q.copy()
+    best_manipulability = _manipulability(compute_jacobian(robot, q))
+
+    for _ in range(max_tries):
+        q_try = q + np.random.uniform(-scale, scale, size=len(q))
+        manipulability = _manipulability(compute_jacobian(robot, q_try))
+        if manipulability > best_manipulability:
+            best_manipulability = manipulability
+            best_q = q_try.copy()
+        if best_manipulability >= threshold:
+            break
+
+    if verbose:
+        print(f"  escape_singularity: best manipulability={best_manipulability:.3e} after perturbations")
+    return best_q
+
+
 def inverse_kinematics(
-    robot: Robot, 
-    target_position: np.ndarray, 
-    initial_guess: np.ndarray, 
-    max_iterations: int = 1000, 
-    tolerance: float = 1e-4, 
-    max_restarts: int = 5
+    robot: Robot,
+    target_position: np.ndarray,
+    initial_guess: np.ndarray,
+    target_rotation: Optional[np.ndarray] = None,
+    weight_position: float = 1.0,
+    weight_orientation: float = 0.05,
+    max_iterations: int = 1000,
+    tolerance: float = 1e-3,
+    max_restarts: int = 5,
+    verbose: bool = False,
+    wrap_joints: bool = False,
 ) -> Optional[np.ndarray]:
     """
-    Computes the numerical Inverse Kinematics (IK) to find the joint configurations 
-    required to reach a targeted 3D Cartesian position using Damped Least Squares (DLS).
+    Numerical Inverse Kinematics via Damped Least Squares (DLS).
 
-    Parameters:
-    -----------
-    robot : Robot
-        The structural robot data model containing joint and link definitions.
-    target_position : np.ndarray
-        A 1D array of shape (3,) representing the target X, Y, Z coordinates in meters.
-    initial_guess : np.ndarray
-        A 1D array representing the initial joint positions to start the optimization loop.
-    max_iterations : int, optional
-        Maximum number of optimization iterations per restart attempt (default is 1000).
-    tolerance : float, optional
-        The maximum allowed Euclidean residual position error for convergence (default is 1e-4).
-    max_restarts : int, optional
-        Maximum number of random restarts allowed if the solver gets trapped in local 
-        minima or singularities (default is 5).
+    Step-size clamping
+    ------------------
+    Uses position error norm only [mm] — not the mixed pos+ori norm.
 
-    Returns:
-    --------
-    Optional[np.ndarray]
-        A 1D array of calculated joint positions if convergence is successful, 
-        or None if the solver fails to converge within the limits.
+        max_step = clip(position_error_norm * 0.05, 0.001, 0.3)
+
+    Singularity handling
+    --------------------
+    _escape_singularity() tries up to 20 random perturbations of ±1.5 rad
+    and picks the configuration with highest manipulability before DLS.
+
+    Joint wrapping (wrap_joints)
+    ----------------------------
+    Disabled by default. Wrapping revolute joints to [-π, π] causes
+    incorrect solutions for robots with negative-axis joints (axis=-Z,
+    axis=-Y): a valid angle such as 1.57 rad becomes -1.57 rad after
+    wrapping, which is the physically opposite rotation. Only enable for
+    robots with real joint limits where all rotation axes are positive.
+
+    Parameters
+    ----------
+    robot              : Robot model.
+    target_position    : (3,) XYZ in robot local frame [mm].
+    initial_guess      : (N,) initial joint positions [rad / mm].
+    target_rotation    : (3,3) rotation matrix or None for pos-only.
+    weight_position    : position error weight (default 1.0).
+    weight_orientation : orientation error weight (default 0.05).
+    max_iterations     : DLS iterations per restart (default 1000).
+    tolerance          : position convergence threshold [mm] (default 1e-3).
+    max_restarts       : random restarts on stall (default 5).
+    verbose            : print convergence/restart info (default False).
+    wrap_joints        : wrap revolute joints to [-π, π] after each step
+                         (default False — see note above).
+
+    Returns
+    -------
+    (N,) joint positions if converged, None otherwise.
     """
-    
-    for restart_index in range(max_restarts):
-        if restart_index == 0:
-            current_joint_positions = initial_guess.copy()
+    use_orientation = target_rotation is not None
+
+    revolute_mask = np.array([
+        j.joint_type in ("revolute", "continuous")
+        for j in robot.joints
+        if j.joint_type != "fixed"
+    ], dtype=bool)
+
+    for restart in range(max_restarts):
+        if restart == 0:
+            joint_positions = initial_guess.copy()
         else:
-            # Apply a random uniform perturbation to escape local minima or singularities
-            current_joint_positions = initial_guess.copy()
-            current_joint_positions += np.random.uniform(-0.3, 0.3, size=len(current_joint_positions))
-            print(f"IK restart {restart_index} with perturbed joint positions = {np.round(current_joint_positions, 3)}")
+            joint_positions = initial_guess.copy()
+            joint_positions += np.random.uniform(-1.5, 1.5, size=len(joint_positions))
+            if verbose:
+                print(f"IK restart {restart}, q={np.round(joint_positions, 3)}")
 
-        # Boolean mask to isolate joints subject to angular wrapping controls
-        revolute_joint_mask = np.array([
-            joint.joint_type in ["revolute", "continuous"]
-            for joint in robot.joints
-            if joint.joint_type != "fixed"
-        ], dtype=bool)
-
-        previous_error_norm = float('inf')
-        stall_counter = 0
-
-        for iteration in range(max_iterations):
-            all_transforms = compute_forward_kinematics_full(robot, current_joint_positions)
-            current_position = all_transforms[-1][:3, 3]
-            
-            position_error = target_position - current_position
-            current_error_norm = np.linalg.norm(position_error)
-
-            # Check convergence criteria
-            if current_error_norm < tolerance:
-                print(f"Converged in {iteration} iterations (restart {restart_index}).")
-                return current_joint_positions
-
-            # Check if optimization has stalled
-            if abs(previous_error_norm - current_error_norm) < 1e-10:
-                stall_counter += 1
-            else:
-                stall_counter = 0
-            previous_error_norm = current_error_norm
-
-            if stall_counter > 30:
-                print(f"Stalled at iteration {iteration}, error = {current_error_norm:.6f}. Triggering restart.")
-                break  # Exit iteration loop to try a new random restart
-
-            # Jacobian computation and linear velocity extraction
-            full_jacobian = compute_jacobian(robot, current_joint_positions)
-            linear_jacobian = full_jacobian[:3, :]
-
-            # Damped Least Squares (Levenberg-Marquardt damping factor) to avoid singularity explosions
-            damping_lambda = 0.01
-            damping_identity = (damping_lambda ** 2) * np.eye(3)
-            coefficient_matrix = linear_jacobian @ linear_jacobian.T + damping_identity
-            
-            # Compute joint step vector
-            joint_delta_step = linear_jacobian.T @ np.linalg.solve(coefficient_matrix, position_error)
-
-            # Restrict step size to ensure stability and smooth optimization transitions
-            step_norm = np.linalg.norm(joint_delta_step)
-            if step_norm > 0.1:
-                joint_delta_step = joint_delta_step * (0.1 / step_norm)
-
-            # Update configurations and wrap angular positions to [-pi, pi] limits
-            current_joint_positions += joint_delta_step
-            current_joint_positions[revolute_joint_mask] = (
-                np.mod(current_joint_positions[revolute_joint_mask] + np.pi, 2 * np.pi) - np.pi
+        # Escape singularity if needed.
+        initial_jacobian = compute_jacobian(robot, joint_positions)
+        initial_manipulability = _manipulability(initial_jacobian)
+        if initial_manipulability < 1e-4:
+            if verbose:
+                print(f"Singular config (manipulability={initial_manipulability:.2e}) at restart {restart}, escaping...")
+            joint_positions = _escape_singularity(
+                joint_positions, robot, revolute_mask,
+                threshold=1e-4, max_tries=20, scale=1.5, verbose=verbose,
             )
 
-    print(f"IK did not converge after {max_restarts} restarts.")
+        previous_position_error = float("inf")
+        stall_count = 0
+
+        for iteration in range(max_iterations):
+            all_transforms      = compute_forward_kinematics_full(robot, joint_positions)
+            current_position    = all_transforms[-1][:3, 3]
+            current_rotation    = all_transforms[-1][:3, :3]
+
+            position_error      = target_position - current_position
+            position_error_norm = float(np.linalg.norm(position_error))
+
+            if position_error_norm < tolerance:
+                if verbose:
+                    print(f"Converged in {iteration} iters (restart {restart}), "
+                          f"position_error={position_error_norm:.4f} mm.")
+                return joint_positions
+
+            if use_orientation:
+                orientation_error = rotation_error(current_rotation, target_rotation)
+                task_error = np.concatenate([
+                    weight_position    * position_error,
+                    weight_orientation * orientation_error,
+                ])
+            else:
+                task_error = weight_position * position_error
+
+            position_error_change   = abs(previous_position_error - position_error_norm)
+            stall_count = stall_count + 1 if position_error_change < 1e-10 else 0
+            previous_position_error = position_error_norm
+            if stall_count > 50:
+                if verbose:
+                    print(f"Stalled at iter {iteration}, pos_err={position_error_norm:.4f} mm.")
+                break
+
+            full_jacobian = compute_jacobian(robot, joint_positions)
+            J = full_jacobian if use_orientation else full_jacobian[:3, :]
+            U, S, Vh = np.linalg.svd(J, full_matrices=False)
+
+            condition_number       = (S[0] / S[-1]) if S[-1] > 1e-12 else np.inf
+            damping_lambda         = 0.1 if condition_number > 100 else (0.01 if condition_number > 10 else 0.001)
+            damped_singular_values = S / (S ** 2 + damping_lambda ** 2)
+            joint_delta            = Vh.T @ (damped_singular_values * (U.T @ task_error))
+
+            step_norm = np.linalg.norm(joint_delta)
+            max_step  = np.clip(position_error_norm * 0.05, 0.001, 0.3)
+            if step_norm > max_step:
+                joint_delta = joint_delta * (max_step / step_norm)
+
+            joint_positions += joint_delta
+            if wrap_joints:
+                joint_positions[revolute_mask] = (
+                    np.mod(joint_positions[revolute_mask] + np.pi, 2 * np.pi) - np.pi
+                )
+
+    if verbose:
+        print(f"IK did not converge after {max_restarts} restarts.")
     return None

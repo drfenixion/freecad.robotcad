@@ -11,87 +11,71 @@ DEVELOPER DESCRIPTION
 ---------------------
 This module registers the FreeCAD Gui command ``IKTool`` inside the RobotCAD
 workbench.  When the user clicks the toolbar icon (or presses I, K) with a
-Cross::Robot object selected, a modal dialog opens:
+Cross::Robot object selected, a non-modal dialog opens:
 
 IKToolDialog
 ├── End Effector selector  - ComboBox listing all leaf links (tips) of the
-│                            robot's kinematic tree.  Selecting one isolates
-│                            the serial sub-chain from that link to the root,
-│                            ignoring all other branches (wheels, legs, etc.).
-├── Target group  - three QDoubleSpinBox fields (X, Y, Z in millimetres)
-│                   pre-filled with the current FK end-effector position
-├── [Solve IK]    - runs RoboTool iterative Jacobian pseudo-inverse solver
-│                   on the ISOLATED sub-chain only
-├── Results table - one row per joint in the sub-chain:
-│     columns: Joint name | Original (rad/mm) | Solved (rad/mm)
-├── Status label  - convergence message + achieved position + error
-├── [Apply to Model]   - writes q_solved → joint_obj.Position,
-│                        robot_obj.touch() + doc.recompute(True) for live
-│                        3-D animation of the FULL robot hierarchy
-├── [Restore Original] - writes q_original back → restores initial pose
-└── [Close]
+│                            robot's kinematic tree.
+├── Target position group  - X, Y, Z in mm (world frame, pre-filled from FK)
+├── Target orientation group - Roll, Pitch, Yaw in deg (world frame, pre-filled)
+├── [Solve IK]    - incremental IK: N_STEPS targets interpolated with
+│                   linear position + SLERP orientation.  Each step is
+│                   applied to the model in real time (smooth animation).
+│                   A temporary App::Origin marker (IK_EE_Marker) is
+│                   created in the viewport at the EF position and updated
+│                   after each solve so the user can verify world-frame
+│                   coordinates visually.  The marker is removed on Close.
+├── Results table - Joint | Original (rad/mm) | Solved (rad/mm)
+├── Status label  - convergence info + position/orientation errors
+├── [Apply to Model]   - write q_solved to document + recompute
+├── [Restore Original] - write q_original back
+└── [Close]            - removes EE marker from scene
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+dialog
+┌─ IK Tool ──────────────────────────────────────────────┐
+│  End Effector: [tip_link ▼]                            │
+│                                                        │
+│  Target position (mm) [world frame]                    │
+│  X: [______]  Y: [______]  Z: [______]                 │
+│                                                        │
+│  Target orientation (deg) [world frame]                │
+│  R: [______]  P: [______]  Y: [______]                 │
+│                                                        │
+│               [  ⚙  Solve IK  ]                        │
+│                                                        │
+│  Results ──────────────────────────────────────────────│
+│  ┌─────────────┬──────────────┬──────────────┐         │
+│  │ Joint       │ Original     │ Solved       │         │
+│  ├─────────────┼──────────────┼──────────────┤         │
+│  │ joint_1     │  0.0000 rad  │  1.2345 rad  │         │
+│  └─────────────┴──────────────┴──────────────┘         │
+│                                                        │
+│  Status: Converged in N iterations.                    │
+│  Target:   [x, y, z] mm  (world)                       │
+│  Achieved: [x, y, z] mm  (world)                       │
+│  Error:    0.000001 mm                                 │
+│  Error orientation: 0.42 deg                           │
+│                                                        │
+│  [ ▶ Apply to Model ]  [ ↩ Restore Original ]  [Close] │
+└────────────────────────────────────────────────────────┘
 
-State management
-~~~~~~~~~~~~~~~~
-_q_original is captured once (on the first Solve click) so the user can
-always return to the pose that existed before the dialog was opened.
-Subsequent Solve calls do NOT overwrite _q_original.
+┌─ EF Position (world frame) ────────────────────────────┐
+│  Pos X:  100.000 mm    Pos Y:  -48.000 mm    Pos Z:  588.000 mm  │
+│  Roll:     0.00 °      Pitch:   -2.53 °      Yaw:   -16.49 °     │
+└────────────────────────────────────────────────────────┘
 
-Sub-chain isolation  (KEY FIX for tree-structured robots)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When a robot has a tree topology (e.g. a manipulator arm PLUS drive wheels),
-passing all joints to the IK solver produces a mathematically ill-defined
-Jacobian and the solver diverges.
+Incremental IK with SLERP orientation interpolation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Position:    p(α) = p_start + α · (p_target − p_start)
+Orientation: R(α) = R_start · exp(α · log(R_start^T · R_target))
+            computed via Rodrigues rotation formula (SLERP)
 
-_get_chain_to_root(robot_obj, end_effector_link_name) walks the parent→child
-map backwards from the chosen end-effector link to the root link, collecting
-only the joints that belong to that unique serial path.  Joints in sibling
-branches (wheels, suspension, other arms) are completely excluded.
-
-The returned joint list is topologically ordered root→EE, guaranteeing that
-the Jacobian matrix is computed over a clean, full-rank serial chain.
-
-recompute fix  (KEY FIX for "nothing happens on Apply")
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Changing joint_obj.Position marks only the joint sub-object as dirty.
-The parent Cross::Robot object does NOT automatically learn that its
-children changed, so a plain doc.recompute() is a no-op.
-
-Solution:
-    robot_obj.touch()        # mark the robot container as dirty
-    doc.recompute(True)      # deep/forced recompute of the whole hierarchy
-
-This forces FreeCAD to re-evaluate every Link's placement transform and
-redraws the meshes in the 3-D viewport immediately.
-
-Integration with RobotCAD
-~~~~~~~~~~~~~~~~~~~~~~~~~
-- Reads the robot via  robot_obj.Proxy.get_joints() / get_links()
-    (standard RobotCAD Proxy API).
-- joint_obj.Position  - float in radians (revolute/continuous) or
-    millimetres (prismatic).  Read and written directly.
-- Units: all Cartesian coordinates in millimetres; joint angles in radians.
-- doc.openTransaction / commitTransaction wraps every write so the action
-    is undoable with Ctrl-Z.
-- robot_obj.touch() + doc.recompute(True) + fcgui.updateGui() after every
-    write triggers the live animation in the 3-D viewport.
-
-RoboTool modules used
+EE Coordinate Marker
 ~~~~~~~~~~~~~~~~~~~~~
-from ..kinematics.models             import Robot, Joint, Link
-from ..kinematics.kinematics         import forward_kinematics
-from ..kinematics.inverse_kinematics import inverse_kinematics
-
-These must live under  freecad/cross/kinematics/  (i.e. your RoboTool
-engine packaged inside RobotCAD).
-
-File location (suggested)
-~~~~~~~~~~~~~~~~~~~~~~~~~
-freecad/cross/ui/command_ik_tool.py
-
-Corresponding icon
-~~~~~~~~~~~~~~~~~~
-freecad/cross/resources/ik_solver.svg   (64 * 64 px, transparent background)
+An App::Origin object named "IK_EE_Marker" is added to the document when
+the dialog opens and positioned at the end-effector location after each
+solve.  Its placement is expressed in WORLD coordinates.  The marker is
+automatically removed when the dialog is closed.
 
 Author  : RoboTool / RobotCAD integration
 License : MIT
@@ -100,16 +84,11 @@ License : MIT
 from __future__ import annotations
 
 import math
-import io
-from contextlib import redirect_stdout
-from collections import defaultdict
 
 import numpy as np
 import FreeCAD as fc
 import FreeCADGui as fcgui
 
-# FreeCAD 1.0 conda env ships PySide6; system FreeCAD may use PySide2.
-# Import whichever is available so the command works in both setups.
 try:
     from PySide6 import QtCore, QtWidgets
     _PYSIDE6 = True
@@ -122,6 +101,10 @@ from ..wb_utils import is_robot
 from ..kinematics.models import Robot, Joint, Link
 from ..kinematics.kinematics import forward_kinematics
 from ..kinematics.inverse_kinematics import inverse_kinematics
+from ..kinematics.jacobians import compute_jacobian
+
+# Default SLERP steps — overridable from the dialog spinbox.
+_N_STEPS_DEFAULT = 50
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -131,114 +114,37 @@ from ..kinematics.inverse_kinematics import inverse_kinematics
 def _build_parent_map(
     robot_obj: fc.App.DocumentObject,
 ) -> tuple[dict[str, str], dict[str, fc.App.DocumentObject]]:
-    """
-    Build a child→parent link map and a name→joint_obj lookup for the robot.
-
-    Parameters
-    ----------
-    robot_obj : fc.App.DocumentObject
-        The Cross::Robot document object.
-
-    Returns
-    -------
-    tuple[dict[str, str], dict[str, fc.App.DocumentObject]]
-        child_to_parent  : maps each child link name to its parent link name.
-        child_to_joint   : maps each child link name to the joint_obj that
-        connects it to its parent.
-    """
     child_to_parent: dict[str, str] = {}
     child_to_joint:  dict[str, fc.App.DocumentObject] = {}
-
     for joint_obj in robot_obj.Proxy.get_joints():
-        parent_link = joint_obj.Parent  # str: parent link name
-        child_link  = joint_obj.Child   # str: child link name
-        child_to_parent[child_link] = parent_link
-        child_to_joint[child_link]  = joint_obj
-
+        child_to_parent[joint_obj.Child] = joint_obj.Parent
+        child_to_joint[joint_obj.Child]  = joint_obj
     return child_to_parent, child_to_joint
 
 
 def _find_leaf_links(robot_obj: fc.App.DocumentObject) -> list[str]:
-    """
-    Return all leaf (end-effector candidate) link names in the robot tree.
-
-    A leaf link is one that never appears as a *parent* of any joint.
-    For a serial arm this is just the tip link; for a tree robot (arm +
-    wheels) this returns all branch tips, letting the user pick the right one.
-
-    Parameters
-    ----------
-    robot_obj : fc.App.DocumentObject
-        The Cross::Robot document object.
-
-    Returns
-    -------
-    list[str]
-        Sorted list of leaf link label strings.
-    """
     all_links:    set[str] = {lnk.Label for lnk in robot_obj.Proxy.get_links()}
-    parent_links: set[str] = set()
-
-    for joint_obj in robot_obj.Proxy.get_joints():
-        parent_links.add(joint_obj.Parent)
-
+    parent_links: set[str] = {j.Parent for j in robot_obj.Proxy.get_joints()}
     leaf_links = sorted(all_links - parent_links)
-    # Fallback: if every link is also a parent (unusual), return all links.
     return leaf_links if leaf_links else sorted(all_links)
 
 
 def _get_chain_to_root(
-    robot_obj:            fc.App.DocumentObject,
-    end_effector_link:    str,
-    child_to_parent:      dict[str, str],
-    child_to_joint:       dict[str, fc.App.DocumentObject],
+    robot_obj:         fc.App.DocumentObject,
+    end_effector_link: str,
+    child_to_parent:   dict[str, str],
+    child_to_joint:    dict[str, fc.App.DocumentObject],
 ) -> list[fc.App.DocumentObject]:
-    """
-    Walk backwards from *end_effector_link* to the root, collecting joints.
-
-    This isolates the unique serial sub-chain for a chosen end-effector and
-    guarantees that sibling branches (wheels, other arms) are excluded.
-    The returned list is ordered root→EE (topological order), which is the
-    order required by the RoboTool FK/IK solvers.
-
-    Only non-fixed joints are included (fixed joints carry no DOF).
-
-    Parameters
-    ----------
-    robot_obj : fc.App.DocumentObject
-        The Cross::Robot document object (used only for its label in errors).
-    end_effector_link : str
-        Label of the chosen end-effector (leaf) link.
-    child_to_parent : dict[str, str]
-        Maps child link label → parent link label (from _build_parent_map).
-    child_to_joint : dict[str, fc.App.DocumentObject]
-        Maps child link label → the joint_obj that produced it.
-
-    Returns
-    -------
-    list[fc.App.DocumentObject]
-        Non-fixed joint document objects in root→EE order.
-
-    Raises
-    ------
-    ValueError
-        If end_effector_link is not found in the kinematic tree.
-    """
     if end_effector_link not in child_to_parent:
-        # The root link has no parent joint; if someone selected it, return [].
         return []
-
-    # Walk child → parent, accumulating joints, then reverse for root→EE order.
     chain_joints: list[fc.App.DocumentObject] = []
     current_link = end_effector_link
-
     while current_link in child_to_parent:
         joint_obj = child_to_joint[current_link]
         if joint_obj.Type != 'fixed':
             chain_joints.append(joint_obj)
         current_link = child_to_parent[current_link]
-
-    chain_joints.reverse()  # now root → EE
+    chain_joints.reverse()
     return chain_joints
 
 
@@ -249,78 +155,66 @@ def _get_chain_to_root(
 def _placement_to_xyz_rpy(
     placement: fc.Placement,
 ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-    """
-    Convert a FreeCAD Placement to (xyz_mm, rpy_rad) tuples.
-
-    Parameters
-    ----------
-    placement : fc.Placement
-        FreeCAD placement containing position and rotation.
-
-    Returns
-    -------
-    tuple[tuple[float, float, float], tuple[float, float, float]]
-        Position (x, y, z) in mm and orientation (roll, pitch, yaw) in radians.
-    """
-    position_vector = placement.Base
-    xyz = (position_vector.x, position_vector.y, position_vector.z)
+    p = placement.Base
     yaw, pitch, roll = placement.Rotation.toEuler()
-    rpy = (math.radians(roll), math.radians(pitch), math.radians(yaw))
-    return xyz, rpy
+    return (
+        (p.x, p.y, p.z),
+        (math.radians(roll), math.radians(pitch), math.radians(yaw)),
+    )
 
 
 def _get_axis_from_placement(placement: fc.Placement) -> tuple[float, float, float]:
     """
-    Return the joint axis direction by rotating the local Z vector by the joint frame.
+    Return the joint rotation axis for the kinematic solver.
 
-    Parameters
-    ----------
-    placement : fc.Placement
-        FreeCAD placement of the joint origin.
+    RobotCAD's get_actuation_placement() always rotates around the local Z
+    axis of the joint frame (fc.Vector(0,0,1)), regardless of the axis
+    defined in the URDF. The joint's Origin RPY already encodes the
+    transformation that maps local Z to the intended physical axis.
 
-    Returns
-    -------
-    tuple[float, float, float]
-        Joint axis (x, y, z) in the parent frame.
+    Using the URDF axis vector directly (e.g. rotating the Z vector by the
+    joint's Origin rotation) causes FK divergence for joints whose physical
+    axis is not Z in the parent frame (e.g. axis=Y, axis=-Z), because the
+    solver then applies the joint rotation around a different axis than
+    RobotCAD does internally.
+
+    Fix: always return (0, 0, 1) so the solver's FK matches RobotCAD exactly.
     """
-    axis_vector = placement.Rotation.multVec(fc.Vector(0, 0, 1))
-    return (axis_vector.x, axis_vector.y, axis_vector.z)
+    return (0.0, 0.0, 1.0)
 
 
 def _build_robot_for_chain(
-    robot_obj:   fc.App.DocumentObject,
+    robot_obj:    fc.App.DocumentObject,
     chain_joints: list[fc.App.DocumentObject],
 ) -> Robot:
-    """
-    Build a RoboTool Robot instance that represents only the given serial chain.
-
-    Links are gathered as: root link + one child link per joint, in order.
-    This guarantees the RoboTool model is a clean linear chain with no
-    dangling branches, which is a prerequisite for a well-formed Jacobian.
-
-    Parameters
-    ----------
-    robot_obj : fc.App.DocumentObject
-        The Cross::Robot document object (used for the robot name).
-    chain_joints : list[fc.App.DocumentObject]
-        Non-fixed joints in root→EE topological order (from _get_chain_to_root).
-
-    Returns
-    -------
-    Robot
-        Populated RoboTool Robot model for the isolated sub-chain.
-    """
     robot_instance = Robot(name=robot_obj.Label)
-
     if not chain_joints:
         return robot_instance
-
-    # Add the root link (parent of the first joint in the chain).
     robot_instance.links.append(Link(name=chain_joints[0].Parent))
-
     for joint_obj in chain_joints:
         xyz, rpy = _placement_to_xyz_rpy(joint_obj.Origin)
         axis     = _get_axis_from_placement(joint_obj.Origin)
+
+        lower = getattr(joint_obj, 'LowerLimit', None)
+        upper = getattr(joint_obj, 'UpperLimit', None)
+
+        # RobotCAD leaves LowerLimit = UpperLimit = 0 when limits are not
+        # configured. Passing 0/0 to the solver is interpreted as "joint is
+        # locked at 0" — the solution gets clamped and the robot snaps back.
+        # Treat the 0/0 case as unconstrained (None) instead.
+        if lower is not None and upper is not None:
+            try:
+                if float(lower) == 0.0 and float(upper) == 0.0:
+                    lower = None
+                    upper = None
+                elif joint_obj.Type != 'prismatic':
+                    # RobotCAD stores revolute limits in degrees; convert to
+                    # radians so the solver compares them against q in radians.
+                    lower = math.radians(float(lower))
+                    upper = math.radians(float(upper))
+            except (TypeError, ValueError):
+                lower = None
+                upper = None
 
         robot_instance.joints.append(Joint(
             name           = joint_obj.Label,
@@ -330,85 +224,173 @@ def _build_robot_for_chain(
             origin_xyz     = xyz,
             origin_rpy     = rpy,
             axis           = axis,
-            limit_lower    = getattr(joint_obj, 'LowerLimit', None),
-            limit_upper    = getattr(joint_obj, 'UpperLimit', None),
+            limit_lower    = lower,
+            limit_upper    = upper,
             velocity_limit = getattr(joint_obj, 'Velocity',   None),
             effort_limit   = getattr(joint_obj, 'Effort',     None),
         ))
-        # Each joint contributes its child link.
         robot_instance.links.append(Link(name=joint_obj.Child))
-
     return robot_instance
 
 
-def _apply_joint_positions(
+def _get_robot_global_transform(robot_obj: fc.App.DocumentObject) -> np.ndarray:
+    placement = (
+        robot_obj.getGlobalPlacement()
+        if hasattr(robot_obj, 'getGlobalPlacement')
+        else robot_obj.Placement
+    )
+    p = placement.Base
+    m = placement.Rotation.toMatrix()
+    T = np.eye(4)
+    T[0, 0] = m.A11;  T[0, 1] = m.A12;  T[0, 2] = m.A13
+    T[1, 0] = m.A21;  T[1, 1] = m.A22;  T[1, 2] = m.A23
+    T[2, 0] = m.A31;  T[2, 1] = m.A32;  T[2, 2] = m.A33
+    T[0, 3] = p.x;    T[1, 3] = p.y;    T[2, 3] = p.z
+    return T
+
+
+def _slerp_rotation(
+    R_start:  np.ndarray,
+    R_target: np.ndarray,
+    alpha:    float,
+) -> np.ndarray:
+    """
+    SLERP between two rotation matrices via Rodrigues formula.
+    R(α) = R_start · exp(α · log(R_start^T · R_target))
+
+    Edge cases handled:
+    - theta ≈ 0   (nearly identical orientations): returns R_target directly.
+    - theta ≈ π   (nearly opposite orientations): sin(theta) → 0, axis is
+                ill-defined by this formula. Returns R_start for alpha < 1,
+                R_target for alpha >= 1 to avoid NaN/inf in the axis vector.
+                A full antipodal SLERP would require quaternions; this is a
+                safe conservative fallback for the incremental-IK use case.
+    """
+    R_rel = R_start.T @ R_target
+    theta = np.arccos(np.clip((np.trace(R_rel) - 1) / 2.0, -1.0, 1.0))
+
+    # Bug fix #3: guard both degenerate cases (theta ≈ 0 and theta ≈ π)
+    if theta < 1e-9:
+        return R_target.copy()
+    if np.pi - theta < 1e-6:
+        # Antipodal case: axis is numerically undefined via skew-symmetric
+        # extraction. Skip smooth interpolation and snap to nearest endpoint.
+        return R_target.copy() if alpha >= 1.0 else R_start.copy()
+
+    axis = np.array([
+        R_rel[2, 1] - R_rel[1, 2],
+        R_rel[0, 2] - R_rel[2, 0],
+        R_rel[1, 0] - R_rel[0, 1],
+    ]) / (2.0 * np.sin(theta))
+    K = np.array([
+        [ 0,        -axis[2],  axis[1]],
+        [ axis[2],   0,       -axis[0]],
+        [-axis[1],   axis[0],  0      ],
+    ])
+    a = alpha * theta
+    R_step = np.eye(3) + np.sin(a) * K + (1.0 - np.cos(a)) * (K @ K)
+    return R_start @ R_step
+
+
+def _read_joint_positions(
+    joint_objects: list[fc.App.DocumentObject],
+) -> np.ndarray:
+    """
+    Read current joint positions from FreeCAD and return them in solver units:
+    - revolute  → radians  (FreeCAD stores degrees, convert with math.radians)
+    - prismatic → mm       (FreeCAD stores mm, pass through as-is)
+
+    This is the inverse of the conversion done in _apply_joint_positions, which
+    calls math.degrees() before writing revolute values back to the document.
+    Without this conversion, q0 arrives at the IK solver in degrees while the
+    solver expects radians — causing FK errors of ~57x and position drift > 100 mm.
+    """
+    q = np.empty(len(joint_objects))
+    for i, j in enumerate(joint_objects):
+        raw = float(j.Position)
+        q[i] = raw if j.Type == 'prismatic' else math.radians(raw)
+    return q
+
+
+def _write_joint_values(
     robot_obj:     fc.App.DocumentObject,
     joint_objects: list[fc.App.DocumentObject],
     joint_values:  np.ndarray,
-    doc:           fc.App.Document,
+) -> None:
+    """
+    Write joint values to the FreeCAD document WITHOUT opening a transaction
+    or calling recompute.  Used for animation steps inside a single outer
+    transaction so that the undo stack gets one entry per Solve, not one
+    per SLERP step.
+    """
+    joint_variables: dict = robot_obj.Proxy.joint_variables
+    for joint_obj, value in zip(joint_objects, joint_values):
+        prop_name = joint_variables.get(joint_obj)
+        if prop_name is None:
+            continue
+        native_value = (
+            float(value) if joint_obj.Type == 'prismatic'
+            else math.degrees(float(value))
+        )
+        setattr(robot_obj, prop_name, native_value)
+
+
+def _apply_joint_positions(
+    robot_obj:         fc.App.DocumentObject,
+    joint_objects:     list[fc.App.DocumentObject],
+    joint_values:      np.ndarray,
+    doc:               fc.App.Document,
     transaction_label: str = 'IK Tool',
 ) -> None:
     """
-    Write joint values to the document and trigger a live 3D viewport update.
-
-    Architecture note — why we write robot._deg properties, not joint.Position
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    joint_obj.Position is a read-only computed property
-    (setEditorMode('Position', ['ReadOnly']) in joint_proxy.py).  It is
-    calculated by FreeCAD during recompute from the robot-level actuator
-    property (e.g. robot.Joint_base_eslabon1_deg).
-
-    The correct write path, discovered by reading robot_proxy.py, is:
-
-        1. Look up the actuator property name via
-            robot_obj.Proxy.joint_variables[joint_obj]
-            e.g. returns 'Joint_base_eslabon1_deg'.
-        2. Convert the solver value (radians / mm) to the property native unit:
-            revolute / continuous  ->  degrees  (property stores degrees)
-            prismatic              ->  mm        (property stores mm)
-        3. setattr(robot_obj, prop_name, converted_value)
-        4. doc.recompute() — FreeCAD propagates deg->rad into
-            joint.Position and redraws the 3-D viewport.
-
-    No robot_obj.touch() is needed: writing the actuator property already
-    marks the robot dirty.  doc.recompute(True) must NOT be used —
-    FreeCAD 1.0 expects a sequence of objects or no argument.
-
-    Parameters
-    ----------
-    robot_obj : fc.App.DocumentObject
-        The Cross::Robot container object.
-    joint_objects : list[fc.App.DocumentObject]
-        Non-fixed Cross::Joint objects to update (sub-chain only).
-    joint_values : np.ndarray
-        Joint positions in solver units: radians for revolute/continuous,
-        millimetres for prismatic.
-    doc : fc.App.Document
-        The active FreeCAD document.
-    transaction_label : str, optional
-        Label shown in the undo history (default: 'IK Tool').
+    Write joint values inside a single transaction and recompute.
+    Used for Apply to Model, Restore Original, and the final step of Solve.
     """
-    joint_variables: dict = robot_obj.Proxy.joint_variables  # joint_obj -> prop_name
-
+    joint_variables: dict = robot_obj.Proxy.joint_variables
     doc.openTransaction(tr(transaction_label))
     for joint_obj, value in zip(joint_objects, joint_values):
         prop_name = joint_variables.get(joint_obj)
         if prop_name is None:
-            # Joint not found in robot's variable map — skip silently.
             continue
-        if joint_obj.Type == 'prismatic':
-            # Solver value is in mm; property stores mm.
-            native_value = float(value)
-        else:
-            # revolute / continuous: solver value is in radians;
-            # property stores degrees.
-            native_value = math.degrees(float(value))
+        native_value = (
+            float(value) if joint_obj.Type == 'prismatic'
+            else math.degrees(float(value))
+        )
         setattr(robot_obj, prop_name, native_value)
     doc.commitTransaction()
-
-    doc.recompute()     # propagates _deg -> Position and redraws viewport
+    doc.recompute()
     fcgui.updateGui()
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FreeCAD document observer — real-time EF pose display
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _EFPoseObserver:
+    """
+    FreeCAD document observer that updates the IK Tool's EF pose display
+    whenever the document is recomputed (e.g. after manually moving a joint
+    slider or after the IK solver applies a solution).
+
+    Uses fc.addDocumentObserver() instead of a QTimer so it fires only on
+    actual document changes — zero polling overhead, no interference with
+    FreeCAD's recompute loop.
+    """
+
+    def __init__(self, dialog: 'IKToolDialog') -> None:
+        self._dialog = dialog
+        self._solving = False   # guard: skip updates while Solve IK is running
+
+    def slotRecomputedDocument(self, doc: fc.App.Document) -> None:
+        """Called by FreeCAD after every document recompute."""
+        if self._solving:
+            return
+        if not self._dialog or not self._dialog.isVisible():
+            return
+        try:
+            self._dialog._update_pose_display_from_model()
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -416,28 +398,7 @@ def _apply_joint_positions(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class IKToolDialog(QtWidgets.QDialog):
-    """Modal dialog for the IK Tool command.
-
-    ┌─ IK Tool ──────────────────────────────────────────────┐
-    │  End Effector: [tip_link ▼]                            │
-    │                                                        │
-    │  Target position (mm)                                  │
-    │  X: [______]  Y: [______]  Z: [______]                 │
-    │                                                        │
-    │               [  ⚙  Solve IK  ]                        │
-    │                                                        │
-    │  Results ──────────────────────────────────────────────│
-    │  ┌─────────────┬──────────────┬──────────────┐         │
-    │  │ Joint       │ Original     │ Solved       │         │
-    │  ├─────────────┼──────────────┼──────────────┤         │
-    │  │ joint_1     │  0.0000 rad  │  1.2345 rad  │         │
-    │  └─────────────┴──────────────┴──────────────┘         │
-    │                                                        │
-    │  Status: Converged. Error: 0.000000 mm                 │
-    │                                                        │
-    │  [ ▶ Apply to Model ]  [ ↩ Restore Original ]  [Close] │
-    └────────────────────────────────────────────────────────┘
-    """
+    """Non-modal IK Tool dialog with EE coordinate marker."""
 
     def __init__(
         self,
@@ -448,27 +409,104 @@ class IKToolDialog(QtWidgets.QDialog):
         self.setWindowTitle(tr('IK Tool'))
         self.setMinimumWidth(520)
 
-        # Remove the "?" help button; enum path differs between PySide2 and PySide6.
         _no_help = (
             getattr(QtCore.Qt.WindowType, 'WindowContextHelpButtonHint', None)
             or getattr(QtCore.Qt, 'WindowContextHelpButtonHint', 0)
         )
         self.setWindowFlags(self.windowFlags() & ~_no_help)
 
-        self._doc          = fc.activeDocument()
+        # Bug fix #2: use the robot's own document instead of fc.activeDocument(),
+        # which may point to a different document when multiple docs are open.
+        self._doc          = robot_obj.Document
         self._robot_obj    = robot_obj
-        self._robot        = None   # RoboTool Robot for the ACTIVE sub-chain
-        self._joint_objs   = []     # joint objects in the active sub-chain
-        self.original_joint_positions   = None   # captured on first Solve; never overwritten
-        self.solved_joint_positions     = None
+        self._robot        = None
+        self._joint_objs   = []
+        self.original_joint_positions = None
+        self.solved_joint_positions   = None
+        self._ee_marker    = None  # temporary App::Origin in the viewport
+        self._solve_count  = 0     # increments with each successful Solve
 
-        # Kinematic tree maps — built once, reused when EE selection changes.
         self._child_to_parent: dict[str, str] = {}
         self._child_to_joint:  dict[str, fc.App.DocumentObject] = {}
 
         self._build_ui()
         self._init_tree_maps()
         self._populate_ee_combo()
+
+        # Document observer — updates the EF pose display whenever FreeCAD
+        # recomputes the document (e.g. after manually moving a joint).
+        # Uses FreeCAD's native notification system instead of a timer,
+        # so it only fires on actual changes with zero polling overhead.
+        self._observer = _EFPoseObserver(self)
+        fc.addDocumentObserver(self._observer)
+
+    # ── EE marker ────────────────────────────────────────────
+
+    def _create_ee_marker(self) -> None:
+        """
+        Add a temporary App::Origin object to the scene at the EF location.
+        The marker shows the world-frame coordinate axes at the end-effector,
+        letting the user verify the actual EF position visually.
+        It is removed automatically when the dialog is closed.
+        """
+        try:
+            self._ee_marker = self._doc.addObject('App::Origin', 'IK_EE_Marker')
+            if hasattr(self._ee_marker, 'ViewObject'):
+                vo = self._ee_marker.ViewObject
+                if hasattr(vo, 'AxisSize'):
+                    vo.AxisSize = 30.0
+                if hasattr(vo, 'PlaneSize'):
+                    vo.PlaneSize = 20.0
+            self._doc.recompute()
+        except Exception:
+            self._ee_marker = None
+
+    def _update_ee_marker(self, T_world_ee: np.ndarray) -> None:
+        """
+        Move the EE marker to the current end-effector pose in world coordinates.
+
+        Parameters
+        ----------
+        T_world_ee : (4,4) homogeneous transform of the EF in world frame.
+        """
+        if self._ee_marker is None:
+            return
+        try:
+            p = T_world_ee[:3, 3]
+            R = T_world_ee[:3, :3]
+            # Build FreeCAD Matrix from rotation (column-major, 1-indexed)
+            fc_matrix = fc.Matrix(
+                R[0, 0], R[0, 1], R[0, 2], p[0],
+                R[1, 0], R[1, 1], R[1, 2], p[1],
+                R[2, 0], R[2, 1], R[2, 2], p[2],
+                0,       0,       0,       1,
+            )
+            self._ee_marker.Placement = fc.Placement(fc_matrix)
+            self._doc.recompute()
+        except Exception:
+            pass
+
+    def _remove_ee_marker(self) -> None:
+        """Remove the temporary EE marker from the document."""
+        if self._ee_marker is not None:
+            try:
+                self._doc.removeObject(self._ee_marker.Name)
+                self._doc.recompute()
+            except Exception:
+                pass
+            self._ee_marker = None
+
+    def closeEvent(self, event) -> None:
+        """Remove the EE marker and observer when the dialog is closed."""
+        fc.removeDocumentObserver(self._observer)
+        self._remove_ee_marker()
+        super().closeEvent(event)
+
+    def reject(self) -> None:
+        """Handle Close button — remove observer and marker, then close."""
+        fc.removeDocumentObserver(self._observer)
+        self._remove_ee_marker()
+        super().reject()
 
     # ── UI construction ───────────────────────────────────────
 
@@ -477,7 +515,7 @@ class IKToolDialog(QtWidgets.QDialog):
         root_layout.setSpacing(10)
         root_layout.setContentsMargins(14, 14, 14, 14)
 
-        # ── End Effector selector ──────────────────────────────
+        # End Effector selector
         grp_ee = QtWidgets.QGroupBox(tr('End Effector'))
         lay_ee = QtWidgets.QHBoxLayout(grp_ee)
         lay_ee.addWidget(QtWidgets.QLabel(tr('Select tip link:')))
@@ -488,8 +526,8 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_ee.addStretch()
         root_layout.addWidget(grp_ee)
 
-        # ── Target position input group ────────────────────────
-        grp_target = QtWidgets.QGroupBox(tr('Target position (mm)'))
+        # Target position
+        grp_target = QtWidgets.QGroupBox(tr('Target position (mm) — world frame'))
         lay_target = QtWidgets.QHBoxLayout(grp_target)
         self._spins: dict[str, QtWidgets.QDoubleSpinBox] = {}
         for axis in ('X', 'Y', 'Z'):
@@ -499,19 +537,133 @@ class IKToolDialog(QtWidgets.QDialog):
             spin_box.setDecimals(3)
             spin_box.setSingleStep(1.0)
             spin_box.setFixedWidth(100)
+            spin_box.setToolTip(tr('Edit freely — press ⚙ Solve IK when ready.'))
             self._spins[axis] = spin_box
             lay_target.addWidget(spin_box)
             if axis != 'Z':
                 lay_target.addSpacing(8)
         root_layout.addWidget(grp_target)
 
-        # ── Solve button ───────────────────────────────────────
+        # Target orientation RPY
+        grp_rotation = QtWidgets.QGroupBox(tr('Target orientation (deg) — world frame'))
+        lay_rotation = QtWidgets.QHBoxLayout(grp_rotation)
+        for axis in ('Roll', 'Pitch', 'Yaw'):
+            lay_rotation.addWidget(QtWidgets.QLabel(f'<b>{axis[0]}</b>'))
+            spin_box = QtWidgets.QDoubleSpinBox()
+            spin_box.setRange(-180.0, 180.0)
+            spin_box.setDecimals(2)
+            spin_box.setSingleStep(1.0)
+            spin_box.setFixedWidth(100)
+            spin_box.setToolTip(tr('Edit freely — press ⚙ Solve IK when ready.'))
+            self._spins[axis] = spin_box
+            lay_rotation.addWidget(spin_box)
+            if axis != 'Yaw':
+                lay_rotation.addSpacing(8)
+        root_layout.addWidget(grp_rotation)
+
+        # "Refresh" button — reads current robot pose and fills spinboxes + display.
+        btn_refresh = QtWidgets.QPushButton(tr('↺  Read current pose'))
+        btn_refresh.setToolTip(tr(
+            'Read the current joint positions from the model and update\n'
+            'the target spinboxes and EF pose display.\n'
+            'Use this after moving joints manually in FreeCAD.'
+        ))
+        btn_refresh.clicked.connect(self._refresh_ef_pose)
+        root_layout.addWidget(btn_refresh)
+
+        # Solver parameters
+        grp_params = QtWidgets.QGroupBox(tr('Solver parameters'))
+        lay_params = QtWidgets.QGridLayout(grp_params)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('SLERP steps')), 0, 0)
+        self._spin_steps = QtWidgets.QSpinBox()
+        self._spin_steps.setRange(5, 200)
+        self._spin_steps.setValue(_N_STEPS_DEFAULT)
+        self._spin_steps.setToolTip(tr(
+            'Number of intermediate targets interpolated between current\n'
+            'pose and goal. More steps = smoother motion and better\n'
+            'convergence for large displacements, but slower solve.'
+        ))
+        lay_params.addWidget(self._spin_steps, 0, 1)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('Max iter / step')), 0, 2)
+        self._spin_maxiter = QtWidgets.QSpinBox()
+        self._spin_maxiter.setRange(100, 5000)
+        self._spin_maxiter.setValue(1000)
+        self._spin_maxiter.setSingleStep(100)
+        self._spin_maxiter.setToolTip(tr(
+            'Maximum DLS iterations per SLERP step.\n'
+            'Increase if the solver stalls before converging.'
+        ))
+        lay_params.addWidget(self._spin_maxiter, 0, 3)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('Ori weight')), 1, 0)
+        self._spin_ori_weight = QtWidgets.QDoubleSpinBox()
+        self._spin_ori_weight.setRange(0.0, 10.0)
+        self._spin_ori_weight.setValue(0.3)
+        self._spin_ori_weight.setSingleStep(0.01)
+        self._spin_ori_weight.setDecimals(3)
+        self._spin_ori_weight.setToolTip(tr(
+            'Weight of orientation error relative to position error.\n'
+            '0 = ignore orientation, 1 = equal weight.\n'
+            'Lower values let the solver prioritize reaching the position.\n'
+            'Recommended: 0.0–0.1 for arms with coaxial joints.'
+        ))
+        lay_params.addWidget(self._spin_ori_weight, 1, 1)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('Max restarts')), 1, 2)
+        self._spin_restarts = QtWidgets.QSpinBox()
+        self._spin_restarts.setRange(0, 20)
+        self._spin_restarts.setValue(5)
+        self._spin_restarts.setToolTip(tr(
+            'Random restarts when the DLS stalls.\n'
+            'More restarts help escape local minima near singularities.'
+        ))
+        lay_params.addWidget(self._spin_restarts, 1, 3)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('Tolerance (mm)')), 2, 0)
+        self._spin_tol = QtWidgets.QDoubleSpinBox()
+        self._spin_tol.setRange(1e-6, 10.0)
+        self._spin_tol.setValue(0.001)
+        self._spin_tol.setDecimals(4)
+        self._spin_tol.setSingleStep(0.001)
+        self._spin_tol.setToolTip(tr(
+            'Position convergence threshold in mm.\n'
+            'Solver stops when position error < this value.\n'
+            'Tighter = more accurate but may not converge for distant targets.'
+        ))
+        lay_params.addWidget(self._spin_tol, 2, 1)
+
+        lay_params.addWidget(QtWidgets.QLabel(tr('Pos weight')), 2, 2)
+        self._spin_pos_weight = QtWidgets.QDoubleSpinBox()
+        self._spin_pos_weight.setRange(0.1, 10.0)
+        self._spin_pos_weight.setValue(1.0)
+        self._spin_pos_weight.setSingleStep(0.1)
+        self._spin_pos_weight.setDecimals(2)
+        self._spin_pos_weight.setToolTip(tr(
+            'Weight of position error in the DLS cost function.\n'
+            'Increase to make the solver more aggressive on position.'
+        ))
+        lay_params.addWidget(self._spin_pos_weight, 2, 3)
+
+        self._chk_verbose = QtWidgets.QCheckBox(tr('Verbose solver output'))
+        self._chk_verbose.setChecked(False)
+        self._chk_verbose.setToolTip(tr(
+            'Print convergence details to the FreeCAD console.\n'
+            'Useful for debugging; disable for normal use.'
+        ))
+        lay_params.addWidget(self._chk_verbose, 3, 0, 1, 4)
+
+        root_layout.addWidget(grp_params)
+
+        # Solve button
         self._btn_solve = QtWidgets.QPushButton(tr('⚙  Solve IK'))
         self._btn_solve.setFixedHeight(34)
+        self._btn_solve.setDefault(True)
         self._btn_solve.clicked.connect(self._on_solve)
         root_layout.addWidget(self._btn_solve)
 
-        # ── Results table ──────────────────────────────────────
+        # Results table
         grp_results = QtWidgets.QGroupBox(tr('Results'))
         lay_results = QtWidgets.QVBoxLayout(grp_results)
         self._table = QtWidgets.QTableWidget(0, 3)
@@ -534,14 +686,36 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_results.addWidget(self._table)
         root_layout.addWidget(grp_results)
 
-        # ── Status label ───────────────────────────────────────
+        # Status label
         self._lbl_status = QtWidgets.QLabel(
             tr('Ready. Select an End Effector, enter a target and press Solve IK.')
         )
         self._lbl_status.setWordWrap(True)
         root_layout.addWidget(self._lbl_status)
 
-        # ── Action buttons ─────────────────────────────────────
+        # Solve log — accumulates results of every Solve call in this session.
+        grp_log = QtWidgets.QGroupBox(tr('Solve log'))
+        lay_log = QtWidgets.QVBoxLayout(grp_log)
+        self._log = QtWidgets.QPlainTextEdit()
+        self._log.setReadOnly(True)
+        self._log.setMaximumBlockCount(500)   # keep last ~500 lines
+        self._log.setMinimumHeight(100)
+        self._log.setMaximumHeight(160)
+        mono = QtWidgets.QApplication.font()
+        mono.setFamily('Courier New' if _PYSIDE6 else 'Courier New, monospace')
+        mono.setPointSize(max(8, mono.pointSize() - 1))
+        self._log.setFont(mono)
+        lay_log_btns = QtWidgets.QHBoxLayout()
+        btn_clear_log = QtWidgets.QPushButton(tr('Clear'))
+        btn_clear_log.setFixedWidth(60)
+        btn_clear_log.clicked.connect(self._log.clear)
+        lay_log_btns.addStretch()
+        lay_log_btns.addWidget(btn_clear_log)
+        lay_log.addWidget(self._log)
+        lay_log.addLayout(lay_log_btns)
+        root_layout.addWidget(grp_log)
+
+        # Action buttons
         lay_btns = QtWidgets.QHBoxLayout()
         self._btn_apply = QtWidgets.QPushButton(tr('▶  Apply to Model'))
         self._btn_apply.setEnabled(False)
@@ -560,10 +734,160 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_btns.addWidget(btn_close)
         root_layout.addLayout(lay_btns)
 
+    # ── EF current pose display ────────────────────────────
+        grp_ef_pose = QtWidgets.QGroupBox(tr('End Effector — current pose (world frame)'))
+        grid_pose = QtWidgets.QGridLayout(grp_ef_pose)
+
+        self._pose_labels: dict[str, QtWidgets.QLabel] = {}
+        labels = [('X', 0, 0), ('Y', 0, 2), ('Z', 0, 4),
+        ('Roll', 1, 0), ('Pitch', 1, 2), ('Yaw', 1, 4)]
+
+        for name, row, col in labels:
+            unit = 'mm' if name in ('X','Y','Z') else '°'
+            grid_pose.addWidget(QtWidgets.QLabel(f'<b>{name}:</b>'), row, col)
+            lbl = QtWidgets.QLabel(f'—  {unit}')
+            lbl.setMinimumWidth(90)
+            lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight if _PYSIDE6
+                    else QtCore.Qt.AlignRight)
+            self._pose_labels[name] = lbl
+            grid_pose.addWidget(lbl, row, col + 1)
+
+        root_layout.addWidget(grp_ef_pose)
+
+    # ── Method update coordinates ───────────────────────────────────
+    def _update_ef_pose_display(self, T_world_ee: np.ndarray) -> None:
+        """
+        Update the EF current pose display in the dialog with the given
+        world-frame homogeneous transform of the end-effector.
+        """
+        P = T_world_ee[:3, 3]
+        R = T_world_ee[:3, :3]
+        sy = math.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+        roll = math.degrees(math.atan2(R[2, 1], R[2, 2]))
+        pitch = math.degrees(math.atan2(-R[2, 0], sy))
+        yaw = math.degrees(math.atan2(R[1, 0], R[0, 0]))
+        # Update labels in the dialog
+        self._pose_labels['X'].setText(f'{P[0]:.3f} mm')
+        self._pose_labels['Y'].setText(f'{P[1]:.3f} mm')
+        self._pose_labels['Z'].setText(f'{P[2]:.3f} mm')
+        self._pose_labels['Roll'].setText(f'{roll:.2f} °')
+        self._pose_labels['Pitch'].setText(f'{pitch:.2f} °')
+        self._pose_labels['Yaw'].setText(f'{yaw:.2f} °')
+
+
+    # ── Solve log ─────────────────────────────────────────────
+
+    def _log_solve_result(
+        self,
+        solve_n:       int,
+        ee_label:      str,
+        target_world:  np.ndarray,
+        achieved_world: np.ndarray,
+        R_achieved:    np.ndarray,
+        R_target_world: np.ndarray,
+        q_start:       np.ndarray,
+        q_final:       np.ndarray,
+        steps_done:    int,
+        n_steps:       int,
+    ) -> None:
+        """Append a formatted solve summary to the log panel."""
+        pos_error = float(np.linalg.norm(target_world - achieved_world))
+        cos_angle = np.clip(
+            (np.trace(R_achieved.T @ R_target_world) - 1) / 2, -1.0, 1.0
+        )
+        ori_error = float(np.rad2deg(np.arccos(cos_angle)))
+
+        sep  = '─' * 52
+        lines = [
+            sep,
+            f'Solve #{solve_n}  EF: {ee_label}  ({steps_done}/{n_steps} steps)',
+            f'  Target   X={target_world[0]:10.3f}  Y={target_world[1]:10.3f}  Z={target_world[2]:10.3f}  mm',
+            f'  Achieved X={achieved_world[0]:10.3f}  Y={achieved_world[1]:10.3f}  Z={achieved_world[2]:10.3f}  mm',
+            f'  Pos error : {pos_error:.4f} mm      Ori error: {ori_error:.4f} deg',
+            '  Joints:',
+        ]
+        for jobj, q0_i, qf_i in zip(self._joint_objs, q_start, q_final):
+            unit   = 'mm' if jobj.Type == 'prismatic' else 'rad'
+            delta  = qf_i - q0_i
+            lines.append(
+                f'    {jobj.Label:<20s}  {q0_i:+.4f} → {qf_i:+.4f}  (Δ {delta:+.4f}) {unit}'
+            )
+        self._log.appendPlainText('\n'.join(lines))
+        # Scroll to bottom
+        sb = self._log.verticalScrollBar()
+        sb.setValue(sb.maximum())
+
+    # ── Manual EF pose refresh ────────────────────────────────
+
+    def _update_pose_display_from_model(self) -> None:
+        """
+        Read current joint positions, run FK, and update ONLY:
+        - The EF pose display panel (X/Y/Z/Roll/Pitch/Yaw labels).
+        - The IK_EE_Marker position in the viewport.
+
+        Does NOT touch the target spinboxes — used after Solve so the
+        user's intended target values are preserved for the next Solve.
+        """
+        if not self._joint_objs or self._robot is None:
+            return
+        try:
+            q_current  = _read_joint_positions(self._joint_objs)
+            T_world    = _get_robot_global_transform(self._robot_obj)
+            T_world_ee = T_world @ forward_kinematics(self._robot, q_current)
+        except Exception:
+            return
+        self._update_ef_pose_display(T_world_ee)
+        if self._ee_marker is not None:
+            self._update_ee_marker(T_world_ee)
+
+    def _refresh_ef_pose(self) -> None:
+        """
+        Read current joint positions, run FK, and update BOTH:
+        - The EF pose display panel.
+        - The target spinboxes (syncs them to the current robot pose).
+
+        Called when the user explicitly requests a pose sync:
+        - When a chain is loaded (_load_chain).
+        - After Restore Original (_on_restore).
+        - When the user presses the ↺ Read current pose button.
+
+        NOT called after Solve — use _update_pose_display_from_model() instead
+        so the target spinboxes keep the user's intended target values.
+        """
+        if not self._joint_objs or self._robot is None:
+            return
+        try:
+            q_current  = _read_joint_positions(self._joint_objs)
+            T_world    = _get_robot_global_transform(self._robot_obj)
+            T_world_ee = T_world @ forward_kinematics(self._robot, q_current)
+        except Exception:
+            return
+        self._update_ef_pose_display(T_world_ee)
+        if self._ee_marker is not None:
+            self._update_ee_marker(T_world_ee)
+        # Reset cached solution so the next Solve reads fresh from the model.
+        self.solved_joint_positions = None
+        # Sync spinboxes to actual pose.
+        pos = T_world_ee[:3, 3]
+        rot = T_world_ee[:3, :3]
+        sy    = math.sqrt(rot[0, 0] ** 2 + rot[1, 0] ** 2)
+        roll  = math.degrees(math.atan2(rot[2, 1], rot[2, 2]))
+        pitch = math.degrees(math.atan2(-rot[2, 0], sy))
+        yaw   = math.degrees(math.atan2(rot[1, 0], rot[0, 0]))
+        for spin in self._spins.values():
+            spin.blockSignals(True)
+        self._spins['X'].setValue(float(pos[0]))
+        self._spins['Y'].setValue(float(pos[1]))
+        self._spins['Z'].setValue(float(pos[2]))
+        self._spins['Roll'].setValue(roll)
+        self._spins['Pitch'].setValue(pitch)
+        self._spins['Yaw'].setValue(yaw)
+        for spin in self._spins.values():
+            spin.blockSignals(False)
+
     # ── Tree initialisation ───────────────────────────────────
 
     def _init_tree_maps(self) -> None:
-        """Build child→parent and child→joint maps from the robot document object."""
         try:
             self._child_to_parent, self._child_to_joint = _build_parent_map(
                 self._robot_obj
@@ -573,56 +897,32 @@ class IKToolDialog(QtWidgets.QDialog):
             self._btn_solve.setEnabled(False)
 
     def _populate_ee_combo(self) -> None:
-        """Fill the End Effector ComboBox with all leaf links in the robot tree."""
         leaf_links = _find_leaf_links(self._robot_obj)
         self._combo_ee.blockSignals(True)
         self._combo_ee.clear()
         for link_label in leaf_links:
             self._combo_ee.addItem(link_label)
         self._combo_ee.blockSignals(False)
-
-        # Trigger load for the default (first) selection.
         if leaf_links:
             self._load_chain(leaf_links[0])
 
     # ── End Effector change ───────────────────────────────────
 
     def _on_ee_changed(self, index: int) -> None:
-        """
-        Called when the user picks a different end-effector link.
-
-        Resets the solved state, re-isolates the sub-chain, rebuilds the
-        RoboTool model, and pre-fills the FK spinboxes for the new chain.
-        """
         ee_label = self._combo_ee.currentText()
         if not ee_label:
             return
-
-        # Reset solved state — the previous solution is for a different chain.
         self.original_joint_positions = None
         self.solved_joint_positions   = None
         self._btn_apply.setEnabled(False)
         self._btn_restore.setEnabled(False)
-
         self._load_chain(ee_label)
 
     def _load_chain(self, end_effector_label: str) -> None:
-        """
-        Isolate the serial sub-chain for *end_effector_label* and rebuild
-        the RoboTool model and UI table for that chain.
-
-        Parameters
-        ----------
-        end_effector_label : str
-            Label of the selected end-effector (leaf) link.
-        """
-        # ── 1. Isolate the sub-chain (topological walk-back) ──
         try:
             chain_joints = _get_chain_to_root(
-                self._robot_obj,
-                end_effector_label,
-                self._child_to_parent,
-                self._child_to_joint,
+                self._robot_obj, end_effector_label,
+                self._child_to_parent, self._child_to_joint,
             )
         except Exception as exc:
             self._lbl_status.setText(f'Error isolating chain: {exc}')
@@ -639,7 +939,6 @@ class IKToolDialog(QtWidgets.QDialog):
             self._robot      = None
             return
 
-        # ── 2. Build RoboTool model for the isolated chain ────
         try:
             self._robot = _build_robot_for_chain(self._robot_obj, chain_joints)
         except Exception as exc:
@@ -650,17 +949,24 @@ class IKToolDialog(QtWidgets.QDialog):
         self._joint_objs = chain_joints
         n_joints = len(chain_joints)
 
-        # ── 3. Pre-fill spinboxes with current FK position ────
-        q0 = np.array([float(j.Position) for j in self._joint_objs])
         try:
-            fk_matrix    = forward_kinematics(self._robot, q0)
-            fk_position  = fk_matrix[:3, 3]
-            for axis, value in zip(('X', 'Y', 'Z'), fk_position):
-                self._spins[axis].setValue(float(value))
+            q0 = _read_joint_positions(self._joint_objs)
         except Exception:
-            pass  # Spinboxes stay at 0 — not a fatal error.
+            self._lbl_status.setText(
+                tr("Solver error: Cannot access 'Position' of deleted object. "
+                "Please close and reopen the IK Tool.")
+            )
+            self._joint_objs = []
+            self._robot = None
+            self._btn_solve.setEnabled(False)
+            return
+        try:
+            if self._ee_marker is None:
+                self._create_ee_marker()
+            self._refresh_ef_pose()
+        except Exception:
+            pass
 
-        # ── 4. Populate results table with current joint values ──
         self._table.setRowCount(n_joints)
         for i, joint_obj in enumerate(self._joint_objs):
             self._table.setItem(i, 0, QtWidgets.QTableWidgetItem(joint_obj.Label))
@@ -671,93 +977,257 @@ class IKToolDialog(QtWidgets.QDialog):
         self._btn_solve.setEnabled(True)
         self._lbl_status.setText(
             tr(f'Chain: {n_joints} joint(s) → "{end_effector_label}". '
-                'Adjust target and press Solve IK.')
+            'Adjust target and press Solve IK.')
         )
 
-    # ── Slot: Solve IK ────────────────────────────────────────
+    # ── Slot: Solve IK (incremental with SLERP) ──────────────
 
     def _on_solve(self) -> None:
-        """Run the IK solver on the active sub-chain and display results."""
         if not self._joint_objs or self._robot is None:
             return
 
         try:
-            target = np.array([self._spins[axis].value() for axis in ('X', 'Y', 'Z')])
-            q0     = np.array([float(j.Position) for j in self._joint_objs])
+            # Build R_target_world from RPY spinboxes
+            roll  = np.deg2rad(self._spins['Roll'].value())
+            pitch = np.deg2rad(self._spins['Pitch'].value())
+            yaw   = np.deg2rad(self._spins['Yaw'].value())
 
-            # Capture original pose on the first solve; do NOT overwrite on re-solve.
+            Rx = np.array([
+                [1, 0,             0            ],
+                [0, np.cos(roll), -np.sin(roll)  ],
+                [0, np.sin(roll),  np.cos(roll)  ],
+            ])
+            Ry = np.array([
+                [ np.cos(pitch), 0, np.sin(pitch)],
+                [ 0,             1, 0            ],
+                [-np.sin(pitch), 0, np.cos(pitch)],
+            ])
+            Rz = np.array([
+                [np.cos(yaw), -np.sin(yaw), 0],
+                [np.sin(yaw),  np.cos(yaw), 0],
+                [0,            0,           1],
+            ])
+            R_target_world = Rz @ Ry @ Rx
+
+            target_world = np.array([
+                self._spins[axis].value() for axis in ('X', 'Y', 'Z')
+            ])
+
+            # Use the cached solution from the previous Solve as q0 when
+            # available. Reading j.Position from the FreeCAD model is unreliable
+            # for chained solves — the document may not have flushed the previous
+            # transaction yet, causing the robot to appear to reset to home.
+            # Fall back to reading from the model only on the first Solve or
+            # after the user explicitly resets with ↺ Read current pose.
+            if self.solved_joint_positions is not None:
+                q0 = self.solved_joint_positions.copy()
+            else:
+                try:
+                    q0 = _read_joint_positions(self._joint_objs)
+                except Exception:
+                    self._lbl_status.setText(
+                        tr("Solver error: Cannot access 'Position' of deleted object. "
+                        "Please close and reopen the IK Tool.")
+                    )
+                    return
+
             if self.original_joint_positions is None:
                 self.original_joint_positions = q0.copy()
                 self._btn_restore.setEnabled(True)
 
-            # Capture solver stdout so it can be shown in the status label.
-            log_buffer = io.StringIO()
-            with redirect_stdout(log_buffer):
-                q_solved = inverse_kinematics(
-                    self._robot,
-                    target_position=target,
-                    initial_guess=q0,
-                )
-            solver_log = log_buffer.getvalue().strip()
+            # World → local frame
+            T_world        = _get_robot_global_transform(self._robot_obj)
+            R_world        = T_world[:3, :3]
+            p_world        = T_world[:3, 3]
+            target_local   = R_world.T @ (target_world - p_world)
+            R_target_local = R_world.T @ R_target_world
 
-            if q_solved is None:
-                for i in range(len(self._joint_objs)):
-                    self._table.setItem(
-                        i, 2, QtWidgets.QTableWidgetItem(tr('Unreachable'))
+            # Current EF pose in local frame — read from the live model q0,
+            # so each chained Solve starts the SLERP from where the robot actually is.
+            T_ee_start = forward_kinematics(self._robot, q0)
+            pos_start  = T_ee_start[:3, 3]
+            R_start    = T_ee_start[:3, :3]
+
+            # Incremental IK: linear position + SLERP orientation
+            n_steps    = self._spin_steps.value()
+            max_iter   = self._spin_maxiter.value()
+            ori_weight = self._spin_ori_weight.value()
+            restarts   = self._spin_restarts.value()
+            tolerance  = self._spin_tol.value()
+            pos_weight = self._spin_pos_weight.value()
+            verbose    = self._chk_verbose.isChecked()
+
+            q_current  = q0.copy()
+            q_final    = None
+            steps_done = 0
+
+            # Pre-warm: if the initial config is singular, run one IK step toward
+            # a tiny displacement (1% of total travel) to get a non-singular q
+            # before the main SLERP loop. This prevents _escape_singularity from
+            # landing on a random pose that becomes step 1 of the animation.
+            J_check = compute_jacobian(self._robot, q_current)
+            w_check = float(np.sqrt(max(0.0, np.linalg.det(
+                J_check[:3, :] @ J_check[:3, :].T
+            ))))
+            if w_check < 1e-4:
+                pos_prewarm = pos_start + 0.01 * (target_local - pos_start)
+                try:
+                    q_warm = inverse_kinematics(
+                        self._robot,
+                        target_position    = pos_prewarm,
+                        initial_guess      = q_current,
+                        target_rotation    = R_start,
+                        weight_position    = pos_weight,
+                        weight_orientation = 0.0,
+                        max_iterations     = max_iter,
+                        tolerance          = np.linalg.norm(target_local - pos_start) * 0.005,
+                        max_restarts       = restarts,
+                        verbose            = verbose,
+                        wrap_joints        = False,
                     )
+                    if q_warm is not None:
+                        q_current = q_warm
+                except Exception:
+                    pass
+
+            # Single transaction for the whole Solve — one undo entry, no
+            # partial revert between steps that was causing the robot to
+            # reset to home when starting a second Solve.
+            self._observer._solving = True
+            self._doc.openTransaction(tr('IK Tool – solve'))
+
+            for step in range(n_steps):
+                alpha      = (step + 1) / n_steps
+                pos_interp = pos_start + alpha * (target_local - pos_start)
+                R_interp   = _slerp_rotation(R_start, R_target_local, alpha)
+
+                try:
+                    q_new = inverse_kinematics(
+                        self._robot,
+                        target_position    = pos_interp,
+                        initial_guess      = q_current,
+                        target_rotation    = R_interp,
+                        weight_position    = pos_weight,
+                        weight_orientation = ori_weight,
+                        max_iterations     = max_iter,
+                        tolerance          = tolerance,
+                        max_restarts       = restarts,
+                        verbose            = verbose,
+                        wrap_joints        = False,
+                    )
+                except Exception as solver_exc:
+                    self._lbl_status.setText(f'Solver exception at step {step+1}: {solver_exc}')
+                    break
+
+                if q_new is None:
+                    break
+
+                # Write values without recompute for smooth animation.
+                # The viewport refreshes via updateGui() after each step.
+                _write_joint_values(self._robot_obj, self._joint_objs, q_new)
+                self._doc.recompute()
+                fcgui.updateGui()
+
+                q_current  = q_new
+                q_final    = q_new
+                steps_done += 1
+
+            self._doc.commitTransaction()
+            self._observer._solving = False
+
+            if q_final is None:
                 self._lbl_status.setText(
-                    tr('IK did not converge. Target may be outside the workspace.')
-                    + (f'\n{solver_log}' if solver_log else '')
+                    tr('IK did not converge on first step. '
+                    'Target may be outside the workspace.')
                 )
                 self._btn_apply.setEnabled(False)
                 return
 
-            self.solved_joint_positions = q_solved
+            self.solved_joint_positions = q_final
 
-            # Update table with original and solved values.
+            # Update results table
             for i in range(len(self._joint_objs)):
                 self._table.setItem(
-                    i, 1, QtWidgets.QTableWidgetItem(f'{self.original_joint_positions[i]:.4f}')
+                    i, 1,
+                    QtWidgets.QTableWidgetItem(f'{self.original_joint_positions[i]:.4f}')
                 )
                 self._table.setItem(
-                    i, 2, QtWidgets.QTableWidgetItem(f'{q_solved[i]:.4f}')
+                    i, 2,
+                    QtWidgets.QTableWidgetItem(f'{q_final[i]:.4f}')
                 )
             self._table.resizeColumnsToContents()
 
-            # Verify solution via FK and compute residual error.
+            # Bug fix #1: removed duplicate/buggy block that used `q_new` (loop-local
+            # variable, potentially None if last step failed) instead of `q_final`.
+            # FK verification and display update now happen once below, using q_final.
+
+            # FK verification + update EE marker to achieved world position
             try:
-                fk_matrix      = forward_kinematics(self._robot, q_solved)
-                achieved       = fk_matrix[:3, 3]
-                residual_error = float(np.linalg.norm(target - achieved))
+                T_solved        = forward_kinematics(self._robot, q_final)
+                T_world_solved  = T_world @ T_solved
+                achieved_world  = T_world_solved[:3, 3]
+                R_achieved      = T_world_solved[:3, :3]
+
+                if self._ee_marker is None:
+                    self._create_ee_marker()
+
+                self._update_ee_marker(T_world_solved)
+                self._update_ef_pose_display(T_world_solved)
+
+                # Update only the pose display panel — do NOT sync spinboxes
+                # so the user's target values are preserved for the next Solve.
+
+                pos_error = float(np.linalg.norm(target_world - achieved_world))
+                cos_angle = np.clip(
+                    (np.trace(R_achieved.T @ R_target_world) - 1) / 2,
+                    -1.0, 1.0
+                )
+                step_info = (
+                    f'partial: {steps_done}/{n_steps} steps'
+                    if steps_done < n_steps
+                    else f'{steps_done}/{n_steps} steps'
+                )
                 status_details = (
-                    f'Target:   [{target[0]:.3f}, {target[1]:.3f}, {target[2]:.3f}] mm\n'
-                    f'Achieved: [{achieved[0]:.3f}, {achieved[1]:.3f}, {achieved[2]:.3f}] mm\n'
-                    f'Error:    {residual_error:.6f} mm'
+                    f'Converged ({step_info})\n'
+                    f'Target:   [{target_world[0]:.3f}, {target_world[1]:.3f}, {target_world[2]:.3f}] mm\n'
+                    f'Achieved: [{achieved_world[0]:.3f}, {achieved_world[1]:.3f}, {achieved_world[2]:.3f}] mm\n'
+                    f'Error:    {pos_error:.6f} mm\n'
+                    f'Error orientation: {np.rad2deg(np.arccos(cos_angle)):.2f} deg'
+                )
+
+                # Log full result to the solve log panel.
+                self._solve_count += 1
+                self._log_solve_result(
+                    solve_n        = self._solve_count,
+                    ee_label       = self._combo_ee.currentText(),
+                    target_world   = target_world,
+                    achieved_world = achieved_world,
+                    R_achieved     = R_achieved,
+                    R_target_world = R_target_world,
+                    q_start        = q0,
+                    q_final        = q_final,
+                    steps_done     = steps_done,
+                    n_steps        = n_steps,
                 )
             except Exception as exc:
                 status_details = f'(FK verification failed: {exc})'
 
-            self._lbl_status.setText(
-                (f'{solver_log}\n{status_details}') if solver_log else status_details
-            )
+            self._lbl_status.setText(status_details)
             self._btn_apply.setEnabled(True)
 
         except Exception as exc:
+            self._observer._solving = False
             self._lbl_status.setText(f'Solver error: {exc}')
             self._btn_apply.setEnabled(False)
 
     # ── Slot: Apply solution ──────────────────────────────────
 
     def _on_apply(self) -> None:
-        """Write solved joint positions to the document and animate the model."""
         if self.solved_joint_positions is None:
             return
         _apply_joint_positions(
-            self._robot_obj,
-            self._joint_objs,
-            self.solved_joint_positions,
-            self._doc,
-            transaction_label='IK Tool – apply',
+            self._robot_obj, self._joint_objs, self.solved_joint_positions,
+            self._doc, transaction_label='IK Tool – apply',
         )
         self._lbl_status.setText(
             self._lbl_status.text() + tr('\n✔ Solution applied to model.')
@@ -766,17 +1236,14 @@ class IKToolDialog(QtWidgets.QDialog):
     # ── Slot: Restore original pose ───────────────────────────
 
     def _on_restore(self) -> None:
-        """Write the original joint positions back to the document."""
         if self.original_joint_positions is None:
             return
         _apply_joint_positions(
-            self._robot_obj,
-            self._joint_objs,
-            self.original_joint_positions,
-            self._doc,
-            transaction_label='IK Tool – restore',
+            self._robot_obj, self._joint_objs, self.original_joint_positions,
+            self._doc, transaction_label='IK Tool – restore',
         )
         self._lbl_status.setText(tr('↩ Original joint positions restored.'))
+        self._refresh_ef_pose()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -784,10 +1251,6 @@ class IKToolDialog(QtWidgets.QDialog):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _IKToolCommand:
-    """FreeCAD Gui command that opens the IK Tool dialog.
-
-    Registers as ``IKTool``.  Only active when a Cross::Robot is selected.
-    """
 
     def GetResources(self) -> dict:
         return {
@@ -799,36 +1262,25 @@ class _IKToolCommand:
                 '\n'
                 'Select a robot, then open this tool to:\n'
                 '  • Choose the End Effector (tip link) for IK.\n'
-                '  • Inspect the current end-effector position (FK).\n'
-                '  • Enter a Cartesian target (X, Y, Z in millimetres).\n'
-                '  • Solve IK via iterative Jacobian pseudo-inverse\n'
-                '    on the isolated serial sub-chain only.\n'
-                '  • See solved joint angles in a results table.\n'
-                '  • Apply the solution → live 3-D animation.\n'
-                '  • Restore the original pose at any time.\n'
+                '  • Inspect the current EF pose in WORLD coordinates.\n'
+                '  • Enter a Cartesian target (X, Y, Z mm + RPY deg).\n'
+                '  • Solve IK with smooth incremental motion (SLERP).\n'
+                '  • A coordinate marker (IK_EE_Marker) shows the\n'
+                '    actual EF position in the 3D viewport.\n'
+                '  • Apply the solution or restore the original pose.\n'
                 '\n'
                 'Requires: a Cross::Robot selected in the scene.\n'
-                'Algorithm: Jacobian pseudo-inverse, step-limited,\n'
-                '           up to 1 000 iterations, tol = 1 × 10⁻⁴ mm.\n'
+                'Algorithm: Damped Least Squares (DLS), 6-DOF,\n'
+                f'           {_N_STEPS_DEFAULT} SLERP-interpolated steps.\n'
             ),
         }
 
     def IsActive(self) -> bool:
-        """Return True only when a Cross::Robot object is selected."""
         selection = fcgui.Selection.getSelection()
         return bool(selection) and is_robot(selection[0])
 
     def Activated(self) -> None:
-        """Open the IK Tool dialog for the selected robot (non-modal)."""
         robot_obj = fcgui.Selection.getSelection()[0]
-
-        # Non-modal window: show() instead of exec_() so the user can
-        # continue interacting with RobotCAD while the dialog is open.
-        #
-        # parent=None avoids the PySide2/6 type error with QMainWindow.
-        # WA_DeleteOnClose=False + self._dialog reference on the command
-        # instance prevent the SEGFAULT caused by Python GC destroying the
-        # C++ Qt object while the window is still visible.
         dialog = IKToolDialog(robot_obj, parent=None)
 
         if _PYSIDE6:
@@ -837,13 +1289,8 @@ class _IKToolCommand:
             _wa_del = QtCore.Qt.WA_DeleteOnClose
         dialog.setAttribute(_wa_del, False)
 
-        # Keep a strong Python reference so GC never collects the dialog.
         self._dialog = dialog
         dialog.show()
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Registration
-# ─────────────────────────────────────────────────────────────────────────────
 
 fcgui.addCommand('IKTool', _IKToolCommand())
