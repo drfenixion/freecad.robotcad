@@ -486,6 +486,9 @@ class JointProxy(ProxyBase):
                 joint_xml.append(limit_xml)
         if joint.Mimic:
             mimic_xml = et.fromstring('<mimic/>')
+            if not joint.MimickedJoint:
+                error('Joint (' + ros_name(joint) + ') has empty MimickedJoint. Set it or disable mimic for this joint.', gui=True)
+                raise ValueError("empty MimickedJoint of joint " + ros_name(joint))
             mimic_joint = ros_name(joint.MimickedJoint)
             mimic_xml.attrib['joint'] = get_valid_urdf_name(mimic_joint)
             mimic_xml.attrib['multiplier'] = str(joint.Multiplier)
