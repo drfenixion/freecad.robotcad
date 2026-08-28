@@ -1,3 +1,37 @@
+# RobotCAD — Release v12.6.7
+
+**Date:** 2026-08-17
+
+## Fixes
+
+- Fixed an error in **collision creation** for objects obtained via a link from an **external document**: the temporary collision source object is now removed from its own document (instead of the active one).
+- Added **document recomputing** after collision creation, so the created collision objects are properly updated in the model tree.
+
+---
+
+### Commits
+
+- `4a2c970` — fix error in collision creation for objects gotten by link from external document. Add doc recomputing after collision creation
+
+---
+
+# RobotCAD — Release v12.6.6
+
+**Date:** 2026-08-17
+
+## Improvements
+
+- Added the **RobotCAD Display Version** tool — shows the RobotCAD workbench version in a dialog.
+- The **Reload Workbench** developer tool is now hidden from the workbench menu.
+
+---
+
+### Commits
+
+- `6672011` — add RobotCAD Display Version tool. Hide Reload Workbench developer tool
+
+---
+
 # RobotCAD — Release v12.6.5
 
 **Date:** 2026-08-16
