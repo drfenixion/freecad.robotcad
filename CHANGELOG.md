@@ -1,3 +1,35 @@
+# RobotCAD — Release v12.6.9
+
+**Date:** 2026-08-28
+
+## Fixes
+
+- Fixed the **Assembly → Robot** converter for joints that reference `Part::LocalCoordinateSystem` (LCS) objects: this second type of coordinate system is now detected by `is_lcs()` and handled correctly as a joint reference.
+
+---
+
+### Commits
+
+- `81586f8` — add second type of coordinate system (Part::LocalCoordinateSystem) to CS detection (is_lcs); fix Assembly to RobotCAD conversion with that type of CS as references of joints
+
+---
+
+# RobotCAD — Release v12.6.8
+
+**Date:** 2026-08-26
+
+## Fixes
+
+- A **modal error** is now shown when activating a joint **mimic** without setting the `MimickedJoint` property (previously the error was silenced).
+
+---
+
+### Commits
+
+- `d3ec61b` — set modal error when activated mimic of joint and don't set MimickedJoint (previously silenced error)
+
+---
+
 # RobotCAD — Release v12.6.7
 
 **Date:** 2026-08-17
