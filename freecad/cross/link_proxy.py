@@ -198,6 +198,18 @@ class LinkProxy(ProxyBase):
         # Updated in `onBeforeChange` and potentially used in `onChanged`.
         self.old_ros_name: str = ''
 
+        # Prevent recursion when this proxy updates `Real`, `Visual` or
+        # `Collision` itself.
+        self._is_wrapping_elements: bool = False
+
+        # True while the document object is being restored, when property
+        # values must not be interpreted as manual user edits.
+        self._is_restoring: bool = False
+
+        # Snapshot of `Real`, `Visual` and `Collision` values before a change
+        # (filled in `onBeforeChange`).
+        self._elements_before_change: dict = {}
+
         # Save the robot to speed-up self.get_robot().
         self._robot: Optional[CrossRobot] = None
 
@@ -343,12 +355,19 @@ class LinkProxy(ProxyBase):
     def onBeforeChange(self, obj: CrossLink, prop: str) -> None:
         """Called before a property of `obj` is changed."""
         # TODO: save the old ros_name and update all joints that used it.
+        if not hasattr(self, '_elements_before_change'):
+            # Old proxy instances, or a proxy not yet initialized (e.g. while
+            # restoring a document created by an older version, properties can
+            # be set before `__init__` has run).
+            self._elements_before_change = {}
         if prop in ['Label', 'Label2']:
             robot = self.get_robot()
             if (robot and is_name_used(obj, robot)):
                 self.old_ros_name = ''
             else:
                 self.old_ros_name = ros_name(obj)
+        if prop in ('Real', 'Visual', 'Collision'):
+            self._elements_before_change[prop] = list(getattr(obj, prop, []))
 
     def onChanged(self, obj: CrossLink, prop: str) -> None:
         if prop == 'Group':
@@ -356,6 +375,7 @@ class LinkProxy(ProxyBase):
             self._vacuum_grippers = None
             self._cleanup_children()
         if prop in ('Real', 'Visual', 'Collision'):
+            self._wrap_manually_added_elements(prop)
             self.update_fc_links()
             self._cleanup_children()
         if prop in ('Label', 'Label2'):
@@ -424,6 +444,11 @@ class LinkProxy(ProxyBase):
     def loads(self, state) -> None:
         if state:
             self.Type, = state
+        # Property values are restored through `onChanged` right after `loads`
+        # when a document is opened. Those must not be treated as manual user
+        # edits, so remember that we are restoring. The flag is cleared in
+        # `onDocumentRestored()` (which calls `__init__`).
+        self._is_restoring = True
 
     def _cleanup_children(self) -> DOList:
         """Remove and return all objects not supported by CROSS::Link."""
@@ -568,6 +593,67 @@ class LinkProxy(ProxyBase):
             if chain_link is self.link:
                 return True
         return False
+
+    def _wrap_manually_added_elements(self, prop: str) -> None:
+        """Wrap elements that were added manually to `prop`.
+
+        When a user binds geometry objects to a `Cross::Link` by editing the
+        `Real`, `Visual` or `Collision` properties in the FreeCAD property
+        editor, each newly added raw geometry object is wrapped the same way
+        as in `make_robot_link_filled()`: an `App::Part` wrapper containing an
+        `App::Link` to the original object is created and stored into the
+        property, and the original object is hidden.
+
+        Wrapping is intentionally not applied when the document is being
+        restored, to avoid converting pre-existing data when opening a file.
+        Recursion is prevented with `_is_wrapping_elements`. Programmatic
+        fills (e.g. `make_robot_links_filled`, URDF/KK import, assembly
+        conversion, collision tools) store `App::Part`/`App::Link`-to-part
+        wrappers and are therefore kept as-is by `_wrap_robot_link_element()`,
+        so they are never wrapped again.
+
+        Note: a user edit in the property editor also runs inside an undo
+        transaction, so `doc.Transacting` must not be used to distinguish
+        manual edits from programmatic ones.
+        """
+        if not self.is_execute_ready():
+            return
+        if not hasattr(self, '_is_wrapping_elements'):
+            # Old proxy instances before document reload.
+            self._is_wrapping_elements = False
+        if not hasattr(self, '_is_restoring'):
+            self._is_restoring = False
+        if not hasattr(self, '_elements_before_change'):
+            self._elements_before_change = {}
+        if self._is_wrapping_elements or self._is_restoring:
+            return
+
+        link = self.link
+        doc = link.Document
+
+        new_values = list(getattr(link, prop, []))
+        if not new_values:
+            return
+        if (not hasattr(link, 'ViewObject')) or (link.ViewObject is None):
+            return
+
+        old_values = list(self._elements_before_change.get(prop, []))
+        # Wrap only objects that were not there before the change.
+        to_wrap = [o for o in new_values if o not in old_values]
+        if not to_wrap:
+            return
+
+        self._is_wrapping_elements = True
+        try:
+            for element in to_wrap:
+                wrapped = _wrap_robot_link_element(link, element)
+                if wrapped is None:
+                    continue
+                new_values[new_values.index(element)] = wrapped
+            if new_values != list(getattr(link, prop, [])):
+                setattr(link, prop, new_values)
+        finally:
+            self._is_wrapping_elements = False
 
     def update_fc_links(self) -> None:
         """Update the FreeCAD link according to the level of details."""
@@ -912,34 +998,246 @@ def make_link(name, doc: Optional[fc.Document] = None, recompute_after: bool = T
     return cross_link
 
 
+def _get_robot_parts_container(doc: fc.Document, name: str) -> DO:
+    """Return the hidden group container `name`, creating it if needed."""
+    container = doc.getObject(name)
+    if not container:
+        container = add_object(doc, 'App::DocumentObjectGroup', name)
+        container.Visibility = False
+    return container
+
+
+def _store_robot_link_element_part(
+        part: DO,
+        doc: Optional[fc.Document] = None,
+) -> None:
+    """Hide the wrapper `part` and add it to the `robot_parts` container.
+
+    Parameters
+    ----------
+    - part: the wrapper `App::Part` to store.
+    - doc: the document that contains the `robot_parts` container. Defaults to
+           `part.Document`.
+
+    """
+    if doc is None:
+        doc = part.Document
+    container = _get_robot_parts_container(doc, 'robot_parts')
+    part.Visibility = False
+    container.addObject(part)
+
+
+def _store_robot_link_element_origin(
+        element: DO,
+        doc: Optional[fc.Document] = None,
+) -> None:
+    """Hide the original `element` and add it to `robot_parts_origins`.
+
+    An element living in another document than `doc` cannot be moved into a
+    group of `doc`; in that case it is only hidden.
+
+    Parameters
+    ----------
+    - element: the original object that was bound to a link.
+    - doc: the document that contains the `robot_parts_origins` container.
+           Defaults to `element.Document`.
+
+    """
+    if doc is None:
+        doc = element.Document
+    if hasattr(element, 'Visibility'):
+        try:
+            element.Visibility = False
+        except Exception:
+            pass
+    if element.Document is not doc:
+        # Cannot be moved into a group of another document.
+        return
+    container = _get_robot_parts_container(doc, 'robot_parts_origins')
+    container.addObject(element)
+
+
+def _is_wrappable_object(obj: DO) -> bool:
+    """Return True if `obj` carries geometry usable for a link element.
+
+    An `App::GeoFeature` has geometry directly. An `App::Link` is wrappable
+    when its (recursively resolved) linked object is a geometry feature; the
+    link itself is then wrapped, preserving its placement and the external
+    reference.
+
+    Note: `App::Part` containers and `App::Link` to an `App::Part` are also
+    derived from `App::GeoFeature`/carry geometry; whether they are wrapped or
+    kept as-is is decided by `_resolve_wrappable_target()`, not here.
+
+    """
+    if is_derived_from(obj, 'App::GeoFeature'):
+        return True
+    if is_freecad_link(obj):
+        # `getLinkedObject(True)` resolves the whole link chain, so no
+        # recursion is needed here.
+        try:
+            linked = obj.getLinkedObject(True)
+        except ReferenceError:
+            return False
+        if (linked is None) or (linked is obj):
+            return False
+        return is_derived_from(linked, 'App::GeoFeature')
+    return False
+
+
+def _make_robot_link_element_wrapper(
+        obj: fc.DO,
+        doc: Optional[fc.Document] = None,
+) -> DO | False:
+    """Create an `App::Part` wrapper with an `App::Link` to `obj`.
+
+    The wrapper is the object stored in the `Real`, `Visual` or `Collision`
+    property of a `Cross::Link`. The original `obj` is not modified.
+
+    Parameters
+    ----------
+    - obj: the geometry object to wrap. It may live in another document than
+           `doc` (e.g. an external document referenced through an `App::Link`).
+    - doc: the document in which the wrapper must be created. Defaults to the
+           document of `obj`, like `make_robot_link_filled()` did historically.
+
+    Return the created wrapper part, or `False` if `obj` is not a geometry
+    object that can be wrapped.
+
+    """
+    if not _is_wrappable_object(obj):
+        return False
+
+    if doc is None:
+        doc = obj.Document
+    part = add_object(doc, 'App::Part', ros_name(obj))
+    fc_link_to_obj = add_object(doc, 'App::Link', ros_name(obj))
+    fc_link_to_obj.LinkedObject = obj
+    fc_link_to_obj.adjustRelativeLinks(part)
+    part.addObject(fc_link_to_obj)
+    return part
+
+
+def _get_link_wrapper_for_object(element: DO) -> DO | None:
+    """Return the existing `App::Part` wrapper of `element`, if any.
+
+    A wrapper is an `App::Part` that contains exactly one `App::Link` to
+    `element`. Such a wrapper is created by `make_robot_link_filled()` and by
+    `_wrap_robot_link_element()`.
+
+    """
+    for ref in getattr(element, 'InList', []):
+        if not is_freecad_link(ref):
+            continue
+        try:
+            if ref.getLinkedObject(True) is not element:
+                continue
+        except ReferenceError:
+            continue
+        # `ref` is an `App::Link` to `element`. Find the `App::Part` that
+        # contains only this link (our wrapper).
+        for parent in getattr(ref, 'InList', []):
+            if not is_part(parent):
+                continue
+            children = list(getattr(parent, 'Group', []))
+            if len(children) == 1 and children[0] is ref:
+                return parent
+    return None
+
+
+def _resolve_wrappable_target(element: DO) -> tuple[DO, DO] | None:
+    """Resolve `element` to (real_object, object_to_hide).
+
+    `real_object` is what the wrapper `App::Part` will link to. For an
+    `App::Link` that does not point to an `App::Part`, the wrapper keeps the
+    `App::Link` itself so that its placement and the linked object are
+    preserved, exactly like `make_robot_link_filled()` does for a selected
+    object.
+
+    Return None when the element is not wrappable (already a wrapper
+    container, an `App::Link` to an `App::Part`, a `Cross::*` object, or not
+    a geometry object).
+
+    """
+    if is_link(element) or is_joint(element) or is_sensor_link(element):
+        # CROSS objects must not be wrapped.
+        return None
+    if is_part(element):
+        # `App::Part` containers (wrappers and parts stored by the
+        # programmatic flows like URDF/KK import) are kept as-is.
+        return None
+    if is_freecad_link(element):
+        # An `App::Link` to an `App::Part` is the internal link of a wrapper
+        # (or a reference to an already managed part): keep as-is.
+        linked = element.getLinkedObject(True)
+        if is_part(linked):
+            return None
+        # Any other `App::Link` must be wrapped too: it carries geometry
+        # through its `LinkedObject` (resolved recursively), so the wrapper
+        # keeps the `App::Link` itself, preserving its placement and the
+        # reference to the (possibly external) linked object.
+        if not _is_wrappable_object(element):
+            return None
+        return element, element
+    if not _is_wrappable_object(element):
+        return None
+    return element, element
+
+
+def _wrap_robot_link_element(link: CrossLink, element: DO) -> DO | None:
+    """Wrap a raw geometry element manually added to `link` properties.
+
+    This is the same mechanism as in `make_robot_link_filled()`: the element
+    is wrapped into an `App::Part` containing an `App::Link` to it, the
+    wrapper is hidden and stored into the `robot_parts` container, and the
+    original element is hidden and moved to `robot_parts_origins`.
+
+    Return the wrapper part, or `None` if the element should be kept as-is
+    (already a wrapper, an `App::Part`, an `App::Link` to a part, a
+    `Cross::*` object, or not a geometry object).
+
+    """
+    resolved = _resolve_wrappable_target(element)
+    if resolved is None:
+        return None
+    real_object, object_to_hide = resolved
+
+    # Avoid double wrapping: if the geometry already lives alone inside an
+    # `App::Part` through an `App::Link` (our wrapper), reuse that wrapper.
+    existing_wrapper = _get_link_wrapper_for_object(real_object)
+    if existing_wrapper is not None:
+        return existing_wrapper
+
+    doc = link.Document
+    part = _make_robot_link_element_wrapper(real_object, doc)
+    if not part:
+        return None
+
+    # Hide the wrapper and store it in the link's document the same way as
+    # `make_robot_link_filled()` with `create_parts_group=True` does.
+    _store_robot_link_element_part(part, doc)
+
+    # Hide the original element (or the original App::Link) and store it in
+    # `robot_parts_origins` the same way as `make_robot_links_filled()` does.
+    _store_robot_link_element_origin(object_to_hide, doc)
+
+    return part
+
+
 def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_reference:str = '') -> CrossLink | False :
     ''' Make robot link and fill Real and Visual of it by selected objects  '''
 
-    if not is_derived_from(obj, 'App::GeoFeature'):
+    # The wrapper must be created in the active document, like the CROSS::Link
+    # itself. `obj` may live in another (external) document, e.g. an object
+    # linked from an external assembly document.
+    doc = fc.ActiveDocument
+    part = _make_robot_link_element_wrapper(obj, doc)
+    if not part:
         message(
             f'Not suited object ({ros_name(obj)}) to create robot link.',
             True,
         )
         return False
-
-    part = add_object(fc.ActiveDocument, 'App::Part', ros_name(obj))
-    fc_link_to_obj = add_object(fc.ActiveDocument, 'App::Link', ros_name(obj))
-    fc_link_to_obj.LinkedObject = obj
-    fc_link_to_obj.adjustRelativeLinks(part)
-    part.addObject(fc_link_to_obj)
-
-    # parent_of_obj = None
-    # try:
-    #     parent_of_obj = obj.Parents[0][0]
-    # except (KeyError, IndexError, AttributeError):
-    #     pass
-
-    # #add created part-wrapper as child to parent of object
-    # if parent_of_obj:
-    #     if is_freecad_link(parent_of_obj):
-    #         parent_of_obj = parent_of_obj.getLinkedObject(True)
-    #     part.adjustRelativeLinks(parent_of_obj) 
-    #     parent_of_obj.addObject(part)
 
     link = make_link('l_' + ros_name(part))
     link.Real = part
@@ -950,14 +1248,9 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     link.ViewObject.ShowReal = True
 
     if create_parts_group:
-        container = fc.ActiveDocument.getObject('robot_parts')
-        if not container:
-            container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', 'robot_parts')
-            container.Visibility = False
-        part.Visibility = False
-        container.addObject(part)
+        _store_robot_link_element_part(part, doc)
 
-    fc.ActiveDocument.recompute()
+    doc.recompute()
 
     return link
 
@@ -983,12 +1276,7 @@ def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = 
                 robot.addObject(link)
 
             if create_parts_group:
-                folder = 'robot_parts_origins'
-                container = fc.ActiveDocument.getObject(folder)
-                if not container:
-                    container = add_object(fc.ActiveDocument, 'App::DocumentObjectGroup', folder)
-                    container.Visibility = False
-                container.addObject(el)
+                _store_robot_link_element_origin(el, fc.ActiveDocument)
     return links
 
 
