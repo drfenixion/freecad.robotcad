@@ -1,3 +1,23 @@
+# RobotCAD — Release v12.7.0
+
+**Date:** 2026-09-04
+
+## Improvements
+
+- **Robot link elements bound manually via the FreeCAD Data tab** (`Real`, `Visual`, `Collision` of a Cross::Link) are now **wrapped the same way as in the "filled links" tools**: each manually added object is automatically wrapped into an `App::Part` containing an `App::Link` to the object, the wrapper is hidden and stored into the `robot_parts` container, and the original object is hidden and moved to `robot_parts_origins`.
+  - Applies to raw geometry objects **and** to `App::Link` objects that do not point to an `App::Part` (such links are wrapped themselves, preserving their placement and the reference to the linked object).
+  - Objects already managed by RobotCAD (`App::Part` wrappers and `App::Link` to a part, `Cross::*` objects) are kept as-is, so programmatic flows (filled-links creation, URDF/KK import, assembly conversion) are **not** double-wrapped.
+  - Wrapping is skipped while restoring documents created by older versions, so existing data is preserved when opening a file.
+
+---
+
+### Commits
+
+- `18480da` — add wrapper (Part) for manually added robot link element (real, visual, collision). Manually means via Elements of Data tab of robot link
+- `282e6da` — bump version
+
+---
+
 # RobotCAD — Release v12.6.9
 
 **Date:** 2026-08-28
