@@ -1145,6 +1145,41 @@ def _get_link_wrapper_for_object(element: DO) -> DO | None:
     return None
 
 
+def _find_or_create_link_element_wrapper(
+        real_object: DO,
+        doc: Optional[fc.Document] = None,
+) -> tuple[DO | None, bool]:
+    """Return the wrapper `App::Part` of `real_object`, reusing it or creating.
+
+    The wrapper is looked up first with `_get_link_wrapper_for_object()`, so a
+    body that was already wrapped (by `make_robot_link_filled()` or by
+    `_wrap_robot_link_element()`) is never wrapped a second time. This lookup
+    is shared by both callers to avoid duplicating the "find existing wrapper"
+    logic.
+
+    Parameters
+    ----------
+    - real_object: the geometry object (or `App::Link`) that the wrapper
+                   `App::Part` must link to.
+    - doc: the document in which a new wrapper must be created. Defaults to the
+           document of `real_object`.
+
+    Return a tuple `(wrapper, created)`:
+    - `wrapper`: the existing or new `App::Part`, or `None` if `real_object`
+                 is not a geometry object that can be wrapped.
+    - `created`: `True` if a new wrapper was created, `False` if an existing
+                 one was reused or if wrapping is not possible.
+
+    """
+    existing_wrapper = _get_link_wrapper_for_object(real_object)
+    if existing_wrapper is not None:
+        return existing_wrapper, False
+    part = _make_robot_link_element_wrapper(real_object, doc)
+    if not part:
+        return None, False
+    return part, True
+
+
 def _resolve_wrappable_target(element: DO) -> tuple[DO, DO] | None:
     """Resolve `element` to (real_object, object_to_hide).
 
@@ -1202,24 +1237,24 @@ def _wrap_robot_link_element(link: CrossLink, element: DO) -> DO | None:
         return None
     real_object, object_to_hide = resolved
 
-    # Avoid double wrapping: if the geometry already lives alone inside an
-    # `App::Part` through an `App::Link` (our wrapper), reuse that wrapper.
-    existing_wrapper = _get_link_wrapper_for_object(real_object)
-    if existing_wrapper is not None:
-        return existing_wrapper
-
+    # Reuse the existing wrapper of the geometry if it was already wrapped
+    # (e.g. when bound to another link), otherwise create a new one. The
+    # lookup is shared with `make_robot_link_filled()`.
     doc = link.Document
-    part = _make_robot_link_element_wrapper(real_object, doc)
-    if not part:
+    part, created = _find_or_create_link_element_wrapper(real_object, doc)
+    if part is None:
         return None
 
-    # Hide the wrapper and store it in the link's document the same way as
-    # `make_robot_link_filled()` with `create_parts_group=True` does.
-    _store_robot_link_element_part(part, doc)
-
-    # Hide the original element (or the original App::Link) and store it in
-    # `robot_parts_origins` the same way as `make_robot_links_filled()` does.
-    _store_robot_link_element_origin(object_to_hide, doc)
+    if created:
+        # Only a newly created wrapper must be stored (hidden into
+        # `robot_parts`) and its original element hidden (moved into
+        # `robot_parts_origins`), the same way as
+        # `make_robot_link_filled()` with `create_parts_group=True` and
+        # `make_robot_links_filled()` do. An existing wrapper was already
+        # stored and its original element already hidden when it was first
+        # created.
+        _store_robot_link_element_part(part, doc)
+        _store_robot_link_element_origin(object_to_hide, doc)
 
     return part
 
@@ -1231,7 +1266,11 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     # itself. `obj` may live in another (external) document, e.g. an object
     # linked from an external assembly document.
     doc = fc.ActiveDocument
-    part = _make_robot_link_element_wrapper(obj, doc)
+    # Reuse the existing wrapper of `obj` if it was already wrapped (e.g. the
+    # body was bound to another link before), like `_wrap_robot_link_element()`
+    # does for manually bound elements. The find-or-create logic is shared and
+    # must not be duplicated here.
+    part, _created = _find_or_create_link_element_wrapper(obj, doc)
     if not part:
         message(
             f'Not suited object ({ros_name(obj)}) to create robot link.',
