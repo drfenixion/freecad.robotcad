@@ -916,6 +916,7 @@ class _ViewProviderLink(ProxyBase):
         )
 
         vobj.ShowCollision = True
+        vobj.ShowReal = True
 
         self._old_show_real = vobj.ShowReal
         self._old_show_visual = vobj.ShowVisual
