@@ -1,3 +1,25 @@
+# RobotCAD — Release v12.7.1
+
+**Date:** 2026-09-05
+
+## Fixes
+
+- Fixed **duplicate `App::Part` wrappers** when binding the same body again via the **New filled robot links** tool (`make_robot_links_filled()`): if a body is already wrapped, its existing `App::Part` wrapper is now **reused** instead of creating a new one. The find-or-create logic is shared between `make_robot_link_filled()` and the manual binding of link elements (`Real`/`Visual`/`Collision`), so the "find existing wrapper" mechanism is not duplicated.
+
+## Improvements
+
+- A robot link created with the **New Link** tool now shows its **Real** geometry by default (`ShowReal = True`), so the view does not have to be toggled before using the **Set Placement** tools for this type of link creation.
+
+---
+
+### Commits
+
+- `9542311` — fix robot link element (visual, real) wrapper recreation when bind same body via make_robot_links_filled()
+- `28d99af` — make "ShowReal = True" of new robot link made via "New Link" tool. Let oportunity to not change vision before use Set Placement tools for that type of robot link creation.
+- `4c67d5b` — bump version
+
+---
+
 # RobotCAD — Release v12.7.0
 
 **Date:** 2026-09-04
