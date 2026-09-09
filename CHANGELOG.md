@@ -1,3 +1,28 @@
+# RobotCAD — Release v12.8.0
+
+**Date:** 2026-09-09
+
+## New features
+
+- Added a **field-of-view (frustum) visualization for camera-type sensors** based on the sensor parameters (`horizontal_fov`, image `width`/`height`, `clip.near`/`clip.far`). The frustum is drawn as a green truncated pyramid in the direction the camera looks at (Gazebo convention: X forward), and is updated when the camera parameters or the sensor placement change.
+- Added a **field-of-view visualization for `gpu_lidar` sensors** based on the lidar parameters: a red sector with **80% transparency** spanning the `scan.horizontal` and `scan.vertical` angle ranges between the `range.min` and `range.max` distances (angles/range read by their full parameter path, e.g. `lidar___scan___horizontal___min_angle`).
+- The field-of-view visualization of sensors (camera frustum and lidar sector) is now **toggleable with the Space key in both directions** (show and hide), like the robot object: the visualization is drawn into a registered FreeCAD display-mode node, whose visibility is managed by FreeCAD itself (previously the Space key could only show but not hide it).
+
+## Improvements
+
+- **Space-key visibility toggling now works for robot links and joints** (show and hide, both directions): the joint markers (axes and actuation indicators) are drawn into a registered display-mode node, and a display-mode node was added to the link as well, so FreeCAD manages their visibility natively. The visibility of the children (parts, sensors) follows the visibility of their link/joint.
+
+---
+
+### Commits
+
+- `9e8d26c` — add camera type sensors frustum (field of view). Add toggleable visibility (by space button) of frustum (field of view) of camera
+- `dece195` — add field of view for gpu_lidar sensor
+- `0bf44d2` — make toggleable visibility of robot link and joint by space button
+- `822a042` — bump version
+
+---
+
 # RobotCAD — Release v12.7.1
 
 **Date:** 2026-09-05
