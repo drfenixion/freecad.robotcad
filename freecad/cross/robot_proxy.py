@@ -736,6 +736,14 @@ class RobotProxy(ProxyBase):
             if aco.Placement != aco.Link.Placement:
                 # Avoid recursive recompute.
                 aco.Placement = aco.Link.Placement
+        # Update sensors attached to links and joints.
+        for elem in self.get_links() + self.get_joints():
+            for sensor in elem.Proxy.get_sensors():
+                if not hasattr(sensor, 'Placement'):
+                    continue
+                if sensor.Placement != elem.Placement:
+                    # Avoid recursive recompute.
+                    sensor.Placement = elem.Placement
         for o in self.robot.Group:
             if (not (has_type(o, 'Cross::RgbCamera')
                     or has_type(o, 'Cross::Lidar2d')

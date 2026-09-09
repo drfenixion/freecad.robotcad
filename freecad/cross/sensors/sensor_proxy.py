@@ -78,6 +78,14 @@ class SensorProxy(ProxyBase):
         obj.setPropertyStatus('_Type', ['Hidden', 'ReadOnly'])
         obj._Type = self.Type
 
+        add_property(
+            obj, 'App::PropertyPlacement', 'Placement', 'Internal',
+            'Placement of the sensor in the robot frame '
+            '(updated from the parent link/joint)',
+            fc.Placement(),
+        )
+        obj.setPropertyStatus('Placement', ['ReadOnly'])
+
 
     def execute(self, obj: CrossSensor) -> None:
         pass
@@ -100,8 +108,40 @@ class SensorProxy(ProxyBase):
         pass
 
 
+def get_sensor_placement(sensor: CrossSensor) -> fc.Placement:
+    """Return the placement of a sensor in the global frame.
+
+    The sensor is attached to a parent link or joint (kept in its Group),
+    so the placement is taken from that parent element.
+    Fallbacks: the robot placement, then the identity.
+
+    Implementation note: a module-level function is used (instead of a
+    proxy method) because the proxy can be restored without its
+    attributes (e.g. on document restore) while `sensor` is always
+    available from the view provider.
+    """
+    for parent in getattr(sensor, 'InList', []):
+        if is_link(parent) or is_joint(parent):
+            if hasattr(parent, 'getGlobalPlacement'):
+                return parent.getGlobalPlacement()
+            return parent.Placement
+        if is_robot(parent) and hasattr(parent, 'Placement'):
+            return parent.Placement
+    return fc.Placement()
+
+
 class _ViewProviderSensor(ProxyBase):
     """A view provider for the Sensor container object """
+
+    # Last parts (suffixes) of camera sensor parameter full names that
+    # change the shape of the field-of-view visualization.
+    _frustum_param_suffixes = [
+        'horizontal_fov',
+        'width',
+        'height',
+        'near',
+        'far',
+    ]
 
     def __init__(self, vobj: VPDO):
         super().__init__(
@@ -120,12 +160,301 @@ class _ViewProviderSensor(ProxyBase):
     def attach(self, vobj: VPDO):
         self.view_object = vobj
         self.sensor = vobj.Object
+        # Add the display properties here only: doing it from within
+        # `onChanged`/`visibilityChanged` (nested property modifications
+        # during a property notification) breaks the visibility handling
+        # in FreeCAD (e.g. the eye icon in the tree does not update).
+        self._init_display_properties(vobj)
+        self._init_display_mode(vobj)
+        self._redraw_frustum()
+
+    def _init_display_properties(self, vobj: VPDO) -> None:
+        """Add the display options of the field-of-view visualization.
+
+        Called from `attach` and lazily from `onChanged` because `onChanged`
+        can be called before `attach` (e.g. on document restore of sensors
+        created before these properties were introduced).
+
+        The frustum visibility follows the standard `Visibility` property,
+        so it can be toggled with the Space key on a selected sensor.
+        """
+        if not hasattr(vobj, 'FrustumColor'):
+            vobj.addProperty(
+                'App::PropertyColor', 'FrustumColor', 'Display Options',
+                'Color of the field-of-view pyramid of a camera sensor',
+            )
+            vobj.FrustumColor = (0.0, 1.0, 0.0)  # Green.
+        if not hasattr(vobj, 'FrustumTransparency'):
+            vobj.addProperty(
+                'App::PropertyIntegerConstraint', 'FrustumTransparency',
+                'Display Options',
+                'Transparency (%) of the field-of-view pyramid of a camera sensor',
+            )
+            # Setter with (value, min, max, step) sets the constraints.
+            vobj.FrustumTransparency = (80, 0, 100, 1)
+
+    def _init_display_mode(self, vobj: VPDO) -> bool:
+        """Create the frustum display-mode node and register it.
+
+        Return True when the frustum node exists and is ready to be drawn
+        into.
+
+        The node is registered with `vobj.addDisplayMode()` so that the
+        standard `Visibility` property is applied by FreeCAD to this node
+        through the display-mode switch (the same mechanism as used by
+        `_ViewProviderPlanningScene`). This is what makes the Space key hide
+        and show the frustum in both directions.
+        """
+        frustum = getattr(self, '_frustum', None)
+        if (frustum is not None
+                and getattr(self, '_frustum_view_object', None) is vobj):
+            return True
+        if (vobj is None) or not hasattr(vobj, 'addDisplayMode'):
+            return False
+        from pivy import coin
+
+        try:
+            frustum = coin.SoSeparator()
+            frustum.setName('Frustum')
+            vobj.addDisplayMode(frustum, 'Frustum')
+        except Exception:
+            # `addDisplayMode` is only possible once the view provider is
+            # attached; do not draw (and do not fall back to `RootNode`,
+            # which would break the visibility toggle) and wait for
+            # `attach()` to run.
+            self._frustum = None
+            return False
+        self._frustum = frustum
+        self._frustum_view_object = vobj
+        return True
+
+    def getDisplayModes(self, vobj: VPDO) -> list[str]:
+        """Return the available display modes."""
+        return ['Frustum']
+
+    def getDefaultDisplayMode(self) -> str:
+        """Return the name of the default display mode."""
+        return 'Frustum'
+
+    def setDisplayMode(self, mode: str) -> str:
+        """Accept the display mode requested by FreeCAD."""
+        return mode
+
+    def _get_view_object(self):
+        """Return the view object or None.
+
+        Implementation note: `getattr(self, 'view_object', None)` is used
+        because the hooks can be called before `attach` has stored the
+        view object.
+        """
+        return getattr(self, 'view_object', None)
+
+    def _get_sensor(self):
+        """Return the sensor DocumentObject or None."""
+        view_object = self._get_view_object()
+        if view_object is None:
+            return None
+        return getattr(view_object, 'Object', None)
+
+    def _get_sensor_type(self) -> str:
+        """Return the sensor type (SDF sensor@type), e.g. `camera`."""
+        return str(getattr(self._get_sensor(), 'attr_type', '') or '')
+
+    def _is_camera_sensor(self) -> bool:
+        """Return True if the sensor is a camera (lidar and others excluded)."""
+        return 'camera' in self._get_sensor_type()
+
+    def _get_sensor_param(self, suffix: str):
+        """Return a sensor parameter value by the last part of its full name.
+
+        Full parameter names look like `camera___clip___far` (name parts are
+        joined with the full-name glue), so `suffix` is the last part,
+        e.g. `far` for `camera___clip___far`.
+        """
+        glue = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+        sensor = self._get_sensor()
+        full_names = getattr(sensor, 'sensor_parameters_fullnames_list', [])
+        for full_name in full_names:
+            if full_name.split(glue)[-1] == suffix:
+                return getattr(sensor, full_name, None)
+        return None
+
+    def _redraw_frustum(self) -> None:
+        """Draw the field-of-view frustum of a camera sensor.
+
+        The frustum (a truncated pyramid) is directed along the positive X
+        axis of the parent link/joint (the direction the camera looks at),
+        following Gazebo's camera convention: X points forward, Y points
+        left (image width) and Z points up (image height).
+        Its near face is at the `clip.near` distance (the start of the
+        camera visibility) and its far face is at the `clip.far` distance.
+        The shape depends on the camera parameters of the sensor data
+        (horizontal_fov, image size, clip near and far distances).
+        """
+        import math
+
+        from pivy import coin
+
+        from ..coin_utils import transform_from_placement
+
+        view_object = self._get_view_object()
+        obj = self._get_sensor()
+        if view_object is None or obj is None:
+            return
+        if not self._init_display_mode(view_object):
+            # The display-mode node is not available yet (e.g. the hooks
+            # were called before `attach()`); do not draw into `RootNode`
+            # because that would not be hidden by FreeCAD on the standard
+            # visibility toggle.
+            return
+
+        # Draw the frustum into the registered display-mode node: FreeCAD
+        # toggles that node through the display-mode switch on the standard
+        # visibility change, so the Space key hides/shows the frustum in both
+        # directions without depending on this redraw (same pattern as
+        # `_ViewProviderPlanningScene`).
+        frustum = self._frustum
+        frustum.removeAllChildren()
+
+        if not getattr(view_object, 'Visibility', True):
+            # FreeCAD toggles the display-mode switch on the standard
+            # visibility change, but keep the python-side redraw symmetric
+            # for the cases where FreeCAD only changes the `Visibility`
+            # property and expects the proxy to react.
+            return
+        if not self._is_camera_sensor():
+            # Sensors without a field of view have no frustum visualization.
+            return
+
+        # Camera parameters from the sensor data.
+        # `horizontal_fov` is in radians (as in SDF),
+        # `near`/`far` are in meters, so convert them to FreeCAD units (mm).
+        hfov = self._get_sensor_param('horizontal_fov')
+        width = self._get_sensor_param('width')
+        height = self._get_sensor_param('height')
+        near = self._get_sensor_param('near')
+        far = self._get_sensor_param('far')
+
+        if hfov is None or far is None:
+            return
+        hfov = float(hfov)
+        far_mm = float(far) * 1000.0
+        near_mm = float(near) * 1000.0 if near is not None else 0.0
+        # The near clip distance is the start of the visibility, it must be
+        # less than the far one.
+        near_mm = min(max(near_mm, 0.0), far_mm * 0.999)
+        if hfov <= 0.0 or hfov >= math.pi or far_mm <= 0.0:
+            return
+
+        # Vertical FOV from the image aspect ratio (like Gazebo does),
+        # fall back to the square image if the image size is unknown.
+        if width and height:
+            aspect_ratio = float(height) / float(width)
+        else:
+            aspect_ratio = 1.0
+        vfov = 2.0 * math.atan(math.tan(hfov / 2.0) * aspect_ratio)
+
+        # Vertices of the truncated pyramid (frustum) along +X:
+        # the first 4 points are the near face (the start of the camera
+        # visibility), the last 4 are the far face.
+        # Gazebo's camera convention is respected relative to the parent
+        # joint/link: X points forward, Y points left (image width) and
+        # Z points up (image height).
+        near_half_width = near_mm * math.tan(hfov / 2.0)
+        near_half_height = near_mm * math.tan(vfov / 2.0)
+        far_half_width = far_mm * math.tan(hfov / 2.0)
+        far_half_height = far_mm * math.tan(vfov / 2.0)
+        vertices = [
+            (near_mm,  near_half_width,  near_half_height),
+            (near_mm,  near_half_width, -near_half_height),
+            (near_mm, -near_half_width, -near_half_height),
+            (near_mm, -near_half_width,  near_half_height),
+            (far_mm,  far_half_width,  far_half_height),  # Far face.
+            (far_mm,  far_half_width, -far_half_height),
+            (far_mm, -far_half_width, -far_half_height),
+            (far_mm, -far_half_width,  far_half_height),
+        ]
+
+        indices = [
+            [0, 1, 5, 4, -1],  # The 4 side faces.
+            [1, 2, 6, 5, -1],
+            [2, 3, 7, 6, -1],
+            [3, 0, 4, 7, -1],
+            [0, 1, 2, 3, -1],  # Near face (the start of the visibility).
+            [4, 5, 6, 7, -1],  # Far face.
+        ]
+
+        sep = coin.SoSeparator()
+
+        # Add a material node.
+        # Implementation note: getattr with defaults is used because
+        # `onChanged` can be called before the display properties are added.
+        material = coin.SoMaterial()
+        material.diffuseColor = getattr(
+            self.view_object, 'FrustumColor', (0.0, 1.0, 0.0),
+        )[:3]
+        material.transparency = getattr(
+            self.view_object, 'FrustumTransparency', 80,
+        ) / 100.0
+        sep.addChild(material)
+
+        # Add a transform node.
+        # The sensor itself has no meaningful own placement, so it is
+        # computed from the parent link/joint (see get_sensor_placement).
+        sep.addChild(transform_from_placement(get_sensor_placement(obj)))
+
+        coord = coin.SoCoordinate3()
+        coord.point.setValues(0, len(vertices), vertices)
+
+        face_set = coin.SoIndexedFaceSet()
+        face_set.coordIndex.setValues(
+            0,
+            sum(len(face) for face in indices),
+            [i for face in indices for i in face],
+        )
+
+        sep.addChild(coord)
+        sep.addChild(face_set)
+        frustum.addChild(sep)
 
     def updateData(self, obj: CrossSensor, prop: str):
+        # Redraw when a camera parameter that defines the frustum shape
+        # has changed or when the sensor placement (parent link/joint pose)
+        # has been updated.
+        if (prop == 'Placement'
+                or prop.split(wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE)[-1]
+                in self._frustum_param_suffixes):
+            self._redraw_frustum()
         return
 
     def onChanged(self, vobj: VPDO, prop: str):
-        sensor: CrossSensor = vobj.Object
+        # Redraw on display option and visibility changes. The frustum is
+        # drawn into a display mode node whose visibility is managed by
+        # FreeCAD itself, so the redraw only (re)creates the content;
+        # `_redraw_frustum()` clears the node when the sensor is hidden.
+        # Note: this hook must never modify properties of `vobj` (a nested
+        # property modification during the notification breaks the
+        # visibility handling in FreeCAD, e.g. the eye icon in the tree
+        # does not update).
+        if prop in ('Visibility', 'FrustumColor', 'FrustumTransparency'):
+            try:
+                self._redraw_frustum()
+            except Exception:
+                pass
+
+    def visibilityChanged(self, vobj: VPDO, visible: bool) -> None:
+        """Called by FreeCAD when the standard visibility changes.
+
+        The frustum is drawn into a display mode node whose visibility is
+        managed by FreeCAD itself (see `_init_display_mode`), so no action
+        is needed here to hide or show it with the Space key. A redraw is
+        only needed to (re)create the content after the object has been
+        restored.
+        """
+        try:
+            self._redraw_frustum()
+        except Exception:
+            pass
 
     def setupContextMenu(self, vobj: VPDO, menu: QMenu) -> None:
         return
