@@ -896,6 +896,54 @@ class _ViewProviderLink(ProxyBase):
     def attach(self, vobj: VPDO):
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(vobj)
+        self._init_display_mode(vobj)
+
+    def _init_display_mode(self, vobj: VPDO) -> bool:
+        """Create the display-mode node and register it.
+
+        Return True when the display-mode node exists and is ready to be
+        used.
+
+        The node is registered with `vobj.addDisplayMode()` so that the
+        standard `Visibility` property is applied by FreeCAD through the
+        display-mode switch on the standard visibility toggle (same
+        mechanism as for the joint markers and the sensor frustum). This is
+        what makes the Space key drive the hide/show in both directions;
+        the actual parts are the children of the link, which are hidden by
+        the visibility propagation (`_propagate_visibility_to_children`).
+        """
+        parts = getattr(self, '_parts', None)
+        if (parts is not None
+                and getattr(self, '_parts_view_object', None) is vobj):
+            return True
+        if (vobj is None) or not hasattr(vobj, 'addDisplayMode'):
+            return False
+        from pivy import coin
+
+        try:
+            parts = coin.SoSeparator()
+            parts.setName('Parts')
+            vobj.addDisplayMode(parts, 'Parts')
+        except Exception:
+            # `addDisplayMode` is only possible once the view provider is
+            # attached; wait for `attach()` to run.
+            self._parts = None
+            return False
+        self._parts = parts
+        self._parts_view_object = vobj
+        return True
+
+    def getDisplayModes(self, vobj: VPDO) -> list[str]:
+        """Return the available display modes."""
+        return ['Parts']
+
+    def getDefaultDisplayMode(self) -> str:
+        """Return the name of the default display mode."""
+        return 'Parts'
+
+    def setDisplayMode(self, mode: str) -> str:
+        """Accept the display mode requested by FreeCAD."""
+        return mode
 
     def _init_extensions(self, vobj: VPDO):
         vobj.addExtension('Gui::ViewProviderGroupExtensionPython')
@@ -929,8 +977,33 @@ class _ViewProviderLink(ProxyBase):
         if prop in ['ShowReal', 'ShowVisual', 'ShowCollision']:
             vobj.Object.Proxy.update_fc_links()
         if prop == 'Visibility':
-            for o in vobj.Object.Group:
-                o.ViewObject.Visibility = vobj.Visibility
+            self._propagate_visibility_to_children(vobj)
+
+    def visibilityChanged(self, vobj: VPDO, visible: bool) -> None:
+        """Called by FreeCAD when the standard visibility changes.
+
+        The link itself draws no own content (its parts are the children),
+        so the standard `Visibility` toggling hides/shows the registered
+        display-mode node of the link. The children of the link
+        (real/visual/collision parts and attached sensors) do not
+        automatically follow the visibility of their parent, so propagate
+        it here to keep the whole subtree hidden/shown symmetrically with
+        the Space key.
+        """
+        try:
+            self._propagate_visibility_to_children(vobj)
+        except Exception:
+            pass
+
+    def _propagate_visibility_to_children(self, vobj: VPDO) -> None:
+        # The group of a link contains the FreeCAD links to the real/visual/
+        # collision parts and the attached sensors; they follow the
+        # visibility of the link. `visibilityChanged` is the fallback for
+        # the cases where FreeCAD does not emit `onChanged('Visibility')`.
+        for o in getattr(vobj.Object, 'Group', []):
+            view_object = getattr(o, 'ViewObject', None)
+            if view_object is not None:
+                view_object.Visibility = vobj.Visibility
 
     def doubleClicked(self, vobj: VPDO):
         gui_doc = vobj.Document

@@ -591,6 +591,55 @@ class _ViewProviderJoint(ProxyBase):
         """Setup the scene sub-graph of the view provider."""
         # `self.__init__()` is not called on document restore, do it manually.
         self.__init__(vobj)
+        self._init_display_mode(vobj)
+        self.draw()
+
+    def _init_display_mode(self, vobj: VP) -> bool:
+        """Create the markers display-mode node and register it.
+
+        Return True when the markers node exists and is ready to be drawn
+        into.
+
+        The markers (joint axes, actuation square/triangle) are registered
+        with `vobj.addDisplayMode()` so that the standard `Visibility`
+        property is applied by FreeCAD to this node through the display-mode
+        switch. This is what makes the Space key hide and show the markers
+        in both directions (content drawn into `RootNode` would not be
+        hidden by FreeCAD on the standard visibility toggle, same issue as
+        for the sensor frustum).
+        """
+        markers = getattr(self, '_markers', None)
+        if (markers is not None
+                and getattr(self, '_markers_view_object', None) is vobj):
+            return True
+        if (vobj is None) or not hasattr(vobj, 'addDisplayMode'):
+            return False
+        from pivy import coin
+
+        try:
+            markers = coin.SoSeparator()
+            markers.setName('Markers')
+            vobj.addDisplayMode(markers, 'Markers')
+        except Exception:
+            # `addDisplayMode` is only possible once the view provider is
+            # attached; do not draw and wait for `attach()` to run.
+            self._markers = None
+            return False
+        self._markers = markers
+        self._markers_view_object = vobj
+        return True
+
+    def getDisplayModes(self, vobj: VP) -> list[str]:
+        """Return the available display modes."""
+        return ['Markers']
+
+    def getDefaultDisplayMode(self) -> str:
+        """Return the name of the default display mode."""
+        return 'Markers'
+
+    def setDisplayMode(self, mode: str) -> str:
+        """Accept the display mode requested by FreeCAD."""
+        return mode
 
     def updateData(
         self,
@@ -610,7 +659,33 @@ class _ViewProviderJoint(ProxyBase):
         if prop in ('ShowAxis', 'AxisLength'):
             self.draw()
         if prop == 'Visibility':
+            # Propagate the visibility to the children (joint sensors) and
+            # (re)draw the markers.
+            self._propagate_visibility_to_children(vobj)
             self.draw()
+
+    def visibilityChanged(self, vobj: VP, visible: bool) -> None:
+        """Called by FreeCAD when the standard visibility changes.
+
+        FreeCAD toggles the display-mode switch of the markers itself on the
+        standard visibility change (see `_init_display_mode`), so the
+        markers are hidden/shown in both directions without this hook. A
+        redraw and a propagation to the children are still performed here so
+        that the subtree follows the visibility symmetrically.
+        """
+        try:
+            self._propagate_visibility_to_children(vobj)
+            self.draw()
+        except Exception:
+            pass
+
+    def _propagate_visibility_to_children(self, vobj: VP) -> None:
+        # The group of a joint contains the attached sensors; they follow
+        # the visibility of the joint.
+        for o in getattr(vobj.Object, 'Group', []):
+            view_object = getattr(o, 'ViewObject', None)
+            if view_object is not None:
+                view_object.Visibility = vobj.Visibility
 
     def draw(self) -> None:
         from .coin_utils import arrow_group
@@ -619,10 +694,16 @@ class _ViewProviderJoint(ProxyBase):
         if not self.is_execute_ready():
             return
         vobj = self.view_object
-        if not hasattr(vobj, 'RootNode'):
+        if not self._init_display_mode(vobj):
+            # The display-mode node is not available yet (e.g. the hooks
+            # were called before `attach()`).
             return
-        root_node = vobj.RootNode
-        root_node.removeAllChildren()
+        # Draw the markers into the registered display-mode node: FreeCAD
+        # toggles that node through the display-mode switch on the standard
+        # visibility change, so the Space key hides/shows the markers in
+        # both directions.
+        markers = self._markers
+        markers.removeAllChildren()
         if not (vobj.Visibility and vobj.AxisLength and vobj.ShowAxis):
             return
         obj = vobj.Object
@@ -644,13 +725,13 @@ class _ViewProviderJoint(ProxyBase):
         p0 = placement.Base
         pz = placement * fc.Vector(0.0, 0.0, length)
         arrow = arrow_group([p0, pz], scale=0.2, color=color)
-        root_node.addChild(arrow)
+        markers.addChild(arrow)
         px = placement * fc.Vector(length / 2.0, 0.0, 0.0)
         arrow = arrow_group([p0, px], scale=0.2, color=(1.0, 0.0, 0.0))
-        root_node.addChild(arrow)
+        markers.addChild(arrow)
         py = placement * fc.Vector(0.0, length / 2.0, 0.0)
         arrow = arrow_group([p0, py], scale=0.2, color=(0.0, 1.0, 0.0))
-        root_node.addChild(arrow)
+        markers.addChild(arrow)
         if obj.Type == 'prismatic':
             placement *= obj.Proxy.get_actuation_placement()
             scale = length * 0.05
@@ -659,7 +740,7 @@ class _ViewProviderJoint(ProxyBase):
             ps2 = placement * fc.Vector(-scale / 2.0, -scale / 2.0, 0.0)
             ps3 = placement * fc.Vector(+scale / 2.0, -scale / 2.0, 0.0)
             square = face_group([ps0, ps1, ps2, ps3], color=color)
-            root_node.addChild(square)
+            markers.addChild(square)
         if obj.Type in ('revolute', 'continuous'):
             placement *= obj.Proxy.get_actuation_placement()
             scale = length * 0.2
@@ -667,7 +748,7 @@ class _ViewProviderJoint(ProxyBase):
             pt1 = placement * fc.Vector(scale, 0.0, 0.0)
             pt2 = placement * fc.Vector(0.0, 0.0, scale / 2.0)
             triangle = face_group([pt0, pt1, pt2], color=color)
-            root_node.addChild(triangle)
+            markers.addChild(triangle)
 
     def doubleClicked(self, vobj):
         gui_doc = vobj.Document
