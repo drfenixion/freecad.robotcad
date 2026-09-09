@@ -143,6 +143,19 @@ class _ViewProviderSensor(ProxyBase):
         'far',
     ]
 
+    # Last parts (suffixes) of lidar sensor parameter full names that
+    # change the shape of the field-of-view visualization. The suffixes are
+    # used only to trigger a redraw on property changes; the actual values
+    # are read with the full path (`_get_sensor_param_path`) because e.g.
+    # `min_angle`/`max_angle` exist both in `scan/horizontal` and
+    # `scan/vertical`.
+    _lidar_param_suffixes = [
+        'min_angle',
+        'max_angle',
+        'min',
+        'max',
+    ]
+
     def __init__(self, vobj: VPDO):
         super().__init__(
             'view_object',
@@ -264,12 +277,20 @@ class _ViewProviderSensor(ProxyBase):
         """Return True if the sensor is a camera (lidar and others excluded)."""
         return 'camera' in self._get_sensor_type()
 
+    def _is_lidar_sensor(self) -> bool:
+        """Return True if the sensor is a lidar (e.g. `gpu_lidar`)."""
+        return 'lidar' in self._get_sensor_type()
+
     def _get_sensor_param(self, suffix: str):
         """Return a sensor parameter value by the last part of its full name.
 
         Full parameter names look like `camera___clip___far` (name parts are
         joined with the full-name glue), so `suffix` is the last part,
         e.g. `far` for `camera___clip___far`.
+
+        Implementation note: use `_get_sensor_param_path()` to read a
+        parameter whose last part is ambiguous (e.g. `min_angle` exists both
+        in `scan/horizontal` and in `scan/vertical` of a lidar).
         """
         glue = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
         sensor = self._get_sensor()
@@ -279,17 +300,38 @@ class _ViewProviderSensor(ProxyBase):
                 return getattr(sensor, full_name, None)
         return None
 
-    def _redraw_frustum(self) -> None:
-        """Draw the field-of-view frustum of a camera sensor.
+    def _get_sensor_param_path(self, parts: list[str]):
+        """Return a sensor parameter value by its full path.
 
-        The frustum (a truncated pyramid) is directed along the positive X
-        axis of the parent link/joint (the direction the camera looks at),
-        following Gazebo's camera convention: X points forward, Y points
-        left (image width) and Z points up (image height).
-        Its near face is at the `clip.near` distance (the start of the
-        camera visibility) and its far face is at the `clip.far` distance.
-        The shape depends on the camera parameters of the sensor data
-        (horizontal_fov, image size, clip near and far distances).
+        Full parameter names look like `camera___clip___far` (name parts are
+        joined with the full-name glue), so `parts` is the list of the full
+        path parts, e.g. `['lidar', 'scan', 'horizontal', 'min_angle']` for
+        `lidar___scan___horizontal___min_angle`.
+
+        The explicit path is required when the last part alone is ambiguous
+        (a lidar has `min_angle`/`max_angle` both in `scan/horizontal` and
+        in `scan/vertical`).
+        """
+        glue = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+        sensor = self._get_sensor()
+        full_name = glue.join(parts)
+        if full_name in getattr(sensor, 'sensor_parameters_fullnames_list', []):
+            return getattr(sensor, full_name, None)
+        return None
+
+    def _redraw_frustum(self) -> None:
+        """Draw the field-of-view visualization of the sensor.
+
+        The shape depends on the sensor type:
+        - a camera gets a frustum (a truncated pyramid) directed along the
+          positive X axis of the parent link/joint (the direction the camera
+          looks at), following Gazebo's camera convention: X points forward,
+          Y points left (image width) and Z points up (image height). Its
+          near face is at the `clip.near` distance and its far face is at
+          the `clip.far` distance;
+        - a lidar gets the volume between the `range.min` and `range.max`
+          shells inside the horizontal/vertical scan angle ranges, in red
+          with 80% transparency (see `_draw_lidar_fov`).
         """
         import math
 
@@ -323,7 +365,12 @@ class _ViewProviderSensor(ProxyBase):
             # property and expects the proxy to react.
             return
         if not self._is_camera_sensor():
-            # Sensors without a field of view have no frustum visualization.
+            if self._is_lidar_sensor():
+                # A lidar FOV is an angular sector between the range min
+                # and range max shells (see `_draw_lidar_fov`); unlike a
+                # camera frustum it is not defined by clip near/far planes.
+                self._draw_lidar_fov(frustum, obj)
+            # Sensors without a field of view have no visualization.
             return
 
         # Camera parameters from the sensor data.
@@ -417,13 +464,170 @@ class _ViewProviderSensor(ProxyBase):
         sep.addChild(face_set)
         frustum.addChild(sep)
 
+    def _draw_lidar_fov(self, frustum, obj) -> None:
+        """Draw the field-of-view visualization of a lidar sensor.
+
+        Unlike a camera, a lidar has no `clip` near/far planes: it measures
+        points between a `range.min` and a `range.max` distance inside the
+        angular sector defined by the `scan` parameters:
+        - `scan/horizontal` (`min_angle`/`max_angle`) is the azimuth,
+          measured around the vertical Z axis from the +X direction;
+        - `scan/vertical` (`min_angle`/`max_angle`) is the elevation above
+          (positive) or below (negative) the horizontal XY plane.
+
+        The sector is drawn between the inner (range min) and the outer
+        (range max) shells in the requested red color with 80% transparency
+        and is placed in the sensor frame like the camera frustum (X
+        forward). It is added to the same registered display-mode node so
+        that the standard visibility toggle (Space key) applies to it too.
+        """
+        import math
+
+        from pivy import coin
+
+        from ..coin_utils import transform_from_placement
+
+        # Lidar parameters are read by their full path (not by the last
+        # part only): a lidar has `min_angle`/`max_angle` both in
+        # `scan/horizontal` and in `scan/vertical`.
+        h_min = self._get_sensor_param_path(
+            ['lidar', 'scan', 'horizontal', 'min_angle'])
+        h_max = self._get_sensor_param_path(
+            ['lidar', 'scan', 'horizontal', 'max_angle'])
+        v_min = self._get_sensor_param_path(
+            ['lidar', 'scan', 'vertical', 'min_angle'])
+        v_max = self._get_sensor_param_path(
+            ['lidar', 'scan', 'vertical', 'max_angle'])
+        range_min = self._get_sensor_param_path(['lidar', 'range', 'min'])
+        range_max = self._get_sensor_param_path(['lidar', 'range', 'max'])
+        if (h_min is None or h_max is None
+                or v_min is None or v_max is None
+                or range_max is None):
+            return
+
+        h_min = float(h_min)
+        h_max = float(h_max)
+        v_min = float(v_min)
+        v_max = float(v_max)
+        # Range min/max are distances in meters (as in SDF), so convert them
+        # to FreeCAD units (mm).
+        range_min_mm = (
+            float(range_min) * 1000.0 if range_min is not None else 0.0)
+        range_max_mm = float(range_max) * 1000.0
+        if (h_max - h_min) <= 1e-9 or (v_max - v_min) <= 1e-9:
+            return
+        if range_max_mm <= 0.0:
+            return
+        range_min_mm = min(max(range_min_mm, 0.0), range_max_mm * 0.999)
+        if range_min_mm <= 0.0:
+            # Degenerate inner shell; keep a tiny radius so that the caps
+            # of the sector stay closed.
+            range_min_mm = range_max_mm * 1e-3
+
+        # Sample the angular spans so that wide fields of view are drawn as
+        # an accurate sector (the four corner rays alone would cut the
+        # azimuth arcs of the lidar).
+        h_count = max(
+            2, int(math.ceil((h_max - h_min) / math.radians(10.0))) + 1)
+        v_count = max(
+            2, int(math.ceil((v_max - v_min) / math.radians(10.0))) + 1)
+        radii = (range_min_mm, range_max_mm)
+
+        def ray(r: float, h_angle: float, v_angle: float):
+            # Lidar ray direction in the sensor frame: X forward, azimuth
+            # around the Z axis (from +X toward +Y) and elevation above the
+            # XY plane (toward +Z).
+            h_cos = math.cos(h_angle)
+            h_sin = math.sin(h_angle)
+            v_cos = math.cos(v_angle)
+            v_sin = math.sin(v_angle)
+            return (r * h_cos * v_cos,
+                    r * h_sin * v_cos,
+                    r * v_sin)
+
+        vertices = []
+        point_index = {}
+
+        def get_point(i: int, j: int, k: int) -> int:
+            key = (i, j, k)
+            index = point_index.get(key)
+            if index is None:
+                h_angle = h_min + (h_max - h_min) * i / (h_count - 1)
+                v_angle = v_min + (v_max - v_min) * j / (v_count - 1)
+                index = len(vertices)
+                point_index[key] = index
+                vertices.append(ray(radii[k], h_angle, v_angle))
+            return index
+
+        indices = []
+
+        def add_quad(a: int, b: int, c: int, d: int) -> None:
+            indices.extend((a, b, c, d, -1))
+
+        # The inner and outer range shells of the sector.
+        for k in (0, 1):
+            for i in range(h_count - 1):
+                for j in range(v_count - 1):
+                    add_quad(
+                        get_point(i, j, k),
+                        get_point(i + 1, j, k),
+                        get_point(i + 1, j + 1, k),
+                        get_point(i, j + 1, k),
+                    )
+        # The top (max elevation) and bottom (min elevation) caps.
+        for j in (v_count - 1, 0):
+            for i in range(h_count - 1):
+                add_quad(
+                    get_point(i, j, 0),
+                    get_point(i + 1, j, 0),
+                    get_point(i + 1, j, 1),
+                    get_point(i, j, 1),
+                )
+        # The side caps at the min and max azimuth.
+        for i in (h_count - 1, 0):
+            for j in range(v_count - 1):
+                add_quad(
+                    get_point(i, j, 0),
+                    get_point(i, j + 1, 0),
+                    get_point(i, j + 1, 1),
+                    get_point(i, j, 1),
+                )
+
+        if not vertices or not indices:
+            return
+
+        sep = coin.SoSeparator()
+
+        # Fixed red color with 80% transparency (the lidar FOV style).
+        material = coin.SoMaterial()
+        material.diffuseColor = (1.0, 0.0, 0.0)
+        material.transparency = 0.8
+        sep.addChild(material)
+
+        # The sensor itself has no meaningful own placement, so it is
+        # computed from the parent link/joint (see get_sensor_placement).
+        sep.addChild(transform_from_placement(get_sensor_placement(obj)))
+
+        coord = coin.SoCoordinate3()
+        coord.point.setValues(0, len(vertices), vertices)
+
+        face_set = coin.SoIndexedFaceSet()
+        face_set.coordIndex.setValues(0, len(indices), indices)
+
+        sep.addChild(coord)
+        sep.addChild(face_set)
+        frustum.addChild(sep)
+
     def updateData(self, obj: CrossSensor, prop: str):
-        # Redraw when a camera parameter that defines the frustum shape
-        # has changed or when the sensor placement (parent link/joint pose)
-        # has been updated.
+        # Redraw when a parameter that defines the shape of the field-of-view
+        # visualization (camera frustum or lidar sector) has changed or when
+        # the sensor placement (parent link/joint pose) has been updated.
+        prop_last_part = prop.split(
+            wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE,
+        )[-1]
         if (prop == 'Placement'
-                or prop.split(wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE)[-1]
-                in self._frustum_param_suffixes):
+                or prop_last_part in self._frustum_param_suffixes
+                or prop_last_part in self._lidar_param_suffixes):
             self._redraw_frustum()
         return
 
