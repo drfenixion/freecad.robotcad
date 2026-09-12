@@ -578,6 +578,17 @@ class RobotProxy(ProxyBase):
             links: list[str] = []
             for link in self.get_links():
                 link_name = ros_name(link)
+
+                # Fix 1
+                all_links = self.get_links()
+
+                print(
+                    '[DEBUG links]',
+                    'count=', len(all_links),
+                    'names=', [ros_name(link) for link in all_links],
+                )
+                # Fix 1
+
                 if ((joint.Child in [link_name])
                     or (
                         hasattr(link, 'Proxy')
