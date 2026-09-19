@@ -1,0 +1,28 @@
+{
+	"mcpServers": {
+		"robotcad": {
+			"type": "streamable-http",
+			"url": "http://127.0.0.1:8006/mcp",
+			"disabled": false,
+			"alwaysAllow": [
+				"list_scene_objects",
+				"set_object_placement",
+				"get_object_info",
+				"get_snapshot",
+				"instructions_to_work_with_tools",
+				"create_robot",
+				"create_links_filled",
+				"create_joint",
+				"set_placement_vision_mode",
+				"create_lcs",
+				"rotate_object",
+				"set_placement_between",
+				"create_collision",
+				"create_link",
+				"set_material",
+				"calculate_mass_and_inertia",
+				"create_joints_filled"
+			]
+		}
+	}
+}

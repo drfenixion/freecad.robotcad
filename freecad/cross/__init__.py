@@ -1,10 +1,6 @@
 """Entry point of the RobotCAD workbench."""
 
-import importlib
-from pathlib import Path
-import subprocess
 import os
-import sys
 
 try:
     # For v0.21:
@@ -13,57 +9,12 @@ except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.22/v1.0:
     from freecad.utils import get_python_exe
 
-def add_packages_path():
-    # dynamically add module to sys.path
-    major = sys.version_info.major
-    minor = sys.version_info.minor
-    pythonPackagesPath = f'~/.local/share/FreeCAD/AdditionalPythonPackages/py{major}{minor}'
-    path = Path(pythonPackagesPath).expanduser().absolute()
-    if not os.path.exists(path):
-        os.makedirs(path)    
-    if path.exists() and (str(path) not in sys.path):
-        sys.path.append(str(path))
-
-    return path
+# Shared pip-install helpers. Defined in a pure-Python module (no FreeCAD
+# import at module level) so that the standalone stdio MCP bridge can reuse
+# them without triggering this heavy workbench initialization.
+from .packages import add_packages_path, check_install_package, pip_install
 
 add_packages_path()
-
-def pip_install(pkg_name):
-    '''Python package installer for AppImage builds. It installs python module inside AppImage'''
-    # should be in __init__.py to eliminate cyrcle dependencies of installed modules
-
-    import site
-    pythonPackagesPath = add_packages_path()
-
-    python_exe = get_python_exe()
-    print('python_exe: ', python_exe)
-
-    p = subprocess.Popen(
-        [python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--target", pythonPackagesPath, pkg_name],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-    )
-
-    for line in iter(p.stdout.readline, b''):
-        if line:
-            print(line.decode("utf-8"), end="")
-    print()
-
-    for err in iter(p.stderr.readline, b''):
-        if err:
-            print(err.decode("utf-8"), end="")
-    print()
-
-    p.stdout.close()
-    p.stderr.close()
-    p.wait(timeout=180)
-
-def check_install_package(packages_import_name, package_name = None):
-    add_packages_path()
-    if importlib.util.find_spec(packages_import_name) is None:
-        if package_name is None:
-            pip_install(packages_import_name)
-        else:   
-            pip_install(package_name)
 
 # Initialize debug with debugpy.
 if os.environ.get('DEBUG'):
@@ -111,6 +62,13 @@ check_install_package('xmltodict')
 check_install_package('collada', 'pycollada')
 check_install_package('PyQt5')
 check_install_package('lxml')
+
+# MCP (Model Context Protocol) server for external LLM agents.
+# The `mcp` package is intentionally NOT installed here (at workbench start):
+# it is installed lazily, on the first use of the MCP tools (server start).
+# See `freecad/cross/mcp/server.py` -> `_ensure_mcp_packages()`.
+# Note: the code targets mcp 2.x (MCPServer). If a 1.x version is already
+# installed, upgrade it: pip install -U mcp
 
 # Must be imported after the call to `add_ros_library_path`.
 from freecad.cross.freecad_utils import warn

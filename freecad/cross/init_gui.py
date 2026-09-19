@@ -55,6 +55,7 @@ from .ui import command_world_generator # noqa: F401
 from .ui import command_transfer_project_to_external_code_generator # noqa: F401
 from .ui import command_wb_settings # noqa: F401
 from .ui import command_generate_robot_by_text  # noqa: F401
+from .ui import command_mcp_agent  # noqa: F401
 from .ui import command_about  # noqa: F401
 
 #CROSS sensors
@@ -137,6 +138,7 @@ class CrossWorkbench(fcgui.Workbench):
             'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
             'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
+            'MCPAgent',  # Defined in ./ui/command_mcp_agent.py.
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
             # 'Reload',  # Developer tool, hidden from toolbar.
         ]
@@ -216,6 +218,9 @@ class CrossWorkbench(fcgui.Workbench):
             'Separator',
             # Workbench settings.
             'WbSettings',  # Defined in ./ui/command_wb_settings.py.
+            'Separator',
+            # MCP agent.
+            'MCPAgent',  # Defined in ./ui/command_mcp_agent.py.
             'Separator',
             # About.
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.

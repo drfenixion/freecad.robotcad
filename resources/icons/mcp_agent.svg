@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- MCP Agent icon: robot head with network/plug motif -->
+  <g>
+    <!-- Robot head -->
+    <rect x="14" y="10" width="36" height="28" rx="5" fill="rgb(216, 216, 216)" stroke="rgb(0, 0, 0)" stroke-width="1.5"/>
+    <!-- Antenna -->
+    <line x1="32" y1="10" x2="32" y2="3" stroke="rgb(0, 0, 0)" stroke-width="1.5"/>
+    <circle cx="32" cy="3" r="2.5" fill="#66bb6a" stroke="rgb(0, 0, 0)" stroke-width="1"/>
+    <!-- Eyes -->
+    <circle cx="24" cy="22" r="3" fill="#42a5f5" stroke="rgb(0, 0, 0)" stroke-width="1"/>
+    <circle cx="40" cy="22" r="3" fill="#42a5f5" stroke="rgb(0, 0, 0)" stroke-width="1"/>
+    <!-- Mouth / grid -->
+    <rect x="24" y="30" width="16" height="3" rx="1.5" fill="rgb(0, 0, 0)"/>
+    <!-- Body -->
+    <rect x="18" y="42" width="28" height="12" rx="3" fill="rgb(216, 216, 216)" stroke="rgb(0, 0, 0)" stroke-width="1.5"/>
+    <!-- Connection plug to the right -->
+    <rect x="46" y="46" width="10" height="4" rx="1" fill="#66bb6a" stroke="rgb(0, 0, 0)" stroke-width="1"/>
+    <rect x="54" y="44" width="4" height="8" rx="1" fill="#66bb6a" stroke="rgb(0, 0, 0)" stroke-width="1"/>
+    <!-- Signal arcs (agent connection) -->
+    <path d="M 12 8 A 4 4 0 0 1 12 2" fill="none" stroke="#42a5f5" stroke-width="1.5"/>
+    <path d="M 8 10 A 7 7 0 0 1 8 -2" fill="none" stroke="#42a5f5" stroke-width="1.5" opacity="0.6"/>
+  </g>
+</svg>
