@@ -66,7 +66,6 @@ Video of creating controllable models: <br />
         1. Multicopter - PX4 or Sverk (PX4 based) + Gazebo + ROS2, all required code for your custom model and dependencies.
         1. Nvidia video cards container support
         1. README instruction how to use
-1. all features from CROSS workbench
 
 # Here various installation options (choose one):
 Recomended FreeCAD version is 1.1.* AppImage. FreeCAD 1.2.*dev also can be used.
