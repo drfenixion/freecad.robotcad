@@ -1,3 +1,29 @@
+# RobotCAD — Release v12.9.0
+
+**Date:** 2026-09-19
+
+## New features
+
+- Added a **built-in MCP server (Model Context Protocol)** that lets an external LLM agent (for example, Roo, Cline or Continue in VS Code, or Claude Desktop) control the RobotCAD document: create robots, links, joints and collisions, position and rotate objects, set materials, compute mass and inertia, select objects and take 3D view snapshots.
+  - **Streamable HTTP transport**: the server runs inside the FreeCAD process in a background thread at `http://127.0.0.1:8006/mcp`, started/stopped from the new **MCP Agent** toolbar button dialog (**Start server**).
+  - **stdio transport**: a bridge process [`freecad/cross/mcp/stdio_server.py`](freecad/cross/mcp/stdio_server.py) that connects to the FreeCAD HTTP server and re-exposes the same tools over stdio (for agents that do not support the HTTP transport).
+  - **Copy config buttons** in the MCP Agent dialog: **Copy HTTP config** and **Copy stdio config** paste ready-to-use snippets into the agent's MCP settings.
+  - 20+ registered tools covering the full robot-building workflow (creation, positioning via `set_placement_between` contact-zone snapping, rotation, LCS, collisions, materials, mass/inertia, joint values, inspection, snapshots). See the tool reference in [`docs/mcp_agent.md`](docs/mcp_agent.md).
+  - A workflow guide for the agent (general algorithm, positioning, joints, collisions, materials, inspection, best practices) is exposed via the `instructions_to_work_with_tools` tool.
+
+## Improvements
+
+- **Refactored dependency installation** ([`freecad/cross/packages.py`](freecad/cross/packages.py)): Python packages required by the workbench (including the `mcp` package for the MCP server) are installed into ~/.local/share/FreeCAD/AdditionalPythonPackages in a unified way.
+
+---
+
+### Commits
+
+- `e7421b8` — Add MCP server. Refactor dependies installation.
+- `56d031b` — bump version
+
+---
+
 # RobotCAD — Release v12.8.0
 
 **Date:** 2026-09-09
