@@ -1,3 +1,22 @@
+# RobotCAD — Release v12.9.1
+
+**Date:** 2026-09-24
+
+## Fixes
+
+- Fixed the **orientation of the field-of-view visualization of sensors** (camera frustum and lidar sector): the visualization is now oriented along the **parent joint** of the link the sensor is attached to (X forward, Z up, Y left), not along the link itself, which can be rotated arbitrarily relative to the joint (e.g. by `MountedPlacement`). The parent joint frame is recovered from the link's own properties (`link.Placement * link.MountedPlacement.inverse()`), so the correct orientation is also shown right after loading a document, without depending on the robot structure being fully restored.
+
+---
+
+### Commits
+
+- `22a2217` — fix placement of sensor visualization of field of view
+- `aaf2b2b` — fix Set placement - sensor tool description
+- `752d166` — fix sensor visualization field of view after file loaded
+- `dad705b` — bump version
+
+---
+
 # RobotCAD — Release v12.9.0
 
 **Date:** 2026-09-19
