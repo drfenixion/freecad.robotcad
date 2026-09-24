@@ -141,7 +141,25 @@ def get_sensor_placement(sensor: CrossSensor) -> fc.Placement:
             # the orientation of the parent joint (the joint the link is
             # the child of), because the sensor frame convention (X
             # forward, Z up, Y left) is defined by the joint frame.
+            #
+            # The parent joint frame (after actuation) is recovered from
+            # the link's own properties: `link.Placement` is set to
+            # `joint_frame * link.MountedPlacement` (see
+            # RobotProxy.compute_poses), so
+            # `joint_frame = link.Placement * link.MountedPlacement.inverse()`.
+            # This is robust at document restore because it depends only
+            # on the link's own properties, not on the robot structure
+            # (which may not be fully restored yet).
             link_placement = _get_global_placement(parent)
+            mounted = getattr(parent, 'MountedPlacement', None)
+            if mounted is not None:
+                joint_frame = link_placement * mounted.inverse()
+                return fc.Placement(
+                    link_placement.Base,
+                    joint_frame.Rotation,
+                )
+            # Fallback for links without MountedPlacement: the parent
+            # joint (may be None at document restore).
             joint = None
             if hasattr(parent, 'Proxy') and hasattr(parent.Proxy, 'get_ref_joint'):
                 joint = parent.Proxy.get_ref_joint()
