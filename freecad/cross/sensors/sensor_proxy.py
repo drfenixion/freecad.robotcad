@@ -31,6 +31,7 @@ from ..wb_utils import SDFORMAT_PATH
 from ..wb_utils import MODULES_PATH
 from ..wb_utils import is_joint
 from ..wb_utils import is_link
+from ..wb_utils import is_robot
 from ..wb_utils import is_sensor
 from ..wb_utils import return_true
 from ..wb_utils import ros_name
@@ -108,6 +109,13 @@ class SensorProxy(ProxyBase):
         pass
 
 
+def _get_global_placement(obj) -> fc.Placement:
+    """Return the global placement of a link or joint."""
+    if hasattr(obj, 'getGlobalPlacement'):
+        return obj.getGlobalPlacement()
+    return obj.Placement
+
+
 def get_sensor_placement(sensor: CrossSensor) -> fc.Placement:
     """Return the placement of a sensor in the global frame.
 
@@ -115,16 +123,37 @@ def get_sensor_placement(sensor: CrossSensor) -> fc.Placement:
     so the placement is taken from that parent element.
     Fallbacks: the robot placement, then the identity.
 
+    The orientation of the field-of-view visualization is based on the
+    parent joint of the link the sensor is attached to (X forward, Z up,
+    Y left), not on the link itself: the link frame can be rotated
+    arbitrarily relative to the joint (e.g. by `MountedPlacement`), while
+    the sensor frame convention follows the joint frame. A sensor attached
+    directly to a joint uses the joint frame as-is.
+
     Implementation note: a module-level function is used (instead of a
     proxy method) because the proxy can be restored without its
     attributes (e.g. on document restore) while `sensor` is always
     available from the view provider.
     """
     for parent in getattr(sensor, 'InList', []):
-        if is_link(parent) or is_joint(parent):
-            if hasattr(parent, 'getGlobalPlacement'):
-                return parent.getGlobalPlacement()
-            return parent.Placement
+        if is_link(parent):
+            # The sensor is attached to a link: use the link position but
+            # the orientation of the parent joint (the joint the link is
+            # the child of), because the sensor frame convention (X
+            # forward, Z up, Y left) is defined by the joint frame.
+            link_placement = _get_global_placement(parent)
+            joint = None
+            if hasattr(parent, 'Proxy') and hasattr(parent.Proxy, 'get_ref_joint'):
+                joint = parent.Proxy.get_ref_joint()
+            if joint is not None:
+                joint_placement = _get_global_placement(joint)
+                return fc.Placement(
+                    link_placement.Base,
+                    joint_placement.Rotation,
+                )
+            return link_placement
+        if is_joint(parent):
+            return _get_global_placement(parent)
         if is_robot(parent) and hasattr(parent, 'Placement'):
             return parent.Placement
     return fc.Placement()
@@ -324,14 +353,19 @@ class _ViewProviderSensor(ProxyBase):
 
         The shape depends on the sensor type:
         - a camera gets a frustum (a truncated pyramid) directed along the
-          positive X axis of the parent link/joint (the direction the camera
-          looks at), following Gazebo's camera convention: X points forward,
-          Y points left (image width) and Z points up (image height). Its
-          near face is at the `clip.near` distance and its far face is at
-          the `clip.far` distance;
+          positive X axis of the parent joint of the link the sensor is
+          attached to (the direction the camera looks at), following
+          Gazebo's camera convention: X points forward, Y points left
+          (image width) and Z points up (image height). Its near face is at
+          the `clip.near` distance and its far face is at the `clip.far`
+          distance;
         - a lidar gets the volume between the `range.min` and `range.max`
           shells inside the horizontal/vertical scan angle ranges, in red
           with 80% transparency (see `_draw_lidar_fov`).
+
+        The orientation of the visualization is based on the parent joint
+        of the link the sensor is attached to (X forward, Z up, Y left),
+        not on the link itself (see `get_sensor_placement`).
         """
         import math
 
@@ -478,8 +512,11 @@ class _ViewProviderSensor(ProxyBase):
         The sector is drawn between the inner (range min) and the outer
         (range max) shells in the requested red color with 80% transparency
         and is placed in the sensor frame like the camera frustum (X
-        forward). It is added to the same registered display-mode node so
-        that the standard visibility toggle (Space key) applies to it too.
+        forward). The orientation is based on the parent joint of the link
+        the sensor is attached to (X forward, Z up, Y left), not on the
+        link itself (see `get_sensor_placement`). It is added to the same
+        registered display-mode node so that the standard visibility toggle
+        (Space key) applies to it too.
         """
         import math
 
