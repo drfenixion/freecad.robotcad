@@ -1,3 +1,20 @@
+# RobotCAD — Release v12.9.2
+
+**Date:** 2026-09-25
+
+## Fixes
+
+- Fixed the **probability of `Real`, `Visual`, and `Collision` links appearing at the root of the construction tree**: when the group of a `Cross::Link` is reset in `update_fc_links()`, objects that are no longer part of the new group are now removed from the document. Removal is safe if the object was already deleted (e.g. old FreeCAD links removed earlier in the same method), no error is raised in that case.
+
+---
+
+### Commits
+
+- `7eeed89` — fix probability of Real, Visual, and Collision links appearing at the root of the construction tree.
+- `4e5ba06` — bump version
+
+---
+
 # RobotCAD — Release v12.9.1
 
 **Date:** 2026-09-24
