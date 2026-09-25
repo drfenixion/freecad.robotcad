@@ -738,7 +738,18 @@ class LinkProxy(ProxyBase):
             + self.get_vacuum_grippers()
         )
         if new_group != link.Group:
+            old_group = list(link.Group)
             link.Group = new_group
+            # Remove objects that are not part of the new group anymore.
+            # They may already be deleted (e.g. the old FreeCAD links removed
+            # above), in which case no error must be raised.
+            for o in old_group:
+                if o in new_group:
+                    continue
+                try:
+                    doc.removeObject(o.Name)
+                except (ReferenceError, AttributeError, TypeError):
+                    pass
 
 
     def export_urdf(
