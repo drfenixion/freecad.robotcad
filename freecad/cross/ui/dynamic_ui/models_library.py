@@ -65,13 +65,12 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 #QtWidgets.QLabel()
                 vendor = re.sub(r"face\Sook", '', vendor, flags=re.IGNORECASE)
                 package_label = name.replace('_description', '').capitalize() + ' ' + vendor.capitalize()
-                setattr(desc, 'package_label', package_label)
-                setattr(desc, 'show', True)
+                package = {'desc': desc, 'package_label': package_label}
                 for tag in desc.tags:
                     if tag in self.packages_grouped_by_tags:
-                        self.packages_grouped_by_tags[tag]['packages'].append(desc)
+                        self.packages_grouped_by_tags[tag]['packages'].append(package)
                     else:
-                        self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[desc]}
+                        self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[package]}
 
 
         self.display_filter_block()
@@ -175,7 +174,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
             for package in tag['packages']:
                 if tag['show']:
                     radio_button = QtWidgets.QRadioButton(
-                        package.package_label,
+                        package['package_label'],
                     )
                     self.radio_buttons.append(radio_button)
                     self.button_group.addButton(radio_button)
