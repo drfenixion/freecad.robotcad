@@ -56,7 +56,7 @@ check_install_package('urdf_parser_py')
 # # Looks like Xacro pip ver is updated. Persist warning comment for some time. 
 # Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
 check_install_package('xacro')
-
+check_install_package('xacrodoc') # model library import use it
 check_install_package('ament_index_python', 'ros-ament-index-python')
 check_install_package('xmltodict')
 check_install_package('collada', 'pycollada')

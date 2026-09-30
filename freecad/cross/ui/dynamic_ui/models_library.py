@@ -286,7 +286,33 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 for attr_name in dir(module):
                     if attr_name.startswith("URDF_PATH"):
                         attr_value = getattr(module, attr_name)
-                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = attr_value
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': False,
+                            'xacro_args': None,
+                        }
+                    elif attr_name.startswith("XACRO_PATH"):
+                        attr_value = getattr(module, attr_name)
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': True,
+                            'xacro_args': None,
+                        }
+
+                # Add variants for additional XACRO_ARGS_* argument sets
+                # (e.g. XACRO_ARGS_NO_HAND, XACRO_ARGS_LEFT_ARM)
+                if hasattr(module, "XACRO_PATH"):
+                    for attr_name in dir(module):
+                        if attr_name.startswith("XACRO_ARGS") and attr_name != "XACRO_ARGS":
+                            xacro_args = getattr(module, attr_name)
+                            if isinstance(xacro_args, dict):
+                                variant_suffix = attr_name[len("XACRO_ARGS"):].strip('_').replace('_', ' ')
+                                variant_label = f"XACRO_PATH ({Path(module.XACRO_PATH).name}) [{variant_suffix}]"
+                                variants[variant_label] = {
+                                    'path': module.XACRO_PATH,
+                                    'is_xacro': True,
+                                    'xacro_args': xacro_args,
+                                }
 
                 dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
                 dialog.setModal(True)
@@ -322,7 +348,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.radio_button_group.setExclusive(True)
 
         first = True
-        for name, path in self.variants.items():
+        for name, variant in self.variants.items():
             radio_button = QtWidgets.QRadioButton(name)
             if first:
                 radio_button.setChecked(True)
@@ -379,9 +405,18 @@ class LoadURDFDialog(QtWidgets.QDialog):
 
         # Create model
         if selected_variant:
+            urdf_path = selected_variant['path']
+            if selected_variant['is_xacro']:
+                # Convert xacro to URDF using robot_descriptions._xacro
+                # (which uses xacrodoc) and process it by the URDF scenario.
+                from robot_descriptions._xacro import get_urdf_path as get_urdf_path_from_xacro
+                urdf_path = get_urdf_path_from_xacro(
+                    self.module,
+                    xacro_args=selected_variant['xacro_args'],
+                )
             robot_from_urdf_path(
                 fc.activeDocument(),
-                selected_variant,
+                urdf_path,
                 self.module.PACKAGE_PATH,
                 self.module.REPOSITORY_PATH,
                 create_without_solids=self.create_without_solids,
