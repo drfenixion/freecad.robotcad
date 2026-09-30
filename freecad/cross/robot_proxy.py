@@ -271,6 +271,13 @@ class RobotProxy(ProxyBase):
         self._controllers: Optional[list[CrossController]] = None
         self._broadcasters: Optional[list[CrossController]] = None
 
+        # When True, `onChanged` does not run the expensive `execute()` on
+        # every `Group` change. Used during bulk creation (e.g. URDF import)
+        # to avoid the O(N^2) behavior of recomputing all joints/poses after
+        # each single object addition. The caller must run `execute()` once
+        # after all objects have been added.
+        self._suppress_execute: bool = False
+
         self._init_properties(obj)
 
     @property
@@ -388,6 +395,20 @@ class RobotProxy(ProxyBase):
         self.compute_poses()
         # self.reset_group()
 
+    def set_batch_mode(self, batch: bool) -> None:
+        """Enable or disable batch mode.
+
+        In batch mode, `onChanged` does not run the expensive `execute()`
+        after each `Group` change. This is used during bulk creation (e.g.
+        URDF import) to avoid the O(N^2) behavior of recomputing all joints
+        and poses after every single object addition. When disabling batch
+        mode, `execute()` is run once to bring the robot up to date.
+
+        """
+        self._suppress_execute = batch
+        if not batch:
+            self.execute(self.robot)
+
     def onChanged(self, obj: CrossRobot, prop: str) -> None:
         # print(f'{obj.Name}.onChanged({prop})') # DEBUG
         if not self.is_execute_ready():
@@ -399,7 +420,8 @@ class RobotProxy(ProxyBase):
             self._joints = None
             self._controllers = None
             self._broadcasters = None
-            self.execute(obj)
+            if not self._suppress_execute:
+                self.execute(obj)
         if prop == 'OutputPath':
             rel_path = remove_ros_workspace(obj.OutputPath)
             if rel_path != obj.OutputPath:
@@ -561,6 +583,11 @@ class RobotProxy(ProxyBase):
 
     def set_joint_enum(self) -> None:
         """Set the enum for Child and Parent of all joints."""
+        if self._suppress_execute:
+            # During batch creation (e.g. URDF import) the enums are set
+            # explicitly by the caller and the full recompute is deferred to
+            # `execute()`, which runs once when batch mode is disabled.
+            return
         def get_possible_parent_links(joint: CrossJoint) -> list[str]:
             links: list[str] = []
             for link in self.get_links():
