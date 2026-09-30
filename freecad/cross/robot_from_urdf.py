@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import degrees
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
@@ -19,7 +20,7 @@ except:
     from PySide6 import QtGui, QtCore, QtWidgets
 
 from freecad.cross.freecadgui_utils import get_progress_bar, set_collision_appearance
-from .freecad_utils import add_object
+from .freecad_utils import add_object, message
 from .freecad_utils import make_group
 from .freecad_utils import warn
 from .joint_proxy import make_joint
@@ -108,6 +109,32 @@ def get_urdf_robot_from_urdf_filename(
     return urdf_robot
 
 
+def _log_import_time(
+        start: datetime,
+        end: datetime,
+        source: str,
+) -> None:
+    """Log the model import duration to the Report view (info level).
+
+    Parameters
+    ----------
+    - start: import start time.
+    - end: import end time.
+    - source: description of the import source, e.g. the model name or file.
+
+    """
+    duration = end - start
+    total_seconds = duration.total_seconds()
+    minutes = int(total_seconds // 60)
+    seconds = total_seconds - minutes * 60
+    message(
+        f'[info] Model import "{source}":\n'
+        f'  start: {start.strftime("%H:%M:%S")}\n'
+        f'  end:   {end.strftime("%H:%M:%S")}\n'
+        f'  duration: {minutes} min {seconds:.1f} s\n',
+    )
+
+
 def robot_from_urdf_path(
         doc: fc.Document,
         filename_path,
@@ -116,12 +143,14 @@ def robot_from_urdf_path(
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
 ) -> CrossRobot:
+    start = datetime.now()
     urdf_robot = get_urdf_robot_from_urdf_filename(
         filename_path,
         package_path,
         repository_path,
     )
     robot = robot_from_urdf(doc, urdf_robot, create_without_solids, remove_solid_splitter)
+    _log_import_time(start, datetime.now(), str(filename_path))
 
     return robot
 
@@ -132,12 +161,14 @@ def assembly_from_urdf_path(
         package_path = None,
         repository_path = None,
 ) -> CrossRobot:
+    start = datetime.now()
     urdf_robot = get_urdf_robot_from_urdf_filename(
         filename_path,
         package_path,
         repository_path,
     )
     robot = assembly_from_urdf(doc, urdf_robot)
+    _log_import_time(start, datetime.now(), str(filename_path))
 
     return robot
 
