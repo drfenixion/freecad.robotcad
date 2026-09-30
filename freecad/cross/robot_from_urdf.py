@@ -171,6 +171,18 @@ def get_real_pkg_path(
 
 
 
+def _update_progress(progressBar, i: int, throttle: int = 5) -> None:
+    """Update the progress bar, throttling GUI event processing.
+
+    Calling `processEvents()` after every single object creation is very
+    expensive for models with many links/joints, so it is only done every
+    `throttle` steps.
+    """
+    progressBar.setValue(i)
+    if i % throttle == 0:
+        QtGui.QApplication.processEvents()
+
+
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
@@ -191,8 +203,7 @@ def robot_from_urdf(
     progressBar.show()
 
     i = 0
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 1
 
     robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, urdf_robot.name)
@@ -204,13 +215,17 @@ def robot_from_urdf(
         robot.ViewObject.ShowVisual = False
         robot.ViewObject.ShowCollision = False
 
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    # Defer the expensive `execute()` (joint enums, joint variables, poses)
+    # until all links and joints have been added. Otherwise `onChanged` runs
+    # it after every single `addObject`, which is O(N^2) overall and makes
+    # the import slower and slower as the robot grows.
+    robot.Proxy.set_batch_mode(True)
+
+    _update_progress(progressBar, i)
     i += 1
 
     colors = _get_colors(urdf_robot)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 1
 
     convert_mesh_to_solid = True
@@ -218,8 +233,7 @@ def robot_from_urdf(
         convert_mesh_to_solid = False
 
     for urdf_link in urdf_robot.links:
-        progressBar.setValue(i)
-        QtGui.QApplication.processEvents()
+        _update_progress(progressBar, i)
         i += 1
         ros_link, visual_part, collision_part, real_part = _add_ros_link(
             urdf_link, robot, collision_group, real_group, visual_group,
@@ -254,21 +268,18 @@ def robot_from_urdf(
 
     joint_map: dict[str, CrossJoint] = {}
     for urdf_joint in urdf_robot.joints:
-        progressBar.setValue(i)
-        QtGui.QApplication.processEvents()
+        _update_progress(progressBar, i)
         i += 1
         ros_joint = _add_ros_joint(urdf_joint, robot)
         joint_map[urdf_joint.name] = ros_joint
     # Mimic joints must be handled after creating all joints because the
     # mimicking joint can be defined before the mimicked joint in URDF.
     _define_mimic_joints(urdf_robot, joint_map)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 2
 
     _canonicalize_joint_axis(robot, urdf_robot, joint_map)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 3
 
     # Change the visual properties after having added all links.
@@ -276,13 +287,18 @@ def robot_from_urdf(
         robot.ViewObject.ShowReal = False
         robot.ViewObject.ShowVisual = True
         robot.ViewObject.ShowCollision = False
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 2
 
+    # All links and joints have been added. Run the deferred `execute()`
+    # (joint enums, joint variables, poses) once and re-enable the normal
+    # onChanged behavior.
+    robot.Proxy.set_batch_mode(False)
+    _update_progress(progressBar, i)
+    i += 1
+
     doc.recompute()
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
 
     progressBar.close()
     QtGui.QApplication.processEvents()
@@ -451,6 +467,29 @@ def _set_link_inertial(
         ros_link.Izz = urdf_link.inertial.inertia.izz
 
 
+def _set_joint_enum_lists(
+        ros_joint: CrossJoint,
+        parent: str,
+        child: str,
+) -> None:
+    """Set minimal Parent/Child enum lists so the values can be assigned.
+
+    In batch mode `RobotProxy.set_joint_enum()` is deferred, so the enum
+    lists would be empty when assigning `Parent`/`Child` in `_add_ros_joint`.
+    Setting the lists explicitly (a list assignment sets the enumeration)
+    allows the values to be assigned without triggering the O(N^2) recompute.
+    The full enum lists are set by `set_joint_enum()` when batch mode is
+    disabled.
+
+    """
+    parent_links: list[str] = [''] + ([parent] if parent else [])
+    child_links: list[str] = [''] + ([child] if child else [])
+    if ros_joint.getEnumerationsOfProperty('Parent') != parent_links:
+        ros_joint.Parent = parent_links
+    if ros_joint.getEnumerationsOfProperty('Child') != child_links:
+        ros_joint.Child = child_links
+
+
 def _add_ros_joint(
         urdf_joint: UrdfJoint,
         robot: CrossRobot,
@@ -460,6 +499,7 @@ def _add_ros_joint(
     ros_joint.Label2 = urdf_joint.name
     ros_joint.adjustRelativeLinks(robot)
     robot.addObject(ros_joint)
+    _set_joint_enum_lists(ros_joint, urdf_joint.parent, urdf_joint.child)
     ros_joint.Parent = urdf_joint.parent
     ros_joint.Child = urdf_joint.child
     ros_joint.Type = urdf_joint.type
@@ -527,13 +567,17 @@ def _canonicalize_joint_axis(
         joint_map: dict[str, CrossJoint],
 ) -> None:
     """Make all joints about/around the z axis."""
+    # Build a reverse map once instead of scanning the dict for every joint.
+    ros_joint_to_name = {ros_joint: name for name, ros_joint in joint_map.items()}
     chains = robot.Proxy.get_chains()
     already_compensated_joints: set[CrossJoint] = set()
     for chain in chains:
         ros_joints = get_joints(chain)
         previous_rotation_to_z = fc.Rotation()
         for ros_joint in ros_joints:
-            name = list(joint_map.keys())[list(joint_map.values()).index(ros_joint)]
+            name = ros_joint_to_name.get(ros_joint)
+            if name is None:
+                continue
             urdf_joint = urdf_robot.joint_map[name]
             rotation_to_z = axis_to_z(urdf_joint)
             if ros_joint in already_compensated_joints:
