@@ -665,19 +665,7 @@ def set_placement_between(
     ref2: str,
     move: str = 'leaf',
 ) -> dict[str, Any]:
-    """Position a link/joint by aligning two references — PRIMARY method.
-
-    The default positioning method: snap the contact zones of two
-    neighbouring links. ``ref1``/``ref2``: face/edge/vertex/circle of a link
-    Real element as ``<real_link>.<inner_link_name>.<feature>.<subelement>``
-    (e.g. ``real_l_chassis001_.chassis001.Box.Face3``) or an already existing
-    LCS; a robot link (``l_...``) cannot be a reference. ``<inner_link_name>``
-    is the **Name of the App::Link inside the Real element** (e.g.
-    ``chassis001``, ``wheel001``) — NOT the source body name (e.g.
-    ``chassis``, ``wheel``). One ref on the parent link, one on the child. Do
-    NOT create LCS objects for this — plain subelement references are enough.
-    ``move='leaf'`` (default, only supported) — final chain element only;
-    ``child_branch``/``parent_tree`` are advanced."""
+    """Position a link/joint by snapping the contact zones of two neighbouring links via two subelement references (one on the parent, one on the child)."""
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
