@@ -1477,6 +1477,27 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
     'positioning': """\
 ## Positioning
 
+### Positioning algorithm (step by step)
+
+1. Get information about the parent link and its child links with
+   `get_object_info(...)` (geometry of the Real element: faces, vertices,
+   `center_of_mass`, `normal`, `surface_type`, `bound_box`).
+2. Choose the faces or vertices on which the child link will be placed by their geometry. 
+   Take the robot's link topology into account — it can be understood from the
+   robot's name or from the context (e.g. a 4-wheeled chassis: the parent is
+   the chassis, the children are the four wheels).
+   Remember, if you select a face, the attachment will be anchored to the coordinates of that face's center of mass.
+3. Print a statement naming the parent link, the index of the face/vertex on
+   it, the child link that will be attached to that face/vertex, and the
+   face/vertex of the child link that will be joined to the parent. Format:
+   `parent_robot_link_name face1/vertex1 - child_robot_link_name face1/vertex1`
+4. Perform `set_placement_between` for the parent/child robot link pair.
+5. Correct the direction of the Z axis of the child link's parent joint if
+   required.
+6. If after these actions you see that the child link significantly intersects
+   the parent link, mirror it. The child link usually overlaps the parent link
+   when the Z axis of its joint points towards the parent link.
+
 - `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps
   the contact zones of two neighbouring links by two references (one on the
   parent link, one on the child link): a face/edge/vertex/circle of the link
