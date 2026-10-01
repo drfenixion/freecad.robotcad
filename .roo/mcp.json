@@ -21,7 +21,8 @@
 				"create_joints_filled",
 				"get_object_info",
 				"set_placement_between",
-				"instructions_to_work_with_tools"
+				"instructions_to_work_with_tools",
+				"check_overlap"
 			]
 		}
 	}

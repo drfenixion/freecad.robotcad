@@ -162,9 +162,12 @@ mirror it at all. Use this for wheels on one side, or generally to place
 symmetric links on opposite sides of a parent kinematic chain.
 
 > **MANDATORY OVERLAP CHECK — HARD GATE, NEVER SKIP, DO IT FOR EVERY CHILD ONE
-> BY ONE, AND PRINT THE NUMBERS.** Run it for EACH child link IMMEDIATELY after
-> positioning it and after EVERY `rotate_object` on its joint — before the next
-> child, before collisions, before materials. Do NOT batch it and do NOT assume
+> BY ONE, AND PRINT THE NUMBERS.** Run it for EACH child link ONLY AFTER its
+> joint has been oriented (for a multi-wheel parent: after ALL wheels' joint
+> local Z axes have been made parallel, pointing left) and after EVERY later
+> `rotate_object` on that joint — before collisions, before materials. The
+> orientation changes the child's global ranges, so a check done before it is
+> meaningless. Do NOT batch it and do NOT assume
 > that because one child is fine the others are too: symmetric children on
 > opposite corners of the same parent commonly end up on OPPOSITE sides of the
 > parent's body — some outside (correct), some inside (overlapping, wrong).

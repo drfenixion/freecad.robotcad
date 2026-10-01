@@ -1182,6 +1182,135 @@ def _ancestor_placement(obj: fc.DocumentObject) -> fc.Placement:
     return fc.Placement()
 
 
+#: Linear tolerance (mm) for the overlap check. A shared face (touch) produces
+#: a zero-thickness intersection and must NOT count as an overlap.
+_OVERLAP_LINEAR_TOL = 1e-6
+
+#: Volume tolerance (mm^3). Intersections with a volume below this are
+#: considered a mere touch (shared face/edge/vertex), not a real overlap.
+_OVERLAP_VOLUME_TOL = 1e-6
+
+
+def _placed_shape_and_ranges(
+    obj: fc.DocumentObject,
+) -> tuple[Optional[Any], Optional[dict[str, list[float]]]]:
+    """Return ``(shape, ranges)`` for ``obj`` in global coordinates.
+
+    ``shape`` is the object's shape (the ``Real`` element's shape for a
+    ``Cross::Link``) in global coordinates and is used for the boolean solid
+    test. ``ranges`` maps ``'x'``/``'y'``/``'z'`` to the global ``[min, max]``
+    of the shape and is used for the axis-interval test.
+
+    Both values are read from the document's own geometry — never from cached
+    or assumed values. Returns ``(None, None)`` when the object has no shape.
+    """
+    shape_obj = _resolve_shape_object(obj)
+    if shape_obj is None:
+        return None, None
+    shape = shape_obj.Shape
+    # ``shape`` is already placed by ``shape_obj.Placement``; the ancestor
+    # transform maps it to global coordinates (identity for the Real element
+    # of a robot link; see ``_ancestor_placement``).
+    ancestor = _ancestor_placement(shape_obj)
+    bbox = shape.BoundBox
+    corners = [
+        fc.Vector(x, y, z)
+        for x in (bbox.XMin, bbox.XMax)
+        for y in (bbox.YMin, bbox.YMax)
+        for z in (bbox.ZMin, bbox.ZMax)
+    ]
+    placed = [ancestor.multVec(corner) for corner in corners]
+    ranges = {
+        'x': [min(p.x for p in placed), max(p.x for p in placed)],
+        'y': [min(p.y for p in placed), max(p.y for p in placed)],
+        'z': [min(p.z for p in placed), max(p.z for p in placed)],
+    }
+    global_shape = shape.copy()
+    try:
+        if not ancestor.isIdentity():
+            global_shape.transformShape(ancestor.Matrix)
+    except Exception:  # noqa: BLE001
+        pass
+    return global_shape, ranges
+
+
+def _axis_overlap(
+    child_range: list[float],
+    parent_range: list[float],
+    tol: float,
+) -> dict[str, Any]:
+    """Return the overlap of two closed intervals on a single axis."""
+    lo = max(child_range[0], parent_range[0])
+    hi = min(child_range[1], parent_range[1])
+    extent = max(0.0, hi - lo)
+    return {
+        'child': list(child_range),
+        'parent': list(parent_range),
+        'overlap_interval': [lo, hi],
+        'overlap_extent': extent,
+        'overlap': extent > tol,
+    }
+
+
+def _overlap_between(
+    parent_obj: fc.DocumentObject,
+    child_obj: fc.DocumentObject,
+    tol: float = _OVERLAP_LINEAR_TOL,
+) -> dict[str, Any]:
+    """Deterministically test whether two shapes overlap in space.
+
+    The decision is the **boolean intersection volume** of the two solids
+    (``child.common(parent).Volume``), computed inside FreeCAD from the
+    document geometry — not an agent-supplied value and not a bounding-box
+    containment proxy. The per-axis AABB intervals and the minimum distance are
+    returned as diagnostics. A shared face/edge/vertex (touch) yields a ~zero
+    volume and is reported as **no overlap**.
+    """
+    parent_shape, parent_ranges = _placed_shape_and_ranges(parent_obj)
+    child_shape, child_ranges = _placed_shape_and_ranges(child_obj)
+    if parent_shape is None or child_shape is None:
+        raise RuntimeError(
+            f'Both "{parent_obj.Name}" and "{child_obj.Name}" must have shape '
+            'geometry (a Cross::Link needs a Real element).',
+        )
+    axes: dict[str, Any] = {}
+    overlap_axes: list[str] = []
+    for axis in ('x', 'y', 'z'):
+        info = _axis_overlap(child_ranges[axis], parent_ranges[axis], tol)
+        axes[axis] = info
+        if info['overlap']:
+            overlap_axes.append(axis)
+    aabb_overlap = len(overlap_axes) == 3
+    common_volume = 0.0
+    solid_test_ok = True
+    try:
+        common_volume = child_shape.common(parent_shape).Volume
+    except Exception:  # noqa: BLE001
+        solid_test_ok = False
+    min_distance = None
+    try:
+        min_distance = child_shape.distToShape(parent_shape)[0]
+    except Exception:  # noqa: BLE001
+        min_distance = None
+    if solid_test_ok:
+        overlap = common_volume > _OVERLAP_VOLUME_TOL
+    else:
+        # Fall back to the AABB test only if the solid test failed.
+        overlap = aabb_overlap and (min_distance is not None and min_distance <= tol)
+    return {
+        'parent': parent_obj.Name,
+        'child': child_obj.Name,
+        'overlap': bool(overlap),
+        'common_volume': common_volume,
+        'solid_test_ok': solid_test_ok,
+        'aabb_overlap': aabb_overlap,
+        'overlap_axes': overlap_axes,
+        'min_distance': min_distance,
+        'tolerance': tol,
+        'axes': axes,
+    }
+
+
 def _face_info(
     face: Any, index: int, ancestor_placement: fc.Placement,
 ) -> dict[str, Any]:
@@ -1373,6 +1502,40 @@ def get_object_info(
 
 
 # ---------------------------------------------------------------------------
+# Overlap-check tool
+# ---------------------------------------------------------------------------
+
+
+def check_overlap(
+    parent: str,
+    child: str,
+    tolerance: float = _OVERLAP_LINEAR_TOL,
+) -> dict[str, Any]:
+    """Deterministically test whether two objects/links overlap in space.
+
+    PRIMARY verification tool for the mandatory overlap check. The decision is
+    the boolean intersection volume of the two solids, computed inside FreeCAD
+    from the document's own geometry — the agent must read the returned
+    ``overlap`` boolean, never supply or assume the values. A shared face (the
+    parts merely touching, ``common_volume`` ~ 0) is reported as no overlap.
+
+    ``parent`` and ``child`` are object/link names or Labels; each may be a
+    robot ``Cross::Link`` (its ``Real`` geometry is used) or any object with a
+    ``Shape``. The result also contains the per-axis AABB intervals
+    (``axes.x/y/z``) and ``min_distance`` for diagnostics.
+    """
+
+    def _impl() -> dict[str, Any]:
+        parent_obj = _resolve_object(parent)
+        child_obj = _resolve_object(child)
+        result = _overlap_between(parent_obj, child_obj, tolerance)
+        result['status'] = 'overlap' if result['overlap'] else 'ok'
+        return _round_floats(result)
+
+    return run_on_main_thread(_impl)
+
+
+# ---------------------------------------------------------------------------
 # Snapshot tool
 # ---------------------------------------------------------------------------
 
@@ -1457,6 +1620,15 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
     'general_algorithm': """\
 ## General algorithm (source of truth)
 
+0. PLAN FIRST. Before touching the document, write an explicit step-by-step
+   plan and keep it updated as you go. The plan MUST list every robot link,
+   the parent/child topology and the reference (face/vertex) chosen for each
+   placement — and it MUST include an explicit **mirroring check**: for every
+   child link decide, up front, whether it may end up on the wrong side of its
+   parent and therefore need mirroring (`rotate_object(child_link, 'x', 180)`,
+   see e-bis). Never skip this item: symmetric parts on opposite sides of a
+   parent (e.g. left/right wheels) are the usual mirroring candidates. The
+   plan is a checklist, not prose — reuse the steps below as its backbone.
 1. No active document? `create_document(name)`.
 2. `create_robot(name)`.
 3. `create_links_filled(robot, object_names)` — create links from existing
@@ -1528,8 +1700,10 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       one side, or generally to place symmetric links on opposite sides of a
       parent kinematic chain.
    e-quater. MANDATORY OVERLAP CHECK — HARD GATE. Run it for EACH child
-      individually, right after positioning it and after every `rotate_object`
-      on its joint, BEFORE the next child / collisions / materials. Never batch
+      individually, ONLY AFTER the child's joint has been oriented (steps d,
+      e and e-ter above) and after every later `rotate_object` on that joint —
+      the orientation changes the child's global ranges, so a check performed
+      before it is meaningless. Run it BEFORE collisions / materials. Never batch
       or assume symmetry: opposite corners often put some children inside the
       parent (overlap). Get the GLOBAL min/max of child and parent on ALL THREE
       axes X/Y/Z via `get_object_info(...)` `Geometry` (do NOT check one axis
@@ -1576,12 +1750,15 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    face/vertex of the child link that will be joined to the parent. Format:
    `parent_robot_link_name face1/vertex1 - child_robot_link_name face1/vertex1`
 4. Perform `set_placement_between` for the parent/child robot link pair.
-5. Correct the direction of the Z axis of the child link's parent joint if
-   required.
-6. Run the MANDATORY OVERLAP CHECK for this child IMMEDIATELY — EACH child on
-   its own, on ALL THREE axes X/Y/Z (not just one), and PRINT the numeric
-   min/max evidence. Mirror the child if it is contained on any axis. Do NOT
-   start the next child, collisions or materials until this child passes.
+5. Orient the JOINT of the child link so its local Z axis lies along the
+   child's functional axis, and — for a parent with several symmetric wheels —
+   make ALL wheels' joint local Z axes point in the SAME direction (left); see
+   steps d–e-ter of the General algorithm.
+6. ONLY AFTER the joint orientation of step 5 above, run the MANDATORY OVERLAP
+   CHECK for this child — EACH child on its own, on ALL THREE axes X/Y/Z (not
+   just one), and PRINT the numeric min/max evidence. Mirror the child if it is
+   contained on any axis. Do NOT start collisions or materials until every
+   child passes.
 
 For the detailed rules of steps 4-6 — reference building, joint orientation,
 mirroring and the overlap-check procedure — follow the **General algorithm**
@@ -1673,6 +1850,10 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
     'best_practices': """\
 ## Best practices
 
+- Start with a written plan (see step 0 of the General algorithm): list the
+  links, the parent/child topology and the reference for each placement, and
+  include an explicit **mirroring check** per child — decide in advance which
+  children are symmetric and may need `rotate_object(child, 'x', 180)`.
 - Resolve exact names with `list_scene_objects()` / `get_object_info()` before
   positioning.
 - Order: robot and links -> joints -> positioning -> collisions/materials.
@@ -1681,10 +1862,11 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
   `get_snapshot()`; fix orientation with `rotate_object()` if needed.
 - Follow the **General algorithm** (source of truth) for reference building,
   joint orientation, the mandatory overlap check and mirroring.
-- The overlap check is a HARD GATE: run it for EACH child right after
-  positioning it, examine ALL THREE axes (X, Y, Z) of the child's vs the
-  parent's global coordinate ranges, and print the numbers. A child contained
-  inside the parent on any axis is a failure and must be mirrored
+- The overlap check is a HARD GATE: run it for EACH child ONLY AFTER its joint
+  has been oriented (all wheels' axles pointing the same, left, direction),
+  then examine ALL THREE axes (X, Y, Z) of the child's vs the parent's global
+  coordinate ranges, and print the numbers. A child contained inside the parent
+  on any axis is a failure and must be mirrored
   (`rotate_object(child, 'x', 180)`). Never inspect only one axis.
 - Do NOT create LCS objects: `create_lcs()` only on explicit user request;
   plain subelement references are enough.
@@ -1774,6 +1956,7 @@ TOOLS: list[tuple[str, Any]] = [
     ('set_joint_values', set_joint_values),
     ('list_scene_objects', list_scene_objects),
     ('get_object_info', get_object_info),
+    ('check_overlap', check_overlap),
     # ('get_snapshot', get_snapshot),
     ('instructions_to_work_with_tools', instructions_to_work_with_tools),
 ]

@@ -227,6 +227,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         'required': ['object_name'],
     },
+    'check_overlap': {
+        'properties': {
+            'parent': {'type': 'string', 'description': 'Parent object/link name or Label'},
+            'child': {'type': 'string', 'description': 'Child object/link name or Label'},
+            'tolerance': {
+                'type': 'number',
+                'description': 'Touch tolerance in mm (default 1e-6); a shared face is not an overlap',
+            },
+        },
+        'required': ['parent', 'child'],
+    },
     'get_snapshot': {
         'properties': {
             'width': {'type': 'integer', 'description': 'Width (default 1024)'},
