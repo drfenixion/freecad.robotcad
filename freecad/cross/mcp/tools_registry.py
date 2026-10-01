@@ -220,7 +220,6 @@ def create_joint(
     parent_link: str = '',
     child_link: str = '',
     type: str = 'fixed',
-    axis: Optional[list[float]] = None,
     lower: float = 0.0,
     upper: float = 0.0,
     effort: float = 0.0,
@@ -242,15 +241,6 @@ def create_joint(
                 joint = make_joint(name, doc, robot=robot_obj, recompute_after=False)
             if type:
                 joint.Type = type
-            if axis is not None and len(axis) == 3:
-                # The joint axis is encoded in the Origin rotation: rotate the
-                # local Z axis to point along `axis`.
-                v = fc.Vector(axis[0], axis[1], axis[2])
-                if v.Length < 1e-9:
-                    raise RuntimeError('Joint axis must be a non-zero vector.')
-                v.normalize()
-                rot = fc.Rotation(fc.Vector(0, 0, 1), v)
-                joint.Origin = fc.Placement(joint.Origin.Base, rot)
             joint.LowerLimit = lower
             joint.UpperLimit = upper
             joint.Effort = effort
@@ -1038,14 +1028,6 @@ def _vector_to_list(vector: fc.Vector) -> list[float]:
     return [vector.x, vector.y, vector.z]
 
 
-def _bound_box_to_list(bound_box: fc.BoundBox) -> list[float]:
-    """Convert a bound box to ``[xmin, ymin, zmin, xmax, ymax, zmax]``."""
-    return [
-        bound_box.XMin, bound_box.YMin, bound_box.ZMin,
-        bound_box.XMax, bound_box.YMax, bound_box.ZMax,
-    ]
-
-
 def _round_floats(value: Any, ndigits: int = 2) -> Any:
     """Recursively round every float in ``value`` to ``ndigits`` decimals.
 
@@ -1120,11 +1102,10 @@ def _face_info(
 
     The face is identified by its 1-based ``index`` (matching FreeCAD's
     ``Face1``, ``Face2``, ...). The description contains the centre of mass,
-    the normal at the centre, the surface type, the area, the bounding box and
-    the coordinates of the face's vertices, so the agent can understand where
-    the face lies on the object's surface. ``ancestor_placement`` is applied to
-    the shape's points (which are already placed by the object's own
-    placement) to reach global coordinates.
+    the surface type, the area and the coordinates of the face's vertices, so
+    the agent can understand where the face lies on the object's surface.
+    ``ancestor_placement`` is applied to the shape's points (which are already
+    placed by the object's own placement) to reach global coordinates.
     """
     info: dict[str, Any] = {
         'index': index,
@@ -1133,35 +1114,18 @@ def _face_info(
         'center_of_mass': _vector_to_list(
             ancestor_placement.multVec(face.CenterOfMass),
         ),
-        'bound_box': _bound_box_to_list(face.BoundBox),
         'orientation': str(face.Orientation),
         'vertices': [
             _vertex_info(v, i + 1, ancestor_placement)
             for i, v in enumerate(face.Vertexes)
         ],
     }
-    # Normal at the centre of the face's parameter range.
-    try:
-        u0, u1, v0, v1 = face.ParameterRange
-        normal = face.normalAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)
-        info['normal'] = _vector_to_list(
-            ancestor_placement.Rotation.multVec(normal),
-        )
-    except Exception:  # noqa: BLE001
-        pass
     surface = getattr(face, 'Surface', None)
     surface_type = surface.__class__.__name__ if surface is not None else 'Unknown'
     info['surface_type'] = surface_type
     # Surface-specific parameters, transformed to global coordinates.
     try:
-        if surface_type == 'Plane':
-            info['plane_normal'] = _vector_to_list(
-                ancestor_placement.Rotation.multVec(surface.Axis),
-            )
-            info['plane_origin'] = _vector_to_list(
-                ancestor_placement.multVec(surface.Position),
-            )
-        elif surface_type == 'Cylinder':
+        if surface_type == 'Cylinder':
             info['axis'] = _vector_to_list(
                 ancestor_placement.Rotation.multVec(surface.Axis),
             )
@@ -1219,9 +1183,6 @@ def _object_geometry_info(
     max_internal_geometry_items: int,
 ) -> dict[str, Any]:
     """Return the faces and vertices of an object in global coordinates."""
-    # Never allow fewer than 100 items, so the geometry description stays
-    # useful for positioning references.
-    max_internal_geometry_items = max(100, max_internal_geometry_items)
     shape_obj = _resolve_shape_object(obj)
     if shape_obj is None:
         return {
@@ -1238,7 +1199,6 @@ def _object_geometry_info(
         'shape_object': shape_obj.Name,
         'local_placement': _placement_to_dict(shape_obj.Placement),
         'ancestor_placement': _placement_to_dict(ancestor_placement),
-        'bound_box': _bound_box_to_list(shape.BoundBox),
         'face_count': len(shape.Faces),
         'vertex_count': len(shape.Vertexes),
     }
@@ -1424,22 +1384,21 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       Do NOT create LCS objects —
       plain subelement references are enough. To pick the right face/vertex,
       first call `get_object_info(link)` and use the
-      geometric information (`center_of_mass`, `normal`, `surface_type`,
-      `bound_box`, `vertices`, `point`) to understand where each face/vertex
-      actually lies — do not guess from the index alone.
+      geometric information (`center_of_mass`, `surface_type`, `vertices`,
+      `point`) to understand where each face/vertex actually lies — do not
+      guess from the index alone.
    b. `set_placement_between(target, ref1, ref2)` — only the two references
       go into the selection.
    c. Control snapshot: `get_snapshot(...)`.
-   d. Make the JOINT's local Z axis lie along the child link's functional
-      axis (a revolute/continuous joint always rotates around its local Z, a
-      prismatic joint always moves along its local Z). Set this direction with
-      the `axis` parameter of `create_joint` (the local Z is rotated to point
-      along `[x, y, z]`; e.g. a wheel whose axle is along Y -> `axis=[0, 1,
-      0]`). A wheel whose axle is not along the joint's local Z will not roll.
-      Do NOT rotate the LINK to achieve this: the link is mounted on the joint
+   d. Orient the JOINT so its local Z axis lies along the child link's
+      functional axis (a revolute/continuous joint always rotates around its
+      local Z, a prismatic joint always moves along its local Z). Do this ONLY
+      by rotating the JOINT with `rotate_object(joint_name, axis, angle_deg)`.
+      NEVER rotate the LINK to achieve this: the link is mounted on the joint
       and follows it, so rotating the link would break its alignment with the
-      joint's local Z.
-   e. Then aim the whole assembly by rotating the JOINT with
+      joint's local Z. A wheel whose axle is not along the joint's local Z
+      will not roll.
+   e. Aim the whole assembly by rotating the JOINT with
       `rotate_object(object_name, axis, angle_deg)`: rotating the joint turns
       its local Z (and with it the child kinematic chain and end link) into
       the required direction. Do NOT rotate the link to fix the final pose —
@@ -1481,7 +1440,7 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 
 1. Get information about the parent link and its child links with
    `get_object_info(...)` (geometry of the Real element: faces, vertices,
-   `center_of_mass`, `normal`, `surface_type`, `bound_box`).
+   `center_of_mass`, `surface_type`).
 2. Choose the faces or vertices on which the child link will be placed by their geometry. 
    Take the robot's link topology into account — it can be understood from the
    robot's name or from the context (e.g. a 4-wheeled chassis: the parent is
@@ -1507,10 +1466,9 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   for the final chain element; `child_branch`/`parent_tree` are advanced.
   Only the two references go into the selection (the target is not selected).
 - To choose the correct face/vertex reference, use the geometric information
-  from `get_object_info(link)` (`center_of_mass`,
-  `normal`, `surface_type`, `bound_box`, `vertices`, `point`) to understand
-  the spatial arrangement of the faces/vertices — do not rely on the index
-  alone.
+  from `get_object_info(link)` (`center_of_mass`, `surface_type`, `vertices`,
+  `point`) to understand the spatial arrangement of the faces/vertices — do
+  not rely on the index alone.
 - Do NOT create LCS objects: plain subelement references are enough.
   `create_lcs` ONLY on explicit user request.
 - `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision;
@@ -1520,14 +1478,13 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   Rotating a joint aims its local Z axis (revolute/continuous rotate around
   Z, prismatic moves along Z) and rotates its child kinematic chain and end
   link together with it.
-- Orientation rule: make the JOINT's local Z lie along the child link's
-  functional axis by setting the `axis` parameter of `create_joint` (e.g.
-  `axis=[0, 1, 0]` for a wheel whose axle is along Y), then rotate the JOINT
-  to aim that axis in the required direction. A revolute/continuous joint
-  always spins around its local Z, so a wheel whose axle is not along that Z
-  will not roll. Do NOT rotate the LINK for this: the link is mounted on the
-  joint and follows it, so rotating the link breaks its alignment with the
-  joint's local Z.
+- Orientation rule: orient the JOINT so its local Z lies along the child
+  link's functional axis by rotating the JOINT with
+  `rotate_object(joint_name, axis, angle_deg)`, then aim that axis in the
+  required direction. A revolute/continuous joint always spins around its
+  local Z, so a wheel whose axle is not along that Z will not roll. Do NOT
+  rotate the LINK for this: the link is mounted on the joint and follows it,
+  so rotating the link breaks its alignment with the joint's local Z.
 - Mirroring a link to the other side of the parent: when the joint is
   oriented correctly AND the link is oriented correctly, but the link's body
   penetrates the parent link's body through its full height (the link should
@@ -1546,14 +1503,14 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 ## Joints
 
 IMPORTANT: a joint always rotates around its **local Z axis** (revolute,
-continuous) or translates along its **local Z axis** (prismatic). The `axis`
-parameter only reorients the joint frame so that its local Z points along the
-given `[x, y, z]` direction — it does not add a new degree of freedom.
+continuous) or translates along its **local Z axis** (prismatic). The joint's
+local Z is oriented by rotating the JOINT itself with `rotate_object` — there
+is NO `axis` parameter on `create_joint`.
 
-- `create_joint(robot, name, parent_link, child_link, type, axis, lower,
+- `create_joint(robot, name, parent_link, child_link, type, lower,
   upper, effort, velocity)` — joint between two links; `type`: `fixed`,
-  `revolute`, `prismatic`, `continuous`, ...; `axis` `[x, y, z]` (local Z is
-  rotated to point along it); limits in degrees (revolute) or mm (prismatic).
+  `revolute`, `prismatic`, `continuous`, ...; limits in degrees (revolute) or
+  mm (prismatic).
 - `create_joints_filled(robot, link_names_in_order, connect_type)` — auto
   joints: `chain` = consecutive links, `spider` = all to the first link.
 - `set_joint_values(robot, values)` — joint ROS names (or Labels) -> degrees
@@ -1564,29 +1521,28 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
 - A `revolute` or `continuous` joint **rotates around its local Z axis** — the
   blue arrow shown on the joint in the 3D view.
 - A `prismatic` joint **moves along its local Z axis** — the same blue arrow.
-- After positioning, the joint can be rotated with the rotation tools
-  (`rotate_object`) to aim its Z axis in the required direction. Rotating a
-  joint also rotates its **child kinematic chain and the end link** together
-  with it, so the whole downstream branch follows the joint orientation.
-- Therefore, to orient a wheel/arm correctly, rotate the JOINT (not only the
+- The joint's local Z is aimed by rotating the JOINT with `rotate_object`.
+  Rotating a joint also rotates its **child kinematic chain and the end link**
+  together with it, so the whole downstream branch follows the joint
+  orientation.
+- Therefore, to orient a wheel/arm correctly, rotate the JOINT (not the
   link): the child link and everything after it turn with the joint.
 - **Make the joint's local Z lie along the child link's functional axis.**
   A revolute or continuous joint always rotates around its local Z, so the
   child link's functional axis (e.g. a wheel's axle) must be aligned with that
   local Z — otherwise the joint will spin the link about the wrong axis and
-  the wheel will not roll. Set this direction with the `axis` parameter of
-  `create_joint` (the local Z is rotated to point along `[x, y, z]`; e.g. a
-  wheel whose axle is along Y -> `axis=[0, 1, 0]`).
+  the wheel will not roll. Achieve this by rotating the JOINT with
+  `rotate_object(joint_name, axis, angle_deg)`.
 - **Do NOT rotate the LINK to achieve this.** The link is mounted on the joint
   and follows it; rotating the link turns it relative to the joint's local Z
   and therefore breaks exactly the alignment you need.
-- **Then aim the whole assembly by rotating the JOINT**, not the link: use
+- **Aim the whole assembly by rotating the JOINT**, not the link: use
   `rotate_object` on the joint to turn its local Z (and the child link with
   it) into the required direction. Rotating only the link would leave the
   joint's rotation axis pointing the wrong way.
-- Summary: (1) set the joint's local Z along the link's functional axis via
-  the `axis` parameter of `create_joint`; (2) rotate the JOINT to point that
-  axis where it is needed.
+- Summary: rotate the JOINT with `rotate_object` to point its local Z along
+  the link's functional axis and then into the required direction. The only
+  allowed rotation of a LINK is the 180° mirror about X (see Positioning).
 """,
     'collisions': """\
 ## Collisions
@@ -1614,8 +1570,8 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   (Real, Visual, Collision, Mass, joint limits, ...). It always returns
   `Geometry`: the spatial description of every face and vertex in
   **global** coordinates. A face has a 1-based `index` (`Face1`, `Face2`, ...),
-  its `center_of_mass`, the `normal` at its centre, its `surface_type`
-  (`Plane`, `Cylinder`, `Sphere`, `Cone`, `Torus`, ...), `area`, `bound_box`
+  its `center_of_mass`, its `surface_type`
+  (`Plane`, `Cylinder`, `Sphere`, `Cone`, `Torus`, ...), `area`
   and the coordinates of its `vertices`; a vertex has a 1-based `index`
   (`Vertex1`, ...) and its `point`. For a `Cross::Link` the geometry of its
   `Real` element is reported, so the indices can be used directly in
@@ -1624,9 +1580,9 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   IMPORTANT: to understand the spatial arrangement of faces and vertices —
   which face is on top, which faces are parallel, which vertex is a corner,
   where a face lies on the object's surface — ALWAYS use this geometric
-  information (`center_of_mass`, `normal`, `surface_type`, `bound_box`,
-  `vertices`, `point`), NOT the face/vertex index alone. The index only
-  identifies the subelement; the coordinates tell you where it actually is.
+  information (`center_of_mass`, `surface_type`, `vertices`, `point`), NOT
+  the face/vertex index alone. The index only identifies the subelement; the
+  coordinates tell you where it actually is.
   Call `get_object_info(...)` before choosing
   positioning references, so the reference is picked from real coordinates
   rather than guessed.
@@ -1640,19 +1596,18 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   positioning.
 - To understand where faces/vertices are located, use the geometric
   information from `get_object_info(...)`
-  (`center_of_mass`, `normal`, `surface_type`, `bound_box`, `vertices`,
-  `point`) — never rely on the face/vertex index alone.
+  (`center_of_mass`, `surface_type`, `vertices`, `point`) — never rely on the
+  face/vertex index alone.
 - Order: robot and links -> joints -> positioning -> collisions/materials.
 - `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()` if needed.
-- Orient a jointed link in two steps: (1) set the joint's local Z along the
-  link's functional axis via the `axis` parameter of `create_joint` (e.g.
-  `axis=[0, 1, 0]` for a wheel whose axle is along Y); (2) rotate the JOINT to
-  aim that axis where it is needed. A revolute/continuous joint always rotates
-  around its local Z, so a wheel whose axle is not along that Z will not roll.
-  Do NOT rotate the LINK for this — the link follows its joint, so rotating
-  the link breaks its alignment with the joint's local Z.
+- Orient a jointed link by rotating the JOINT with `rotate_object` so its
+  local Z lies along the link's functional axis (e.g. a wheel's axle). A
+  revolute/continuous joint always rotates around its local Z, so a wheel
+  whose axle is not along that Z will not roll. Do NOT rotate the LINK for
+  this — the link follows its joint, so rotating the link breaks its alignment
+  with the joint's local Z.
 - If the joint and the link are both correctly oriented but the link's body
   penetrates the parent link's body through its full height, mirror the link
   to the other side by rotating the LINK 180° about the X axis:

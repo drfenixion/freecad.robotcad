@@ -50,7 +50,6 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'parent_link': {'type': 'string', 'description': 'Parent link name'},
             'child_link': {'type': 'string', 'description': 'Child link name'},
             'type': {'type': 'string', 'description': 'fixed, revolute, prismatic, continuous, ...'},
-            'axis': {'type': 'array', 'items': {'type': 'number'}, 'description': 'Joint axis [x, y, z]: local Z is rotated to point along it; revolute joints rotate around Z, prismatic move along Z'},
             'lower': {'type': 'number', 'description': 'Lower limit (deg or mm)'},
             'upper': {'type': 'number', 'description': 'Upper limit (deg or mm)'},
             'effort': {'type': 'number', 'description': 'Max effort (N or Nm)'},
