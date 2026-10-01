@@ -98,11 +98,14 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'type': 'string',
                 'description': (
                     'Ref 1 (PRIMARY method): face/edge/vertex/circle of a link '
-                    "Real element as '<real_link>.<body>.<subelement>' (e.g. "
-                    "'real_l_chassis001_.chassis001.Box.Face3') or an already "
-                    'existing LCS. A robot link (l_...) cannot be a ref. Must '
-                    'lie on the parent link. Do NOT create LCS objects — plain '
-                    'subelement references are enough.'
+                    "Real element as '<real_link>.<inner_link_name>.<feature>."
+                    "<subelement>' (e.g. 'real_l_chassis001_.chassis001.Box."
+                    "Face3') or an already existing LCS. <inner_link_name> is "
+                    'the Name of the App::Link inside the Real element (e.g. '
+                    "'chassis001', 'wheel001') — NOT the source body name "
+                    "(e.g. 'chassis', 'wheel'). A robot link (l_...) cannot be "
+                    'a ref. Must lie on the parent link. Do NOT create LCS '
+                    'objects — plain subelement references are enough.'
                 ),
             },
             'ref2': {
@@ -120,7 +123,19 @@ TOOL_SCHEMAS: dict[str, dict] = {
     'rotate_object': {
         'properties': {
             'object_name': {'type': 'string', 'description': 'Joint, link or LCS name'},
-            'axis': {'type': 'string', 'enum': ['x', 'y', 'z']},
+            'axis': {
+                'type': 'string',
+                'enum': ['x', 'y', 'z'],
+                'description': (
+                    'Rotation axis. To orient a jointed link, rotate the JOINT '
+                    "(its local Z is the functional axis). To MIRROR a link to "
+                    'the other side of the parent, rotate the LINK 180° about '
+                    "the X axis (NOT Z): the link is aligned along its local Z, "
+                    'so rotating about Z would only spin it around its own '
+                    'functional axis, while rotating about X flips it across Z '
+                    'to the opposite side.'
+                ),
+            },
             'angle_deg': {'type': 'number', 'description': 'Angle in degrees'},
         },
         'required': ['object_name'],
@@ -131,12 +146,15 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'subelement': {
                 'type': 'string',
                 'description': (
-                    "Subelement of the link Real element: '<real_link>.<body>."
-                    "<subelement>' (e.g. 'real_l_chassis001_.chassis001.Box."
-                    "Face3'); short forms 'chassis001.Box.Face3' / 'Box.Face3' "
-                    'accepted; empty = Real origin. ONLY on explicit user '
-                    'request: the default positioning workflow never needs an '
-                    'LCS — use plain subelement references in '
+                    "Subelement of the link Real element: '<real_link>."
+                    "<inner_link_name>.<feature>.<subelement>' (e.g. "
+                    "'real_l_chassis001_.chassis001.Box.Face3'); "
+                    '<inner_link_name> is the Name of the App::Link inside the '
+                    "Real element (e.g. 'chassis001'), NOT the source body "
+                    "name (e.g. 'chassis'); short forms 'chassis001.Box.Face3' "
+                    "/ 'Box.Face3' accepted; empty = Real origin. ONLY on "
+                    'explicit user request: the default positioning workflow '
+                    'never needs an LCS — use plain subelement references in '
                     'set_placement_between instead.'
                 ),
             },
@@ -195,24 +213,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
     'get_object_info': {
         'properties': {
             'object_name': {'type': 'string', 'description': 'Object name or label'},
-            'include_geometry': {
-                'type': 'boolean',
-                'description': (
-                    'Include the spatial description of all faces and vertices '
-                    '(global coordinates). Default true.'
-                ),
-            },
-            'include_faces': {
-                'type': 'boolean',
-                'description': 'Include faces in Geometry (default true)',
-            },
-            'include_vertices': {
-                'type': 'boolean',
-                'description': 'Include vertices in Geometry (default true)',
-            },
-            'max_items': {
+            'max_internal_geometry_items': {
                 'type': 'integer',
-                'description': 'Max faces/vertices returned (default 1000)',
+                'minimum': 100,
+                'description': 'Max faces/vertices returned (default 1000, minimum 100)',
             },
         },
         'required': ['object_name'],

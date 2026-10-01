@@ -543,21 +543,27 @@ def _select_link_subelement(doc: fc.Document, ref: str) -> dict[str, str]:
     """Select a subelement on the Real element of a robot link.
 
     ``ref`` is a subelement path in the form
-    ``<real_link>.<body>.<subelement>`` (e.g.
+    ``<real_link>.<inner_link_name>.<feature>.<subelement>`` (e.g.
     ``real_l_chassis001_.chassis001.Box.Face3``) where ``<real_link>`` is the
-    Real element link (``real_l_...``) of a robot link and the subelement is a
+    Real element link (``real_l_...``) of a robot link, ``<inner_link_name>``
+    is the **Name of the App::Link inside the Real element** (e.g.
+    ``chassis001``, ``wheel001``) — NOT the name of the source body the link
+    was filled from (e.g. ``chassis``, ``wheel``) — and the subelement is a
     face, edge, circle or vertex of the link's ``Real`` element. The path is
-    tolerant: the body may be given by ``Name`` or ``Label``, intermediate
-    levels may be omitted and the internal Real element name (``real_l_...``)
-    is accepted though not needed. **The robot link itself (``l_...``) cannot
-    be used as a reference** — the path must start with the Real element link.
+    tolerant: the inner link may be given by ``Name`` or ``Label``,
+    intermediate levels may be omitted and the internal Real element name
+    (``real_l_...``) is accepted though not needed. **The robot link itself
+    (``l_...``) cannot be used as a reference** — the path must start with the
+    Real element link.
     """
     parts = [p for p in ref.split('.') if p]
     if len(parts) < 2:
         raise RuntimeError(
             f'"{ref}" is not a valid reference. Use a subelement path '
-            '"<real_link>.<body>.<subelement>" (e.g. '
-            '"real_l_chassis001_.chassis001.Box.Face3") or an LCS name.'
+            '"<real_link>.<inner_link_name>.<feature>.<subelement>" (e.g. '
+            '"real_l_chassis001_.chassis001.Box.Face3") or an LCS name. '
+            'The inner link name is the Name of the App::Link inside the Real '
+            'element (e.g. "chassis001"), NOT the source body name.'
         )
     # A robot link (l_...) cannot be a reference: the path must start with
     # the Real element link (real_l_...).
@@ -569,8 +575,8 @@ def _select_link_subelement(doc: fc.Document, ref: str) -> dict[str, str]:
         raise RuntimeError(
             f'"{ref}" starts with the robot link "{parts[0]}". A robot link '
             'cannot be a reference. Use the Real element link path instead: '
-            '"<real_link>.<body>.<subelement>" (e.g. '
-            f'"{real_name}.<body>.<Face|Edge|VertexN>").'
+            '"<real_link>.<inner_link_name>.<feature>.<subelement>" (e.g. '
+            f'"{real_name}.<inner_link_name>.<Face|Edge|VertexN>").'
         )
     link_obj = None
     real_link = None
@@ -592,7 +598,7 @@ def _select_link_subelement(doc: fc.Document, ref: str) -> dict[str, str]:
         raise RuntimeError(
             f'"{ref}" is not a valid reference: "{parts[0]}" is not the Real '
             'element link of any robot link. Use '
-            '"<real_link>.<body>.<subelement>" (e.g. '
+            '"<real_link>.<inner_link_name>.<feature>.<subelement>" (e.g. '
             '"real_l_chassis001_.chassis001.Box.Face3") or an LCS name.'
         )
     candidates = _subelement_path_candidates(doc, real_link, ref, link_obj)
@@ -608,12 +614,14 @@ def _select_link_subelement(doc: fc.Document, ref: str) -> dict[str, str]:
     except Exception:  # noqa: BLE001
         pass
     wrapper = _real_link_wrapper(real_link)
-    wrapper_name = wrapper.Name if wrapper is not None else '<body>'
+    wrapper_name = wrapper.Name if wrapper is not None else '<inner_link_name>'
     raise RuntimeError(
         f'Cannot select "{ref}" on the Real element of link '
         f'"{link_obj.Name}". Use '
         f'"{real_link.Name}.{wrapper_name}.<feature>.<Face|Edge|VertexN>" '
         f'(e.g. "{real_link.Name}.{wrapper_name}.Vertex1"). '
+        f'The inner link name is the Name of the App::Link inside the Real '
+        f'element (e.g. "chassis001"), NOT the source body name. '
         f'Tried paths: {", ".join(candidates)}.'
     )
 
@@ -624,8 +632,12 @@ def _select_reference(doc: fc.Document, ref: str) -> dict[str, str]:
     A reference for the Set Placement tools is either:
     - an LCS object (by ``Name`` or ``Label``), or
     - a subelement (face, edge, circle or vertex) of the ``Real`` element of
-      a robot link, given as ``<real_link>.<body>.<subelement>``, e.g.
-      ``real_l_chassis001_.chassis001.Box.Face3``.
+      a robot link, given as
+      ``<real_link>.<inner_link_name>.<feature>.<subelement>``, e.g.
+      ``real_l_chassis001_.chassis001.Box.Face3``. ``<inner_link_name>`` is
+      the **Name of the App::Link inside the Real element** (e.g.
+      ``chassis001``, ``wheel001``) — NOT the source body name (e.g.
+      ``chassis``, ``wheel``).
 
     A robot link itself cannot be a reference.
     """
@@ -640,8 +652,10 @@ def _select_reference(doc: fc.Document, ref: str) -> dict[str, str]:
         f'"{ref}" cannot be used as a reference. A robot link (or any whole '
         'object) is not allowed: use a face, edge, vertex or circle of the '
         'Real element of a robot link in the form '
-        '"<real_link>.<body>.<subelement>" (e.g. '
-        '"real_l_chassis001_.chassis001.Box.Face3"), or an LCS.'
+        '"<real_link>.<inner_link_name>.<feature>.<subelement>" (e.g. '
+        '"real_l_chassis001_.chassis001.Box.Face3"), or an LCS. The inner '
+        'link name is the Name of the App::Link inside the Real element '
+        '(e.g. "chassis001"), NOT the source body name.'
     )
 
 
@@ -655,12 +669,15 @@ def set_placement_between(
 
     The default positioning method: snap the contact zones of two
     neighbouring links. ``ref1``/``ref2``: face/edge/vertex/circle of a link
-    Real element as ``<real_link>.<body>.<subelement>`` (e.g.
-    ``real_l_chassis001_.chassis001.Box.Face3``) or an already existing LCS; a
-    robot link (``l_...``) cannot be a reference. One ref on the parent link,
-    one on the child. Do NOT create LCS objects for this — plain subelement
-    references are enough. ``move='leaf'`` (default, only supported) — final
-    chain element only; ``child_branch``/``parent_tree`` are advanced."""
+    Real element as ``<real_link>.<inner_link_name>.<feature>.<subelement>``
+    (e.g. ``real_l_chassis001_.chassis001.Box.Face3``) or an already existing
+    LCS; a robot link (``l_...``) cannot be a reference. ``<inner_link_name>``
+    is the **Name of the App::Link inside the Real element** (e.g.
+    ``chassis001``, ``wheel001``) — NOT the source body name (e.g.
+    ``chassis``, ``wheel``). One ref on the parent link, one on the child. Do
+    NOT create LCS objects for this — plain subelement references are enough.
+    ``move='leaf'`` (default, only supported) — final chain element only;
+    ``child_branch``/``parent_tree`` are advanced."""
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -697,15 +714,7 @@ def set_placement_between(
 
 
 def rotate_object(object_name: str, axis: str = 'z', angle_deg: float = 45.0) -> dict[str, Any]:
-    """Rotate a joint Origin, link MountedPlacement or LCS by an angle.
-
-    To orient a jointed link, rotate the JOINT (its ``Origin``): the child
-    link follows the joint, so rotating the joint aims the joint's local Z
-    (and the link with it). Do NOT rotate the LINK to align its functional
-    axis with the joint's local Z — the link is mounted on the joint and
-    follows it, so rotating the link breaks that alignment. Set the joint's
-    local Z along the link's functional axis with the ``axis`` parameter of
-    ``create_joint`` instead."""
+    """Rotate a joint Origin, link MountedPlacement or LCS by an angle about the given axis."""
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -1201,11 +1210,12 @@ def _vertex_info(
 
 def _object_geometry_info(
     obj: fc.DocumentObject,
-    include_faces: bool,
-    include_vertices: bool,
-    max_items: int,
+    max_internal_geometry_items: int,
 ) -> dict[str, Any]:
     """Return the faces and vertices of an object in global coordinates."""
+    # Never allow fewer than 100 items, so the geometry description stays
+    # useful for positioning references.
+    max_internal_geometry_items = max(100, max_internal_geometry_items)
     shape_obj = _resolve_shape_object(obj)
     if shape_obj is None:
         return {
@@ -1237,56 +1247,34 @@ def _object_geometry_info(
         result['area'] = shape.Area
     except Exception:  # noqa: BLE001
         pass
-    if include_faces:
-        faces = list(shape.Faces)
-        truncated = bool(max_items) and len(faces) > max_items
-        if truncated:
-            faces = faces[:max_items]
-        result['faces'] = [
-            _face_info(face, i + 1, ancestor_placement)
-            for i, face in enumerate(faces)
-        ]
-        if truncated:
-            result['faces_truncated'] = True
-    if include_vertices:
-        vertices = list(shape.Vertexes)
-        truncated = bool(max_items) and len(vertices) > max_items
-        if truncated:
-            vertices = vertices[:max_items]
-        result['vertices'] = [
-            _vertex_info(vertex, i + 1, ancestor_placement)
-            for i, vertex in enumerate(vertices)
-        ]
-        if truncated:
-            result['vertices_truncated'] = True
+    faces = list(shape.Faces)
+    truncated = len(faces) > max_internal_geometry_items
+    if truncated:
+        faces = faces[:max_internal_geometry_items]
+    result['faces'] = [
+        _face_info(face, i + 1, ancestor_placement)
+        for i, face in enumerate(faces)
+    ]
+    if truncated:
+        result['faces_truncated'] = True
+    vertices = list(shape.Vertexes)
+    truncated = len(vertices) > max_internal_geometry_items
+    if truncated:
+        vertices = vertices[:max_internal_geometry_items]
+    result['vertices'] = [
+        _vertex_info(vertex, i + 1, ancestor_placement)
+        for i, vertex in enumerate(vertices)
+    ]
+    if truncated:
+        result['vertices_truncated'] = True
     return result
 
 
 def get_object_info(
     object_name: str,
-    include_geometry: bool = True,
-    include_faces: bool = True,
-    include_vertices: bool = True,
-    max_items: int = 1000,
+    max_internal_geometry_items: int = 1000,
 ) -> dict[str, Any]:
-    """Return detailed information about a single object.
-
-    When ``include_geometry`` is True, the returned dict also contains a
-    ``Geometry`` entry with the spatial description of every face and vertex
-    of the object, in **global** coordinates:
-
-    - a face is described by its 1-based ``index`` (``Face1``, ``Face2``, ...),
-      its centre of mass, the normal at its centre, its surface type
-      (``Plane``, ``Cylinder``, ``Sphere``, ``Cone``, ``Torus``, ...), its
-      area, its bounding box and the coordinates of its vertices;
-    - a vertex is described by its 1-based ``index`` (``Vertex1``, ...) and its
-      coordinates.
-
-    For a ``Cross::Link`` the geometry of its ``Real`` element is reported, so
-    the face/vertex indices can be used directly in positioning references
-    (e.g. ``real_l_...Face3``). ``max_items`` caps the number of faces and
-    vertices returned (default 1000; 0 = no limit).
-    """
+    """Return detailed information about a single object, including a ``Geometry`` entry with the global-coordinate description of every face and vertex."""
 
     def _impl() -> dict[str, Any]:
         obj = _resolve_object(object_name)
@@ -1321,10 +1309,7 @@ def get_object_info(
             upper = getattr(obj, 'UpperLimit', None)
             info['LowerLimit'] = str(lower) if lower is not None else None
             info['UpperLimit'] = str(upper) if upper is not None else None
-        if include_geometry:
-            info['Geometry'] = _object_geometry_info(
-                obj, include_faces, include_vertices, max_items,
-            )
+        info['Geometry'] = _object_geometry_info(obj, max_internal_geometry_items)
         return info
 
     return run_on_main_thread(_impl)
@@ -1426,10 +1411,13 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    two neighbouring links. Per pair:
    a. Choose one reference on the parent link and one on the child link: a
       face/edge/vertex/circle of the link Real element as
-      `<real_link>.<body>.<subelement>` (e.g.
-      `real_l_chassis001_.chassis001.Box.Face3`). Do NOT create LCS objects —
+      `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
+      `real_l_chassis001_.chassis001.Box.Face3`). `<inner_link_name>` is the
+      Name of the App::Link inside the Real element (e.g. `chassis001`,
+      `wheel001`) — NOT the source body name (e.g. `chassis`, `wheel`).
+      Do NOT create LCS objects —
       plain subelement references are enough. To pick the right face/vertex,
-      first call `get_object_info(link, include_geometry=True)` and use the
+      first call `get_object_info(link)` and use the
       geometric information (`center_of_mass`, `normal`, `surface_type`,
       `bound_box`, `vertices`, `point`) to understand where each face/vertex
       actually lies — do not guess from the index alone.
@@ -1450,6 +1438,18 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       its local Z (and with it the child kinematic chain and end link) into
       the required direction. Do NOT rotate the link to fix the final pose —
       rotate the joint.
+   e-bis. Mirroring a link to the other side of the parent: if the joint is
+      oriented correctly AND the link is oriented correctly, but the link's
+      body penetrates the parent link's body through its full height (the
+      link should sit on the opposite side), rotate the LINK 180° about the
+      X axis: `rotate_object(link_name, 'x', 180)`. The link is aligned along
+      its local Z (the functional axis), so rotating it about X mirrors it
+      about Z — the link flips to the other side of the joint while its
+      Z-axis alignment and the joint orientation stay intact. Use the X axis,
+      NOT Z: rotating the link about Z would only spin it around its own
+      functional axis and would not mirror it at all. Use this for wheels on
+      one side, or generally to place symmetric links on opposite sides of a
+      parent kinematic chain.
    f. Verify with another snapshot.
 7. Add collisions: `create_collision(link_or_robot)` — default WITHOUT `type`
    (type `copy`). Primitive `type` values (`box`, `sphere`, `cylinder_x/y/z`)
@@ -1474,13 +1474,13 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 - `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps
   the contact zones of two neighbouring links by two references (one on the
   parent link, one on the child link): a face/edge/vertex/circle of the link
-  Real element as `<real_link>.<body>.<subelement>` (e.g.
+  Real element as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
   `real_l_chassis001_.chassis001.Box.Face3`) or an already existing LCS; a
   robot link (`l_...`) cannot be a reference. `move='leaf'` (default) — only
   for the final chain element; `child_branch`/`parent_tree` are advanced.
   Only the two references go into the selection (the target is not selected).
 - To choose the correct face/vertex reference, use the geometric information
-  from `get_object_info(link, include_geometry=True)` (`center_of_mass`,
+  from `get_object_info(link)` (`center_of_mass`,
   `normal`, `surface_type`, `bound_box`, `vertices`, `point`) to understand
   the spatial arrangement of the faces/vertices — do not rely on the index
   alone.
@@ -1501,6 +1501,17 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   will not roll. Do NOT rotate the LINK for this: the link is mounted on the
   joint and follows it, so rotating the link breaks its alignment with the
   joint's local Z.
+- Mirroring a link to the other side of the parent: when the joint is
+  oriented correctly AND the link is oriented correctly, but the link's body
+  penetrates the parent link's body through its full height (the link should
+  be mirrored to the opposite side), rotate the LINK 180° about the X axis
+  with `rotate_object(link_name, 'x', 180)`. The link is aligned along its
+  local Z (the functional axis), so rotating it about X mirrors it about Z:
+  the link flips to the other side of the joint while its Z-axis alignment
+  and the joint orientation stay intact. Use the X axis, NOT Z: rotating the
+  link about Z would only spin it around its own functional axis and would
+  not mirror it. Use this for wheels on one side, or generally to place
+  symmetric links on opposite sides of a parent kinematic chain.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
   Real element. ONLY on explicit user request.
 """,
@@ -1572,10 +1583,9 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
 
 - `list_scene_objects()` — scene description (robots, links, joints, other
   objects) with placements.
-- `get_object_info(object_name, include_geometry, include_faces,
-  include_vertices, max_items)` — one object details (Real, Visual, Collision,
-  Mass, joint limits, ...). With `include_geometry=True` (default) it also
-  returns `Geometry`: the spatial description of every face and vertex in
+- `get_object_info(object_name, max_internal_geometry_items)` — one object details
+  (Real, Visual, Collision, Mass, joint limits, ...). It always returns
+  `Geometry`: the spatial description of every face and vertex in
   **global** coordinates. A face has a 1-based `index` (`Face1`, `Face2`, ...),
   its `center_of_mass`, the `normal` at its centre, its `surface_type`
   (`Plane`, `Cylinder`, `Sphere`, `Cone`, `Torus`, ...), `area`, `bound_box`
@@ -1590,7 +1600,7 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   information (`center_of_mass`, `normal`, `surface_type`, `bound_box`,
   `vertices`, `point`), NOT the face/vertex index alone. The index only
   identifies the subelement; the coordinates tell you where it actually is.
-  Call `get_object_info(..., include_geometry=True)` before choosing
+  Call `get_object_info(...)` before choosing
   positioning references, so the reference is picked from real coordinates
   rather than guessed.
 - `get_snapshot(width, height, format)` — 3D view capture; returns a base64
@@ -1602,7 +1612,7 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
 - Resolve exact names with `list_scene_objects()` / `get_object_info()` before
   positioning.
 - To understand where faces/vertices are located, use the geometric
-  information from `get_object_info(..., include_geometry=True)`
+  information from `get_object_info(...)`
   (`center_of_mass`, `normal`, `surface_type`, `bound_box`, `vertices`,
   `point`) — never rely on the face/vertex index alone.
 - Order: robot and links -> joints -> positioning -> collisions/materials.
@@ -1616,6 +1626,17 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   around its local Z, so a wheel whose axle is not along that Z will not roll.
   Do NOT rotate the LINK for this — the link follows its joint, so rotating
   the link breaks its alignment with the joint's local Z.
+- If the joint and the link are both correctly oriented but the link's body
+  penetrates the parent link's body through its full height, mirror the link
+  to the other side by rotating the LINK 180° about the X axis:
+  `rotate_object(link_name, 'x', 180)`. The link is aligned along its local Z
+  (the functional axis), so rotating it about X mirrors it about Z: the link
+  simply ends up on the opposite side of the joint, still attached to it,
+  while the joint orientation and the link's Z-axis alignment are preserved.
+  Use the X axis, NOT Z: rotating the link about Z would only spin it around
+  its own functional axis and would not mirror it. This is the way to place
+  symmetric links (e.g. wheels) on opposite sides of a parent kinematic
+  chain.
 - Do NOT create LCS objects: `create_lcs()` only on explicit user request;
   plain subelement references are enough.
 - Prefer explicit subelement references over guessing by eye.

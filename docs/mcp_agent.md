@@ -129,6 +129,24 @@ Do **not** call `rotate_object` on the link to fix its orientation relative to
 the joint: the link must stay aligned with the joint's local Z, and rotating
 the link is exactly what breaks that alignment.
 
+**Mirroring a link to the other side of the parent.** There is one case where
+rotating the link is the correct fix: when the joint is oriented correctly
+**and** the link is oriented correctly, but the link's body penetrates the
+parent link's body through its full height (the link should sit on the
+opposite side). Rotate the **link** 180° about the **X axis**:
+
+```
+rotate_object(link_name, 'x', 180)
+```
+
+The link is aligned along its local Z (the functional axis), so rotating it
+about X mirrors it about Z: the link flips to the other side of the joint
+while its Z-axis alignment and the joint orientation stay intact. Use the
+**X axis, not Z**: because the link is aligned along its local Z, rotating it
+about Z would only spin the link around its own functional axis and would not
+mirror it at all. Use this for wheels on one side, or generally to place
+symmetric links on opposite sides of a parent kinematic chain.
+
 **Do not create LCS objects** — plain subelement references are enough.
 `create_lcs` is used **only if the user explicitly asks for it**.
 
@@ -139,23 +157,32 @@ the link is exactly what breaks that alignment.
 
 **A robot link cannot be a reference for `set_placement_between`** — only a
 face, edge, vertex, circle or LCS on the Real element of a link. The
-subelement reference is given as `<real_link>.<body>.<subelement>`, e.g.
+subelement reference is given as
+`<real_link>.<inner_link_name>.<feature>.<subelement>`, e.g.
 `real_l_chassis001_.chassis001.Box.Face3` (`<real_link>` is the Real element
-link of the robot link, `real_l_...`; `<body>` is the body inside the link
-Real element; `Face3` is the subelement). The path **must** start with the
-Real element link (`real_l_...`); a path from the robot link (`l_...`), e.g.
-`l_chassis001.chassis001.Box.Vertex3`, is invalid and is rejected with an
-error. The path is tolerant: the body may be given either as `Name` or
-`Label`, intermediate levels may be omitted, and the internal Real element
-name (`real_l_...`) is accepted though not required. If the path cannot be
-resolved, the error lists the tried variants.
+link of the robot link, `real_l_...`; `<inner_link_name>` is the **Name of the
+`App::Link` inside the Real element** — e.g. `chassis001`, `wheel001` — **NOT
+the name of the source body the link was filled from** — e.g. `chassis`,
+`wheel`; `Box` is the feature; `Face3` is the subelement). The path **must**
+start with the Real element link (`real_l_...`); a path from the robot link
+(`l_...`), e.g. `l_chassis001.chassis001.Box.Vertex3`, is invalid and is
+rejected with an error. The path is tolerant: the inner link may be given
+either as `Name` or `Label`, intermediate levels may be omitted, and the
+internal Real element name (`real_l_...`) is accepted though not required. If
+the path cannot be resolved, the error lists the tried variants.
+
+> **Common mistake:** using the source body name (`chassis`, `wheel`) instead
+> of the inner link Name (`chassis001`, `wheel001`). The Real element of a
+> link contains an `App::Link` whose `Name` is what must appear in the
+> reference. Inspect the Real element with `get_object_info('real_l_...')` to
+> read the inner link `Name` before building the reference.
 
 | Tool | Description |
 |---|---|
-| `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method.** Snaps the contact zones of two neighbouring links by two references (analog of `Set Placement - fast`). References: face/edge/vertex/circle of the link Real element as `<real_link>.<body>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`) or an already existing LCS; a robot link (`l_...`) cannot be a reference — the path must start with the Real element link (`real_l_...`). Only `ref1` and `ref2` are put into the selection (the `target` is not selected). One reference must lie on the parent link, the other on the child link. **Do NOT create LCS objects** — plain subelement references are enough. `move` defaults to `leaf` — currently only suitable for the final (leaf) element of the kinematic chain. |
+| `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method.** Snaps the contact zones of two neighbouring links by two references (analog of `Set Placement - fast`). References: face/edge/vertex/circle of the link Real element as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`) or an already existing LCS; a robot link (`l_...`) cannot be a reference — the path must start with the Real element link (`real_l_...`). `<inner_link_name>` is the **Name of the `App::Link` inside the Real element** (e.g. `chassis001`, `wheel001`) — **NOT the source body name** (e.g. `chassis`, `wheel`). Only `ref1` and `ref2` are put into the selection (the `target` is not selected). One reference must lie on the parent link, the other on the child link. **Do NOT create LCS objects** — plain subelement references are enough. `move` defaults to `leaf` — currently only suitable for the final (leaf) element of the kinematic chain. |
 | `set_placement_vision_mode(robot)` | Show only the Real elements of the robot links, hide Visual and Collision. Call before positioning. |
 | `rotate_object(object_name, axis, angle_deg)` | Rotate the joint Origin / link MountedPlacement / LCS. Used to correct the orientation of the joint and of the link relative to the joint after a control snapshot. |
-| `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Use only if the user explicitly asks for it** — the basic positioning algorithm never requires creating an LCS: use plain subelement references in `set_placement_between` instead. **Important:** the subelement reference is given as `<real_link>.<body>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`); a path from the robot link (`l_...`) is invalid. |
+| `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Use only if the user explicitly asks for it** — the basic positioning algorithm never requires creating an LCS: use plain subelement references in `set_placement_between` instead. **Important:** the subelement reference is given as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`), where `<inner_link_name>` is the **Name of the `App::Link` inside the Real element** (e.g. `chassis001`) — **NOT the source body name** (e.g. `chassis`); a path from the robot link (`l_...`) is invalid. |
 
 ### Material and inertia
 
