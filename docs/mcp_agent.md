@@ -123,6 +123,14 @@ link about the wrong axis and the wheel will not roll. The link is mounted on
 the joint and follows it, so **rotating the link itself would break this
 alignment** (it would turn the link relative to the joint's Z). Instead:
 
+> **Chassis: all wheel Z axes must point the same way (to the left).** For a
+> chassis (a parent with several symmetric wheels), all wheels' joint local Z
+> axes (the wheel axles) MUST point in the SAME direction — to the LEFT. Do
+> not mirror the joints so that opposite wheels point in opposite directions:
+> every wheel's Z axis must be parallel and point the same way (left), so that
+> all wheels roll consistently. If a wheel's Z axis points the other way,
+> rotate its JOINT (not the link) to flip it into the common left direction.
+
 1. **Orient the joint's local Z along the link's functional axis** by rotating
    the JOINT with `rotate_object(joint_name, axis, angle_deg)`. There is no
    `axis` parameter on `create_joint` — the joint's local Z is aimed purely by
@@ -152,6 +160,31 @@ while its Z-axis alignment and the joint orientation stay intact. Use the
 about Z would only spin the link around its own functional axis and would not
 mirror it at all. Use this for wheels on one side, or generally to place
 symmetric links on opposite sides of a parent kinematic chain.
+
+> **MANDATORY OVERLAP CHECK — NEVER SKIP, DO IT FOR EVERY CHILD ONE BY ONE.**
+> After positioning EACH child link (and after every `rotate_object` on its
+> joint) you MUST verify that the child link does NOT overlap the parent
+> link's body. Do NOT assume that because one child is fine the others are
+> too: symmetric children placed on opposite corners of the same parent
+> commonly end up on OPPOSITE sides of the parent's body — some outside
+> (correct), some inside (overlapping, wrong). This is exactly the case for a
+> 4-wheeled chassis: the wheels on the two corners at one end sit outside,
+> while the wheels on the two corners at the other end sit inside the chassis
+> body and MUST be mirrored. Procedure (repeat for each child):
+> 1. `get_object_info(child_link)` — read the global coordinates of its
+>    `Geometry` (`center_of_mass`, `vertices`, face `center_of_mass`).
+> 2. `get_object_info(parent_link)` — read the global coordinate range
+>    (bounding box) of the parent's `Geometry`.
+> 3. If the child's body lies INSIDE the parent's body (its coordinates fall
+>    within the parent's bounding range along the axis perpendicular to the
+>    mounting face), the child OVERLAPS the parent and MUST be mirrored.
+> 4. Mirror it by rotating the LINK 180° about the X axis:
+>    `rotate_object(child_link, 'x', 180)`, then re-run `get_object_info` and
+>    confirm the child now lies OUTSIDE the parent's body.
+>
+> A child that overlaps the parent is a positioning FAILURE, not an
+> acceptable result. Do NOT proceed to the next child, to collisions, or to
+> materials until EVERY child has passed this check.
 
 **Do not create LCS objects** — plain subelement references are enough.
 `create_lcs` is used **only if the user explicitly asks for it**.
