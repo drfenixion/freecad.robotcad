@@ -128,8 +128,6 @@ def _obj_basic_info(obj: fc.DocumentObject) -> dict[str, Any]:
     }
     if hasattr(obj, 'Placement'):
         info['Placement'] = _placement_to_dict(obj.Placement)
-    if is_link(obj) and hasattr(obj, 'MountedPlacement'):
-        info['MountedPlacement'] = _placement_to_dict(obj.MountedPlacement)
     return info
 
 
@@ -699,7 +697,15 @@ def set_placement_between(
 
 
 def rotate_object(object_name: str, axis: str = 'z', angle_deg: float = 45.0) -> dict[str, Any]:
-    """Rotate a joint Origin, link MountedPlacement or LCS by an angle."""
+    """Rotate a joint Origin, link MountedPlacement or LCS by an angle.
+
+    To orient a jointed link, rotate the JOINT (its ``Origin``): the child
+    link follows the joint, so rotating the joint aims the joint's local Z
+    (and the link with it). Do NOT rotate the LINK to align its functional
+    axis with the joint's local Z — the link is mounted on the joint and
+    follows it, so rotating the link breaks that alignment. Set the joint's
+    local Z along the link's functional axis with the ``axis`` parameter of
+    ``create_joint`` instead."""
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -1025,8 +1031,262 @@ def list_scene_objects() -> dict[str, Any]:
     return run_on_main_thread(_impl)
 
 
-def get_object_info(object_name: str) -> dict[str, Any]:
-    """Return detailed information about a single object."""
+# ---------------------------------------------------------------------------
+# Geometry inspection helpers
+# ---------------------------------------------------------------------------
+
+
+def _vector_to_list(vector: fc.Vector) -> list[float]:
+    """Convert a FreeCAD vector to a JSON-serializable ``[x, y, z]`` list."""
+    return [vector.x, vector.y, vector.z]
+
+
+def _bound_box_to_list(bound_box: fc.BoundBox) -> list[float]:
+    """Convert a bound box to ``[xmin, ymin, zmin, xmax, ymax, zmax]``."""
+    return [
+        bound_box.XMin, bound_box.YMin, bound_box.ZMin,
+        bound_box.XMax, bound_box.YMax, bound_box.ZMax,
+    ]
+
+
+def _resolve_shape_object(obj: fc.DocumentObject) -> Optional[fc.DocumentObject]:
+    """Return the object whose ``Shape`` holds the geometry to report.
+
+    For a ``Cross::Link`` the geometry lives in its ``Real`` element (the
+    ``App::Link`` named ``real_...``); for any other object the object itself
+    is used when it has a ``Shape``. Returns ``None`` when no shape is found.
+    """
+    if is_link(obj):
+        try:
+            return _find_link_real_element(obj)
+        except RuntimeError:
+            pass
+        # Fallback: the first Real element that carries a shape.
+        for real in getattr(obj, 'Real', []):
+            if hasattr(real, 'Shape'):
+                return real
+        return None
+    if hasattr(obj, 'Shape'):
+        return obj
+    return None
+
+
+def _ancestor_placement(obj: fc.DocumentObject) -> fc.Placement:
+    """Return the ancestor transform of ``obj`` (its own placement removed).
+
+    ``obj.Shape`` is **already placed by ``obj.Placement``**: for a box at
+    ``Placement=(100,0,0)`` the shape's bound box is ``(100,0,0)-(110,20,30)``,
+    i.e. the local box shifted by the object's own placement. ``obj.Placement``
+    is the object's own placement, while ``getGlobalPlacement()`` returns
+    ``ancestors * obj.Placement``. Removing the object's own placement leaves
+    the ancestor transform, which is what must be applied on top of
+    ``obj.Shape`` to reach global coordinates::
+
+        global_point = getGlobalPlacement() * obj.Placement.inverse() * shape_point
+                     = ancestors * obj.Placement * obj.Placement.inverse() * shape_point
+                     = ancestors * shape_point
+
+    The result is the identity for top-level objects and for the ``Real``
+    element of a robot link, whose shape is already in global coordinates
+    because the robot sets the ``App::Link`` placement.
+    """
+    if hasattr(obj, 'getGlobalPlacement'):
+        try:
+            return obj.getGlobalPlacement() * obj.Placement.inverse()
+        except Exception:  # noqa: BLE001
+            return fc.Placement()
+    return fc.Placement()
+
+
+def _face_info(
+    face: Any, index: int, ancestor_placement: fc.Placement,
+) -> dict[str, Any]:
+    """Return the spatial description of a single face (global coordinates).
+
+    The face is identified by its 1-based ``index`` (matching FreeCAD's
+    ``Face1``, ``Face2``, ...). The description contains the centre of mass,
+    the normal at the centre, the surface type, the area, the bounding box and
+    the coordinates of the face's vertices, so the agent can understand where
+    the face lies on the object's surface. ``ancestor_placement`` is applied to
+    the shape's points (which are already placed by the object's own
+    placement) to reach global coordinates.
+    """
+    info: dict[str, Any] = {
+        'index': index,
+        'name': f'Face{index}',
+        'area': face.Area,
+        'center_of_mass': _vector_to_list(
+            ancestor_placement.multVec(face.CenterOfMass),
+        ),
+        'bound_box': _bound_box_to_list(face.BoundBox),
+        'orientation': str(face.Orientation),
+        'vertices': [
+            _vector_to_list(ancestor_placement.multVec(v.Point))
+            for v in face.Vertexes
+        ],
+    }
+    # Normal at the centre of the face's parameter range.
+    try:
+        u0, u1, v0, v1 = face.ParameterRange
+        normal = face.normalAt((u0 + u1) / 2.0, (v0 + v1) / 2.0)
+        info['normal'] = _vector_to_list(
+            ancestor_placement.Rotation.multVec(normal),
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    surface = getattr(face, 'Surface', None)
+    surface_type = surface.__class__.__name__ if surface is not None else 'Unknown'
+    info['surface_type'] = surface_type
+    # Surface-specific parameters, transformed to global coordinates.
+    try:
+        if surface_type == 'Plane':
+            info['plane_normal'] = _vector_to_list(
+                ancestor_placement.Rotation.multVec(surface.Axis),
+            )
+            info['plane_origin'] = _vector_to_list(
+                ancestor_placement.multVec(surface.Position),
+            )
+        elif surface_type == 'Cylinder':
+            info['axis'] = _vector_to_list(
+                ancestor_placement.Rotation.multVec(surface.Axis),
+            )
+            info['radius'] = surface.Radius
+            info['center'] = _vector_to_list(
+                ancestor_placement.multVec(surface.Center),
+            )
+        elif surface_type == 'Sphere':
+            info['radius'] = surface.Radius
+            info['center'] = _vector_to_list(
+                ancestor_placement.multVec(surface.Center),
+            )
+        elif surface_type == 'Cone':
+            info['axis'] = _vector_to_list(
+                ancestor_placement.Rotation.multVec(surface.Axis),
+            )
+            info['radius'] = surface.Radius
+            info['semi_angle'] = surface.SemiAngle
+            info['apex'] = _vector_to_list(
+                ancestor_placement.multVec(surface.Apex),
+            )
+        elif surface_type == 'Torus':
+            info['axis'] = _vector_to_list(
+                ancestor_placement.Rotation.multVec(surface.Axis),
+            )
+            info['major_radius'] = surface.MajorRadius
+            info['minor_radius'] = surface.MinorRadius
+            info['center'] = _vector_to_list(
+                ancestor_placement.multVec(surface.Center),
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    return info
+
+
+def _vertex_info(
+    vertex: Any, index: int, ancestor_placement: fc.Placement,
+) -> dict[str, Any]:
+    """Return the spatial description of a single vertex (global coordinates).
+
+    The vertex is identified by its 1-based ``index`` (matching FreeCAD's
+    ``Vertex1``, ``Vertex2``, ...). ``ancestor_placement`` is applied to the
+    shape's point (already placed by the object's own placement) to reach
+    global coordinates.
+    """
+    return {
+        'index': index,
+        'name': f'Vertex{index}',
+        'point': _vector_to_list(ancestor_placement.multVec(vertex.Point)),
+    }
+
+
+def _object_geometry_info(
+    obj: fc.DocumentObject,
+    include_faces: bool,
+    include_vertices: bool,
+    max_items: int,
+) -> dict[str, Any]:
+    """Return the faces and vertices of an object in global coordinates."""
+    shape_obj = _resolve_shape_object(obj)
+    if shape_obj is None:
+        return {
+            'error': (
+                f'Object "{obj.Name}" has no shape geometry. For a Cross::Link '
+                'make sure it has a Real element.'
+            ),
+        }
+    shape = shape_obj.Shape
+    # ``shape`` is already placed by ``shape_obj.Placement``; the ancestor
+    # transform is applied on top to reach global coordinates.
+    ancestor_placement = _ancestor_placement(shape_obj)
+    result: dict[str, Any] = {
+        'shape_object': shape_obj.Name,
+        'coordinate_system': 'global',
+        'ancestor_placement': _placement_to_dict(ancestor_placement),
+        'bound_box': _bound_box_to_list(shape.BoundBox),
+        'face_count': len(shape.Faces),
+        'vertex_count': len(shape.Vertexes),
+    }
+    try:
+        result['center_of_mass'] = _vector_to_list(
+            ancestor_placement.multVec(shape.CenterOfGravity),
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        result['volume'] = shape.Volume
+        result['area'] = shape.Area
+    except Exception:  # noqa: BLE001
+        pass
+    if include_faces:
+        faces = list(shape.Faces)
+        truncated = bool(max_items) and len(faces) > max_items
+        if truncated:
+            faces = faces[:max_items]
+        result['faces'] = [
+            _face_info(face, i + 1, ancestor_placement)
+            for i, face in enumerate(faces)
+        ]
+        if truncated:
+            result['faces_truncated'] = True
+    if include_vertices:
+        vertices = list(shape.Vertexes)
+        truncated = bool(max_items) and len(vertices) > max_items
+        if truncated:
+            vertices = vertices[:max_items]
+        result['vertices'] = [
+            _vertex_info(vertex, i + 1, ancestor_placement)
+            for i, vertex in enumerate(vertices)
+        ]
+        if truncated:
+            result['vertices_truncated'] = True
+    return result
+
+
+def get_object_info(
+    object_name: str,
+    include_geometry: bool = True,
+    include_faces: bool = True,
+    include_vertices: bool = True,
+    max_items: int = 1000,
+) -> dict[str, Any]:
+    """Return detailed information about a single object.
+
+    When ``include_geometry`` is True, the returned dict also contains a
+    ``Geometry`` entry with the spatial description of every face and vertex
+    of the object, in **global** coordinates:
+
+    - a face is described by its 1-based ``index`` (``Face1``, ``Face2``, ...),
+      its centre of mass, the normal at its centre, its surface type
+      (``Plane``, ``Cylinder``, ``Sphere``, ``Cone``, ``Torus``, ...), its
+      area, its bounding box and the coordinates of its vertices;
+    - a vertex is described by its 1-based ``index`` (``Vertex1``, ...) and its
+      coordinates.
+
+    For a ``Cross::Link`` the geometry of its ``Real`` element is reported, so
+    the face/vertex indices can be used directly in positioning references
+    (e.g. ``real_l_...Face3``). ``max_items`` caps the number of faces and
+    vertices returned (default 1000; 0 = no limit).
+    """
 
     def _impl() -> dict[str, Any]:
         obj = _resolve_object(object_name)
@@ -1046,6 +1306,7 @@ def get_object_info(object_name: str) -> dict[str, Any]:
             info['Real'] = [r.Name for r in getattr(obj, 'Real', [])]
             info['Visual'] = [v.Name for v in getattr(obj, 'Visual', [])]
             info['Collision'] = [c.Name for c in getattr(obj, 'Collision', [])]
+            info['MountedPlacement'] = _placement_to_dict(obj.MountedPlacement)
             # Mass is a Base.Quantity, convert to a JSON-serializable string.
             mass = getattr(obj, 'Mass', None)
             info['Mass'] = str(mass) if mass is not None else None
@@ -1060,6 +1321,10 @@ def get_object_info(object_name: str) -> dict[str, Any]:
             upper = getattr(obj, 'UpperLimit', None)
             info['LowerLimit'] = str(lower) if lower is not None else None
             info['UpperLimit'] = str(upper) if upper is not None else None
+        if include_geometry:
+            info['Geometry'] = _object_geometry_info(
+                obj, include_faces, include_vertices, max_items,
+            )
         return info
 
     return run_on_main_thread(_impl)
@@ -1071,12 +1336,11 @@ def get_object_info(object_name: str) -> dict[str, Any]:
 
 
 def get_snapshot(
-    path: Optional[str] = None,
     width: int = 1024,
     height: int = 768,
     format: str = 'png',
 ) -> dict[str, Any]:
-    """Save a snapshot of the active 3D view, return its path and a base64 data URI."""
+    """Capture the active 3D view and return it as a base64 data URI."""
 
     def _impl() -> dict[str, Any]:
         if not fc.GuiUp:
@@ -1100,28 +1364,29 @@ def get_snapshot(
         fcgui.SendMsgToActiveView('ViewFit')
         # Let the GUI process the view fit / redraw before capturing.
         QtGui.QApplication.processEvents()
-        if path is None:
-            fd, tmp_path = tempfile.mkstemp(suffix=f'.{format}')
-            os.close(fd)
-            save_path = tmp_path
-        else:
-            save_path = str(Path(path).expanduser())
-        # saveImage() may return None even on success (it saves the file
-        # directly), so verify the file on disk instead of the return value.
-        view.saveImage(save_path, width, height, 'White')
-        if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
-            raise RuntimeError(f'Failed to save image to {save_path}')
-        result: dict[str, Any] = {
-            'path': save_path,
+        # saveImage() writes to a file, so use a temporary one and read it back.
+        fd, save_path = tempfile.mkstemp(suffix=f'.{format}')
+        os.close(fd)
+        try:
+            # saveImage() may return None even on success (it saves the file
+            # directly), so verify the file on disk instead of the return value.
+            view.saveImage(save_path, width, height, 'White')
+            if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
+                raise RuntimeError('Failed to capture the 3D view.')
+            with open(save_path, 'rb') as f:
+                data = f.read()
+        finally:
+            try:
+                os.remove(save_path)
+            except OSError:
+                pass
+        mime = 'image/png' if format == 'png' else f'image/{format}'
+        return {
             'width': width,
             'height': height,
             'format': format,
+            'data_uri': f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}',
         }
-        with open(save_path, 'rb') as f:
-            data = f.read()
-        mime = 'image/png' if format == 'png' else f'image/{format}'
-        result['data_uri'] = f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}'
-        return result
 
     return run_on_main_thread(_impl)
 
@@ -1163,13 +1428,29 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       face/edge/vertex/circle of the link Real element as
       `<real_link>.<body>.<subelement>` (e.g.
       `real_l_chassis001_.chassis001.Box.Face3`). Do NOT create LCS objects —
-      plain subelement references are enough.
+      plain subelement references are enough. To pick the right face/vertex,
+      first call `get_object_info(link, include_geometry=True)` and use the
+      geometric information (`center_of_mass`, `normal`, `surface_type`,
+      `bound_box`, `vertices`, `point`) to understand where each face/vertex
+      actually lies — do not guess from the index alone.
    b. `set_placement_between(target, ref1, ref2)` — only the two references
       go into the selection.
    c. Control snapshot: `get_snapshot(...)`.
-   d. If the orientation is wrong, correct it with
-      `rotate_object(object_name, axis, angle_deg)`.
-   e. Verify with another snapshot.
+   d. Make the JOINT's local Z axis lie along the child link's functional
+      axis (a revolute/continuous joint always rotates around its local Z, a
+      prismatic joint always moves along its local Z). Set this direction with
+      the `axis` parameter of `create_joint` (the local Z is rotated to point
+      along `[x, y, z]`; e.g. a wheel whose axle is along Y -> `axis=[0, 1,
+      0]`). A wheel whose axle is not along the joint's local Z will not roll.
+      Do NOT rotate the LINK to achieve this: the link is mounted on the joint
+      and follows it, so rotating the link would break its alignment with the
+      joint's local Z.
+   e. Then aim the whole assembly by rotating the JOINT with
+      `rotate_object(object_name, axis, angle_deg)`: rotating the joint turns
+      its local Z (and with it the child kinematic chain and end link) into
+      the required direction. Do NOT rotate the link to fix the final pose —
+      rotate the joint.
+   f. Verify with another snapshot.
 7. Add collisions: `create_collision(link_or_robot)` — default WITHOUT `type`
    (type `copy`). Primitive `type` values (`box`, `sphere`, `cylinder_x/y/z`)
    ONLY on explicit user request.
@@ -1198,12 +1479,28 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   robot link (`l_...`) cannot be a reference. `move='leaf'` (default) — only
   for the final chain element; `child_branch`/`parent_tree` are advanced.
   Only the two references go into the selection (the target is not selected).
+- To choose the correct face/vertex reference, use the geometric information
+  from `get_object_info(link, include_geometry=True)` (`center_of_mass`,
+  `normal`, `surface_type`, `bound_box`, `vertices`, `point`) to understand
+  the spatial arrangement of the faces/vertices — do not rely on the index
+  alone.
 - Do NOT create LCS objects: plain subelement references are enough.
   `create_lcs` ONLY on explicit user request.
 - `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision;
   call before positioning.
 - `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`,
   link `MountedPlacement` or LCS; correct orientation after a snapshot.
+  Rotating a joint aims its local Z axis (revolute/continuous rotate around
+  Z, prismatic moves along Z) and rotates its child kinematic chain and end
+  link together with it.
+- Orientation rule: make the JOINT's local Z lie along the child link's
+  functional axis by setting the `axis` parameter of `create_joint` (e.g.
+  `axis=[0, 1, 0]` for a wheel whose axle is along Y), then rotate the JOINT
+  to aim that axis in the required direction. A revolute/continuous joint
+  always spins around its local Z, so a wheel whose axle is not along that Z
+  will not roll. Do NOT rotate the LINK for this: the link is mounted on the
+  joint and follows it, so rotating the link breaks its alignment with the
+  joint's local Z.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
   Real element. ONLY on explicit user request.
 """,
@@ -1223,6 +1520,35 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
   joints: `chain` = consecutive links, `spider` = all to the first link.
 - `set_joint_values(robot, values)` — joint ROS names (or Labels) -> degrees
   (revolute) or mm (prismatic).
+
+### Joint axis orientation (IMPORTANT)
+
+- A `revolute` or `continuous` joint **rotates around its local Z axis** — the
+  blue arrow shown on the joint in the 3D view.
+- A `prismatic` joint **moves along its local Z axis** — the same blue arrow.
+- After positioning, the joint can be rotated with the rotation tools
+  (`rotate_object`) to aim its Z axis in the required direction. Rotating a
+  joint also rotates its **child kinematic chain and the end link** together
+  with it, so the whole downstream branch follows the joint orientation.
+- Therefore, to orient a wheel/arm correctly, rotate the JOINT (not only the
+  link): the child link and everything after it turn with the joint.
+- **Make the joint's local Z lie along the child link's functional axis.**
+  A revolute or continuous joint always rotates around its local Z, so the
+  child link's functional axis (e.g. a wheel's axle) must be aligned with that
+  local Z — otherwise the joint will spin the link about the wrong axis and
+  the wheel will not roll. Set this direction with the `axis` parameter of
+  `create_joint` (the local Z is rotated to point along `[x, y, z]`; e.g. a
+  wheel whose axle is along Y -> `axis=[0, 1, 0]`).
+- **Do NOT rotate the LINK to achieve this.** The link is mounted on the joint
+  and follows it; rotating the link turns it relative to the joint's local Z
+  and therefore breaks exactly the alignment you need.
+- **Then aim the whole assembly by rotating the JOINT**, not the link: use
+  `rotate_object` on the joint to turn its local Z (and the child link with
+  it) into the required direction. Rotating only the link would leave the
+  joint's rotation axis pointing the wrong way.
+- Summary: (1) set the joint's local Z along the link's functional axis via
+  the `axis` parameter of `create_joint`; (2) rotate the JOINT to point that
+  axis where it is needed.
 """,
     'collisions': """\
 ## Collisions
@@ -1246,20 +1572,50 @@ given `[x, y, z]` direction — it does not add a new degree of freedom.
 
 - `list_scene_objects()` — scene description (robots, links, joints, other
   objects) with placements.
-- `get_object_info(object_name)` — one object details (Real, Visual,
-  Collision, Mass, joint limits, ...).
-- `get_snapshot(path, width, height, format)` — 3D view capture; returns
-  path + base64 `data:` URI.
+- `get_object_info(object_name, include_geometry, include_faces,
+  include_vertices, max_items)` — one object details (Real, Visual, Collision,
+  Mass, joint limits, ...). With `include_geometry=True` (default) it also
+  returns `Geometry`: the spatial description of every face and vertex in
+  **global** coordinates. A face has a 1-based `index` (`Face1`, `Face2`, ...),
+  its `center_of_mass`, the `normal` at its centre, its `surface_type`
+  (`Plane`, `Cylinder`, `Sphere`, `Cone`, `Torus`, ...), `area`, `bound_box`
+  and the coordinates of its `vertices`; a vertex has a 1-based `index`
+  (`Vertex1`, ...) and its `point`. For a `Cross::Link` the geometry of its
+  `Real` element is reported, so the indices can be used directly in
+  positioning references (e.g. `real_l_...Face3`).
+
+  IMPORTANT: to understand the spatial arrangement of faces and vertices —
+  which face is on top, which faces are parallel, which vertex is a corner,
+  where a face lies on the object's surface — ALWAYS use this geometric
+  information (`center_of_mass`, `normal`, `surface_type`, `bound_box`,
+  `vertices`, `point`), NOT the face/vertex index alone. The index only
+  identifies the subelement; the coordinates tell you where it actually is.
+  Call `get_object_info(..., include_geometry=True)` before choosing
+  positioning references, so the reference is picked from real coordinates
+  rather than guessed.
+- `get_snapshot(width, height, format)` — 3D view capture; returns a base64
+  `data:` URI.
 """,
     'best_practices': """\
 ## Best practices
 
 - Resolve exact names with `list_scene_objects()` / `get_object_info()` before
   positioning.
+- To understand where faces/vertices are located, use the geometric
+  information from `get_object_info(..., include_geometry=True)`
+  (`center_of_mass`, `normal`, `surface_type`, `bound_box`, `vertices`,
+  `point`) — never rely on the face/vertex index alone.
 - Order: robot and links -> joints -> positioning -> collisions/materials.
 - `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()` if needed.
+- Orient a jointed link in two steps: (1) set the joint's local Z along the
+  link's functional axis via the `axis` parameter of `create_joint` (e.g.
+  `axis=[0, 1, 0]` for a wheel whose axle is along Y); (2) rotate the JOINT to
+  aim that axis where it is needed. A revolute/continuous joint always rotates
+  around its local Z, so a wheel whose axle is not along that Z will not roll.
+  Do NOT rotate the LINK for this — the link follows its joint, so rotating
+  the link breaks its alignment with the joint's local Z.
 - Do NOT create LCS objects: `create_lcs()` only on explicit user request;
   plain subelement references are enough.
 - Prefer explicit subelement references over guessing by eye.

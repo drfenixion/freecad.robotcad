@@ -195,12 +195,30 @@ TOOL_SCHEMAS: dict[str, dict] = {
     'get_object_info': {
         'properties': {
             'object_name': {'type': 'string', 'description': 'Object name or label'},
+            'include_geometry': {
+                'type': 'boolean',
+                'description': (
+                    'Include the spatial description of all faces and vertices '
+                    '(global coordinates). Default true.'
+                ),
+            },
+            'include_faces': {
+                'type': 'boolean',
+                'description': 'Include faces in Geometry (default true)',
+            },
+            'include_vertices': {
+                'type': 'boolean',
+                'description': 'Include vertices in Geometry (default true)',
+            },
+            'max_items': {
+                'type': 'integer',
+                'description': 'Max faces/vertices returned (default 1000)',
+            },
         },
         'required': ['object_name'],
     },
     'get_snapshot': {
         'properties': {
-            'path': {'type': 'string', 'description': 'Output path (temp file if omitted)'},
             'width': {'type': 'integer', 'description': 'Width (default 1024)'},
             'height': {'type': 'integer', 'description': 'Height (default 768)'},
             'format': {'type': 'string', 'enum': ['png', 'jpg', 'bmp'], 'description': 'Image format'},

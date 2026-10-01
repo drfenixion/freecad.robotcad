@@ -100,6 +100,35 @@ references go into the selection). A control snapshot is taken
 snapshot is taken to verify. The loop then repeats for the next links until
 all links are positioned.
 
+**Joint axis orientation.** A `revolute` or `continuous` joint **rotates
+around its local Z axis** (the blue arrow shown on the joint in the 3D view);
+a `prismatic` joint **moves along its local Z axis** (the same blue arrow).
+After positioning, the joint can be rotated with the rotation tools
+(`rotate_object`) to aim its Z axis in the required direction. Rotating a
+joint also rotates its **child kinematic chain and the end link** together
+with it, so the whole downstream branch follows the joint orientation — to
+orient a wheel/arm correctly, rotate the JOINT, not the link.
+
+**Align the joint's local Z with the child link's functional axis — by
+setting the JOINT, never by rotating the link.** Because a revolute/continuous
+joint always spins around its local Z, the child link's functional axis (e.g.
+a wheel's axle) must lie along that local Z — otherwise the joint rotates the
+link about the wrong axis and the wheel will not roll. The link is mounted on
+the joint and follows it, so **rotating the link itself would break this
+alignment** (it would turn the link relative to the joint's Z). Instead:
+
+1. **Set the joint's local Z along the link's functional axis** — pass the
+   desired direction as the `axis` parameter of `create_joint` (the local Z is
+   rotated to point along `[x, y, z]`). For a wheel whose axle is along Y, use
+   `axis=[0, 1, 0]`.
+2. **Aim the whole assembly by rotating the JOINT** with
+   `rotate_object(joint_name, axis, angle_deg)` — this turns the joint's local
+   Z (and the child link with it) into the required direction.
+
+Do **not** call `rotate_object` on the link to fix its orientation relative to
+the joint: the link must stay aligned with the joint's local Z, and rotating
+the link is exactly what breaks that alignment.
+
 **Do not create LCS objects** — plain subelement references are enough.
 `create_lcs` is used **only if the user explicitly asks for it**.
 
@@ -142,7 +171,7 @@ resolved, the error lists the tried variants.
 |---|---|
 | `list_scene_objects()` | JSON description of the scene (robots, links, joints, objects). |
 | `get_object_info(object_name)` | Detailed info about an object, including the contents of its group (`Group`). |
-| `get_snapshot(path, width, height, format)` | 3D view snapshot; returns the file path and a base64 `data:` URI for vision agents. |
+| `get_snapshot(width, height, format)` | 3D view snapshot; returns a base64 `data:` URI for vision agents. |
 
 ### Agent instructions
 
