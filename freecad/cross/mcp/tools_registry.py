@@ -1527,33 +1527,18 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       functional axis and would not mirror it at all. Use this for wheels on
       one side, or generally to place symmetric links on opposite sides of a
       parent kinematic chain.
-   e-quater. MANDATORY OVERLAP CHECK — NEVER SKIP, DO IT FOR EVERY CHILD.
-      After positioning EACH child link (and after every `rotate_object` on
-      its joint) you MUST verify that the child link does NOT overlap the
-      parent link's body. Do this for EVERY child one by one — do NOT assume
-      that because one child is fine the others are too. Symmetric children
-      placed on opposite corners of the same parent commonly end up on
-      OPPOSITE sides of the parent's body: some outside (correct), some
-      inside (overlapping, wrong). This is exactly the case for a 4-wheeled
-      chassis: wheels on the two corners at one end sit outside, while the
-      wheels on the two corners at the other end sit inside the chassis body
-      and MUST be mirrored.
-      Procedure (repeat for each child):
-        1. `get_object_info(child_link)` — read the global coordinates of its
-           `Geometry` (`center_of_mass`, `vertices`, face `center_of_mass`).
-        2. `get_object_info(parent_link)` — read the global coordinate range
-           (bounding box) of the parent's `Geometry`.
-        3. Compare: if the child's body lies INSIDE the parent's body (its
-           coordinates fall within the parent's bounding range along the axis
-           perpendicular to the mounting face), the child OVERLAPS the parent
-           and MUST be mirrored.
-        4. Mirror it by rotating the LINK 180° about the X axis:
-           `rotate_object(child_link, 'x', 180)` (see e-bis). Then re-run
-           `get_object_info(child_link)` and confirm the child now lies
-           OUTSIDE the parent's body.
-      A child that overlaps the parent is a positioning FAILURE, not an
-      acceptable result. Do NOT proceed to the next child, to collisions, or
-      to materials until EVERY child has passed this check.
+   e-quater. MANDATORY OVERLAP CHECK — HARD GATE. Run it for EACH child
+      individually, right after positioning it and after every `rotate_object`
+      on its joint, BEFORE the next child / collisions / materials. Never batch
+      or assume symmetry: opposite corners often put some children inside the
+      parent (overlap). Get the GLOBAL min/max of child and parent on ALL THREE
+      axes X/Y/Z via `get_object_info(...)` `Geometry` (do NOT check one axis
+      only, do NOT judge by eye). If the child's range on ANY axis is CONTAINED
+      inside the parent's on that axis → OVERLAP FAILURE: mirror the child with
+      `rotate_object(child_link, 'x', 180)` (see e-bis), then re-check. PRINT for
+      every child: `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..]
+      Z[..] -> OUTSIDE` (or `OVERLAP -> mirrored`). Never proceed until every
+      child passes and the numbers are printed.
    f. Verify with another snapshot.
 7. Add collisions: `create_collision(link_or_robot)` — default WITHOUT `type`
    (type `copy`). Primitive `type` values (`box`, `sphere`, `cylinder_x/y/z`)
@@ -1580,55 +1565,27 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 1. Get information about the parent link and its child links with
    `get_object_info(...)` (geometry of the Real element: faces, vertices,
    `center_of_mass`, `surface_type`).
-2. Choose the faces or vertices on which the child link will be placed by their geometry. 
-   Take the robot's link topology into account — it can be understood from the
-   robot's name or from the context (e.g. a 4-wheeled chassis: the parent is
-   the chassis, the children are the four wheels).
-   Remember, if you select a face, the attachment will be anchored to the coordinates of that face's center of mass.
+2. Choose the faces or vertices on which the child link will be placed by their
+   geometry. Take the robot's link topology into account — it can be understood
+   from the robot's name or from the context (e.g. a 4-wheeled chassis: the
+   parent is the chassis, the children are the four wheels). If you select a
+   face, the attachment is anchored to the coordinates of that face's center of
+   mass.
 3. Print a statement naming the parent link, the index of the face/vertex on
    it, the child link that will be attached to that face/vertex, and the
    face/vertex of the child link that will be joined to the parent. Format:
    `parent_robot_link_name face1/vertex1 - child_robot_link_name face1/vertex1`
 4. Perform `set_placement_between` for the parent/child robot link pair.
-   IMPORTANT: if `set_placement_between` returns no error but the target's
-   coordinates did NOT change, you have most likely moved it into its own
-   coordinates (the two references resolved to the same point). Verify the
-   target's placement with `get_object_info(target)` after the call and pick
-   different references (e.g. a face instead of a vertex) if nothing moved.
 5. Correct the direction of the Z axis of the child link's parent joint if
-   required. For a chassis (a parent with several symmetric wheels), all
-   wheels' joint local Z axes (the wheel axles) MUST point in the SAME
-   direction — to the LEFT. Do not mirror the joints so that opposite wheels
-   point in opposite directions: every wheel's Z axis must be parallel and
-   point the same way (left), so that all wheels roll consistently. If a
-   wheel's Z axis points the other way, rotate its JOINT (not the link) to
-   flip it into the common left direction.
-6. MANDATORY OVERLAP CHECK — NEVER SKIP, DO IT FOR EVERY CHILD ONE BY ONE.
-   After positioning EACH child link (and after every `rotate_object` on its
-   joint) you MUST verify that the child link does NOT overlap the parent
-   link's body. Do NOT assume that because one child is fine the others are
-   too: symmetric children placed on opposite corners of the same parent
-   commonly end up on OPPOSITE sides of the parent's body — some outside
-   (correct), some inside (overlapping, wrong). This is exactly the case for
-   a 4-wheeled chassis: the wheels on the two corners at one end sit outside,
-   while the wheels on the two corners at the other end sit inside the
-   chassis body and MUST be mirrored.
-   Procedure (repeat for each child):
-     a. `get_object_info(child_link)` — read the global coordinates of its
-        `Geometry` (`center_of_mass`, `vertices`, face `center_of_mass`).
-     b. `get_object_info(parent_link)` — read the global coordinate range
-        (bounding box) of the parent's `Geometry`.
-     c. Compare: if the child's body lies INSIDE the parent's body (its
-        coordinates fall within the parent's bounding range along the axis
-        perpendicular to the mounting face), the child OVERLAPS the parent
-        and MUST be mirrored.
-     d. Mirror it by rotating the LINK 180° about the X axis:
-        `rotate_object(child_link, 'x', 180)`. Then re-run
-        `get_object_info(child_link)` and confirm the child now lies OUTSIDE
-        the parent's body.
-   A child that overlaps the parent is a positioning FAILURE, not an
-   acceptable result. Do NOT proceed to the next child, to collisions, or to
-   materials until EVERY child has passed this check.
+   required.
+6. Run the MANDATORY OVERLAP CHECK for this child IMMEDIATELY — EACH child on
+   its own, on ALL THREE axes X/Y/Z (not just one), and PRINT the numeric
+   min/max evidence. Mirror the child if it is contained on any axis. Do NOT
+   start the next child, collisions or materials until this child passes.
+
+For the detailed rules of steps 4-6 — reference building, joint orientation,
+mirroring and the overlap-check procedure — follow the **General algorithm**
+(source of truth).
 
 - `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps
   the contact zones of two neighbouring links by two references (one on the
@@ -1638,43 +1595,10 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   robot link (`l_...`) cannot be a reference. `move='leaf'` (default) — only
   for the final chain element; `child_branch`/`parent_tree` are advanced.
   Only the two references go into the selection (the target is not selected).
-- Build each reference from the `Reference` block returned by
-  `get_object_info(link)` / `list_scene_objects()`: take `Reference.prefix`
-  and append `.FaceN` / `.VertexN` / `.EdgeN`. NEVER guess the inner link
-  name. Links filled from the same source body share one inner link name
-  (four wheels from one `wheel` body → all `wheel001`); the per-link suffix
-  is NOT valid.
-- To choose the correct face/vertex reference, use the geometric information
-  from `get_object_info(link)` (`center_of_mass`, `surface_type`, `vertices`,
-  `point`) to understand the spatial arrangement of the faces/vertices — do
-  not rely on the index alone.
-- Do NOT create LCS objects: plain subelement references are enough.
-  `create_lcs` ONLY on explicit user request.
 - `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision;
   call before positioning.
 - `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`,
   link `MountedPlacement` or LCS; correct orientation after a snapshot.
-  Rotating a joint aims its local Z axis (revolute/continuous rotate around
-  Z, prismatic moves along Z) and rotates its child kinematic chain and end
-  link together with it.
-- Orientation rule: orient the JOINT so its local Z lies along the child
-  link's functional axis by rotating the JOINT with
-  `rotate_object(joint_name, axis, angle_deg)`, then aim that axis in the
-  required direction. A revolute/continuous joint always spins around its
-  local Z, so a wheel whose axle is not along that Z will not roll. Do NOT
-  rotate the LINK for this: the link is mounted on the joint and follows it,
-  so rotating the link breaks its alignment with the joint's local Z.
-- Mirroring a link to the other side of the parent: when the joint is
-  oriented correctly AND the link is oriented correctly, but the link's body
-  penetrates the parent link's body through its full height (the link should
-  be mirrored to the opposite side), rotate the LINK 180° about the X axis
-  with `rotate_object(link_name, 'x', 180)`. The link is aligned along its
-  local Z (the functional axis), so rotating it about X mirrors it about Z:
-  the link flips to the other side of the joint while its Z-axis alignment
-  and the joint orientation stay intact. Use the X axis, NOT Z: rotating the
-  link about Z would only spin it around its own functional axis and would
-  not mirror it. Use this for wheels on one side, or generally to place
-  symmetric links on opposite sides of a parent kinematic chain.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
   Real element. ONLY on explicit user request.
 """,
@@ -1684,7 +1608,8 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 IMPORTANT: a joint always rotates around its **local Z axis** (revolute,
 continuous) or translates along its **local Z axis** (prismatic). The joint's
 local Z is oriented by rotating the JOINT itself with `rotate_object` — there
-is NO `axis` parameter on `create_joint`.
+is NO `axis` parameter on `create_joint`. See the **General algorithm**
+(source of truth) for the orientation and mirroring rules.
 
 - `create_joint(robot, name, parent_link, child_link, type, lower,
   upper, effort, velocity)` — joint between two links; `type`: `fixed`,
@@ -1694,34 +1619,6 @@ is NO `axis` parameter on `create_joint`.
   joints: `chain` = consecutive links, `spider` = all to the first link.
 - `set_joint_values(robot, values)` — joint ROS names (or Labels) -> degrees
   (revolute) or mm (prismatic).
-
-### Joint axis orientation (IMPORTANT)
-
-- A `revolute` or `continuous` joint **rotates around its local Z axis** — the
-  blue arrow shown on the joint in the 3D view.
-- A `prismatic` joint **moves along its local Z axis** — the same blue arrow.
-- The joint's local Z is aimed by rotating the JOINT with `rotate_object`.
-  Rotating a joint also rotates its **child kinematic chain and the end link**
-  together with it, so the whole downstream branch follows the joint
-  orientation.
-- Therefore, to orient a wheel/arm correctly, rotate the JOINT (not the
-  link): the child link and everything after it turn with the joint.
-- **Make the joint's local Z lie along the child link's functional axis.**
-  A revolute or continuous joint always rotates around its local Z, so the
-  child link's functional axis (e.g. a wheel's axle) must be aligned with that
-  local Z — otherwise the joint will spin the link about the wrong axis and
-  the wheel will not roll. Achieve this by rotating the JOINT with
-  `rotate_object(joint_name, axis, angle_deg)`.
-- **Do NOT rotate the LINK to achieve this.** The link is mounted on the joint
-  and follows it; rotating the link turns it relative to the joint's local Z
-  and therefore breaks exactly the alignment you need.
-- **Aim the whole assembly by rotating the JOINT**, not the link: use
-  `rotate_object` on the joint to turn its local Z (and the child link with
-  it) into the required direction. Rotating only the link would leave the
-  joint's rotation axis pointing the wrong way.
-- Summary: rotate the JOINT with `rotate_object` to point its local Z along
-  the link's functional axis and then into the required direction. The only
-  allowed rotation of a LINK is the 180° mirror about X (see Positioning).
 """,
     'collisions': """\
 ## Collisions
@@ -1778,69 +1675,19 @@ is NO `axis` parameter on `create_joint`.
 
 - Resolve exact names with `list_scene_objects()` / `get_object_info()` before
   positioning.
-- To understand where faces/vertices are located, use the geometric
-  information from `get_object_info(...)`
-  (`center_of_mass`, `surface_type`, `vertices`, `point`) — never rely on the
-  face/vertex index alone.
 - Order: robot and links -> joints -> positioning -> collisions/materials.
 - `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()` if needed.
-- If `set_placement_between()` returns no error but the target's coordinates
-  did NOT change, you have most likely moved it into its own coordinates (the
-  two references resolved to the same point). Check the target's placement
-  with `get_object_info(target)` after the call and choose different
-  references (e.g. a face instead of a vertex) if nothing moved.
-- Orient a jointed link by rotating the JOINT with `rotate_object` so its
-  local Z lies along the link's functional axis (e.g. a wheel's axle). A
-  revolute/continuous joint always rotates around its local Z, so a wheel
-  whose axle is not along that Z will not roll. Do NOT rotate the LINK for
-  this — the link follows its joint, so rotating the link breaks its alignment
-  with the joint's local Z.
-- For a chassis (a parent with several symmetric wheels), all wheels' joint
-  local Z axes (the wheel axles) MUST point in the SAME direction — to the
-  LEFT. Do not mirror the joints so that opposite wheels point in opposite
-  directions: every wheel's Z axis must be parallel and point the same way
-  (left), so that all wheels roll consistently. If a wheel's Z axis points the
-  other way, rotate its JOINT (not the link) to flip it into the common left
-  direction.
-- MANDATORY OVERLAP CHECK — NEVER SKIP, DO IT FOR EVERY CHILD ONE BY ONE.
-  After positioning EACH child link (and after every `rotate_object` on its
-  joint) you MUST verify that the child link does NOT overlap the parent
-  link's body. Do NOT assume that because one child is fine the others are
-  too: symmetric children placed on opposite corners of the same parent
-  commonly end up on OPPOSITE sides of the parent's body — some outside
-  (correct), some inside (overlapping, wrong). This is exactly the case for
-  a 4-wheeled chassis: the wheels on the two corners at one end sit outside,
-  while the wheels on the two corners at the other end sit inside the
-  chassis body and MUST be mirrored. Procedure (repeat for each child):
-  (a) `get_object_info(child_link)` — read the global coordinates of its
-  `Geometry` (`center_of_mass`, `vertices`, face `center_of_mass`);
-  (b) `get_object_info(parent_link)` — read the global coordinate range
-  (bounding box) of the parent's `Geometry`;
-  (c) if the child's body lies INSIDE the parent's body (its coordinates fall
-  within the parent's bounding range along the axis perpendicular to the
-  mounting face), the child OVERLAPS the parent and MUST be mirrored;
-  (d) mirror it by rotating the LINK 180° about the X axis:
-  `rotate_object(child_link, 'x', 180)`, then re-run `get_object_info` and
-  confirm the child now lies OUTSIDE the parent's body. A child that overlaps
-  the parent is a positioning FAILURE, not an acceptable result. Do NOT
-  proceed to the next child, to collisions, or to materials until EVERY child
-  has passed this check.
-- If the joint and the link are both correctly oriented but the link's body
-  penetrates the parent link's body through its full height, mirror the link
-  to the other side by rotating the LINK 180° about the X axis:
-  `rotate_object(link_name, 'x', 180)`. The link is aligned along its local Z
-  (the functional axis), so rotating it about X mirrors it about Z: the link
-  simply ends up on the opposite side of the joint, still attached to it,
-  while the joint orientation and the link's Z-axis alignment are preserved.
-  Use the X axis, NOT Z: rotating the link about Z would only spin it around
-  its own functional axis and would not mirror it. This is the way to place
-  symmetric links (e.g. wheels) on opposite sides of a parent kinematic
-  chain.
+- Follow the **General algorithm** (source of truth) for reference building,
+  joint orientation, the mandatory overlap check and mirroring.
+- The overlap check is a HARD GATE: run it for EACH child right after
+  positioning it, examine ALL THREE axes (X, Y, Z) of the child's vs the
+  parent's global coordinate ranges, and print the numbers. A child contained
+  inside the parent on any axis is a failure and must be mirrored
+  (`rotate_object(child, 'x', 180)`). Never inspect only one axis.
 - Do NOT create LCS objects: `create_lcs()` only on explicit user request;
   plain subelement references are enough.
-- Prefer explicit subelement references over guessing by eye.
 - Never guess the inner link name of a reference: read `Reference.prefix`
   from `get_object_info(link)` / `list_scene_objects()` and append the
   subelement. Links filled from the same source body share one inner link

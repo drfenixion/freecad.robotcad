@@ -161,30 +161,39 @@ about Z would only spin the link around its own functional axis and would not
 mirror it at all. Use this for wheels on one side, or generally to place
 symmetric links on opposite sides of a parent kinematic chain.
 
-> **MANDATORY OVERLAP CHECK — NEVER SKIP, DO IT FOR EVERY CHILD ONE BY ONE.**
-> After positioning EACH child link (and after every `rotate_object` on its
-> joint) you MUST verify that the child link does NOT overlap the parent
-> link's body. Do NOT assume that because one child is fine the others are
-> too: symmetric children placed on opposite corners of the same parent
-> commonly end up on OPPOSITE sides of the parent's body — some outside
-> (correct), some inside (overlapping, wrong). This is exactly the case for a
-> 4-wheeled chassis: the wheels on the two corners at one end sit outside,
-> while the wheels on the two corners at the other end sit inside the chassis
-> body and MUST be mirrored. Procedure (repeat for each child):
-> 1. `get_object_info(child_link)` — read the global coordinates of its
->    `Geometry` (`center_of_mass`, `vertices`, face `center_of_mass`).
-> 2. `get_object_info(parent_link)` — read the global coordinate range
->    (bounding box) of the parent's `Geometry`.
-> 3. If the child's body lies INSIDE the parent's body (its coordinates fall
->    within the parent's bounding range along the axis perpendicular to the
->    mounting face), the child OVERLAPS the parent and MUST be mirrored.
-> 4. Mirror it by rotating the LINK 180° about the X axis:
->    `rotate_object(child_link, 'x', 180)`, then re-run `get_object_info` and
->    confirm the child now lies OUTSIDE the parent's body.
+> **MANDATORY OVERLAP CHECK — HARD GATE, NEVER SKIP, DO IT FOR EVERY CHILD ONE
+> BY ONE, AND PRINT THE NUMBERS.** Run it for EACH child link IMMEDIATELY after
+> positioning it and after EVERY `rotate_object` on its joint — before the next
+> child, before collisions, before materials. Do NOT batch it and do NOT assume
+> that because one child is fine the others are too: symmetric children on
+> opposite corners of the same parent commonly end up on OPPOSITE sides of the
+> parent's body — some outside (correct), some inside (overlapping, wrong).
+> This is exactly what happens on a 4-wheeled chassis: the two wheels at one
+> end sit outside, the two at the other end sit inside the chassis body and
+> MUST be mirrored. Procedure (repeat for each child):
+> 1. `get_object_info(child_link)` — read the GLOBAL coordinates of its
+>    `Geometry` (`center_of_mass`, every face `center_of_mass`, every
+>    `vertices[*].point`) and compute the child's min/max on EACH of the three
+>    axes X, Y and Z.
+> 2. `get_object_info(parent_link)` — take the parent's global coordinate range
+>    the same way (min/max on X, Y and Z).
+> 3. **Check ALL THREE AXES, not just one.** On every axis the child's range
+>    must extend OUTSIDE the parent's range; if the child's range on ANY axis
+>    is CONTAINED inside the parent's range on that axis, the bodies overlap →
+>    OVERLAP FAILURE. A single convenient axis is NOT enough: a wheel snapped
+>    to a corner can pass along X (length) while its disc is buried inside the
+>    parent along Y (width). Do not judge by eye.
+> 4. Mirror on failure by rotating the LINK 180° about the X axis:
+>    `rotate_object(child_link, 'x', 180)`, then re-run step 1 and confirm the
+>    child's range now lies OUTSIDE the parent's range on the failing axis.
+> 5. PRINT the evidence for EVERY child before continuing, in this form:
+>    `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..] Z[..] ->
+>    OUTSIDE` (or `OVERLAP -> mirrored`).
 >
 > A child that overlaps the parent is a positioning FAILURE, not an
 > acceptable result. Do NOT proceed to the next child, to collisions, or to
-> materials until EVERY child has passed this check.
+> materials until EVERY child has passed this check AND its numbers have been
+> printed.
 
 **Do not create LCS objects** — plain subelement references are enough.
 `create_lcs` is used **only if the user explicitly asks for it**.
@@ -218,10 +227,10 @@ the path cannot be resolved, the error lists the tried variants.
 
 | Tool | Description |
 |---|---|
-| `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method.** Snaps the contact zones of two neighbouring links by two references (analog of `Set Placement - fast`). References: face/edge/vertex/circle of the link Real element as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`) or an already existing LCS; a robot link (`l_...`) cannot be a reference — the path must start with the Real element link (`real_l_...`). `<inner_link_name>` is the **Name of the `App::Link` inside the Real element** (e.g. `chassis001`, `wheel001`) — **NOT the source body name** (e.g. `chassis`, `wheel`). Only `ref1` and `ref2` are put into the selection (the `target` is not selected). One reference must lie on the parent link, the other on the child link. **Do NOT create LCS objects** — plain subelement references are enough. `move` defaults to `leaf` — currently only suitable for the final (leaf) element of the kinematic chain. |
+| `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method.** Snaps the contact zones of two neighbouring links by two references (analog of `Set Placement - fast`). Reference format and rules: see above. Only `ref1` and `ref2` are put into the selection (the `target` is not selected). One reference must lie on the parent link, the other on the child link. `move` defaults to `leaf` — currently only suitable for the final (leaf) element of the kinematic chain. |
 | `set_placement_vision_mode(robot)` | Show only the Real elements of the robot links, hide Visual and Collision. Call before positioning. |
 | `rotate_object(object_name, axis, angle_deg)` | Rotate the joint Origin / link MountedPlacement / LCS. Used to correct the orientation of the joint and of the link relative to the joint after a control snapshot. |
-| `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Use only if the user explicitly asks for it** — the basic positioning algorithm never requires creating an LCS: use plain subelement references in `set_placement_between` instead. **Important:** the subelement reference is given as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g. `real_l_chassis001_.chassis001.Box.Face3`), where `<inner_link_name>` is the **Name of the `App::Link` inside the Real element** (e.g. `chassis001`) — **NOT the source body name** (e.g. `chassis`); a path from the robot link (`l_...`) is invalid. |
+| `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Use only if the user explicitly asks for it** — the basic positioning algorithm never requires creating an LCS: use plain subelement references in `set_placement_between` instead. Reference format and rules: see above. |
 
 ### Material and inertia
 
