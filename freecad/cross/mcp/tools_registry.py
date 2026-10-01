@@ -1046,6 +1046,24 @@ def _bound_box_to_list(bound_box: fc.BoundBox) -> list[float]:
     ]
 
 
+def _round_floats(value: Any, ndigits: int = 2) -> Any:
+    """Recursively round every float in ``value`` to ``ndigits`` decimals.
+
+    Walks dicts, lists and tuples and rounds all ``float`` leaves, so the
+    output of the inspection tools stays compact and readable. Non-float
+    values (strings, ints, bools, ``None``) are returned unchanged.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return round(value, ndigits)
+    if isinstance(value, dict):
+        return {key: _round_floats(item, ndigits) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_round_floats(item, ndigits) for item in value]
+    return value
+
+
 def _resolve_shape_object(obj: fc.DocumentObject) -> Optional[fc.DocumentObject]:
     """Return the object whose ``Shape`` holds the geometry to report.
 
@@ -1118,8 +1136,8 @@ def _face_info(
         'bound_box': _bound_box_to_list(face.BoundBox),
         'orientation': str(face.Orientation),
         'vertices': [
-            _vector_to_list(ancestor_placement.multVec(v.Point))
-            for v in face.Vertexes
+            _vertex_info(v, i + 1, ancestor_placement)
+            for i, v in enumerate(face.Vertexes)
         ],
     }
     # Normal at the centre of the face's parameter range.
@@ -1218,7 +1236,7 @@ def _object_geometry_info(
     ancestor_placement = _ancestor_placement(shape_obj)
     result: dict[str, Any] = {
         'shape_object': shape_obj.Name,
-        'coordinate_system': 'global',
+        'local_placement': _placement_to_dict(shape_obj.Placement),
         'ancestor_placement': _placement_to_dict(ancestor_placement),
         'bound_box': _bound_box_to_list(shape.BoundBox),
         'face_count': len(shape.Faces),
@@ -1298,7 +1316,7 @@ def get_object_info(
             info['LowerLimit'] = str(lower) if lower is not None else None
             info['UpperLimit'] = str(upper) if upper is not None else None
         info['Geometry'] = _object_geometry_info(obj, max_internal_geometry_items)
-        return info
+        return _round_floats(info)
 
     return run_on_main_thread(_impl)
 
@@ -1710,7 +1728,7 @@ TOOLS: list[tuple[str, Any]] = [
     ('set_joint_values', set_joint_values),
     ('list_scene_objects', list_scene_objects),
     ('get_object_info', get_object_info),
-    ('get_snapshot', get_snapshot),
+    # ('get_snapshot', get_snapshot),
     ('instructions_to_work_with_tools', instructions_to_work_with_tools),
 ]
 
