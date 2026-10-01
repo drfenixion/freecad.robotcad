@@ -100,6 +100,12 @@ references go into the selection). A control snapshot is taken
 snapshot is taken to verify. The loop then repeats for the next links until
 all links are positioned.
 
+> **If `set_placement_between` returns no error but the target's coordinates
+> did NOT change**, you have most likely moved it into its own coordinates
+> (the two references resolved to the same point). Verify the target's
+> placement with `get_object_info(target)` after the call and pick different
+> references (e.g. a face instead of a vertex) if nothing moved.
+
 **Joint axis orientation.** A `revolute` or `continuous` joint **rotates
 around its local Z axis** (the blue arrow shown on the joint in the 3D view);
 a `prismatic` joint **moves along its local Z axis** (the same blue arrow).

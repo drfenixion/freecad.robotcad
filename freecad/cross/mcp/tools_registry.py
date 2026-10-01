@@ -27,6 +27,7 @@ try:
 except ImportError:
     from PySide6 import QtGui
 
+from ..freecad_utils import is_link as is_freecad_link
 from ..freecad_utils import is_lcs
 from ..freecadgui_utils import (
     createBoundBox,
@@ -381,6 +382,73 @@ def _find_link_real_element(link_obj: fc.DocumentObject) -> fc.DocumentObject:
     )
 
 
+def _reference_paths(link_obj: fc.DocumentObject) -> dict[str, Any]:
+    """Return the exact subelement-reference paths for a robot link.
+
+    A positioning reference for ``set_placement_between`` must be
+    ``<real_link>.<inner_link_name>.<feature>.<subelement>`` where
+    ``<inner_link_name>`` is the **Name of the App::Link inside the Real
+    element** — NOT the source body name and NOT the robot link name.
+
+    Several links filled from the **same** source body share one wrapper
+    ``App::Part`` and therefore one inner link name. For four wheels created
+    from one ``wheel`` body, every wheel link's inner link is ``wheel001``;
+    the per-link suffix (``wheel002``, ``wheel003``, ...) is NOT a valid inner
+    link name. This helper resolves the real path from the object tree so the
+    agent never has to guess it.
+
+    Return a dict with:
+    - ``real_link``: Name of the Real element link (``real_l_...``).
+    - ``inner_link``: Name of the App::Link inside the Real element.
+    - ``feature``: Name of the geometry feature (``Box``, ``Cylinder``, ...)
+      when it can be determined, else ``None``.
+    - ``prefix``: ready-to-use path prefix
+      ``<real_link>.<inner_link>.<feature>`` (feature omitted when unknown).
+    - ``example``: a concrete example reference (``<prefix>.Face1``).
+
+    Return an empty dict when the link has no Real element.
+    """
+    try:
+        real_link = _find_link_real_element(link_obj)
+    except RuntimeError:
+        return {}
+    wrapper = _real_link_wrapper(real_link)
+    if wrapper is None:
+        return {}
+    # The inner App::Link is the single App::Link child of the wrapper.
+    inner_link = None
+    for child in getattr(wrapper, 'Group', []):
+        if is_freecad_link(child):
+            inner_link = child
+            break
+    if inner_link is None:
+        # Fall back to the wrapper itself (e.g. a plain App::Part).
+        inner_link = wrapper
+    # The geometry feature is the tip of the PartDesign Body the inner link
+    # points to, or the linked object itself.
+    linked = getattr(inner_link, 'LinkedObject', None)
+    if isinstance(linked, (list, tuple)):
+        linked = linked[0] if linked else None
+    feature = None
+    if linked is not None:
+        tip = getattr(linked, 'Tip', None)
+        if tip is not None:
+            feature = tip.Name
+        elif hasattr(linked, 'Shape'):
+            feature = linked.Name
+    parts = [real_link.Name, inner_link.Name]
+    if feature:
+        parts.append(feature)
+    prefix = '.'.join(parts)
+    return {
+        'real_link': real_link.Name,
+        'inner_link': inner_link.Name,
+        'feature': feature,
+        'prefix': prefix,
+        'example': f'{prefix}.Face1',
+    }
+
+
 def _geometry_token(part: str) -> bool:
     """Return True if ``part`` is a subelement token (``Face1``, ``Edge2``...)."""
     for prefix in ('Face', 'Edge', 'Vertex'):
@@ -494,6 +562,21 @@ def _subelement_path_candidates(
     if wrapper is None:
         return candidates
     wrapper_name = wrapper.Name
+    # The inner App::Link name (the only valid <inner_link_name>). Several
+    # links filled from the same source body share one wrapper and therefore
+    # one inner link name; the per-link suffix is NOT valid.
+    inner_name = None
+    for child in getattr(wrapper, 'Group', []):
+        if is_freecad_link(child):
+            inner_name = child.Name
+            break
+    if inner_name is None:
+        inner_name = wrapper_name
+    # If the caller gave a wrong inner-link segment (e.g. "wheel003" instead
+    # of "wheel001"), substitute the real one so the reference still resolves.
+    if inner_name and mapped and mapped[0] not in (wrapper_name, inner_name):
+        _add([inner_name, *mapped[1:]])
+        _add([wrapper_name, inner_name, *mapped[1:]])
     rest = mapped[1:] if mapped[0] == wrapper_name else mapped
     # As given under the wrapper, and without the wrapper level.
     _add([wrapper_name, *rest])
@@ -998,7 +1081,11 @@ def list_scene_objects() -> dict[str, Any]:
             if is_robot(obj):
                 robots.append(_obj_basic_info(obj))
             elif is_link(obj):
-                links.append(_obj_basic_info(obj))
+                info = _obj_basic_info(obj)
+                reference = _reference_paths(obj)
+                if reference:
+                    info['Reference'] = reference
+                links.append(info)
             elif is_joint(obj):
                 info = _obj_basic_info(obj)
                 info['Parent'] = getattr(obj, 'Parent', '')
@@ -1265,6 +1352,10 @@ def get_object_info(
             mass = getattr(obj, 'Mass', None)
             info['Mass'] = str(mass) if mass is not None else None
             info['MaterialCardName'] = getattr(obj, 'MaterialCardName', '')
+            # Exact subelement-reference prefix for set_placement_between.
+            reference = _reference_paths(obj)
+            if reference:
+                info['Reference'] = reference
         elif is_joint(obj):
             info['Parent'] = getattr(obj, 'Parent', '')
             info['Child'] = getattr(obj, 'Child', '')
@@ -1380,15 +1471,29 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
       `real_l_chassis001_.chassis001.Box.Face3`). `<inner_link_name>` is the
       Name of the App::Link inside the Real element (e.g. `chassis001`,
-      `wheel001`) — NOT the source body name (e.g. `chassis`, `wheel`).
+      `wheel001`) — NOT the source body name (e.g. `chassis`, `wheel`) and
+      NOT the robot link name.
+      **NEVER guess this path.** Call `get_object_info(link)` (or
+      `list_scene_objects()`) and read the `Reference` block: use
+      `Reference.prefix` and append `.FaceN` / `.VertexN` / `.EdgeN`.
+      IMPORTANT: links filled from the **same** source body share one wrapper
+      and therefore one inner link name — e.g. four wheels made from one
+      `wheel` body all have `inner_link = "wheel001"`; the per-link suffix
+      (`wheel002`, `wheel003`, ...) is NOT a valid inner link name.
       Do NOT create LCS objects —
       plain subelement references are enough. To pick the right face/vertex,
-      first call `get_object_info(link)` and use the
-      geometric information (`center_of_mass`, `surface_type`, `vertices`,
-      `point`) to understand where each face/vertex actually lies — do not
-      guess from the index alone.
+      use the geometric information from `get_object_info(link)`
+      (`center_of_mass`, `surface_type`, `vertices`, `point`) to understand
+      where each face/vertex actually lies — do not guess from the index
+      alone.
    b. `set_placement_between(target, ref1, ref2)` — only the two references
       go into the selection.
+      IMPORTANT: if `set_placement_between` returns no error but the target's
+      coordinates did NOT change, you have most likely moved it into its own
+      coordinates (the two references resolved to the same point). Verify the
+      target's placement with `get_object_info(target)` after the call and
+      pick different references (e.g. a face instead of a vertex) if nothing
+      moved.
    c. Control snapshot: `get_snapshot(...)`.
    d. Orient the JOINT so its local Z axis lies along the child link's
       functional axis (a revolute/continuous joint always rotates around its
@@ -1451,6 +1556,11 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    face/vertex of the child link that will be joined to the parent. Format:
    `parent_robot_link_name face1/vertex1 - child_robot_link_name face1/vertex1`
 4. Perform `set_placement_between` for the parent/child robot link pair.
+   IMPORTANT: if `set_placement_between` returns no error but the target's
+   coordinates did NOT change, you have most likely moved it into its own
+   coordinates (the two references resolved to the same point). Verify the
+   target's placement with `get_object_info(target)` after the call and pick
+   different references (e.g. a face instead of a vertex) if nothing moved.
 5. Correct the direction of the Z axis of the child link's parent joint if
    required.
 6. If after these actions you see that the child link significantly intersects
@@ -1465,6 +1575,12 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
   robot link (`l_...`) cannot be a reference. `move='leaf'` (default) — only
   for the final chain element; `child_branch`/`parent_tree` are advanced.
   Only the two references go into the selection (the target is not selected).
+- Build each reference from the `Reference` block returned by
+  `get_object_info(link)` / `list_scene_objects()`: take `Reference.prefix`
+  and append `.FaceN` / `.VertexN` / `.EdgeN`. NEVER guess the inner link
+  name. Links filled from the same source body share one inner link name
+  (four wheels from one `wheel` body → all `wheel001`); the per-link suffix
+  is NOT valid.
 - To choose the correct face/vertex reference, use the geometric information
   from `get_object_info(link)` (`center_of_mass`, `surface_type`, `vertices`,
   `point`) to understand the spatial arrangement of the faces/vertices — do
@@ -1577,6 +1693,11 @@ is NO `axis` parameter on `create_joint`.
   `Real` element is reported, so the indices can be used directly in
   positioning references (e.g. `real_l_...Face3`).
 
+  For a `Cross::Link` the result also contains a `Reference` block with the
+  exact positioning-reference path: `real_link`, `inner_link`, `feature`,
+  `prefix` and `example`. Use `Reference.prefix` + `.FaceN`/`.VertexN` for
+  `set_placement_between`; never guess the inner link name.
+
   IMPORTANT: to understand the spatial arrangement of faces and vertices —
   which face is on top, which faces are parallel, which vertex is a corner,
   where a face lies on the object's surface — ALWAYS use this geometric
@@ -1602,6 +1723,11 @@ is NO `axis` parameter on `create_joint`.
 - `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()` if needed.
+- If `set_placement_between()` returns no error but the target's coordinates
+  did NOT change, you have most likely moved it into its own coordinates (the
+  two references resolved to the same point). Check the target's placement
+  with `get_object_info(target)` after the call and choose different
+  references (e.g. a face instead of a vertex) if nothing moved.
 - Orient a jointed link by rotating the JOINT with `rotate_object` so its
   local Z lies along the link's functional axis (e.g. a wheel's axle). A
   revolute/continuous joint always rotates around its local Z, so a wheel
@@ -1622,6 +1748,10 @@ is NO `axis` parameter on `create_joint`.
 - Do NOT create LCS objects: `create_lcs()` only on explicit user request;
   plain subelement references are enough.
 - Prefer explicit subelement references over guessing by eye.
+- Never guess the inner link name of a reference: read `Reference.prefix`
+  from `get_object_info(link)` / `list_scene_objects()` and append the
+  subelement. Links filled from the same source body share one inner link
+  name (e.g. all four wheels → `wheel001`).
 """,
 }
 

@@ -109,7 +109,14 @@ TOOL_SCHEMAS: dict[str, dict] = {
             },
             'ref2': {
                 'type': 'string',
-                'description': 'Ref 2: same format; must lie on the child link.',
+                'description': (
+                    'Ref 2: same format; must lie on the child link. If the call '
+                    "returns no error but the target's coordinates did NOT "
+                    'change, you have most likely moved it into its own '
+                    'coordinates (the two references resolved to the same '
+                    'point) — verify with get_object_info(target) and pick '
+                    'different references (e.g. a face instead of a vertex).'
+                ),
             },
             'move': {
                 'type': 'string',
