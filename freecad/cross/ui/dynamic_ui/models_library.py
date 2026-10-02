@@ -26,9 +26,33 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
 
     def initUI(self):
-        self.resize(400, 350)
+        # Size the dialog to 75% of the FreeCAD main window.
+        preferred_width = 800
+        preferred_height = 1000
+        import FreeCADGui as fcg
+        main_window = fcg.getMainWindow()
+        if main_window is not None:
+            preferred_width = max(200, main_window.width() * 3 // 4)
+            preferred_height = max(200, main_window.height() * 3 // 4)
+        self.resize(preferred_width, preferred_height)
         self.setWindowTitle("Models library")
+
+        # The whole content lives inside a scroll area so the models list can
+        # be scrolled vertically when it does not fit into the window height.
+        self.content_widget = QtWidgets.QWidget()
         self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+        self.content_widget.setLayout(self.main_layout)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setWidget(self.content_widget)
+
+        # Root layout: scrollable content on top, action buttons fixed below.
+        self.root_layout = QtWidgets.QVBoxLayout()
+        self.root_layout.setContentsMargins(10, 10, 10, 10)
+        self.root_layout.addWidget(self.scroll_area, 1)
 
         # prepare data
         from modules.robot_descriptions.robot_descriptions._descriptions import DESCRIPTIONS
@@ -36,7 +60,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.packages_grouped_by_tags = {}
         for name in sorted(list(DESCRIPTIONS)):
             desc = DESCRIPTIONS[name]
-            if desc.has_urdf:
+            if desc.has_urdf or desc.has_mjcf:
 
                 vendor = ''
                 #get module code for parse
@@ -78,13 +102,13 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
         self.button = QtWidgets.QPushButton('Open model variants')
         self.button.clicked.connect(self.get_selected_value)
-        self.main_layout.addWidget(self.button)
+        self.root_layout.addWidget(self.button)
 
         self.update_models_list_button = QtWidgets.QPushButton('Update models list')
         self.update_models_list_button.clicked.connect(self.update_models_list)
         if self.__class__.is_models_list_updated:
             self.update_models_list_button.setEnabled(False)
-        self.main_layout.addWidget(self.update_models_list_button)
+        self.root_layout.addWidget(self.update_models_list_button)
 
         # link to docks
         weblink = QtWidgets.QLabel()
@@ -117,8 +141,8 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         description.setText("Use models without creating solids only for fast view. Solids are needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
         self.main_layout.addWidget(description)
 
-        # adding widgets to main layout
-        self.setLayout(self.main_layout)
+        # adding widgets to root layout
+        self.setLayout(self.root_layout)
         self.show()
 
 
@@ -290,6 +314,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                             'path': attr_value,
                             'is_xacro': False,
                             'xacro_args': None,
+                            'is_mjcf': False,
                         }
                     elif attr_name.startswith("XACRO_PATH"):
                         attr_value = getattr(module, attr_name)
@@ -297,6 +322,15 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                             'path': attr_value,
                             'is_xacro': True,
                             'xacro_args': None,
+                            'is_mjcf': False,
+                        }
+                    elif attr_name.startswith("MJCF_PATH"):
+                        attr_value = getattr(module, attr_name)
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': False,
+                            'xacro_args': None,
+                            'is_mjcf': True,
                         }
 
                 # Add variants for additional XACRO_ARGS_* argument sets
@@ -312,6 +346,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                                     'path': module.XACRO_PATH,
                                     'is_xacro': True,
                                     'xacro_args': xacro_args,
+                                    'is_mjcf': False,
                                 }
 
                 dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
@@ -413,6 +448,15 @@ class LoadURDFDialog(QtWidgets.QDialog):
                 urdf_path = get_urdf_path_from_xacro(
                     self.module,
                     xacro_args=selected_variant['xacro_args'],
+                )
+            elif selected_variant['is_mjcf']:
+                # Convert MJCF to URDF using the self-contained converter
+                # and process it by the URDF scenario.
+                from freecad.cross.mjcf_utils import get_urdf_path as get_urdf_path_from_mjcf
+                urdf_path = get_urdf_path_from_mjcf(
+                    selected_variant['path'],
+                    package_path=self.module.PACKAGE_PATH,
+                    repository_path=self.module.REPOSITORY_PATH,
                 )
             robot_from_urdf_path(
                 fc.activeDocument(),
