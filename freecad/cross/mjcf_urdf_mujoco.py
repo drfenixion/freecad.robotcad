@@ -138,15 +138,22 @@ def _export_obj(model, mesh_id, path):
 def _geom_is_collision(model, geom_id):
     """Classify a geom as collision (as opposed to visual).
 
-    The MuJoCo Menagerie convention is ``group == 2`` for visual geoms and
-    ``group == 3`` for collision geoms, so ``group`` is the primary signal.
-    This matters because some models (e.g. Apptronik Apollo) disable contacts
-    globally with ``contype = conaffinity = 0`` *including* on their collision
-    geoms, so the contact flags alone cannot distinguish the two.
+    MuJoCo has no dedicated visual/collision flag, so several signals are
+    combined (in priority order):
 
-    For models that do not follow the convention (no explicit group), the
-    contact flags are used as a fallback: geoms that never collide
-    (``contype == conaffinity == 0``) are treated as visual.
+    1. ``group == 2`` is visual and ``group == 3`` is collision (the MuJoCo
+       Menagerie convention, used by go1/go2/panda/ur10e/h1/... and also by
+       models such as Apptronik Apollo that additionally set
+       ``contype = conaffinity = 0`` on *both* kinds, so the contact flags
+       alone cannot distinguish them);
+    2. the geom name (``*collision*`` / ``*_col`` vs ``*visual*``) — needed for
+       models such as Shadow DexEE whose collision *estimate* primitives use
+       ``group = 5`` with ``contype = conaffinity = 0`` but are named
+       ``*CollisionGeom_*``;
+    3. mesh geoms without ``group == 3`` are visual (collision meshes are
+       always marked with ``group == 3`` in practice);
+    4. otherwise, geoms that can never collide (``contype == conaffinity == 0``)
+       are treated as visual.
     """
     contype = int(model.geom_contype[geom_id])
     conaffinity = int(model.geom_conaffinity[geom_id])
@@ -155,6 +162,16 @@ def _geom_is_collision(model, geom_id):
         return False
     if group == 3:
         return True
+
+    name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) or ''
+    lname = name.lower()
+    if 'collision' in lname:
+        return True
+    if 'visual' in lname:
+        return False
+
+    if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_MESH):
+        return False
     if contype == 0 and conaffinity == 0:
         return False
     return True
