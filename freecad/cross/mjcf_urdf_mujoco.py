@@ -138,16 +138,24 @@ def _export_obj(model, mesh_id, path):
 def _geom_is_collision(model, geom_id):
     """Classify a geom as collision (as opposed to visual).
 
-    The MuJoCo Menagerie convention is that visual geoms have
-    ``contype == conaffinity == 0`` and / or ``group == 2`` while collision
-    geoms use non-zero contact flags and / or ``group == 3``.
+    The MuJoCo Menagerie convention is ``group == 2`` for visual geoms and
+    ``group == 3`` for collision geoms, so ``group`` is the primary signal.
+    This matters because some models (e.g. Apptronik Apollo) disable contacts
+    globally with ``contype = conaffinity = 0`` *including* on their collision
+    geoms, so the contact flags alone cannot distinguish the two.
+
+    For models that do not follow the convention (no explicit group), the
+    contact flags are used as a fallback: geoms that never collide
+    (``contype == conaffinity == 0``) are treated as visual.
     """
     contype = int(model.geom_contype[geom_id])
     conaffinity = int(model.geom_conaffinity[geom_id])
     group = int(model.geom_group[geom_id])
-    if contype == 0 and conaffinity == 0:
+    if group == 2:
         return False
-    if group == 2 and group != 3:
+    if group == 3:
+        return True
+    if contype == 0 and conaffinity == 0:
         return False
     return True
 
