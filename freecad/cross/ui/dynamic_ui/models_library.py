@@ -3,12 +3,93 @@ import os
 from pathlib import Path
 import re
 import sys
+import threading
 from PySide import QtGui, QtCore, QtWidgets
 import FreeCAD as fc
 from freecad.cross.freecad_utils import message
 from freecad.cross.freecadgui_utils import get_progress_bar
 from freecad.cross.robot_from_urdf import robot_from_urdf_path
 from ...wb_utils import ROBOT_DESCRIPTIONS_MODULE_PATH, ROBOT_DESCRIPTIONS_REPO_PATH, git_init_submodules
+
+
+class _CloneProgressEmitter(QtCore.QObject):
+    """Thread-safe bridge for git clone progress updates.
+
+    GitPython reports clone progress from background "pump" threads, so the
+    value is forwarded to the widgets through a queued signal connection.
+    """
+
+    value_changed = QtCore.Signal(int)
+
+
+def _get_robot_descriptions_cache_module():
+    """Return the ``robot_descriptions._cache`` module used by descriptions.
+
+    Description modules are loaded by file path under the top-level package
+    name ``robot_descriptions``, so their relative ``from ._cache import ...``
+    resolves to ``robot_descriptions._cache`` loaded from
+    ``ROBOT_DESCRIPTIONS_MODULE_PATH``. This helper loads that exact module so
+    that patching ``CloneProgressBar`` takes effect.
+    """
+    parent_name = 'robot_descriptions'
+    parent_init = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, '__init__.py')
+    parent_spec = importlib.util.spec_from_file_location(parent_name, parent_init)
+    parent_module = importlib.util.module_from_spec(parent_spec)
+    sys.modules[parent_name] = parent_module
+    parent_spec.loader.exec_module(parent_module)
+
+    cache_name = 'robot_descriptions._cache'
+    cache_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, '_cache.py')
+    cache_spec = importlib.util.spec_from_file_location(cache_name, cache_path)
+    cache_module = importlib.util.module_from_spec(cache_spec)
+    sys.modules[cache_name] = cache_module
+    cache_spec.loader.exec_module(cache_module)
+    return cache_module
+
+
+def install_clone_progress_hook(progress_bar):
+    """Route robot_descriptions git clone progress to a Qt progress bar.
+
+    The repository download percentage is mapped to the 5-95% range of the
+    given progress bar. Must be called before the robot description module is
+    imported, because the clone happens at import time.
+
+    Returns the emitter that must be kept alive by the caller for the duration
+    of the clone.
+    """
+    rd_cache = _get_robot_descriptions_cache_module()
+
+    emitter = _CloneProgressEmitter()
+    # Use a queued connection so the progress bar is always updated in the GUI
+    # thread, even though the signal is emitted from GitPython's worker threads.
+    emitter.value_changed.connect(
+        progress_bar.setValue,
+        QtCore.Qt.QueuedConnection,
+    )
+    state = {'last': 5}
+
+    class QtCloneProgressBar(rd_cache.RemoteProgress):
+        """RemoteProgress that reports the download ratio to a Qt widget."""
+
+        def update(self, op_code, cur_count, max_count=None, message=''):
+            # Only follow the network download stage (RECEIVING). Other stages
+            # (resolving deltas, checkout, ...) are ignored so the bar keeps
+            # reflecting the download percentage.
+            if not (op_code & self.RECEIVING):
+                return
+            if not max_count:
+                return
+            try:
+                fraction = float(cur_count) / float(max_count)
+            except (TypeError, ValueError, ZeroDivisionError):
+                return
+            value = max(5, min(95, 5 + int(fraction * 90)))
+            if value != state['last']:
+                state['last'] = value
+                emitter.value_changed.emit(value)
+
+    rd_cache.CloneProgressBar = QtCloneProgressBar
+    return emitter
 
 
 class ModelsLibraryModalClass(QtGui.QDialog):
@@ -261,8 +342,10 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 )
                 progressBar.show()
 
-                i = 0
-                progressBar.setValue(i)
+                # Show 5% immediately, then follow the actual repository
+                # download percentage reported by the git clone.
+                progressBar.setValue(5)
+                self._clone_progress_emitter = install_clone_progress_hook(progressBar)
                 QtGui.QApplication.processEvents()
 
                 #module = import_module(f"robot_descriptions.{description_name}") #in case of direct pip module import
@@ -276,31 +359,62 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                     spec.loader.exec_module(module)
 
                     return module
-                # override global robot_descriptions module if present
-                import_robot_desc_module_by_path(
-                    f"robot_descriptions",
-                    os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'__init__.py'),
-                )
-                module_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name}.py')
-                module_path_alternative = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name_alternative}.py')
-                try:
-                    module = import_robot_desc_module_by_path(
-                        f"robot_descriptions.{description_name}",
-                        module_path,
+
+                def load_robot_desc_module():
+                    """Import the description module (this clones the repo).
+
+                    Runs in a worker thread, so the git clone progress is
+                    reported while the GUI thread keeps processing events.
+                    """
+                    # override global robot_descriptions module if present
+                    import_robot_desc_module_by_path(
+                        f"robot_descriptions",
+                        os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'__init__.py'),
                     )
-                except FileNotFoundError:
+                    module_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name}.py')
+                    module_path_alternative = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name_alternative}.py')
                     try:
-                        module = import_robot_desc_module_by_path(
-                            f"robot_descriptions.{description_name_alternative}",
+                        return import_robot_desc_module_by_path(
+                            f"robot_descriptions.{description_name}",
                             module_path,
                         )
                     except FileNotFoundError:
-                        module = import_robot_desc_module_by_path(
-                            f"robot_descriptions.{description_name_alternative}",
-                            module_path_alternative,
-                        )
-                i = 100
-                progressBar.setValue(i)
+                        try:
+                            return import_robot_desc_module_by_path(
+                                f"robot_descriptions.{description_name_alternative}",
+                                module_path,
+                            )
+                        except FileNotFoundError:
+                            return import_robot_desc_module_by_path(
+                                f"robot_descriptions.{description_name_alternative}",
+                                module_path_alternative,
+                            )
+
+                # Run the blocking clone/import in a worker thread and keep
+                # pumping GUI events here so the queued progress updates are
+                # applied while the repository is being downloaded.
+                load_result = {}
+                load_error = {}
+
+                def _load_target():
+                    try:
+                        load_result['module'] = load_robot_desc_module()
+                    except Exception as error:  # noqa: BLE001
+                        load_error['error'] = error
+
+                load_thread = threading.Thread(target=_load_target, daemon=True)
+                load_thread.start()
+                while load_thread.is_alive():
+                    QtGui.QApplication.processEvents()
+                    load_thread.join(0.05)
+
+                if 'error' in load_error:
+                    progressBar.close()
+                    self.setEnabled(True)
+                    raise load_error['error']
+                module = load_result['module']
+
+                progressBar.setValue(100)
                 QtGui.QApplication.processEvents()
                 progressBar.close()
                 QtGui.QApplication.processEvents()
