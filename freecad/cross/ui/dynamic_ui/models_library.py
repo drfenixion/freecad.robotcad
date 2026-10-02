@@ -564,8 +564,8 @@ class LoadURDFDialog(QtWidgets.QDialog):
                     xacro_args=selected_variant['xacro_args'],
                 )
             elif selected_variant['is_mjcf']:
-                # Convert MJCF to URDF using the self-contained converter
-                # and process it by the URDF scenario.
+                # Convert MJCF to URDF using the MuJoCo converter and process it
+                # by the URDF scenario.
                 from freecad.cross.mjcf_utils import get_urdf_path as get_urdf_path_from_mjcf
                 urdf_path = get_urdf_path_from_mjcf(
                     selected_variant['path'],
