@@ -69,11 +69,25 @@ def _array2str(arr):
 
 
 def _quat_to_rpy(quat):
-    """Return URDF roll-pitch-yaw for a w-x-y-z quaternion."""
-    w, x, y, z = (float(v) for v in quat)
+    """Return URDF roll-pitch-yaw (ZYX) for a w-x-y-z quaternion.
+
+    The quaternion is normalised first because MJCF stores unnormalised
+    quaternions (e.g. ``1 -1 1 1``) that MuJoCo normalises internally. The
+    ``pitch == +/-90`` gimbal-lock case is handled explicitly: roll and yaw are
+    coupled there, so yaw is fixed to zero and the full rotation is folded into
+    roll (returning roll = 0 there, as a naive formula would, loses the
+    rotation and visibly mis-orients the joint; e.g. Sawyer ``right_l1``).
+    """
+    q = np.asarray(quat, dtype=float)
+    norm = float(np.linalg.norm(q))
+    if norm > 0.0:
+        q = q / norm
+    w, x, y, z = (float(v) for v in q)
     r00 = 1.0 - 2.0 * (y * y + z * z)
     r10 = 2.0 * (x * y + w * z)
     r20 = 2.0 * (x * z - w * y)
+    r11 = 1.0 - 2.0 * (x * x + z * z)
+    r12 = 2.0 * (y * z - w * x)
     r21 = 2.0 * (y * z + w * x)
     r22 = 1.0 - 2.0 * (x * x + y * y)
     sy = float(np.sqrt(r00 * r00 + r10 * r10))
@@ -82,7 +96,7 @@ def _quat_to_rpy(quat):
         pitch = float(np.arctan2(-r20, sy))
         yaw = float(np.arctan2(r10, r00))
     else:
-        roll = float(np.arctan2(-r21, r22))
+        roll = float(np.arctan2(-r12, r11))
         pitch = float(np.arctan2(-r20, sy))
         yaw = 0.0
     return np.array([roll, pitch, yaw])
