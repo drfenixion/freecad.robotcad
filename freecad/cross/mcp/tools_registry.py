@@ -1957,7 +1957,7 @@ TOOLS: list[tuple[str, Any]] = [
     ('list_scene_objects', list_scene_objects),
     ('get_object_info', get_object_info),
     ('check_overlap', check_overlap),
-    # ('get_snapshot', get_snapshot),
+    ('get_snapshot', get_snapshot),
     ('instructions_to_work_with_tools', instructions_to_work_with_tools),
 ]
 
