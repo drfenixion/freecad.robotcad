@@ -170,7 +170,13 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 #QtWidgets.QLabel()
                 vendor = re.sub(r"face\Sook", '', vendor, flags=re.IGNORECASE)
                 package_label = name.replace('_description', '').capitalize() + ' ' + vendor.capitalize()
-                package = {'desc': desc, 'package_label': package_label}
+                model_name = name.replace('_description', '')
+                package = {
+                    'desc': desc,
+                    'package_label': package_label,
+                    # Lower-cased haystack for the live search: model name + manufacturer.
+                    'search': (package_label + ' ' + model_name).lower(),
+                }
                 for tag in desc.tags:
                     if tag in self.packages_grouped_by_tags:
                         self.packages_grouped_by_tags[tag]['packages'].append(package)
@@ -178,6 +184,9 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                         self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[package]}
 
 
+        # Live search state (combined with the tag filter).
+        self.search_text = ''
+        self.current_tag_filter = 'all'
         self.display_filter_block()
         self.display_packages_block()
 
@@ -239,29 +248,36 @@ class ModelsLibraryModalClass(QtGui.QDialog):
             layout.addWidget(radio_button, row_val, column_val)
 
 
-        formGroupBox = QtWidgets.QGroupBox('Filter by tag')
+        formGroupBox = QtWidgets.QGroupBox('Filter')
+        outer_layout = QtWidgets.QVBoxLayout()
+
+        # Live search by model name and manufacturer. The clear button is shown
+        # inside the field, on the right, only while it contains text.
+        self.search_field = QtWidgets.QLineEdit()
+        self.search_field.setPlaceholderText('Search by model or manufacturer')
+        self.search_field.setClearButtonEnabled(True)
+        self.search_field.textChanged.connect(self.on_search_changed)
+        outer_layout.addWidget(self.search_field)
+
         row_val = 0
         column_val = 0
         self.tags_radio_buttons = []
         self.tags_button_group = QtWidgets.QButtonGroup()
-        layout = QtWidgets.QGridLayout()
+        grid_layout = QtWidgets.QGridLayout()
         for tag_name, packages in self.packages_grouped_by_tags.items():
-            add_tag_button(layout, tag_name)
+            add_tag_button(grid_layout, tag_name)
             column_val += 1
             if column_val > 3:
                 column_val = 0
                 row_val += 1
-        add_tag_button(layout, 'all')
-        column_val += 1
-        if column_val > 3:
-            column_val = 0
-            row_val += 1
+        add_tag_button(grid_layout, 'all')
+        # Default to showing all tags.
+        self.tags_radio_buttons[-1].setChecked(True)
 
-        for i in range(layout.columnCount()):
-            layout.setColumnStretch(i, 1)
-        # for i in range(layout.rowCount()):
-        #     layout.setRowStretch(i, 1)
-        formGroupBox.setLayout(layout)
+        for i in range(grid_layout.columnCount()):
+            grid_layout.setColumnStretch(i, 1)
+        outer_layout.addLayout(grid_layout)
+        formGroupBox.setLayout(outer_layout)
         self.main_layout.addWidget(formGroupBox)
 
 
@@ -275,19 +291,29 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.radio_buttons = []
         self.button_group = QtWidgets.QButtonGroup()
         layout = QtWidgets.QGridLayout()
+        search_text = getattr(self, 'search_text', '')
+        added_packages = set()
         for tag_name, tag in self.packages_grouped_by_tags.items():
+            # The tag filter and the text search are applied together.
+            if not tag['show']:
+                continue
             for package in tag['packages']:
-                if tag['show']:
-                    radio_button = QtWidgets.QRadioButton(
-                        package['package_label'],
-                    )
-                    self.radio_buttons.append(radio_button)
-                    self.button_group.addButton(radio_button)
-                    layout.addWidget(radio_button, row_val, column_val)
-                    column_val += 1
-                    if column_val > 3:
-                        column_val = 0
-                        row_val += 1
+                if search_text and search_text not in package.get('search', ''):
+                    continue
+                # A package may belong to several tags; show it only once.
+                if id(package) in added_packages:
+                    continue
+                added_packages.add(id(package))
+                radio_button = QtWidgets.QRadioButton(
+                    package['package_label'],
+                )
+                self.radio_buttons.append(radio_button)
+                self.button_group.addButton(radio_button)
+                layout.addWidget(radio_button, row_val, column_val)
+                column_val += 1
+                if column_val > 3:
+                    column_val = 0
+                    row_val += 1
         for i in range(layout.columnCount()):
             layout.setColumnStretch(i, 1)
         for i in range(layout.rowCount()):
@@ -299,15 +325,21 @@ class ModelsLibraryModalClass(QtGui.QDialog):
     def filter_by_tag(self):
         for radio_button in self.tags_radio_buttons:
             if radio_button.isChecked():
-                filter_tag_name = radio_button.text()
-                for tag_name, tag in self.packages_grouped_by_tags.items():
-                    if filter_tag_name == 'all':
-                        self.packages_grouped_by_tags[tag_name]['show'] = True
-                    else:
-                        if filter_tag_name != tag_name:
-                            self.packages_grouped_by_tags[tag_name]['show'] = False
-                        else:
-                            self.packages_grouped_by_tags[tag_name]['show'] = True
+                self.current_tag_filter = radio_button.text()
+        self.apply_filters()
+
+    def on_search_changed(self, text):
+        """Filter the models list letter by letter as the user types."""
+        self.search_text = text.strip().lower()
+        self.apply_filters()
+
+    def apply_filters(self):
+        """Recompute the visible tags from the tag filter and rebuild the list."""
+        for tag_name, tag in self.packages_grouped_by_tags.items():
+            if self.current_tag_filter == 'all':
+                tag['show'] = True
+            else:
+                tag['show'] = (tag_name == self.current_tag_filter)
         self.display_packages_block()
 
 
