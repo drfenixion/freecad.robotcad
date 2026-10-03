@@ -1,3 +1,74 @@
+# RobotCAD — Release v12.10.0
+
+**Date:** 2026-10-03
+
+## New features
+
+- Added a **dependency installation system**: the Python packages required by the workbench are now checked and installed in a unified way (into `~/.local/share/FreeCAD/AdditionalPythonPackages`), with a new dependencies dialog ([`freecad/cross/dependencies.py`](freecad/cross/dependencies.py), [`freecad/cross/ui/dependencies_dialog.py`](freecad/cross/ui/dependencies_dialog.py)).
+- Added **MJCF import from the Models Library**: models in MJCF format can be imported directly, using the new MJCF → URDF converter ([`freecad/cross/mjcf_utils.py`](freecad/cross/mjcf_utils.py)).
+- Added **xacro import** support for the Models Library.
+- Added a **search filter** to the Models Library.
+- Updated the **Robots Library** to `robot_descriptions` v3.
+- Added a **cloning progress bar** to the Models Library.
+
+## Improvements
+
+- **Performance optimization for URDF import**: `RobotProxy` now has a batch mode that disables loop recalculation of joint Parent/Child and other `onChange` events during import ([`freecad/cross/robot_from_urdf.py`](freecad/cross/robot_from_urdf.py)).
+- Added **time metrics** to the URDF importer.
+- Models loaded from the library now receive a **semantic name**; the active document is checked/created when the Models Library is used, and adding a model to an empty document is handled correctly.
+- `create_without_solids` (remove solid splitter) is now **enabled by default** in the Models Library import; option description fixed.
+- Improved **MCP tools**: better `set_placement_between` and rotation usage, geometric spatial perception via `get_object_info`, positioning algorithm added to the agent instructions, `get_snapshot` reactivated, and the `axis` parameter removed from `create_joint`.
+- Removed the **PyQt5 dependency** — replaced with FreeCAD's integrated PySide.
+- Updated the `ros2_controllers` and `Dynamic_World_Generator` modules.
+
+## Fixes
+
+- Fixed the **MJCF to URDF converter** (joint type orientation and collision generation).
+- Fixed the new controllers parameter type (`''` / `none`).
+
+---
+
+### Commits
+
+- `8e03a8c` — set semantic name for models gotten from MJCF and xacro from Models Library; check and create active doc when using Models Library; check adding model from Models Lib to empty doc
+- `6e8616a` — add dependencies installation system
+- `9c50362` — remove PyQt5 dependency because replaced with FreeCAD's integrated PySide
+- `efbff83` — update ros2_controllers module
+- `c4dbacb` — add search filter to Models Library
+- `1748124` — fix MJCF to URDF converter
+- `d761e8b` — fix MJCF to URDF conversion
+- `d1c232b` — set create_without_solids as default in Models Library; fix option description
+- `cf20dec` — fix Models Library MJCF some joint type orientation
+- `c38dfca` — fix Models Library MJCF collision generation
+- `ed3458d` — fix Models Library MJCF to URDF collision generation
+- `a2e6b33` — fix MJCF import from Models Library
+- `d3e81e4` — reactivate get_snapshot MCP tool
+- `dc6e1da` — add cloning progressbar to Models Library
+- `89130a3` — add MJCF import from Models Library
+- `eff159c` — improve MCP tools
+- `5768897` — improve MCP tools
+- `0d817d4` — improve MCP set_placement_between
+- `4e15c81` — improve MCP set_placement_between
+- `3b74913` — remove axis param from create_joint
+- `9b23be9` — add positioning algorithm to instruction of MCP
+- `7c5b323` — fix MCP tools
+- `061aa32` — decrease set_placement_between MCP tool description
+- `d568bcc` — improve MCP tools
+- `2cacb76` — improve MCP Set Placement and Rotation tools usage; add geometric spatial perception to agent by get_object_info
+- `2907003` — add xacro import opportunity for Models Library
+- `3b03197` — fix new controllers param type - `''`
+- `0b2f480` — activate by default remove_solid_splitter option from Models Library import
+- `738ff7c` — add time metrics to robot_from_urdf
+- `269733d` — fix message
+- `a66ea6a` — use batch mode of RobotProxy for URDF import
+- `83dac77` — add batch mode to onChange and set_joint_enum in RobotProxy
+- `28a6b0e` — update to robot_descriptions v3 (Robots Library)
+- `fd9fb87` — update Dynamic_World_Generator; swap PyQt5 to FreeCAD's PySide
+- `9fdb2d2` — remove installation of PyQt5
+- `a37ff33` — bump version
+
+---
+
 # RobotCAD — Release v12.9.2
 
 **Date:** 2026-09-25
