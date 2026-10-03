@@ -1,7 +1,9 @@
 from .sdf_schema_parser import sdf_schema_parser
 
 import xml.etree.ElementTree as ET
-import xmltodict
+# NOTE: `xmltodict` is imported lazily (inside get_element_as_dict) so that this
+# module can be imported even when the package is not installed yet. It is
+# listed in package.xml and installed via the dependencies dialog.
 
 from ...utils import dict_to_xml
 
@@ -61,6 +63,7 @@ class sdf_tree:
     @property
     def get_element_as_dict(self) -> dict:
         """Convert root element (ET) to dictionary"""
+        import xmltodict  # Deferred: may need a pip install first.
         return xmltodict.parse(ET.tostring(self._root_elem))
 
 

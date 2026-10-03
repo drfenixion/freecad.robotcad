@@ -14,7 +14,9 @@ import os
 import yaml
 import xml.etree.ElementTree as ET
 import re
-import xmltodict
+# NOTE: `xmltodict` is imported lazily (inside get_sensors_data) so that this
+# module can be imported even when the package is not installed yet. It is
+# listed in package.xml and installed via the dependencies dialog.
 
 import FreeCAD as fc
 
@@ -852,6 +854,8 @@ def add_sensor_properties(
 
 def get_sensors_data(SENSORS_PATH: Path = SENSORS_DATA_PATH) -> dict :
     ''' Get sensors data. '''
+
+    import xmltodict  # Deferred: may need a pip install first.
 
     def collect_sensors_parameters(sensors_dirs: dict) -> dict :
         ''' Adding to sensors their collected parameters. '''

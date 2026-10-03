@@ -61,8 +61,32 @@ def add_packages_path():
     return path
 
 
-def pip_install(pkg_name):
-    """Install a Python package into FreeCAD's AdditionalPythonPackages."""
+def invalidate_import_caches():
+    """Make freshly pip-installed packages discoverable.
+
+    ``importlib`` caches directory listings, so a package installed into
+    ``AdditionalPythonPackages`` right after a failed import would not be found
+    until the caches are invalidated. Safe to call at any time.
+    """
+    import importlib
+
+    add_packages_path()
+    importlib.invalidate_caches()
+
+
+def pip_install(pkg_name, on_output=None, timeout: int = 600):
+    """Install a Python package into FreeCAD's AdditionalPythonPackages.
+
+    ``on_output``, if given, is called with each decoded line written by pip
+    on stdout/stderr. This lets a GUI show live progress. The stdout and
+    stderr pipes are read concurrently (via ``selectors``) so that a
+    progress-heavy pip run cannot dead-lock on a full stderr pipe.
+
+    Return the pip return code (0 on success).
+    """
+    import os
+    import selectors
+
     packages_path = add_packages_path()
 
     python_exe = get_python_exe()
@@ -77,19 +101,45 @@ def pip_install(pkg_name):
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
 
-    for line in iter(p.stdout.readline, b''):
-        if line:
-            print(line.decode("utf-8"), end="")
-    print()
+    # Merge and stream stdout/stderr without blocking on either pipe.
+    selector = selectors.DefaultSelector()
+    assert p.stdout is not None and p.stderr is not None
+    selector.register(p.stdout, selectors.EVENT_READ)
+    selector.register(p.stderr, selectors.EVENT_READ)
 
-    for err in iter(p.stderr.readline, b''):
-        if err:
-            print(err.decode("utf-8"), end="")
-    print()
+    def _emit(chunk: bytes) -> None:
+        text = chunk.decode('utf-8', errors='replace')
+        if on_output is not None:
+            try:
+                on_output(text)
+            except Exception:
+                pass
+        else:
+            print(text, end='')
 
-    p.stdout.close()
-    p.stderr.close()
-    p.wait(timeout=180)
+    try:
+        while selector.get_map():
+            for key, _ in selector.select(timeout=timeout):
+                # Read raw chunks (not lines): pip emits progress updates
+                # terminated by a carriage return, which readline() would
+                # hold back until the next newline.
+                try:
+                    chunk = os.read(key.fileobj.fileno(), 4096)
+                except OSError:
+                    chunk = b''
+                if chunk:
+                    _emit(chunk)
+                else:
+                    selector.unregister(key.fileobj)
+    finally:
+        selector.close()
+        p.stdout.close()
+        p.stderr.close()
+
+    if on_output is None:
+        print()
+
+    return p.wait(timeout=timeout)
 
 
 def check_install_package(packages_import_name, package_name=None):

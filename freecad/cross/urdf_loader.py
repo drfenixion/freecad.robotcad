@@ -9,7 +9,10 @@ from freecad.cross.utils import get_parent_by_pattern
 from urdf_parser_py.urdf import Robot
 
 from xacro import init_stacks, process_doc, XacroException
-from . import xacro as xacro_inst
+# Import the top-level `xacro` package directly. Using `from . import xacro`
+# would rely on the parent package rebinding the name (done by a fragile
+# `import xacro` in __init__.py) and fails when that import was skipped.
+import xacro as xacro_inst
 import xml
 
 

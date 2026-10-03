@@ -26,6 +26,21 @@
       <subdirectory>freecad/robotcad</subdirectory>
       <pythonmin>3.11</pythonmin>
       <conflict type="addon">CROSS</conflict>
+
+      <!-- Python dependencies, checked and installed by the "Check and install
+           dependencies" action (see freecad/cross/dependencies.py). The element
+           text is the *package* (pip) name; when the *import* name differs, it
+           is given by the "import" attribute (or via KNOWN_IMPORT_NAMES). -->
+      <depend type="python">urdf_parser_py</depend>
+      <depend type="python">xacro</depend>
+      <depend type="python">xacrodoc</depend>
+      <depend type="python">mujoco</depend>
+      <depend type="python" import="ament_index_python">ros-ament-index-python</depend>
+      <depend type="python">xmltodict</depend>
+      <depend type="python" import="collada">pycollada</depend>
+      <depend type="python">lxml</depend>
+      <!-- MCP (Model Context Protocol) is optional. -->
+      <depend optional="true" type="python">mcp</depend>
     </workbench>
   </content>
 

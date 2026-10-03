@@ -8,12 +8,13 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 
 try:
-    from PySide import QtWidgets
+    from PySide import QtCore, QtWidgets
 except ImportError:
-    from PySide6 import QtWidgets
+    from PySide6 import QtCore, QtWidgets
 
 from ..gui_utils import tr
 from ..wb_constants import MOD_PATH
+from .dependencies_dialog import open_dependencies_dialog
 
 
 def _get_package_xml_value(tag: str) -> str:
@@ -48,6 +49,55 @@ def get_robotcad_release_date() -> str:
     return _get_package_xml_value('date')
 
 
+class AboutDialog(QtWidgets.QDialog):
+    """About dialog with version information and a dependencies button."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(tr('About RobotCAD'))
+        self.setModal(False)
+        self.resize(420, 200)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        version = get_robotcad_version() or tr('unknown')
+        release_date = get_robotcad_release_date() or tr('unknown')
+
+        title = QtWidgets.QLabel(f'<h2>RobotCAD</h2>')
+        layout.addWidget(title)
+
+        info = QtWidgets.QLabel(
+            tr('RobotCAD version: {}').format(version) + '<br>' +
+            tr('Release date: {}').format(release_date),
+        )
+        info.setTextFormat(QtCore.Qt.RichText)
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        layout.addStretch(1)
+
+        button_row = QtWidgets.QHBoxLayout()
+
+        self.dependencies_button = QtWidgets.QPushButton(
+            tr('Check and install dependencies'),
+        )
+        self.dependencies_button.clicked.connect(self._on_dependencies_clicked)
+        button_row.addWidget(self.dependencies_button)
+
+        button_row.addStretch(1)
+
+        self.close_button = QtWidgets.QPushButton(tr('Close'))
+        self.close_button.clicked.connect(self.close)
+        button_row.addWidget(self.close_button)
+
+        layout.addLayout(button_row)
+
+    def _on_dependencies_clicked(self) -> None:
+        open_dependencies_dialog(parent=self, auto_install=False)
+
+
 class _AboutCommand:
     """The command definition to show the RobotCAD version."""
 
@@ -63,18 +113,11 @@ class _AboutCommand:
         return True
 
     def Activated(self):
-        version = get_robotcad_version() or tr('unknown')
-        release_date = get_robotcad_release_date() or tr('unknown')
-        message = (
-            tr('RobotCAD version: {}').format(version) + '\n' +
-            tr('Release date: {}').format(release_date)
-        )
-
-        QtWidgets.QMessageBox.information(
-            None,
-            tr('About RobotCAD'),
-            message,
-        )
+        dialog = AboutDialog(fcgui.getMainWindow())
+        dialog.setAttribute(QtCore.Qt.WA_DeleteOnClose, False)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
 
 fcgui.addCommand('AboutRobotCAD', _AboutCommand())

@@ -1,73 +1,166 @@
 
+import importlib
+
+import FreeCAD as fc
 import FreeCADGui as fcgui
 
-from .ui import command_assembly_from_urdf  # noqa: F401
-from .ui import command_box_from_bounding_box  # noqa: F401
-from .ui import command_bring_robot_to_pose  # noqa: F401
-from .ui import command_calculate_mass_and_inertia  # noqa: F401
-from .ui import command_duplicate_robot # noqa: F401
-from .ui import command_get_planning_scene  # noqa: F401
-from .ui import command_kk_edit  # noqa: F401
-from .ui import command_new_attached_collision_object  # noqa: F401
-from .ui import command_new_joint # noqa: F401
-from .ui import command_new_joints_filled # noqa: F401
-from .ui import command_new_joints_filled_spider_connect # noqa: F401
-from .ui import command_new_link # noqa: F401
-from .ui import command_new_links_filled # noqa: F401
-from .ui import command_new_observer # noqa: F401
-from .ui import command_new_pose # noqa: F401
-from .ui import command_new_robot # noqa: F401
-from .ui import command_explode_links # noqa: F401
-# from .ui import command_ik_tool # noqa: F401
-from .ui import command_new_trajectory # noqa: F401
-from .ui import command_new_controller # noqa: F401
-from .ui import command_new_sensor # noqa: F401
-from .ui import command_open_models_library # noqa: F401
-from .ui import command_new_workcell # noqa: F401
-from .ui import command_new_xacro_object # noqa: F401
-from .ui import command_manage_link_display # noqa: F401
-from .ui import command_new_lcs_at_robot_link_body # noqa: F401
-from .ui import command_reload # Developer tool. # noqa: F401
-from .ui import command_robot_from_urdf # noqa: F401
-from .ui import command_set_joints # noqa: F401
-from .ui import command_set_placement # noqa: F401
-from .ui import command_set_placement_fast # noqa: F401
-from .ui import command_set_placement_fast_child_to_parent # noqa: F401
-from .ui import command_set_placement_fast_parent_to_child # noqa: F401
-from .ui import command_set_placement_fast_sensor # noqa: F401
-from .ui import command_set_placement_in_absolute_coordinates # noqa: F401
-from .ui import command_set_placement_by_orienteer # noqa: F401
-from .ui import command_set_placement_by_orienteer_with_hold_chain # noqa: F401
-from .ui import command_rotate_joint_x # noqa: F401
-from .ui import command_rotate_joint_y # noqa: F401
-from .ui import command_rotate_joint_z # noqa: F401
-from .ui import command_simplify_mesh # noqa: F401
-from .ui import command_sphere_from_bounding_box # noqa: F401
-from .ui import command_cylinder_x_aligned_from_bounding_box # noqa: F401
-from .ui import command_cylinder_y_aligned_from_bounding_box # noqa: F401
-from .ui import command_cylinder_z_aligned_from_bounding_box # noqa: F401
-from .ui import command_create_collision_copy_obj # noqa: F401
-from .ui import command_update_planning_scene # noqa: F401
-from .ui import command_urdf_export # noqa: F401
-from .ui import command_set_material # noqa: F401
-from .ui import command_calculate_mass_and_inertia # noqa: F401
-from .ui import command_world_generator # noqa: F401
-from .ui import command_transfer_project_to_external_code_generator # noqa: F401
-from .ui import command_wb_settings # noqa: F401
-from .ui import command_generate_robot_by_text  # noqa: F401
-from .ui import command_mcp_agent  # noqa: F401
-from .ui import command_about  # noqa: F401
+# Command modules are imported resiliently: a module that fails to import
+# (typically because a pip dependency such as `xmltodict` is not installed) no
+# longer aborts the whole workbench initialization. The missing command is
+# simply skipped, a soft warning is printed, and the "Check and install
+# dependencies" dialog is offered on workbench activation.
+_COMMAND_MODULES = [
+    'command_assembly_from_urdf',
+    'command_box_from_bounding_box',
+    'command_bring_robot_to_pose',
+    'command_calculate_mass_and_inertia',
+    'command_duplicate_robot',
+    'command_get_planning_scene',
+    'command_kk_edit',
+    'command_new_attached_collision_object',
+    'command_new_joint',
+    'command_new_joints_filled',
+    'command_new_joints_filled_spider_connect',
+    'command_new_link',
+    'command_new_links_filled',
+    'command_new_observer',
+    'command_new_pose',
+    'command_new_robot',
+    'command_explode_links',
+    'command_new_trajectory',
+    'command_new_controller',
+    'command_new_sensor',
+    'command_open_models_library',
+    'command_new_workcell',
+    'command_new_xacro_object',
+    'command_manage_link_display',
+    'command_new_lcs_at_robot_link_body',
+    'command_reload',
+    'command_robot_from_urdf',
+    'command_set_joints',
+    'command_set_placement',
+    'command_set_placement_fast',
+    'command_set_placement_fast_child_to_parent',
+    'command_set_placement_fast_parent_to_child',
+    'command_set_placement_fast_sensor',
+    'command_set_placement_in_absolute_coordinates',
+    'command_set_placement_by_orienteer',
+    'command_set_placement_by_orienteer_with_hold_chain',
+    'command_rotate_joint_x',
+    'command_rotate_joint_y',
+    'command_rotate_joint_z',
+    'command_simplify_mesh',
+    'command_sphere_from_bounding_box',
+    'command_cylinder_x_aligned_from_bounding_box',
+    'command_cylinder_y_aligned_from_bounding_box',
+    'command_cylinder_z_aligned_from_bounding_box',
+    'command_create_collision_copy_obj',
+    'command_update_planning_scene',
+    'command_urdf_export',
+    'command_set_material',
+    'command_world_generator',
+    'command_transfer_project_to_external_code_generator',
+    'command_wb_settings',
+    'command_generate_robot_by_text',
+    'command_mcp_agent',
+    'command_about',
+    # CROSS sensors.
+    'command_new_lidar2d',
+    'command_new_rgb_camera',
+    'command_new_ultrasound',
+    # CROSS vacuum gripper.
+    'command_new_vacuum_gripper',
+]
 
-#CROSS sensors
-from .ui import command_new_lidar2d  # noqa: F401
-from .ui import command_new_rgb_camera  # noqa: F401
-from .ui import command_new_ultrasound  # noqa: F401
+from .deferred_messages import add_message
 
-#CROSS vacuum gripper
-from .ui import command_new_vacuum_gripper  # noqa: F401
+for _module_name in _COMMAND_MODULES:
+    try:
+        importlib.import_module(f'.ui.{_module_name}', __package__)
+    except Exception as _exc:  # noqa: BLE001 - keep the workbench usable.
+        # Deferred: reported when the workbench is activated, not at start-up.
+        add_message(f'Tool "{_module_name}" could not be loaded: {_exc}')
+
+
+def _report_deferred_on_activation() -> None:
+    """Report load-time issues now that the workbench is being activated."""
+    from .deferred_messages import add_message, flush
+
+    try:
+        from .dependencies import missing_dependencies
+        missing = [d.pip_name for d in missing_dependencies(include_optional=False)]
+    except Exception:
+        missing = []
+
+    if missing:
+        add_message('RobotCAD: missing dependencies: ' + ', '.join(missing))
+        add_message(
+            'RobotCAD: use "About RobotCAD" -> "Check and install dependencies" '
+            '(or the same button in "Workbench settings") to install them.',
+        )
+
+    flush()
+
+
+def reactivate_commands_and_workspace() -> None:
+    """Re-enable tools disabled by missing dependencies and rebuild the GUI.
+
+    Called after the dependencies were installed. Re-imports the command
+    modules that failed to load or disabled themselves, then rebuilds the
+    toolbar and menu so the newly-available commands appear immediately.
+    """
+    import sys
+
+    from .packages import invalidate_import_caches
+    invalidate_import_caches()
+
+    for name in _COMMAND_MODULES:
+        full_name = f'{__package__}.ui.{name}'
+        module = sys.modules.get(full_name)
+        try:
+            if module is None:
+                importlib.import_module(f'.ui.{name}', __package__)
+            elif getattr(module, 'imports_ok', True) is False:
+                importlib.reload(module)
+        except Exception:
+            pass
+
+    from .deferred_messages import flush
+    flush()
+
+    # Rebuild the toolbar and menu with the now-available commands.
+    workbench = _WORKBENCH_INSTANCE
+    for remover in ('removeToolbar', 'removeMenu'):
+        try:
+            getattr(workbench, remover)('RobotCAD')
+        except Exception:
+            pass
+    workbench.appendToolbar(
+        'RobotCAD', _registered_commands(workbench._toolbar_commands),
+    )
+    workbench.appendMenu(
+        'RobotCAD', _registered_commands(workbench._menu_commands),
+    )
+    try:
+        fcgui.updateGui()
+    except Exception:
+        pass
+
 
 from .wb_utils import ICON_PATH
 from . import wb_constants
+
+
+def _registered_commands(commands: list[str]) -> list[str]:
+    """Drop command names that are not registered (e.g. failed modules).
+
+    Separators are always kept.
+    """
+    try:
+        registered = set(fcgui.listCommands())
+    except Exception:
+        return commands
+    return [c for c in commands if c == 'Separator' or c in registered]
 
 
 class CrossWorkbench(fcgui.Workbench):
@@ -142,7 +235,7 @@ class CrossWorkbench(fcgui.Workbench):
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
             # 'Reload',  # Developer tool, hidden from toolbar.
         ]
-        self.appendToolbar('RobotCAD', toolbar_commands)
+        self.appendToolbar('RobotCAD', _registered_commands(toolbar_commands))
 
         # Same as commands but with NewObserver and without Reload.
         menu_commands = [
@@ -173,7 +266,7 @@ class CrossWorkbench(fcgui.Workbench):
             'ManageLinkDisplay',  # Defined in ./ui/command_manage_link_display.py.
             'NewLCSAtRobotLinkBody',  # Defined in ./ui/command_new_lcs_at_robot_link_body.py.
             'SetCROSSPlacementFast',  # Defined in ./ui/command_set_placement_fast.py.
-            'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.            
+            'SetCROSSPlacementFastChildToParent',  # Defined in ./ui/command_set_placement_fast_child_to_parent.py.
             'SetCROSSPlacementFastParentToChild',  # Defined in ./ui/command_set_placement_fast_parent_to_child.py.
             'SetCROSSPlacementInAbsoluteCoordinates',  # Defined in ./ui/command_set_placement_in_absolute_coordinates.py.
             'SetCROSSPlacementByOrienteer',  # Defined in ./ui/command_set_placement_by_orienteer.py.
@@ -226,18 +319,40 @@ class CrossWorkbench(fcgui.Workbench):
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
         ]
 
-        self.appendMenu('RobotCAD', menu_commands)
+        self.appendMenu('RobotCAD', _registered_commands(menu_commands))
+
+        # Kept so the toolbar/menu can be rebuilt after the dependencies are
+        # installed (see reactivate_commands_and_workspace).
+        self._toolbar_commands = toolbar_commands
+        self._menu_commands = menu_commands
 
         fcgui.addIconPath(str(ICON_PATH))
         # fcgui.addLanguagePath(joinDir('Resources/translations'))
 
     def Activated(self):
-        """Code run when a user switches to this workbench."""
-        pass
+        """Code run when a user switches to this workbench.
+
+        Reports the messages collected during load (disabled tools / missing
+        dependencies), then checks the dependencies and, when some required
+        package is missing, opens the interactive install dialog (which can be
+        closed by the user).
+        """
+        try:
+            _report_deferred_on_activation()
+        except Exception:
+            pass
+
+        try:
+            from .ui.dependencies_dialog import show_dependencies_if_missing
+            show_dependencies_if_missing()
+        except Exception:
+            # Never block switching to the workbench on a dependency check.
+            pass
 
     def Deactivated(self):
         """Code run when this workbench is deactivated."""
         pass
 
 
-fcgui.addWorkbench(CrossWorkbench())
+_WORKBENCH_INSTANCE = CrossWorkbench()
+fcgui.addWorkbench(_WORKBENCH_INSTANCE)

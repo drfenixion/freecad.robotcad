@@ -12,8 +12,9 @@ try:
     from freecad.cross.robot_from_urdf import assembly_from_urdf_path  # FreeCAD's PySide!
     imports_ok = True
 except ImportError as e:
-    # TODO: Warn the user more nicely.
-    warn(str(e) + '. Assembly from URDF tool is disabled.', gui=False)
+    # Reported when the workbench is activated, not at FreeCAD start-up.
+    from ..deferred_messages import add_message
+    add_message(str(e) + '. Assembly from URDF tool is disabled.')
     imports_ok = False
 
 

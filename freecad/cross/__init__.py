@@ -12,7 +12,7 @@ except (ModuleNotFoundError, ImportError, AttributeError):
 # Shared pip-install helpers. Defined in a pure-Python module (no FreeCAD
 # import at module level) so that the standalone stdio MCP bridge can reuse
 # them without triggering this heavy workbench initialization.
-from .packages import add_packages_path, check_install_package, pip_install
+from .packages import add_packages_path, pip_install
 
 add_packages_path()
 
@@ -49,26 +49,13 @@ from .wb_globals import g_ros_distro
 add_ros_library_path(g_ros_distro)
 
 
-# pip installs
-# should be after add_ros_library_path because ros package must be initialized firstly
-check_install_package('urdf_parser_py')
-
-# # Looks like Xacro pip ver is updated. Persist warning comment for some time. 
-# Disabled Xacro auto pip install because of on pip too old version. Xacro should be installed from Conda or by Rosdep
-check_install_package('xacro')
-check_install_package('xacrodoc') # model library import use it
-check_install_package('mujoco') # model library import use it
-check_install_package('ament_index_python', 'ros-ament-index-python')
-check_install_package('xmltodict')
-check_install_package('collada', 'pycollada')
-check_install_package('lxml')
-
-# MCP (Model Context Protocol) server for external LLM agents.
-# The `mcp` package is intentionally NOT installed here (at workbench start):
-# it is installed lazily, on the first use of the MCP tools (server start).
-# See `freecad/cross/mcp/server.py` -> `_ensure_mcp_packages()`.
-# Note: the code targets mcp 2.x (MCPServer). If a 1.x version is already
-# installed, upgrade it: pip install -U mcp
+# Python dependencies (urdf_parser_py, xacro, xacrodoc, mujoco,
+# ament_index_python, xmltodict, collada, lxml, and optionally mcp) are
+# declared in the addon's package.xml and are NO LONGER installed silently
+# here. They are checked and installed through the interactive
+# "Check and install dependencies" action, shown automatically when the
+# workbench is activated and some package is missing. See
+# freecad/cross/dependencies.py and freecad/cross/ui/dependencies_dialog.py.
 
 # Must be imported after the call to `add_ros_library_path`.
 from freecad.cross.freecad_utils import warn
@@ -82,6 +69,7 @@ try:
         warn('ROS2 was not detected. Import of Xacro files is disabled. URDF import is posible.', gui=False)
     imports_ok = True
 except Exception as e:
-    # TODO: Warn the user more nicely.
-    warn(str(e) + '. Models library tool is disabled.', gui=False)
+    # Reported when the workbench is activated, not at FreeCAD start-up.
+    from .deferred_messages import add_message
+    add_message(str(e) + '. URDF/Xacro import support is limited.')
     imports_ok = False

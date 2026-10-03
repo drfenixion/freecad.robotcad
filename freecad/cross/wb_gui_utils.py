@@ -254,6 +254,11 @@ class WbSettingsGetter:
 
         self.form.button_box.accepted.connect(self.on_ok)
         self.form.button_box.rejected.connect(self.on_cancel)
+
+        if hasattr(self.form, 'button_check_dependencies'):
+            self.form.button_check_dependencies.clicked.connect(
+                self.on_button_check_dependencies,
+            )
         
         # Hook for subclasses to add extra connections before exec_()
         self._on_form_loaded()
@@ -291,6 +296,15 @@ class WbSettingsGetter:
         if self.get_settings(get_ros_workspace=False, get_vhacd_path=True):
             return self.vhacd_path
         return self._old_vhacd_path
+
+    def on_button_check_dependencies(self):
+        """Open the interactive dependencies check/install dialog.
+
+        The dialog only lists the packages; installation starts when the user
+        clicks the "Install missing" button.
+        """
+        from .ui.dependencies_dialog import open_dependencies_dialog
+        open_dependencies_dialog(parent=self.form, auto_install=False)
 
     def on_button_browse_workspace(self):
         path = QtGui.QFileDialog.getExistingDirectory(
