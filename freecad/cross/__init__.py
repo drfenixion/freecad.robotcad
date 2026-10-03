@@ -61,7 +61,6 @@ check_install_package('mujoco') # model library import use it
 check_install_package('ament_index_python', 'ros-ament-index-python')
 check_install_package('xmltodict')
 check_install_package('collada', 'pycollada')
-check_install_package('PyQt5')
 check_install_package('lxml')
 
 # MCP (Model Context Protocol) server for external LLM agents.
