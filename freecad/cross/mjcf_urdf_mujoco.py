@@ -23,8 +23,12 @@ collision checking):
 * correct handling of mesh-referencing geoms (MuJoCo bakes the asset ``scale``
   and centring offset into ``geom_pos`` / ``geom_quat``, so the raw
   ``mesh_vert`` buffer can be exported as-is);
-* ``autolimits``-aware joint limits (unlimited hinges become ``continuous``)
-  with sane ``effort`` / ``velocity`` defaults;
+* ``autolimits``-aware joint limits (unlimited hinges and hinges with a
+  full-turn range become ``continuous``) with sane ``effort`` / ``velocity``
+  defaults. Joint ranges are also extended to include the home pose (the URDF
+  zero), because the importer clamps a joint value that lies outside its
+  limits and would otherwise silently rotate the child link away from its true
+  home orientation;
 * the MJCF joint reference angle (``ref``) is folded into the emitted joint
   coordinate (and into the joint limits) so the URDF zero pose matches the
   MuJoCo reference pose (models such as Cassie define ``ref`` on their knee and
@@ -34,12 +38,24 @@ collision checking):
   the original snippet). Bodies with a single joint whose anchor coincides with
   the body frame map directly onto one URDF joint (no auxiliary link); bodies
   with a non-zero joint anchor or with several joints use intermediate dummy
-  links only when needed.
+  links only when needed;
+* joint ranges always include the home pose. MuJoCo bodies can end up with a
+  joint range that excludes the zero pose (typically the joints closing a
+  kinematic loop, such as Cassie's ``foot_crank``/``foot``). The importer
+  clamps the joint value to the nearest limit, which silently rotates the
+  child link away from its home orientation; the emitted range is therefore
+  widened to include zero.
+* link and joint names are sanitized and made unique. Some MJCF models use
+  characters (``/``, ``:``, spaces) that are invalid in FreeCAD object names;
+  in particular a ``/`` in a link name makes the FreeCAD importer fail to look
+  the link up during joint-axis canonicalization, leaving every non-z-axis link
+  mis-oriented (MuJoCo Menagerie's Aloha and ShadowHand are affected).
 
 The module exposes a single public entry point:
 :func:`convert_mjcf_to_urdf`.
 """
 
+import math
 import os
 import os.path as osp
 import xml.etree.ElementTree as ET
@@ -61,6 +77,9 @@ _WORLD_LINK = 'world'
 # Default effort/velocity for joints whose MJCF does not define them.
 _DEFAULT_EFFORT = '1000'
 _DEFAULT_VELOCITY = '1000'
+
+# 2*pi, used to detect revolute joints that cover a full turn.
+_TWO_PI = 2.0 * math.pi
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +138,27 @@ def _quat_rotate(quat, vec):
 
 def _sanitize(name):
     return ''.join(c if (c.isalnum() or c in '-_.') else '_' for c in name) or 'item'
+
+
+def _unique_name(name, used):
+    """Return ``name`` sanitized and made unique within ``used`` (a set).
+
+    URDF link and joint names must be sanitized and unique: some MJCF models
+    (e.g. MuJoCo Menagerie's Aloha, ShadowHand) use ``/`` in body/joint names,
+    which the FreeCAD URDF importer mishandles when canonicalizing joint axes
+    (it then fails to look the link up by name), leaving every non-z-axis
+    link mis-oriented.
+    """
+    name = _sanitize(name)
+    if name not in used:
+        used.add(name)
+        return name
+    i = 1
+    while '%s_%d' % (name, i) in used:
+        i += 1
+    new_name = '%s_%d' % (name, i)
+    used.add(new_name)
+    return new_name
 
 
 def _name(model, obj_type, index):
@@ -316,6 +356,18 @@ def _mj_joint_to_urdf_type(model, jid):
 
 def _add_joint(root, name, jtype, parent, child, origin_xyz, origin_quat,
                axis=None, limits=None, offset=0.0):
+    # ``offset`` is the MJCF joint reference angle folded into the emitted zero
+    # position, so the MJCF range is shifted by it as well.
+    shifted = None
+    if limits is not None:
+        shifted = (float(limits[0]) - offset, float(limits[1]) - offset)
+
+    # A revolute joint whose shifted range spans a full turn rotates freely,
+    # which URDF/FreeCAD represents as ``continuous`` (no <limit>).
+    if (jtype == 'revolute' and shifted is not None
+            and (shifted[1] - shifted[0]) >= _TWO_PI - 1e-6):
+        jtype = 'continuous'
+
     joint = ET.SubElement(root, 'joint', {'name': name, 'type': jtype})
     ET.SubElement(joint, 'parent', {'link': parent})
     ET.SubElement(joint, 'child', {'link': child})
@@ -327,11 +379,19 @@ def _add_joint(root, name, jtype, parent, child, origin_xyz, origin_quat,
         # emitted (writing one would silently clamp the joint).
         if jtype != 'continuous':
             limit = {'effort': _DEFAULT_EFFORT, 'velocity': _DEFAULT_VELOCITY}
-            if limits is not None:
-                # ``offset`` is the MJCF joint reference angle folded into the
-                # emitted zero position, so the MJCF range is shifted by it too.
-                limit['lower'] = '%.9g' % (float(limits[0]) - offset)
-                limit['upper'] = '%.9g' % (float(limits[1]) - offset)
+            if shifted is not None:
+                lo, hi = shifted
+                # The URDF zero pose is the model's home pose. A range that
+                # excludes 0 is clamped by the importer (FreeCAD sets the joint
+                # value to the nearest limit when assembling), which silently
+                # rotates the child link away from its true home orientation.
+                # Extend the limit just enough so the home pose is reachable.
+                if lo > 0.0:
+                    lo = 0.0
+                if hi < 0.0:
+                    hi = 0.0
+                limit['lower'] = '%.9g' % lo
+                limit['upper'] = '%.9g' % hi
             ET.SubElement(joint, 'limit', limit)
     return joint
 
@@ -353,28 +413,34 @@ def _joint_ref_and_limits(model, jid, jtype):
         adr = int(model.jnt_qposadr[jid])
         ref = float(model.qpos0[adr])
     if jtype in ('revolute', 'prismatic'):
+        # An unlimited joint has an (effectively) empty range (-inf, 0); keeping
+        # it verbatim is fine because the empty range means "no restriction".
         lo, hi = (float(v) for v in model.jnt_range[jid])
-        if jtype == 'prismatic' and not int(model.jnt_limited[jid]):
-            lo, hi = -1.0, 1.0
         limits = (lo, hi)
     return ref, limits
 
 
 def _add_body_joint_chain(root, model, bid, parent_name, body_name,
-                          origin_xyz, origin_quat, base_names, dummy_counter):
+                          origin_xyz, origin_quat, used_link_names,
+                          used_joint_names, dummy_counter):
     """Emit the joint chain connecting ``parent_name`` to ``body_name``.
 
     ``origin_xyz`` / ``origin_quat`` describe the body frame in the parent link
     frame. For a body with no joints a single fixed joint is emitted. For a body
     with joints, a chain of dummy links is inserted so each MuJoCo joint keeps
     its own anchor and axis (see the module docstring).
+
+    ``used_link_names`` / ``used_joint_names`` are the sets of already emitted
+    link / joint names, kept so every generated name is sanitized and unique.
     """
     jnt_adr = int(model.body_jntadr[bid])
     jnt_num = int(model.body_jntnum[bid])
 
     if jnt_num == 0:
-        _add_joint(root, '%s2%s_fixed' % (parent_name, body_name), 'fixed',
-                   parent_name, body_name, origin_xyz, origin_quat)
+        _add_joint(root,
+                   _unique_name('%s2%s_fixed' % (parent_name, body_name),
+                                used_joint_names),
+                   'fixed', parent_name, body_name, origin_xyz, origin_quat)
         return
 
     # Fast path: a body with a single joint whose anchor coincides with the body
@@ -383,7 +449,9 @@ def _add_body_joint_chain(root, model, bid, parent_name, body_name,
     # origin and no intermediate (massless) link is needed.
     if jnt_num == 1:
         jid = jnt_adr
-        jname = _name(model, mujoco.mjtObj.mjOBJ_JOINT, jid) or 'joint_%d' % jid
+        jname = _unique_name(
+            _name(model, mujoco.mjtObj.mjOBJ_JOINT, jid) or 'joint_%d' % jid,
+            used_joint_names)
         jpos = np.asarray(model.jnt_pos[jid], dtype=float)
         jaxis = np.asarray(model.jnt_axis[jid], dtype=float)
         jtype = _mj_joint_to_urdf_type(model, jid)
@@ -396,13 +464,14 @@ def _add_body_joint_chain(root, model, bid, parent_name, body_name,
         # A massless intermediate link carries the joint; a fixed joint then
         # brings the frame back to the child body frame.
         dummy_counter[0] += 1
-        dummy = '%s_jointbody_%d' % (jname, dummy_counter[0])
+        dummy = _unique_name('%s_jointbody_%d' % (jname, dummy_counter[0]),
+                             used_link_names)
         _add_link(root, dummy)
-        base_names.add(dummy)
         anchor_xyz = origin_xyz + _quat_rotate(origin_quat, jpos)
         _add_joint(root, jname, jtype, parent_name, dummy, anchor_xyz,
                    origin_quat, axis=jaxis, limits=limits, offset=ref)
-        _add_joint(root, '%s_offset' % jname, 'fixed', dummy, body_name,
+        _add_joint(root, _unique_name('%s_offset' % jname, used_joint_names),
+                   'fixed', dummy, body_name,
                    -jpos, np.array([1.0, 0.0, 0.0, 0.0]))
         return
 
@@ -411,16 +480,18 @@ def _add_body_joint_chain(root, model, bid, parent_name, body_name,
     last_jname = None
     for i in range(jnt_num):
         jid = jnt_adr + i
-        jname = _name(model, mujoco.mjtObj.mjOBJ_JOINT, jid) or 'joint_%d' % jid
+        jname = _unique_name(
+            _name(model, mujoco.mjtObj.mjOBJ_JOINT, jid) or 'joint_%d' % jid,
+            used_joint_names)
         last_jname = jname
         jpos = np.asarray(model.jnt_pos[jid], dtype=float)
         jaxis = np.asarray(model.jnt_axis[jid], dtype=float)
         jtype = _mj_joint_to_urdf_type(model, jid)
 
         dummy_counter[0] += 1
-        dummy = '%s_jointbody_%d' % (jname, dummy_counter[0])
+        dummy = _unique_name('%s_jointbody_%d' % (jname, dummy_counter[0]),
+                             used_link_names)
         _add_link(root, dummy)
-        base_names.add(dummy)
 
         if i == 0:
             # The first joint is anchored in the child body frame and the joint
@@ -494,6 +565,8 @@ def convert_mjcf_to_urdf(mjcf_file, urdf_file, mesh_dir=None, package_prefix=Non
 
     # Root link: always emit the MJCF ``world`` frame as the URDF root.
     _add_link(root, _WORLD_LINK)
+    used_link_names = {_WORLD_LINK}
+    used_joint_names = set()
 
     # Links + geoms.
     body_names = {}
@@ -501,7 +574,9 @@ def convert_mjcf_to_urdf(mjcf_file, urdf_file, mesh_dir=None, package_prefix=Non
         if bid == 0:
             body_names[bid] = _WORLD_LINK
             continue
-        name = _name(model, mujoco.mjtObj.mjOBJ_BODY, bid) or 'body_%d' % bid
+        name = _unique_name(
+            _name(model, mujoco.mjtObj.mjOBJ_BODY, bid) or 'body_%d' % bid,
+            used_link_names)
         body_names[bid] = name
         link = _add_link(root, name)
         _add_inertial(link, model, bid)
@@ -509,7 +584,6 @@ def convert_mjcf_to_urdf(mjcf_file, urdf_file, mesh_dir=None, package_prefix=Non
 
     # Joints.
     dummy_counter = [0]
-    dummy_names = set()
     for bid in range(1, model.nbody):
         parent_bid = int(model.body_parentid[bid])
         parent_name = body_names[parent_bid]
@@ -517,7 +591,8 @@ def convert_mjcf_to_urdf(mjcf_file, urdf_file, mesh_dir=None, package_prefix=Non
         body_pos = np.asarray(model.body_pos[bid], dtype=float)
         body_quat = np.asarray(model.body_quat[bid], dtype=float)
         _add_body_joint_chain(root, model, bid, parent_name, body_name,
-                              body_pos, body_quat, dummy_names, dummy_counter)
+                              body_pos, body_quat, used_link_names,
+                              used_joint_names, dummy_counter)
 
     xmlstr = minidom.parseString(ET.tostring(root)).toprettyxml(indent='  ')
     with open(urdf_file, 'w') as f:
