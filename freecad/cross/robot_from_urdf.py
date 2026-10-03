@@ -142,6 +142,7 @@ def robot_from_urdf_path(
         repository_path = None,
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
+        name: str = None,
 ) -> CrossRobot:
     start = datetime.now()
     urdf_robot = get_urdf_robot_from_urdf_filename(
@@ -149,7 +150,9 @@ def robot_from_urdf_path(
         package_path,
         repository_path,
     )
-    robot = robot_from_urdf(doc, urdf_robot, create_without_solids, remove_solid_splitter)
+    robot = robot_from_urdf(
+        doc, urdf_robot, create_without_solids, remove_solid_splitter, name,
+    )
     _log_import_time(start, datetime.now(), str(filename_path))
 
     return robot
@@ -219,8 +222,18 @@ def robot_from_urdf(
         urdf_robot: UrdfRobot,
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
+        name: str = None,
 ) -> CrossRobot:
-    """Creates a CROSS::Robot from URDF."""
+    """Creates a CROSS::Robot from URDF.
+
+    Parameters
+    ----------
+    - name: optional robot name override. When not given, the name from the
+      URDF description (``urdf_robot.name``) is used. The models library
+      passes the semantic model name here so converted MJCF/xacro robots are
+      not called ``converted_robot``.
+
+    """
     doc.openTransaction(tr('Robot from URDF'))
 
     pkg_name = ''
@@ -237,7 +250,7 @@ def robot_from_urdf(
     _update_progress(progressBar, i)
     i += 1
 
-    robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, urdf_robot.name)
+    robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, name or urdf_robot.name)
     # Change the Show properties before having added all links.
     # Disable show of all for not creating any link to real, visial, collision
     # in progress of creating robot links

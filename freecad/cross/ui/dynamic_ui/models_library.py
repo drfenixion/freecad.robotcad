@@ -174,6 +174,9 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 package = {
                     'desc': desc,
                     'package_label': package_label,
+                    # Semantic model name from the library, used as the robot
+                    # name when importing MJCF/xacro models.
+                    'model_name': model_name,
                     # Lower-cased haystack for the live search: model name + manufacturer.
                     'search': (package_label + ' ' + model_name).lower(),
                 }
@@ -495,7 +498,23 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                                     'is_mjcf': False,
                                 }
 
-                dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
+                # Find the semantic model name of the selected package.
+                model_name = None
+                for tag in self.packages_grouped_by_tags.values():
+                    for package in tag['packages']:
+                        if package['package_label'] == radio_button.text():
+                            model_name = package.get('model_name')
+                            break
+                    if model_name:
+                        break
+
+                dialog = LoadURDFDialog(
+                    module,
+                    variants,
+                    parrent_window = self,
+                    package_name = radio_button.text(),
+                    model_name = model_name,
+                )
                 dialog.setModal(True)
                 self.setEnabled(True)
                 dialog.exec_()
@@ -506,12 +525,23 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
 
 class LoadURDFDialog(QtWidgets.QDialog):
-    def __init__(self, module, variants, parrent_window, package_name, parent=None):
+    def __init__(
+            self,
+            module,
+            variants,
+            parrent_window,
+            package_name,
+            model_name = None,
+            parent = None,
+    ):
         super(LoadURDFDialog, self).__init__(parent)
         self.module = module
         self.variants = variants
         self.parrent_window = parrent_window
         self.package_name = package_name
+        # Semantic model name from the library, used as the robot name for
+        # MJCF/xacro imports (instead of ``converted_robot``).
+        self.model_name = model_name
         self.create_without_solids = True
         self.remove_solid_splitter = True
         self.initUI()
@@ -574,6 +604,32 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.remove_solid_splitter = False
 
 
+    def _ensure_active_document(self) -> bool:
+        """Return the active document, creating one if needed.
+
+        If the active document already contains objects, ask the user for
+        confirmation before adding the model to it. Return ``None`` when the
+        user cancels.
+        """
+        doc = fc.activeDocument()
+        if doc is None:
+            doc = fc.newDocument()
+            return doc
+
+        if len(doc.Objects):
+            answer = QtWidgets.QMessageBox.question(
+                self,
+                "Document is not empty",
+                "Are you sure you want to create the model in this document?"
+                " It already contains objects.",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No,
+            )
+            if answer != QtWidgets.QMessageBox.Yes:
+                return None
+        return doc
+
+
     def load_urdf(self):
         # get choosed variant
         selected_variant = None
@@ -587,6 +643,13 @@ class LoadURDFDialog(QtWidgets.QDialog):
 
         # Create model
         if selected_variant:
+            # Check that there is an active document and confirm adding the
+            # model to a non-empty document.
+            doc = self._ensure_active_document()
+            if doc is None:
+                self.setEnabled(True)
+                return
+
             urdf_path = selected_variant['path']
             if selected_variant['is_xacro']:
                 # Convert xacro to URDF using robot_descriptions._xacro
@@ -605,13 +668,19 @@ class LoadURDFDialog(QtWidgets.QDialog):
                     package_path=self.module.PACKAGE_PATH,
                     repository_path=self.module.REPOSITORY_PATH,
                 )
+            # For MJCF/xacro the generated URDF is named 'converted_robot', so
+            # use the semantic model name from the library instead.
+            name = self.model_name if (
+                selected_variant['is_xacro'] or selected_variant['is_mjcf']
+            ) else None
             robot_from_urdf_path(
-                fc.activeDocument(),
+                doc,
                 urdf_path,
                 self.module.PACKAGE_PATH,
                 self.module.REPOSITORY_PATH,
                 create_without_solids=self.create_without_solids,
                 remove_solid_splitter=self.remove_solid_splitter,
+                name=name,
             )
             # enable buttons
             self.setEnabled(True)
