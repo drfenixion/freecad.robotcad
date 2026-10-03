@@ -27,7 +27,7 @@ from pathlib import Path
 
 # Bumped whenever the conversion output changes in a way that invalidates
 # previously cached URDFs (the cache key includes this value).
-CONVERTER_VERSION = '9'
+CONVERTER_VERSION = '10'
 
 
 # ---------------------------------------------------------------------------

@@ -25,10 +25,15 @@ collision checking):
   ``mesh_vert`` buffer can be exported as-is);
 * ``autolimits``-aware joint limits (unlimited hinges become ``continuous``)
   with sane ``effort`` / ``velocity`` defaults;
+* the MJCF joint reference angle (``ref``) is folded into the emitted joint
+  coordinate (and into the joint limits) so the URDF zero pose matches the
+  MuJoCo reference pose (models such as Cassie define ``ref`` on their knee and
+  tarsus hinges);
 * correct multi-joint-per-body chain conversion (the intermediate frames are
   derived from each joint's position, fixing an off-by-one accumulation bug in
-  the original snippet). Bodies with a single joint map directly onto one URDF
-  joint (no auxiliary link), while multi-joint bodies use intermediate dummy
+  the original snippet). Bodies with a single joint whose anchor coincides with
+  the body frame map directly onto one URDF joint (no auxiliary link); bodies
+  with a non-zero joint anchor or with several joints use intermediate dummy
   links only when needed.
 
 The module exposes a single public entry point:
@@ -310,7 +315,7 @@ def _mj_joint_to_urdf_type(model, jid):
 
 
 def _add_joint(root, name, jtype, parent, child, origin_xyz, origin_quat,
-               axis=None, limits=None):
+               axis=None, limits=None, offset=0.0):
     joint = ET.SubElement(root, 'joint', {'name': name, 'type': jtype})
     ET.SubElement(joint, 'parent', {'link': parent})
     ET.SubElement(joint, 'child', {'link': child})
@@ -318,12 +323,41 @@ def _add_joint(root, name, jtype, parent, child, origin_xyz, origin_quat,
     if jtype in ('revolute', 'prismatic', 'continuous'):
         if axis is not None:
             ET.SubElement(joint, 'axis', {'xyz': _array2str(axis)})
-        limit = {'effort': _DEFAULT_EFFORT, 'velocity': _DEFAULT_VELOCITY}
-        if limits is not None:
-            limit['lower'] = '%.9g' % float(limits[0])
-            limit['upper'] = '%.9g' % float(limits[1])
-        ET.SubElement(joint, 'limit', limit)
+        # ``continuous`` joints are unlimited by definition, so no <limit> is
+        # emitted (writing one would silently clamp the joint).
+        if jtype != 'continuous':
+            limit = {'effort': _DEFAULT_EFFORT, 'velocity': _DEFAULT_VELOCITY}
+            if limits is not None:
+                # ``offset`` is the MJCF joint reference angle folded into the
+                # emitted zero position, so the MJCF range is shifted by it too.
+                limit['lower'] = '%.9g' % (float(limits[0]) - offset)
+                limit['upper'] = '%.9g' % (float(limits[1]) - offset)
+            ET.SubElement(joint, 'limit', limit)
     return joint
+
+
+def _joint_ref_and_limits(model, jid, jtype):
+    """Return the MJCF reference angle (``ref``) and the URDF joint limits.
+
+    MuJoCo stores the joint reference angle (``ref`` attribute) in ``qpos0`` and
+    folds it into the body frame: the actual rotation contributed by a hinge or
+    slide joint is ``R_axis(qpos - ref)`` about the axis expressed in the body
+    frame (see ``mj_kinematics``). A non-zero ``ref`` therefore has to be folded
+    into the URDF joint coordinate so that the URDF zero matches the MuJoCo
+    reference pose. The returned limits are the raw MJCF range; the caller
+    shifts them by ``-ref`` together with the coordinate.
+    """
+    ref = 0.0
+    limits = None
+    if jtype in ('revolute', 'prismatic', 'continuous'):
+        adr = int(model.jnt_qposadr[jid])
+        ref = float(model.qpos0[adr])
+    if jtype in ('revolute', 'prismatic'):
+        lo, hi = (float(v) for v in model.jnt_range[jid])
+        if jtype == 'prismatic' and not int(model.jnt_limited[jid]):
+            lo, hi = -1.0, 1.0
+        limits = (lo, hi)
+    return ref, limits
 
 
 def _add_body_joint_chain(root, model, bid, parent_name, body_name,
@@ -343,24 +377,33 @@ def _add_body_joint_chain(root, model, bid, parent_name, body_name,
                    parent_name, body_name, origin_xyz, origin_quat)
         return
 
-    # Fast path: a body with a single joint maps directly onto one URDF joint.
-    # The joint position only shifts the joint frame inside the child link and is
-    # folded into the joint origin, so no intermediate (massless) link is needed.
+    # Fast path: a body with a single joint whose anchor coincides with the body
+    # frame (``jnt_pos == 0``) maps directly onto one URDF joint. The body frame
+    # is then the joint frame, so the body orientation is kept as the joint
+    # origin and no intermediate (massless) link is needed.
     if jnt_num == 1:
         jid = jnt_adr
         jname = _name(model, mujoco.mjtObj.mjOBJ_JOINT, jid) or 'joint_%d' % jid
         jpos = np.asarray(model.jnt_pos[jid], dtype=float)
         jaxis = np.asarray(model.jnt_axis[jid], dtype=float)
         jtype = _mj_joint_to_urdf_type(model, jid)
+        ref, limits = _joint_ref_and_limits(model, jid, jtype)
+        if np.linalg.norm(jpos) < 1e-12:
+            _add_joint(root, jname, jtype, parent_name, body_name, origin_xyz,
+                       origin_quat, axis=jaxis, limits=limits, offset=ref)
+            return
+        # A non-zero anchor means the joint frame differs from the body frame.
+        # A massless intermediate link carries the joint; a fixed joint then
+        # brings the frame back to the child body frame.
+        dummy_counter[0] += 1
+        dummy = '%s_jointbody_%d' % (jname, dummy_counter[0])
+        _add_link(root, dummy)
+        base_names.add(dummy)
         anchor_xyz = origin_xyz + _quat_rotate(origin_quat, jpos)
-        limits = None
-        if jtype in ('revolute', 'prismatic'):
-            lo, hi = (float(v) for v in model.jnt_range[jid])
-            limits = (lo, hi)
-            if jtype == 'prismatic' and not int(model.jnt_limited[jid]):
-                limits = (-1.0, 1.0)
-        _add_joint(root, jname, jtype, parent_name, body_name, anchor_xyz,
-                   origin_quat, axis=jaxis, limits=limits)
+        _add_joint(root, jname, jtype, parent_name, dummy, anchor_xyz,
+                   origin_quat, axis=jaxis, limits=limits, offset=ref)
+        _add_joint(root, '%s_offset' % jname, 'fixed', dummy, body_name,
+                   -jpos, np.array([1.0, 0.0, 0.0, 0.0]))
         return
 
     current_parent = parent_name
@@ -390,15 +433,10 @@ def _add_body_joint_chain(root, model, bid, parent_name, body_name,
             anchor_xyz = jpos - prev_pos
             anchor_quat = np.array([1.0, 0.0, 0.0, 0.0])
 
-        limits = None
-        if jtype in ('revolute', 'prismatic'):
-            lo, hi = (float(v) for v in model.jnt_range[jid])
-            limits = (lo, hi)
-            if jtype == 'prismatic' and not int(model.jnt_limited[jid]):
-                limits = (-1.0, 1.0)
+        ref, limits = _joint_ref_and_limits(model, jid, jtype)
 
         _add_joint(root, jname, jtype, current_parent, dummy, anchor_xyz,
-                   anchor_quat, axis=jaxis, limits=limits)
+                   anchor_quat, axis=jaxis, limits=limits, offset=ref)
 
         current_parent = dummy
         prev_pos = jpos
