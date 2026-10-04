@@ -64,7 +64,7 @@ Video of creating controllable models: <br />
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
         1. ros2_controllers (integrated in your package with ros2_control launcher)
-        1. Multicopter - PX4 or Sverk (PX4 based) + Gazebo + ROS2, all required code for your custom model and dependencies.
+        1. Multicopter - PX4 or Sverk (PX4 based framework) + Gazebo + ROS2, all required code for your custom model and dependencies.
         1. Nvidia video cards container support
         1. README instruction how to use
 
