@@ -44,7 +44,7 @@ Video of creating controllable models: <br />
 1. Collisions automatic making tools (based on Real element of robot link)
 1. Controllers and sensor data broadcasters based on ros2_controllers (ros2_control)
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
-1. Sensors based on Gazebo sensors
+1. Sensors based on Gazebo sensors. Field of view visualization depends on sensor parameters.
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
 1. Explode View with adjustable offset and states memory.
