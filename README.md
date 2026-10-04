@@ -44,10 +44,11 @@ Video of creating controllable models: <br />
 1. Collisions automatic making tools (based on Real element of robot link)
 1. Controllers and sensor data broadcasters based on ros2_controllers (ros2_control)
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
-1. Sensors based on Gazebo sensors
+1. Sensors based on Gazebo sensors. Field of view visualization depends on sensor parameters.
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
 1. Explode View with adjustable offset and states memory.
+1. Agentic assembling - MCP server.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz, PX4, Sverk
     1. URDF (kinematics, mass, inertia, sensors, etc.)
@@ -63,7 +64,7 @@ Video of creating controllable models: <br />
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
         1. ros2_controllers (integrated in your package with ros2_control launcher)
-        1. Multicopter - PX4 or Sverk (PX4 based) + Gazebo + ROS2, all required code for your custom model and dependencies.
+        1. Multicopter - PX4 or Sverk (PX4 based framework) + Gazebo + ROS2, all required code for your custom model and dependencies.
         1. Nvidia video cards container support
         1. README instruction how to use
 
