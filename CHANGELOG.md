@@ -1,3 +1,24 @@
+# RobotCAD — Release v12.10.1
+
+**Date:** 2026-10-04
+
+## Fixes
+
+- Fixed a **regression in the MJCF → URDF converter** that tilted some previously-correct joints (e.g. the `FR_calf_joint` / `FL_calf_joint` / `RL_calf_joint` / `RR_calf_joint` of **go1**, and the **spot** knees). Joint limits are now widened to include the home pose **only for joints on a closed kinematic loop** (detected from MuJoCo `connect` / `weld` equality constraints); ordinary joints keep their exact MJCF range and are clamped at home as before ([`freecad/cross/mjcf_urdf_mujoco.py`](freecad/cross/mjcf_urdf_mujoco.py)). This restores the correct tilt of the non-loop joints while keeping the loop joints (e.g. **Cassie** `foot-crank` / `foot`) correct. The converter cache version is bumped to `13`.
+- Fixed **URDF import of models whose `<transmission>` blocks have no `<hardwareInterface>`** (e.g. Cassie `cassie_v4.urdf`). `urdf_parser_py` rejects such transmissions with a `ParseError`, which made the Models Library import fail; all `<transmission>` elements are now stripped before parsing ([`freecad/cross/urdf_loader.py`](freecad/cross/urdf_loader.py)).
+- Fixed the wording of the Models Library import options: "Don't create solids (quick view only)" and "Remove splitters (edges) from solid`s faces (usefull for Set Placement but increases import time)" ([`freecad/cross/ui/dynamic_ui/models_library.py`](freecad/cross/ui/dynamic_ui/models_library.py)).
+
+---
+
+### Commits
+
+- `6398f0a` — bump version
+- `f8814f4` — fix option description
+- `f1ca6e4` — fix transmission tag removing when import urdf
+- `ced6f8f` — fix mjcf to urdf convertion
+
+---
+
 # RobotCAD — Release v12.10.0
 
 **Date:** 2026-10-03
