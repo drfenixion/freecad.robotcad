@@ -78,12 +78,15 @@ def custom_xacro_parse(inp, filename=None):
     if inp.find('xmlns:xacro=') == -1:
         inp = inp.replace('<robot ', '<robot xmlns:xacro="http://example.com/sensor" ', 1)
 
-    # Cut problematic urdf fragments (looks like urdf_parser_py can parse it)
+    # Cut problematic urdf fragments (the CROSS::Robot is built from links,
+    # joints, materials and geometry only).
     # https://github.com/ros/urdf_parser_py/issues/90
+    # ``<transmission>`` elements are not used to build the robot and
+    # ``urdf_parser_py`` fails on several of them (e.g. a transmission joint
+    # without a ``hardwareInterface``, as in cassie_v4), so drop them all.
     if inp.find('<transmission') > -1:
-        pattern = r'<transmission .*?>(?:(?!<transmission>|</transmission>)[\s\S])*(<rightActuator|<gap_joint|<use_simulated_gripper_joint|<passive_joint|<simulated_actuated_joint|<rightActuator|<flexJoint|<rollJoint|<passive_joint)(?:(?!<transmission>)[\s\S])*?<\/transmission>'
-        flags = re.MULTILINE
-        inp = re.sub(pattern, '', inp, flags=flags)
+        inp = re.sub(r'<transmission\b[^>]*/>', '', inp)
+        inp = re.sub(r'<transmission\b[\s\S]*?</transmission>', '', inp)
 
     # replace xacro:include filenames with absolute paths
     # in case of not compiled package gotten from robot_description module or as import URDF
