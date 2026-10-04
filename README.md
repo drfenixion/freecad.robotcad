@@ -48,6 +48,7 @@ Video of creating controllable models: <br />
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
 1. Explode View with adjustable offset and states memory.
+1. Agentic assembling - MCP server.
 1. Basic code generator:
     1. ROS2 package with launchers for Gazebo, RViz, PX4, Sverk
     1. URDF (kinematics, mass, inertia, sensors, etc.)
