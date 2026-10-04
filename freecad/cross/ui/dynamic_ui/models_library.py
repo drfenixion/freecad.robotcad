@@ -567,12 +567,12 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.radio_button_group.addButton(radio_button)
             self.layout.addWidget(radio_button)
 
-        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Don`t create solids (only fast view)")
+        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Don`t create solids (quick view only)")
         self.create_without_solids_checkbox.setChecked(self.create_without_solids)
         self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
         self.layout.addWidget(self.create_without_solids_checkbox)
 
-        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitters (edges) from solids (usefull for Set Placement)")
+        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitters (edges) from solid`s faces (usefull for Set Placement but increases import time)")
         if self.remove_solid_splitter:
             self.remove_solid_splitter_checkbox.setChecked(True)
         self.remove_solid_splitter_checkbox.stateChanged.connect(self.update_remove_solid_splitter)
