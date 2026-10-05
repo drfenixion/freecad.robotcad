@@ -105,7 +105,7 @@ class _OverrideInertialPropertiesCommand:
             'Pixmap': 'override_inertial_properties.svg',
             'MenuText': tr('Override inertial properties'),
             'ToolTip': tr(
-                'Add RobotCad Override properties to selected objects.\n'
+                'Add RobotCad Override Inertial Properties to selected objects.\n'
                 '\n'
                 'Override properties are used in "advanced" inertia and\n'
                 'mass calculation mode (see Robot\'s "InertiaCalculationMethod"\n'

@@ -14,6 +14,7 @@ _COMMAND_MODULES = [
     'command_box_from_bounding_box',
     'command_bring_robot_to_pose',
     'command_calculate_mass_and_inertia',
+    'command_calculate_object_mass_and_inertia',
     'command_duplicate_robot',
     'command_get_planning_scene',
     'command_kk_edit',
@@ -227,6 +228,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'OverrideInertialProperties',  # Defined in ./ui/command_override_inertial_properties.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
+            'CalculateObjectMassAndInertia',  # Defined in ./ui/command_calculate_object_mass_and_inertia.py.
             'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
             'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.  'UrdfExport',  # Defined in ./ui/command_urdf_export.py.  'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.  'WbSettings',  # Defined in ./ui/command_wb_settings.py.
@@ -301,6 +303,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'OverrideInertialProperties',  # Defined in ./ui/command_override_inertial_properties.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
+            'CalculateObjectMassAndInertia',  # Defined in ./ui/command_calculate_object_mass_and_inertia.py.
             'Separator',
             # Import / export.
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
