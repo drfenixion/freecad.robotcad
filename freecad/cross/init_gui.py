@@ -58,6 +58,7 @@ _COMMAND_MODULES = [
     'command_update_planning_scene',
     'command_urdf_export',
     'command_set_material',
+	'command_override_inertial_properties',
     'command_world_generator',
     'command_transfer_project_to_external_code_generator',
     'command_wb_settings',
@@ -224,13 +225,11 @@ class CrossWorkbench(fcgui.Workbench):
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'SetJoints',  # Defined in ./ui/command_set_joints.py.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
+            'OverrideInertialProperties',  # Defined in ./ui/command_override_inertial_properties.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
             'WorldGenerator',  # Defined in ./ui/command_world_generator.py.
             'UrdfImport',  # Defined in ./ui/command_robot_from_urdf.py.
-            'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.
-            'UrdfExport',  # Defined in ./ui/command_urdf_export.py.
-            'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.
-            'WbSettings',  # Defined in ./ui/command_wb_settings.py.
+            'AssemblyFromUrdf',  # Defined in ./ui/command_assembly_from_urdf.py.  'UrdfExport',  # Defined in ./ui/command_urdf_export.py.  'TransferProjectToExternalCodeGenerator',  # Defined in ./ui/command_transfer_project_to_external_code_generator.py.  'WbSettings',  # Defined in ./ui/command_wb_settings.py.
             'MCPAgent',  # Defined in ./ui/command_mcp_agent.py.
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
             # 'Reload',  # Developer tool, hidden from toolbar.
@@ -300,6 +299,7 @@ class CrossWorkbench(fcgui.Workbench):
             'Separator',
             # Definition of inertial properties.
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
+            'OverrideInertialProperties',  # Defined in ./ui/command_override_inertial_properties.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
             'Separator',
             # Import / export.

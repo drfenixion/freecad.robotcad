@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- This work is licensed under a 
+<a rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed">CC0 1.0</a>.
+-->
+
+<svg
+   viewBox="0 0 64 64"
+   version="1.1"
+   id="svg40"
+   sodipodi:docname="override_inertial_properties.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:bx="https://boxy-svg.com">
+  <defs
+     id="defs44" />
+  <sodipodi:namedview
+     id="namedview42"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="8.6649868"
+     inkscape:cx="15.291425"
+     inkscape:cy="20.311629"
+     inkscape:window-width="1916"
+     inkscape:window-height="1050"
+     inkscape:window-x="0"
+     inkscape:window-y="26"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg40" />
+  <rect
+     width="20.184"
+     height="18.042"
+     style="fill:#d8d8d8;stroke:#000000"
+     x="3.39903"
+     y="1.928156"
+     id="rect2" />
+  <rect
+     x="9.626"
+     y="43.461"
+     width="10.239"
+     height="10.671"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     rx="1.445"
+     ry="1.445"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect6" />
+  <rect
+     x="41.57"
+     y="42.31"
+     width="20.184"
+     height="18.042"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect8" />
+  <rect
+     x="16.85"
+     y="55.022"
+     width="1.599"
+     height="6.927"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect12" />
+  <rect
+     x="12.654"
+     y="35.893"
+     width="4.636"
+     height="4.276"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     rx="0.266"
+     ry="0.266"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect14" />
+  <rect
+     x="14.456"
+     y="40.232"
+     width="0.901"
+     height="3.058"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     rx="0.266"
+     ry="0.266"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect16" />
+  <rect
+     x="19.865"
+     y="44.224"
+     width="5.989"
+     height="1.975"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     rx="0.513"
+     ry="0.513"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect18" />
+  <rect
+     x="3.639"
+     y="44.1"
+     width="5.989"
+     height="2.099"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     rx="0.513"
+     ry="0.513"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect20" />
+  <path
+     d="M 1.723 5.343 H 3.921 L 3.921 3.194 L 9.935 7.091 L 3.921 10.987 L 3.921 8.838 H 1.723 V 5.343 Z"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     transform="matrix(-0.9999949932098388, 0.003113000188022852, -0.0031770002096891403, -0.9999949932098388, 40.3493309020996, 58.677764892578125)"
+     bx:shape="arrow 1.723 3.194 8.212 7.792 3.496 6.014 0 1@c1b53b3e"
+     id="path22" />
+  <path
+     d="M 1.723 5.352 H 4.144 L 4.144 3.2 L 10.158 7.103 L 4.144 11.005 L 4.144 8.853 H 1.723 V 5.352 Z"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     transform="matrix(0.0005830000736750662, 0.9999999999999999, -0.9999999999999999, 0.0005710000405088067, 20.044342041015618, 21.247175216674805)"
+     bx:shape="arrow 1.723 3.2 8.434 7.805 3.501 6.014 0 1@6c5d0264"
+     id="path24" />
+  <text
+     style="font-size:6.34776px;font-family:Arial, sans-serif;white-space:pre;fill:#333333;stroke-width:2.04766"
+     x="5.6130772"
+     y="13.274094"
+     transform="scale(1.0051245,0.99490163)"
+     id="text26">Metal</text>
+  <text
+     style="font-size:18.6667px;font-family:Arial, sans-serif;white-space:pre;fill:#ff0000;stroke-width:2.04766"
+     x="26.439863"
+     y="17.33996"
+     transform="scale(1.0051245,0.99490163)"
+     id="text26-3"><tspan
+       sodipodi:role="line"
+       id="tspan1166"
+       x="26.439863"
+       y="17.33996">M=..</tspan><tspan
+       sodipodi:role="line"
+       id="tspan1168"
+       x="26.439863"
+       y="40.673336" /></text>
+  <text
+     style="font-size:18.6667px;font-family:Arial, sans-serif;white-space:pre;fill:#ff0000;stroke-width:2.04766"
+     x="26.613825"
+     y="35.621422"
+     transform="scale(1.0051245,0.99490163)"
+     id="text26-3-3"><tspan
+       sodipodi:role="line"
+       id="tspan1166-6"
+       x="26.613825"
+       y="35.621422">Ixy=</tspan><tspan
+       sodipodi:role="line"
+       id="tspan1168-7"
+       x="26.613825"
+       y="58.954796" /></text>
+  <text
+     style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 2.1px; white-space: pre;"
+     transform="matrix(2.0581579208374023, 0, 0, 2.0372250080108643, -2.3072969913482737, -2.1284210681915283)"
+     id="text36"><tspan
+       x="22.616"
+       y="26.011"
+       id="tspan30">Other</tspan><tspan
+       x="22.616"
+       dy="1em"
+       id="tspan32">​</tspan><tspan
+       id="tspan34">Material</tspan></text>
+  <rect
+     x="11.055"
+     y="55.022"
+     width="1.599"
+     height="6.927"
+     style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"
+     transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -2.220446049250313e-16)"
+     id="rect38" />
+  <path
+     style="opacity:0.991574;fill:#ff0000;fill-opacity:0.992157;stroke:#ff0000;stroke-width:2;stroke-dasharray:none"
+     d="M 26.394294,21.028387 0.58776579,0.86992495"
+     id="path327"
+     sodipodi:nodetypes="cc" />
+  <g
+     id="g1036"
+     style="stroke-width:2;stroke-dasharray:none">
+    <path
+       style="opacity:0.991574;fill:#ff0000;fill-opacity:0.992157;stroke:#ff0000;stroke-width:2;stroke-dasharray:none"
+       d="M 0.58776579,21.028387 26.394294,0.86992495"
+       id="path1033"
+       sodipodi:nodetypes="cc" />
+  </g>
+</svg>
