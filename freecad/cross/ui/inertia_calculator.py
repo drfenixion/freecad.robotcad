@@ -7,24 +7,18 @@ import FreeCAD as fc
 
 
 # Console output levels accepted by calculate()'s `output_level` argument.
-# LOG_LEVEL_WARN suppresses LOG_LEVEL_INFO messages (the tree-walk trace);
-# warnings are always printed.
+# LOG_LEVEL_INFO print all tree-like trace.
+# LOG_LEVEL_WARN only warinings are displayed.
 LOG_LEVEL_INFO = 'info'
 LOG_LEVEL_WARN = 'warn'
 
-# Property group shown in the FreeCAD property panel for every property the
-# "Override inertial properties" command adds (see
-# command_override_inertial_properties.py, which imports the names below
-# rather than redefining them, since it depends on this module and not the
-# other way around). Kept separate from the "Inertial Parameters" group
-# used by CROSS Link/Robot's own Mass/CenterOfMass/Ixx..Izz properties, so
-# the two never mix on the same object, and so future, non-inertia-related
-# overrides can be added to the same "RobotCad" group later.
+
+# Override properties for inertia calculator. For more information see 
+# calculate() documentation.
 PROPERTY_GROUP = 'RobotCad'
 
 # Override mode enumeration values, in the order shown in the property
-# panel. OVERRIDE_MODE_NONE is first so it is selected by default when the
-# property is first added to an object.
+# panel. 'none' is considered default mode.
 OVERRIDE_MODE_NONE = 'none'
 OVERRIDE_MODE_DENSITY = 'density'
 OVERRIDE_MODE_MASS = 'mass'
@@ -58,7 +52,7 @@ OVERRIDE_VALUE_PROPERTY_NAMES = (
 
 
 def print_matrix(M: np.ndarray) -> None:
-    """ Print matrix """
+    """ Print FreeCAD inertia matrix """
     for i in range(M.shape[0]):
         for j in range(M.shape[1]):
             print('%20.4f' % M[i, j], end=', ')
@@ -89,7 +83,7 @@ def screw_tf_matrix(T: fc.Matrix) -> NDArray:
 
 
 def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
-    """ Construct generalized 6x6 rigid body inertia matrix.
+    """ Construct rigid body mass matrix (generalized 6x6 inertia matrix).
 
     Arguments
     ---------
@@ -103,7 +97,7 @@ def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
     Return
     ------
     ArrayLike
-        6x6 generalized inertia matrix of rigid body.
+        6x6 mass matrix of rigid body.
     """
     # inertia matrix
     J = np.array([[J.A11, J.A12, J.A13],
@@ -120,7 +114,7 @@ def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
 
 
 def mass_com_inertia(JJ: np.ndarray) -> Tuple[float, fc.Vector, fc.Matrix]:
-    """ Extract the inertia matrix, center of mass location and mass from a generalized inertia matrix. """
+    """ Extract the inertia matrix, center of mass location and mass from a rigid body mass matrix. """
     m = (JJ[3,3] + JJ[4,4] + JJ[5,5]) / 3.0
     cog = 0.5 * fc.Vector(-JJ[1,5] - JJ[5,1], JJ[0,5] + JJ[5,0], -JJ[0,4] - JJ[4,0]) / m
     R = fc.Matrix()
@@ -212,28 +206,28 @@ def calculate(
 ):
     ''' Calculate the 6x6 inertia matrix of an object.
 
-    Walks along the object tree, finds solid objects with volume and calculates the overall inertia matrix using material properties.
-    Default behavior can be overridden by specifying object properties. These properties are added by the
-    "Override inertial properties" command (see command_override_inertial_properties.py) and are not
-    present on an object unless that command was run on it.
+    It traverses the object tree, finds solid objects with volume and calculates the total inertia matrix
+	taking in account material properties. Mass matrix (generalized 6d inertia matrix of rigid body) 
+	is calcutaed the root object container frame (root object Placement property is taken in account).
+
+    Default behavior can be overridden by specifying object properties from group 'RobotCad'.
 
     Object properties
     -----------------
     RobotCadOverrideMode: App::PropertyEnumeration, optional
         Property specifies calculation mode for this object. If not present, 'none' mode is used.
         Possible values:
-        * 'none': Use the solid's shape and material to calculate inertia. This mode can be overridden in subobjects.
+        * 'none': Use the solid's shape and material to calculate inertia. This mode can be overridden 
+		    in subobjects.
         * 'density': Material is ignored. RobotCadDensity is used for this object. Override properties
             in child objects are ignored.
-        * 'mass': Material is ignored. Shape density is assumed uniform and RobotCadMass is known.
-            Override properties in child objects are ignored.
+        * 'mass': Material is ignored. Shape density is assumed uniform and with mass specified 
+		    by RobotCadMass property. Override properties in child objects are ignored.
         * 'manual': Object mass, center of mass and inertia matrix are provided manually via
-            RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz. Override properties
-            in child objects are ignored.
-        * 'ignore': This object and its whole subtree are not processed at all (not even to
-            find linked/contained/solid objects). The generalized inertia matrix for this object
-            is assumed zero, as if it had neither mass nor volume. Override properties in child
-            objects are ignored, since the child objects themselves are never visited.
+            RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz properties. Override 
+			properties in child objects are ignored.
+        * 'ignore': This object and its whole subtree are not processed at all. Inertia and mass is 
+		    assumed zero.
     RobotCadMass: App::PropertyMass, optional
         Mass for 'mass' and 'manual' override mode.
     RobotCadDensity: App::PropertyDensity, optional
@@ -266,7 +260,7 @@ def calculate(
     Return
     ------
     np.ndarray
-        6x6 inertia matrix in coordinat frame of root object container (ignore_placement = False)
+        6x6 mass matrix of rigid body in coordinat frame of root object container (ignore_placement = False)
 		or in local coordinate frame of root object (ignore_placement = True). 
 		.
 
