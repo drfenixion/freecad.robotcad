@@ -3,7 +3,7 @@
 # Vars
 # For using of ROS packages from inside RobotCAD, FreeCAD build must have same Python version as ROS2 OS (py3.12)
 # Some of RobotCAD tools uses ROS2 packages
-custom_fc_appimage=FreeCAD_1.1.0-Linux-x86_64-py311.AppImage
+custom_fc_appimage=FreeCAD_1.1.4-Linux-x86_64-py311.AppImage
 custom_command="./../freecad/freecad_custom_appimage_dir/$custom_fc_appimage --appimage-extract-and-run"
 use_custom_command=false # set true if you want to use FreeCAD AppImage instead of system (inside docker container) FreeCAD
 # Dont forget place FC to docker/freecad/freecad_custom_appimage_dir in that case and fix $custom_fc_appimage variable value
