@@ -50,4 +50,8 @@ class _WorldGeneratorCommand:
         )          
 
 
-fcgui.addCommand('WorldGenerator', _WorldGeneratorCommand())
+# Keep a module-level reference to the command instance. Without it, Python
+# may garbage-collect the object right after addCommand(), which invalidates
+# the associated QAction and makes the command unusable.
+_world_generator_command = _WorldGeneratorCommand()
+fcgui.addCommand('WorldGenerator', _world_generator_command)
