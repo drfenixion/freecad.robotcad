@@ -11,6 +11,9 @@ import FreeCAD as fc
 # LOG_LEVEL_WARN only warinings are displayed.
 LOG_LEVEL_INFO = 'info'
 LOG_LEVEL_WARN = 'warn'
+# All log levels in the order shown in the property panel. The first one is
+# the default.
+LOG_LEVELS = [LOG_LEVEL_WARN, LOG_LEVEL_INFO]
 
 
 # Override properties for inertia calculator. For more information see 
@@ -82,6 +85,26 @@ def screw_tf_matrix(T: fc.Matrix) -> NDArray:
                      [  S @ R,               R ]])
 
 
+def transform_to_frame(JJ: NDArray, placement: fc.Placement) -> NDArray:
+    """ Express a 6x6 inertia matrix in the frame where `placement` is defined.
+
+    Arguments
+    ---------
+    JJ: np.ndarray
+        6x6 mass matrix of a rigid body in a local frame.
+    placement: fc.Placement
+        Placement of that local frame in the target frame (local to target
+        transform), e.g. the global placement of an object.
+
+    Return
+    ------
+    np.ndarray
+        6x6 mass matrix of the same body in the target frame.
+    """
+    X = screw_tf_matrix(placement.Matrix.inverse())
+    return X.T @ JJ @ X
+
+
 def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
     """ Construct rigid body mass matrix (generalized 6x6 inertia matrix).
 
@@ -113,14 +136,66 @@ def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
                      [      mS.T, m * np.eye(3)]])
 
 
-def mass_com_inertia(JJ: np.ndarray) -> Tuple[float, fc.Vector, fc.Matrix]:
-    """ Extract the inertia matrix, center of mass location and mass from a rigid body mass matrix. """
-    m = (JJ[3,3] + JJ[4,4] + JJ[5,5]) / 3.0
-    cog = 0.5 * fc.Vector(-JJ[1,5] - JJ[5,1], JJ[0,5] + JJ[5,0], -JJ[0,4] - JJ[4,0]) / m
-    R = fc.Matrix()
-    for i in range(3):
-        R.setRow(i, fc.Vector(JJ[0,0:3]))
-    return m, cog, R
+def mass_com_inertia(JJ: np.ndarray) -> Tuple[float, fc.Vector, NDArray]:
+    """ Extract mass, center of mass and inertia from a rigid body mass matrix.
+
+    Inverse of `inertia_matrix6d()`: `JJ` is the generalized 6x6 matrix
+
+        JJ = [[J - m*S@S,      m*S],
+              [    m*S.T, m*eye(3)]]
+
+    where `S = skew(com)` and `J` is the inertia matrix about the center of
+    mass. All results are expressed in the same frame and units as `JJ`.
+
+    Return
+    ------
+    (float, fc.Vector, np.ndarray)
+        Mass, center of mass location and 3x3 inertia matrix relative to the
+        center of mass (axes parallel to the axes of the frame `JJ` is
+        expressed in). For a matrix without mass (m <= 0) the center of mass
+        is the origin and the inertia matrix is zero.
+    """
+    m = (JJ[3, 3] + JJ[4, 4] + JJ[5, 5]) / 3.0
+    if m <= 0.0:
+        return 0.0, fc.Vector(0.0, 0.0, 0.0), np.zeros((3, 3))
+    # mS block is m * skew(com); use its antisymmetric part to suppress
+    # numerical asymmetry.
+    mS = 0.5 * (JJ[0:3, 3:6] - JJ[3:6, 0:3])
+    com = fc.Vector(mS[2, 1], mS[0, 2], mS[1, 0]) * (1.0 / m)
+    S = np.array([[0.0, -com.z, com.y],
+                  [com.z, 0.0, -com.x],
+                  [-com.y, com.x, 0.0]])
+    J = JJ[0:3, 0:3] + m * (S @ S)
+    # symmetrize
+    J = 0.5 * (J + J.T)
+    return m, com, J
+
+
+def log_message(output_level: str, msg_level: str, level: int, message: str) -> None:
+    """ Print `message` through FreeCAD's Console, honoring `output_level`.
+
+    Arguments
+    ---------
+    output_level: str
+        Console verbosity: LOG_LEVEL_INFO prints both info messages and
+        warnings; LOG_LEVEL_WARN prints only warnings.
+    msg_level: str
+        This message's own severity (LOG_LEVEL_INFO or LOG_LEVEL_WARN); it is
+        only printed when `output_level` is verbose enough to include it.
+    level: int
+        Level in the tree of objects. It encodes the recursion depth and is
+        what gives the console log its tree-shaped structure (two spaces per
+        level).
+    message: str
+        Message text.
+    """
+    if msg_level == LOG_LEVEL_INFO and output_level != LOG_LEVEL_INFO:
+        return
+    line = f'{msg_level.upper()}:{"  " * level} {message}'
+    if msg_level == LOG_LEVEL_WARN:
+        fc.Console.PrintWarning(line + '\n')
+    else:
+        fc.Console.PrintMessage(line + '\n')
 
 
 def get_property(obj: fc.DocumentObject, name: str, ptype: Optional[str] = None, units: Optional[str] = None, default: Optional[Any] = None, check_func: Optional[Callable[[Any], bool]] = None, check_desc: str = '') -> Any:
@@ -266,24 +341,9 @@ def calculate(
 
     '''
 
-    print_leader = '  ' * level
-
     def log(msg_level: str, message: str) -> None:
-        """ Print `message` through FreeCAD's Console, honoring `output_level`.
-
-        `msg_level` (LOG_LEVEL_INFO or LOG_LEVEL_WARN) is this message's own
-        severity; it is only printed when `output_level` is verbose enough
-        to include it. `print_leader` is preserved in the output: it
-        encodes the recursion depth and is what gives the console log its
-        tree-shaped structure.
-        """
-        if msg_level == LOG_LEVEL_INFO and output_level != LOG_LEVEL_INFO:
-            return
-        line = f'{msg_level.upper()}:{print_leader} {message}'
-        if msg_level == LOG_LEVEL_WARN:
-            fc.Console.PrintWarning(line + '\n')
-        else:
-            fc.Console.PrintMessage(line + '\n')
+        """ Print `message` at this call's tree `level`, see `log_message()`. """
+        log_message(output_level, msg_level, level, message)
 
     #
     # process properties
@@ -496,3 +556,4 @@ def calculate(
     #
     log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): unknown type without volume/mass.')
     return np.zeros((6,6))
+
