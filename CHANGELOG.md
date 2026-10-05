@@ -1,3 +1,29 @@
+# RobotCAD — Release v12.10.2
+
+**Date:** 2026-10-05
+
+## Improvements
+
+- **Dynamic World Generator** (Gazebo map editor, [`modules/Dynamic_World_Generator`](modules/Dynamic_World_Generator)): obstacle and wall colors are now chosen from a **color palette** (`QColorDialog`) instead of typing a color name. The selected color is stored as an exact RGB tuple (`0.0..1.0`), so the canvas preview and the saved SDF always match, and arbitrary palette colors survive a save/load round-trip ([`code/utils/color_button.py`](modules/Dynamic_World_Generator/code/utils/color_button.py), [`code/utils/color_utils.py`](modules/Dynamic_World_Generator/code/utils/color_utils.py), [`code/classes/world_manager.py`](modules/Dynamic_World_Generator/code/classes/world_manager.py)).
+
+## Fixes
+
+- **Dynamic World Generator** — fixed the **silent loss of wall/obstacle changes when Gazebo is installed but not running**: `apply_changes()` skipped writing the SDF whenever the Gazebo service call returned a non-zero code (the supported "generate SDF without a running Gazebo" workflow). Model changes are now always persisted to the SDF file, while runtime service calls are best-effort and gated on a running simulation ([`code/classes/world_manager.py`](modules/Dynamic_World_Generator/code/classes/world_manager.py)).
+- **Dynamic World Generator** — fixed **duplicate/overwriting model names**: names were derived from `len(models) + 1`, which collides after removing a model or loading a world (silently overwriting an existing model). Unique names are now generated ([`code/classes/pages/walls_design_page.py`](modules/Dynamic_World_Generator/code/classes/pages/walls_design_page.py), [`code/classes/pages/static_obstacles_page.py`](modules/Dynamic_World_Generator/code/classes/pages/static_obstacles_page.py)).
+- **Dynamic World Generator** — fixed an **uncaught `ValueError` when adding a wall** with a non-numeric width/height, and an `AttributeError` in the worlds list refresh before a world/simulation was selected ([`code/classes/pages/walls_design_page.py`](modules/Dynamic_World_Generator/code/classes/pages/walls_design_page.py)).
+- Fixed a possible **garbage-collection of the World Generator FreeCAD command**, which could invalidate its QAction and make the menu/toolbar entry unusable; the command instance is now kept in a module-level reference ([`freecad/cross/ui/command_world_generator.py`](freecad/cross/ui/command_world_generator.py)).
+
+---
+
+### Commits
+
+- `b7500f1` — Dynamic_World_Generator: add color picker (palette `QColorDialog` instead of text input; store exact RGB)
+- `9f2e208` — Dynamic_World_Generator: fix bugs (always persist model changes to SDF; unique model names; guard wall numeric input; fix worlds list refresh before simulation selection)
+- `f62004f` — update Dynamic_World_Generator (fix bugs, add color picker); keep a module-level reference to the `WorldGenerator` FreeCAD command instance
+- `f41ea10` — bump version
+
+---
+
 # RobotCAD — Release v12.10.1
 
 **Date:** 2026-10-04
