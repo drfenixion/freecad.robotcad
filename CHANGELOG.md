@@ -1,3 +1,20 @@
+# RobotCAD — Release v12.10.3
+
+**Date:** 2026-10-06
+
+## Fixes
+
+- Fixed the **level-of-detail (Real / Visual / Collision) links of a link falling to the root of the construction tree** after importing a model (e.g. **fingeredu**) or toggling `ShowReal` / `ShowVisual` / `ShowCollision`. FreeCAD does not always rebuild the branch of an `App::Part` after its generated children are deleted and recreated, so the new links were shown at the root even though they were still children of the part. [`refresh_objects_trees()`](freecad/cross/freecadgui_utils.py) re-queries the affected branches (expanding then restoring their state) so FreeCAD shows the links under their actual parent without touching the rest of the tree ([`freecad/cross/link_proxy.py`](freecad/cross/link_proxy.py)).
+
+---
+
+### Commits
+
+- `674c8a2` — bump version
+- `7bc1278` — fix lod (Real, Visual, Collision) links subelements dropping to root of building tree
+
+---
+
 # RobotCAD — Release v12.10.2
 
 **Date:** 2026-10-05
