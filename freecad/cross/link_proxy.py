@@ -7,6 +7,7 @@ import xml.etree.ElementTree as et
 import FreeCAD as fc
 import FreeCADGui as fcgui
 from freecad.cross.freecadgui_utils import get_sorted_concated_names
+from freecad.cross.freecadgui_utils import refresh_objects_trees
 
 from .freecad_utils import ProxyBase, is_body, volume_mm3
 from .freecad_utils import add_property
@@ -61,8 +62,6 @@ def _add_fc_links_lod(
     """Create FreeCAD links to real, visual or collision elements.
 
     Return the list of created FreeCAD link objects.
-    The objects are not added to the CROSS::link (it's a group), just to the
-    document.
 
     Parameters
     ----------
@@ -729,7 +728,7 @@ class LinkProxy(ProxyBase):
                     link, link.Collision, 'collision',
             )
 
-        # Reset the group.
+        # Reset the group
         new_group = (
             self._fc_links_real
             + self._fc_links_visual
@@ -751,6 +750,9 @@ class LinkProxy(ProxyBase):
                 except (ReferenceError, AttributeError, TypeError):
                     pass
 
+        refresh_objects_trees(
+            list(link.Real) + list(link.Visual) + list(link.Collision),
+        )
 
     def export_urdf(
         self,
