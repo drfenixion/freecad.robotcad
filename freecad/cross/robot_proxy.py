@@ -35,6 +35,7 @@ from .freecad_utils import get_first_not_assembly
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
+from .ui.inertia_calculator import LOG_LEVEL_WARN, LOG_LEVELS
 from .urdf_utils import xml_comment_element
 from .utils import get_valid_filename, replace_substring_in_keys
 from .utils import grouper
@@ -374,6 +375,42 @@ class RobotProxy(ProxyBase):
         # Initialize RobotType enum based on GenerateCodeForRosVersion
         self._update_robot_type_enum(obj)
 
+        # Implementation note: the properties below are added here, not only
+        # in `make_robot()`, so that robots saved by older versions get them
+        # with their default values when the document is restored
+        # (`onDocumentRestored()` calls `__init__()` and thus this method).
+        # They must not be added to the "ready" list given to
+        # `ProxyBase.__init__()`: an old robot lacks them until restored.
+        self._init_enum_property(
+            obj, 'InertiaCalculationMethod',  'Inertial Parameters', wb_constants.INERTIA_METHODS, wb_constants.INERTIA_METHOD_BASIC,
+            (
+                'Method used by the "Calculate mass and inertia" tool.\n'
+                '\n'
+                '* "basic": assumes robot links have uniform density with\n' 
+                '  materials specified on the link or robot level.\n'
+                '  As alternative link mass can be specifeid instead of material\n'
+                '  (see "CalculateInertiaBasedonMass" property).'
+                '\n'
+                '* "advanced": performs walk over link objects subree to\n'
+                '  calculate inertial propertis. It uses per object material setitings.\n'
+                '  Note that object material can be inherited form container.\n'
+                '  Method supports several override modes (mass, density, manual) on object or \n'
+                '  container level (see "OverrideInertialProperties" command).\n'
+                '  Output verbosity is controlled by "InertiaCalculatorLogLevel" property.'
+            ),
+        )
+        self._init_enum_property(
+            obj, 'InertiaCalculatorLogLevel',  'Inertial Parameters', LOG_LEVELS, LOG_LEVEL_WARN,
+            (
+                'Console verbosity of the "advanced" inertia calculation:'
+                ' * "warn" prints only warnings, mostly about incorrect material\n'
+                'or override settings.\n'
+                \n
+                ' * "info" prints the trace of the calculation (objects, containers,\n'
+                'origin of material]porperties, calculated mass).'
+            ),
+        )
+
         add_property(
             obj, 'App::PropertyStringList', 'ExplodeViewStates', 'Internal',
             'Saved explode view states. Each state is a JSON string with sorted link names and their MountedPlacement.Base positions.',
@@ -387,6 +424,30 @@ class RobotProxy(ProxyBase):
             obj, 'App::PropertyPlacement', 'Placement',
             'Base', 'Placement',
         )
+
+    @staticmethod
+    def _init_enum_property(
+            obj: CrossRobot,
+            name: str, 
+            group: str,
+            values: list[str],
+            default: str,
+            help_: str,
+    ) -> None:
+        """Add an enumeration property in group if missing.
+
+        The list of values and the default are set only when the property is
+        created: on document restore the value saved in the document must be
+        kept.
+
+        """
+        is_new = name not in obj.PropertiesList
+        add_property(
+            obj, 'App::PropertyEnumeration', name, group, help_,
+        )
+        if is_new:
+            setattr(obj, name, list(values))
+            setattr(obj, name, default)
 
     def execute(self, obj: CrossRobot) -> None:
         self._cleanup_group()
