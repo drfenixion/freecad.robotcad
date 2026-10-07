@@ -20,8 +20,8 @@ from ..freecad_utils import error
 from ..gui_utils import tr
 from ..wb_utils import is_joint, is_link, is_robot
 from .calculate_object_mass_and_inertia_dialog import CalculateObjectMassAndInertiaDialog
-from .calculate_object_mass_and_inertia_dialog import FRAME_GLOBAL, FRAME_LOCAL, TARGET_FRAMES
-from .inertia_calculator import LOG_LEVEL_INFO, LOG_LEVEL_WARN
+from .calculate_object_mass_and_inertia_dialog import FRAME_GLOBAL, FRAME_LOCAL
+from .inertia_calculator import LOG_LEVEL_INFO
 from .inertia_calculator import calculate, log_message, mass_com_inertia, transform_to_frame
 
 DO = fc.DocumentObject
@@ -64,11 +64,36 @@ def format_inertial_properties(
     return '\n'.join(lines)
 
 
+def _object_subname(root: DO, subname: str) -> str:
+    """Return the part of `subname` that designates a document object.
+
+    A selection path is made of object names followed, if a sub-element (face,
+    edge, vertex, solid...) is selected, by the name of the element:
+    'Body.Box.Face6' -> 'Body.Box.'. With topological naming, the element name
+    can contain dots and object-like text, e.g. 'Box.;#a:1;:H5d4,F.Face6', so
+    the element name is not removed by looking at the last dot. Instead, the
+    longest prefix of the path for which FreeCAD returns a document object is
+    used. Return '' if only `root` itself is designated.
+
+    """
+    parts = subname.split('.')
+    for n in range(len(parts) - 1, 0, -1):
+        candidate = '.'.join(parts[:n]) + '.'
+        try:
+            obj = root.getSubObject(candidate, 0)
+        except (RuntimeError, ValueError, TypeError):
+            continue
+        if isinstance(obj, fc.DocumentObject):
+            return candidate
+    return ''
+
+
 def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.Placement]]:
     """Return the single selected object and its placement in the global frame.
 
     The global placement includes the placement of the object and of all its
-    containers (App::Part, Assembly...) from the root of the document.
+    containers (App::Part, Assembly...) from the root of the document. If a
+    sub-element (face, edge...) is selected, the object it belongs to is used.
     Return (None, None) if not exactly one object is selected.
 
     """
@@ -77,9 +102,8 @@ def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.P
         return None, None
     root = selection[0].Object
     subname = selection[0].SubElementNames[0] if selection[0].SubElementNames else ''
-    # Remove a selected face, edge or vertex: 'Body.Box.Face6' -> 'Body.Box.'.
-    if subname and not subname.endswith('.'):
-        subname = subname.rsplit('.', maxsplit=1)[0] + '.' if '.' in subname else ''
+    # Remove a selected face, edge, vertex or solid: 'Body.Box.Face6' -> 'Body.Box.'.
+    subname = _object_subname(root, subname)
 
     if not subname:
         placement = root.Placement if hasattr(root, 'Placement') else fc.Placement()
@@ -90,7 +114,7 @@ def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.P
     # parent of `root`, i.e. including the placement of `root`.
     obj = root.getSubObject(subname, 0)
     placement = root.getSubObject(subname, 3)
-    if obj is None or not isinstance(placement, fc.Placement):
+    if not isinstance(obj, fc.DocumentObject) or not isinstance(placement, fc.Placement):
         return None, None
     return obj, placement
 
@@ -101,7 +125,9 @@ class _CalculateObjectMassAndInertiaCommand:
             'Pixmap': 'calculate_mass_and_inertia.svg',
             'MenuText': tr('Calculate: mass and inertia of the selected object'),
             'ToolTip': tr(
-                'Select one object (body, Part or Assembly container, link to a body and press this button.\n'
+                'Open the task panel to calculate mass and inertia of an object.\n'
+                'Select one object (body, Part or Assembly container, link to a body)\n'
+                'and press "Calculate" in the task panel. Press "Close" when done.\n'
                 '\n'
                 'Tool will calculate mass, center of mass and inertia matrix of the object and print result in Report View.\n'
                 'It utilizes "advanced" method (see "InertiaCalculationMethod" property for more information) which takes\n'
@@ -112,10 +138,26 @@ class _CalculateObjectMassAndInertiaCommand:
         }
 
     def IsActive(self) -> bool:
-        return len(fcgui.Selection.getSelection()) == 1
+        # The task panel can be opened without selection, the selection is
+        # checked when "Calculate" is pressed.
+        return True
 
     def Activated(self) -> None:
-        # get object and it global placement
+        # The task panel is shown in the Tasks tab: only one can be active.
+        if CalculateObjectMassAndInertiaDialog.is_task_dialog_active():
+            error('Another task dialog is active. Close it first.', gui=True)
+            return
+        # The panel is not modal and stays open: the calculation is done at
+        # each click on "Calculate", for the object selected at that moment.
+        CalculateObjectMassAndInertiaDialog(
+            on_calculate=lambda dialog: self._calculate_and_print(
+                dialog.target_frame, dialog.log_level,
+            ),
+        ).show()
+
+    @staticmethod
+    def _calculate_and_print(target_frame: str, log_level: str) -> None:
+        # get object and its global placement
         obj, global_placement = _selected_object_and_global_placement()
         # check if object is valid
         if obj is None:
@@ -128,15 +170,11 @@ class _CalculateObjectMassAndInertiaCommand:
                 gui=True,
             )
             return
-        # request parameters
-        dialog = CalculateObjectMassAndInertiaDialog(f'{obj.Label} ({obj.Name})')
-        if not dialog.exec():
-            return
         # calculate inertia properties
-        log_message(dialog.log_level, LOG_LEVEL_INFO, 0, f'Calculate inertial properties of "{obj.Label}" ({obj.FullName}), frame: {_FRAME_DESCRIPTIONS[dialog.target_frame]}.')
+        log_message(log_level, LOG_LEVEL_INFO, 0, f'Calculate inertial properties of "{obj.Label}" ({obj.FullName}), frame: {_FRAME_DESCRIPTIONS[target_frame]}.')
         try:
-            JJ = calculate(obj, ignore_placement=True, level=1, output_level=dialog.log_level)
-            if dialog.target_frame == FRAME_GLOBAL:
+            JJ = calculate(obj, ignore_placement=True, level=1, output_level=log_level)
+            if target_frame == FRAME_GLOBAL:
                 JJ = transform_to_frame(JJ, global_placement)
         except (ValueError, KeyError, TypeError) as e:
             error(f'Object "{obj.Label}": {e}', gui=True)
@@ -144,10 +182,10 @@ class _CalculateObjectMassAndInertiaCommand:
         mass, center_of_mass, inertia = mass_com_inertia(JJ)
         # check result for sanity
         if mass <= 0.0:
-            error(f'Object "{obj.Label}": calculated mass is zero. Assign materials to the parts of the object (or set the RobotCad override properties)  and check the console log (select the "{LOG_LEVEL_INFO}" log level).', gui=True,) 
+            error(f'Object "{obj.Label}": calculated mass is zero. Assign materials to the parts of the object (or set the RobotCad override properties)  and check the console log (select the "{LOG_LEVEL_INFO}" log level).', gui=True,)
             return
         # print result
-        fc.Console.PrintMessage(format_inertial_properties(mass, center_of_mass, inertia, header=f'Mass and inertia of "{obj.Label}" ({obj.FullName}), expressed in the {_FRAME_DESCRIPTIONS[dialog.target_frame]}:') + '\n')
+        fc.Console.PrintMessage(format_inertial_properties(mass, center_of_mass, inertia, header=f'Mass and inertia of "{obj.Label}" ({obj.FullName}), expressed in the {_FRAME_DESCRIPTIONS[target_frame]}:') + '\n')
 
 
 fcgui.addCommand('CalculateObjectMassAndInertia', _CalculateObjectMassAndInertiaCommand())

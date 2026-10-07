@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import FreeCADGui as fcgui
 from PySide import QtWidgets  # FreeCAD's PySide
 
@@ -26,32 +28,65 @@ _LOG_LEVEL_TEXTS = {
 }
 
 
-class CalculateObjectMassAndInertiaDialog:
-    """A dialog to get the parameters of the object mass and inertia calculation.
+def _enum_to_int(value) -> int:
+    """Return the integer value of a Qt enum or flag.
 
-    The last accepted values are kept for the next dialog of the session.
+    PySide6 enums are Python enums that cannot always be converted with
+    `int()`, they have a `value` attribute. PySide2 enums are int-like.
+
+    """
+    return int(getattr(value, 'value', value))
+
+
+class CalculateObjectMassAndInertiaDialog:
+    """A task panel to calculate the mass and inertia of the selected object.
+
+    The panel is shown in the "Tasks" tab of the combo view (FreeCAD task
+    dialog). It is not modal and stays open until "Close" is pressed: the user
+    selects an object and presses "Calculate", as many times as needed. The
+    `on_calculate` callback is called with the panel at each click on
+    "Calculate"; it must check the selection itself.
+
+    FreeCAD does not store the values of task panels. The last selected values
+    are kept in class attributes and used as initial values of the next panel,
+    until FreeCAD is closed.
 
     """
 
-    # Values of the last accepted dialog (initial values of the next one).
+    # Last selected values (initial values of the next panel).
     _last_target_frame: str = FRAME_GLOBAL
     _last_log_level: str = LOG_LEVEL_WARN
 
-    def __init__(self, object_label: str = ''):
-        self.target_frame: str = type(self)._last_target_frame
-        self.log_level: str = type(self)._last_log_level
+    def __init__(
+            self,
+            on_calculate: Callable[[CalculateObjectMassAndInertiaDialog], None],
+    ):
+        """Constructor.
 
-        self.form = QtWidgets.QDialog(fcgui.getMainWindow())
+        Parameters
+        ----------
+        - on_calculate: called when the user presses "Calculate". The selected
+                        values are in the attributes `target_frame` and
+                        `log_level`.
+
+        """
+        self._on_calculate = on_calculate
+
+        # The widget shown in the task panel.
+        self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(tr('Calculate object mass and inertia'))
         layout = QtWidgets.QFormLayout(self.form)
 
-        if object_label:
-            layout.addRow(tr('Object'), QtWidgets.QLabel(object_label))
+        hint = QtWidgets.QLabel(tr('Select an object and press "Calculate".'))
+        hint.setWordWrap(True)
+        layout.addRow(hint)
 
         self._combo_target_frame = QtWidgets.QComboBox()
         for value in TARGET_FRAMES:
             self._combo_target_frame.addItem(tr(_TARGET_FRAME_TEXTS[value]), value)
-        self._combo_target_frame.setCurrentIndex(TARGET_FRAMES.index(self.target_frame))
+        self._combo_target_frame.setCurrentIndex(
+            TARGET_FRAMES.index(type(self)._last_target_frame),
+        )
         self._combo_target_frame.setToolTip(tr(
             'Frame in which the center of mass and the inertia matrix are expressed:\n'
             '- global: global frame (document root);\n'
@@ -62,27 +97,48 @@ class CalculateObjectMassAndInertiaDialog:
         self._combo_log_level = QtWidgets.QComboBox()
         for value in LOG_LEVELS:
             self._combo_log_level.addItem(tr(_LOG_LEVEL_TEXTS[value]), value)
-        self._combo_log_level.setCurrentIndex(LOG_LEVELS.index(self.log_level))
+        self._combo_log_level.setCurrentIndex(
+            LOG_LEVELS.index(type(self)._last_log_level),
+        )
         self._combo_log_level.setToolTip(tr('Console verbosity of the calculation.'))
         layout.addRow(tr('Log level'), self._combo_log_level)
 
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok
-            | QtWidgets.QDialogButtonBox.StandardButton.Cancel,
+        self._button_calculate = QtWidgets.QPushButton(tr('Calculate'))
+        self._button_calculate.setToolTip(
+            tr('Calculate inertia properties of selected object'),
         )
-        buttons.accepted.connect(self.form.accept)
-        buttons.rejected.connect(self.form.reject)
-        layout.addRow(buttons)
+        self._button_calculate.clicked.connect(self._on_calculate_clicked)
+        layout.addRow(self._button_calculate)
 
-    def exec(self) -> bool:
-        """Show the dialog, return True if accepted (OK)."""
-        if not self.form.exec():
-            return False
-        self.target_frame = self._combo_target_frame.currentData()
-        self.log_level = self._combo_log_level.currentData()
+    @property
+    def target_frame(self) -> str:
+        return self._combo_target_frame.currentData()
+
+    @property
+    def log_level(self) -> str:
+        return self._combo_log_level.currentData()
+
+    @staticmethod
+    def is_task_dialog_active() -> bool:
+        """Return True if a task dialog (of any command) is already shown."""
+        return bool(fcgui.Control.activeDialog())
+
+    def show(self) -> None:
+        """Show the panel in the Tasks tab of the combo view."""
+        fcgui.Control.showDialog(self)
+
+    def _on_calculate_clicked(self, checked: bool = False) -> None:
+        # Remember the values for the next panel.
         type(self)._last_target_frame = self.target_frame
         type(self)._last_log_level = self.log_level
-        return True
+        self._on_calculate(self)
 
-    def close(self) -> None:
-        self.form.close()
+    # Task dialog interface called by FreeCAD.
+
+    def getStandardButtons(self) -> int:
+        # Only "Close", "Calculate" is in the form. "Close" calls `reject()`.
+        return _enum_to_int(QtWidgets.QDialogButtonBox.StandardButton.Close)
+
+    def reject(self) -> bool:
+        fcgui.Control.closeDialog()
+        return True
