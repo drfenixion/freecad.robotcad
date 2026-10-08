@@ -20,28 +20,13 @@ from .inertia_calculator import calculate, log_message, mass_com_inertia
 # Inertia calculator results are in kg*mm^2, link inertia is in kg*m^2.
 _KG_MM2_TO_KG_M2 = 1.0e-6
 
+def center_of_mass_placement_in_link_frame(center_of_mass: fc.Vector, mount_placement: fc.Placement):
+    """ Return placement of center of mass frame relative to link mount frame. 
 
-def center_of_mass_in_link_frame(
-        center_of_mass: fc.Vector,
-        mounted_placement: fc.Placement,
-) -> fc.Placement:
-    """Return the link `CenterOfMass` placement (URDF `<inertial><origin>`).
-
-    Parameters
-    ----------
-    - center_of_mass: center of mass in the local frame of the Real element
-                      (mm); the inertia tensor about it is expressed in the
-                      axes of that frame.
-    - mounted_placement: transform from the local frame of the Real element to
-                         the link frame (`link.MountedPlacement`).
-
-    Return a placement with the center of mass in the link frame as Base and
-    `mounted_placement.Rotation` as Rotation, i.e. the orientation of the
-    inertia axes (the Real element's local axes) in the link frame.
-
+        `mount_placement` is local frame placement in link mount frame. Function changes its origin location
+        to `center_of_mass`.
     """
-    return fc.Placement(mounted_placement * center_of_mass, mounted_placement.Rotation, fc.Vector())
-
+    return fc.Placement(mount_placement * center_of_mass, mount_placement.Rotation, fc.Vector())
 
 @dataclass
 class _LinkInertialProperties:
@@ -160,12 +145,14 @@ def _calculate_link_basic(
         mass_kg = link.Mass.Value
         result_mass_kg = None  # keep the mass entered by the user
 
+    center_of_mass_placement = center_of_mass_placement_in_link_frame(center_of_gravity, link.MountedPlacement)
     # TODO: have matrix_of_inertia return a specified unit without correction
     elem_matrix_of_inertia = correct_matrix_of_inertia(elem_matrix_of_inertia, elem_volume_mm3, mass_kg)
-
+    
+    print(f'Link "{link.Label}": mass: {mass_kg} kg, center of mass in link mount frame: {center_of_mass_placement.Base} mm.',)
     return _LinkInertialProperties(
         mass_kg=result_mass_kg,
-        center_of_mass=center_of_mass_in_link_frame(center_of_gravity, link.MountedPlacement),
+        center_of_mass=center_of_mass_placement,
         ixx=elem_matrix_of_inertia.A11,
         ixy=elem_matrix_of_inertia.A12,
         ixz=elem_matrix_of_inertia.A13,
@@ -181,15 +168,9 @@ def _calculate_link_advanced(
 ) -> Optional[_LinkInertialProperties]:
     """Calculate inertial properties of a link with the "advanced" method.
 
-    The Real element of the link (a body, or an Assembly / Part container for
-    a compound link) is calculated in its local frame (its Placement is
-    ignored) with its material and the RobotCad override properties of it and
-    of its subtree. Properties of the link (Material*, MaterialNotCalculate,
-    CalculateInertiaBasedOnMass) and the robot material are ignored.
-
     Same convention as the "basic" method (and the URDF `<inertial>` tag): the
     inertia tensor is expressed in the axes of the Real element's local frame,
-    the center of mass is expressed in the link frame
+    the center of mass is expressed in the link mount frame
     (`MountedPlacement * center of mass`) and the Rotation of the center of
     mass placement is `MountedPlacement.Rotation`, i.e. the orientation of the
     inertia axes relative to the link frame.
@@ -236,14 +217,14 @@ def _calculate_link_advanced(
         return None
 
     inertia = inertia_kg_mm2 * _KG_MM2_TO_KG_M2
-    link_center_of_mass = center_of_mass_in_link_frame(center_of_mass, link.MountedPlacement)
+    center_of_mass_placement = center_of_mass_placement_in_link_frame(center_of_mass, link.MountedPlacement)
     log_message(
         output_level, LOG_LEVEL_INFO, 1,
-        f'link "{link.Label}": mass: {mass_kg} kg, center of mass in link frame: {link_center_of_mass.Base} mm.',
+        f'link "{link.Label}": mass: {mass_kg} kg, center of mass in link mount frame: {center_of_mass_placement.Base} mm.',
     )
     return _LinkInertialProperties(
         mass_kg=mass_kg,
-        center_of_mass=link_center_of_mass,
+        center_of_mass=center_of_mass_placement,
         ixx=inertia[0, 0],
         ixy=inertia[0, 1],
         ixz=inertia[0, 2],
@@ -288,29 +269,30 @@ class _CalculateMassAndInertiaCommand:
                 'and fills links data.\n'
                 '\n'
                 'The calculation method is selected by the robot property "InertiaCalculationMethod"'
-                ' (group "Inertial Parameters"): "basic" (default) or "advanced".\n'
+                '(group "Inertial Parameters"): "basic" (default) or "advanced".\n'
                 '\n'
                 'Basic method\n'
-                'Mass is based on density (from material).'
-                ' If link does not have own material, default material will be taken'
-                ' from robot element.\n'
-                'If property of link - "MaterialNotCalculate" is'
-                ' true link will skipped. In that case you should manually fill link inertia and mass.\n'
+                'Robot link density is assumed uniform with density specified via link material.\n'
+                'If link does not have own material, default material will be taken\n'
+                'from robot element. If "CalculateMaterialBasedOnMass" property is set then density\n'
+                'is calulated from user specified "Mass" property and caluated link volume.\n'
+                'If "MaterialNotCalculate" link property is true calcuation is skipped.\n' 
+                'In this case you should manually fill inertial parameters.\n'
                 '\n'
                 'Advanced method\n'
-                'Uses the materials assigned to the parts of the assembly and the optional RobotCad override'
-                ' properties set by "Override inertial properties" tool (a compound link is an Assembly or Part container).'
-                ' Materials and calculation properties of links and robot are ignored.'
-                ' Calculation trace is printed to the console, its verbosity is set by the robot'
-                ' property "InertiaCalculatorLogLevel".\n'
+                'Uses the materials assigned to the parts of the assembly and the optional RobotCad override\n'
+                'properties set by "Override inertial properties" tool (a compound link is an Assembly or Part container).\n'
+                'Materials and inertia calculation properties of links and robot are ignored (e.g. "CalculateMaterialBasedOnMass").\n'
+                'Calculation trace is printed to the Report View, its verbosity can be adjusted by \n'
+                '"InertiaCalculatorLogLevel robot property.\n'
                 '\n'
                 'You can visually check inertia placement'
-                ' in Gazebo. \nTurn on display of inertia in Gazebo'
-                ' and check what generated inertia blocks'
-                ' approximately \nsame size and same'
-                ' position/orientation as their links. \nInertia'
-                ' block orientation tilt to towards the mass'
-                ' displacement is ok for unsymmetrical bodies.',
+                'in Gazebo. \nTurn on display of inertia in Gazebo'
+                'and check what generated inertia blocks'
+                'approximately \nsame size and same'
+                'position/orientation as their links. \nInertia'
+                'block orientation tilt to towards the mass'
+                'displacement is ok for unsymmetrical bodies.',
             ),
         }
 

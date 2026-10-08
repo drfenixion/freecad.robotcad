@@ -33,7 +33,7 @@ WORKBENCH_NAME = 'RobotCAD - ROS2'
 #     RobotCad* override properties of the assembly elements.
 INERTIA_METHOD_BASIC = 'basic'
 INERTIA_METHOD_ADVANCED = 'advanced'
-INERTIA_METHODS = [INERTIA_METHOD_BASIC, INERTIA_METHOD_ADVANCED]
+INERTIA_METHODS = [INERTIA_METHOD_BASIC, INERTIA_METHOD_ADVANCED] # first element is default
 
 lcs_wrapper_prefix = "LCS wrapper "
 

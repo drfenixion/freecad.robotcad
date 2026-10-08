@@ -31,7 +31,6 @@ from .freecad_utils import is_origin
 from .freecad_utils import label_or
 from .freecad_utils import warn
 from .freecad_utils import is_link as is_fc_link
-from .freecad_utils import get_first_not_assembly
 from .gui_utils import tr
 from .ros.utils import split_package_path
 from .ui.file_overwrite_confirmation_dialog import FileOverwriteConfirmationDialog
@@ -384,16 +383,16 @@ class RobotProxy(ProxyBase):
         self._init_enum_property(
             obj, 'InertiaCalculationMethod',  'Inertial Parameters', wb_constants.INERTIA_METHODS, wb_constants.INERTIA_METHOD_BASIC,
             (
-                'Method used by the "Calculate mass and inertia" tool.\n'
+                'Method used by the "Calculate Mass and Inertia" tool.\n'
                 '\n'
                 '* "basic": assumes robot links have uniform density with\n' 
                 '  materials specified on the link or robot level.\n'
-                '  As alternative link mass can be specifeid instead of material\n'
-                '  (see "CalculateInertiaBasedonMass" property).'
+                '  As alternative link mass can be specified instead of material\n'
+                '  (see "CalculateInertiaBasedOnMass" property).'
                 '\n'
-                '* "advanced": performs walk over link objects subree to\n'
-                '  calculate inertial propertis. It uses per object material setitings.\n'
-                '  Note that object material can be inherited form container.\n'
+                '* "advanced": performs walk over link objects subtree to\n'
+                '  calculate inertial properties. It uses per object material settings.\n'
+                '  Note that object material can be inherited from container.\n'
                 '  Method supports several override modes (mass, density, manual) on object or \n'
                 '  container level (see "OverrideInertialProperties" command).\n'
                 '  Output verbosity is controlled by "InertiaCalculatorLogLevel" property.'
@@ -405,9 +404,9 @@ class RobotProxy(ProxyBase):
                 'Console verbosity of the "advanced" inertia calculation:'
                 ' * "warn" prints only warnings, mostly about incorrect material\n'
                 'or override settings.\n'
-                \n
+                '\n'
                 ' * "info" prints the trace of the calculation (objects, containers,\n'
-                'origin of material]porperties, calculated mass).'
+                'origin of material properties, calculated mass).'
             ),
         )
 
