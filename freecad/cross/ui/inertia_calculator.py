@@ -171,6 +171,19 @@ def mass_com_inertia(JJ: np.ndarray) -> Tuple[float, fc.Vector, NDArray]:
     return m, com, J
 
 
+# Leader of the console log lines: tree structure of the objects.
+# Indentation added for each tree level and branch symbol in the end. ASCII alternative: '|-> '.
+LOG_INDENT = '    '
+LOG_BRANCH = '└─> '
+
+def log_leader(level: int) -> str:
+    """ Return the leader of a console log line at tree `level`.
+    """
+    if level <= 0:
+        return ''
+    return LOG_INDENT * (level - 1) + LOG_BRANCH
+
+
 def log_message(output_level: str, msg_level: str, level: int, message: str) -> None:
     """ Print `message` through FreeCAD's Console, honoring `output_level`.
 
@@ -184,14 +197,20 @@ def log_message(output_level: str, msg_level: str, level: int, message: str) -> 
         only printed when `output_level` is verbose enough to include it.
     level: int
         Level in the tree of objects. It encodes the recursion depth and is
-        what gives the console log its tree-shaped structure (two spaces per
-        level).
+        what gives the console log its tree-shaped structure: level 0 is
+        printed as is, deeper levels get a leader made of `LOG_INDENT` for
+        each level above the first and a branch symbol `LOG_BRANCH`, e.g.::
+
+            INFO: Calculate inertial properties of "Assembly"
+            INFO: └─> object Assembly: container
+            INFO:     └─> object Box1: solids
+            INFO:     └─> object Box2: solids
     message: str
         Message text.
     """
     if msg_level == LOG_LEVEL_INFO and output_level != LOG_LEVEL_INFO:
         return
-    line = f'{msg_level.upper()}:{"  " * level} {message}'
+    line = f'{msg_level.upper()}: {log_leader(level)}{message}'
     if msg_level == LOG_LEVEL_WARN:
         fc.Console.PrintWarning(line + '\n')
     else:
@@ -199,7 +218,7 @@ def log_message(output_level: str, msg_level: str, level: int, message: str) -> 
 
 
 def get_property(obj: fc.DocumentObject, name: str, ptype: Optional[str] = None, units: Optional[str] = None, default: Optional[Any] = None, check_func: Optional[Callable[[Any], bool]] = None, check_desc: str = '') -> Any:
-    """ Get FreeCAD object property by name
+    """ Get FreeCAD object property by name.
 
     Arguments
     ---------
