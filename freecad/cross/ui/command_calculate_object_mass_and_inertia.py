@@ -65,30 +65,6 @@ def format_inertial_properties(
     return '\n'.join(lines)
 
 
-def _object_subname(root: DO, subname: str) -> str:
-    """Return the part of `subname` that designates a document object.
-
-    A selection path is made of object names followed, if a sub-element (face,
-    edge, vertex, solid...) is selected, by the name of the element:
-    'Body.Box.Face6' -> 'Body.Box.'. With topological naming, the element name
-    can contain dots and object-like text, e.g. 'Box.;#a:1;:H5d4,F.Face6', so
-    the element name is not removed by looking at the last dot. Instead, the
-    longest prefix of the path for which FreeCAD returns a document object is
-    used. Return '' if only `root` itself is designated.
-
-    """
-    parts = subname.split('.')
-    for n in range(len(parts) - 1, 0, -1):
-        candidate = '.'.join(parts[:n]) + '.'
-        try:
-            obj = root.getSubObject(candidate, 0)
-        except (RuntimeError, ValueError, TypeError):
-            continue
-        if isinstance(obj, fc.DocumentObject):
-            return candidate
-    return ''
-
-
 def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.Placement]]:
     """Return the single selected object and its placement in the global frame.
 
@@ -101,23 +77,27 @@ def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.P
     selection = fcgui.Selection.getSelectionEx('', 0)
     if len(selection) != 1 or len(selection[0].SubElementNames) > 1:
         return None, None
+    # `root` is the object selected in the tree (possibly a container),
+    # `subname` the path from `root` to the selected object or sub-element,
+    # e.g. 'Body.Box.' or 'Body.Box.Face6'. It is empty if `root` is selected.
     root = selection[0].Object
     subname = selection[0].SubElementNames[0] if selection[0].SubElementNames else ''
-    # Remove a selected face, edge, vertex or solid: 'Body.Box.Face6' -> 'Body.Box.'.
-    subname = _object_subname(root, subname)
 
     if not subname:
         placement = root.Placement if hasattr(root, 'Placement') else fc.Placement()
         return root, placement
 
-    # Cf. DocumentObjectPyImp.cpp::getSubObject: retType 0 is the object,
-    # retType 3 is the placement of the sub-object in the frame of the
-    # parent of `root`, i.e. including the placement of `root`.
-    obj = root.getSubObject(subname, 0)
-    placement = root.getSubObject(subname, 3)
-    if not isinstance(obj, fc.DocumentObject) or not isinstance(placement, fc.Placement):
+    # retType 2: (last object of the path, accumulated matrix, geometry). The
+    # last object is the one owning the element if the path ends with an
+    # element name. The matrix is the transform of that object in the frame of
+    # the parent of `root`, i.e. it includes the placement of `root`.
+    result = root.getSubObject(subname, 2)
+    if not result:
         return None, None
-    return obj, placement
+    obj, matrix, _ = result
+    if not isinstance(obj, fc.DocumentObject) or not isinstance(matrix, fc.Matrix):
+        return None, None
+    return obj, fc.Placement(matrix)
 
 
 class _CalculationError(Exception):
