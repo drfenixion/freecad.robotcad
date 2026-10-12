@@ -13,6 +13,10 @@ e.g. by pointing `PYTHONPATH` at FreeCAD's `lib`/`Mod` directories, or by
 invoking it as `freecadcmd -m pytest ...` if the `pytest` package is
 installed into FreeCAD's own interpreter.)
 
+Tests of functions defined in command modules (`import_command()`) and the
+selection tests need the FreeCAD GUI (`FreeCADGui`); without it they are
+skipped.
+
 Module overview
 ----------------
 base.py
@@ -49,6 +53,28 @@ test_overrides.py
 test_material_resolution.py
     Material resolution: own material, inherited material, missing
     density, missing material entirely.
+test_logging.py
+    Smoke test: both console output levels run to completion and give the
+    same numeric result (the output level only affects what is printed).
+test_link_integration.py
+    Plugin integration helpers: `mass_com_inertia`, `calculate(...,
+    ignore_placement=True)` for a link's Real element (local frame, Part
+    container as compound), `center_of_mass_placement_in_link_frame` (URDF
+    `<inertial>` convention shared with the "basic" method; defined in the
+    command module), `log_message` / `log_leader` (tree-shaped console
+    log) and the shared enumeration constants.
+test_object_inertia.py
+    "Calculate object mass and inertia" command: `transform_to_frame` with
+    `calculate()` in the local/global frame, `getSubObject(subname, 2)`
+    (object and matrix, also with a face/edge/solid at the end of the path),
+    the object and global placement of a real selection, and the text output
+    (`format_inertial_properties`) of the command module.
+test_robot_properties.py
+    Robot properties `InertiaCalculationMethod` / `InertiaCalculatorLogLevel`:
+    defaults, enumerations, migration of robots saved without them.
+commands.py
+    `import_command()`: imports a command module, skipping the test when the
+    GUI is not available (functions defined in command modules).
 
 Upstream issue found while writing these tests (fixed 2026-10-04)
 ------------------------------------------------------------------
