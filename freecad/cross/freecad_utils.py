@@ -586,6 +586,9 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     Args:
         path (str): The FreeCAD path string (e.g., "Body.LCS.X")
         doc (FreeCAD.Document, optional): Required for type verification.
+            Document of the first object of the path (`base_name`); the rest
+            of the path is followed from this object, also into other
+            documents through links.
     
     Returns:
         dict: Parsed path information.
@@ -621,50 +624,35 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     def get_object(base_name: str, sub_path: List[str]) -> Optional[Any]:
         """
         Navigate through FreeCAD object hierarchy.
-        Handles the case where getSubObject returns Placement instead of object.
+
+        Only the base object is looked up by name (in `doc`). The rest of the
+        path is followed from it with `getSubObjectList()`, i.e. the same way
+        FreeCAD resolves a selection: through groups, `App::Link` and
+        documents. Object names are unique only per document and the objects
+        after a link may live in another (external) document, so looking up
+        any other part of the path by name in `doc` may return an unrelated
+        object with the same name.
+
+        Return None if the path cannot be followed (no guessing).
         """
-        
-        # Step 1: Get base object
+
         obj = doc.getObject(base_name)
         if not obj:
             return None
-        
-        # Step 2: If sub_path is empty, return base object
+
+        sub_path = [name for name in sub_path if name]
         if not sub_path:
             return obj
-        
-        # Step 3: Try to find the target object
-        # Priority 1: Search directly in document (most reliable for datums)
-        # target_name = sub_path[-1]
-        # target_obj = doc.getObject(target_name)
-        # if target_obj:
-        #     return target_obj
-        
-        for target_name in reversed(sub_path):
-            target_obj = doc.getObject(target_name)
-            if target_obj:
-                return target_obj
 
-        # Priority 2: Try getSubObject with different retType values
-        for ret_type in [3, 2, 0, None]:
-            try:
-                if ret_type is None:
-                    sub_obj = obj.getSubObject(target_name)
-                else:
-                    sub_obj = obj.getSubObject(target_name, retType=ret_type)
-                
-                # Check if we got an actual object (not Placement)
-                if sub_obj and not isinstance(sub_obj, fc.Placement) and not isinstance(sub_obj, tuple):
-                    return sub_obj
-            except:
-                continue
-        
-        # Priority 3: Search in OutList (direct children)
-        for child in obj.OutList:
-            if child.Name == target_name or child.Label == target_name:
-                return child
-        
-        return None
+        try:
+            objs = obj.getSubObjectList('.'.join(sub_path) + '.')
+        except Exception:
+            return None
+        # `objs` is [obj, <one object per element of sub_path>] when the
+        # whole path was resolved.
+        if len(objs) != len(sub_path) + 1:
+            return None
+        return objs[-1]
 
     # -------------------------------------------------------------------------
     # Helper: Check object type
@@ -704,6 +692,16 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     
     if isinstance(path, tuple):
         path = path[0] if len(path) else ''
+
+    # Convert a mapped (toponaming) element name to the old-style one, e.g.
+    # 'Link.Box.;#7:1;:G0;XTR;:Hd5,F.Face6' -> 'Link.Box.Face6'. A mapped
+    # name may contain dots and would break the split below.
+    try:
+        obj_path, mapped_element, element = Part.splitSubname(path)
+        if mapped_element:
+            path = obj_path + element
+    except (AttributeError, ValueError):
+        pass
 
     parts = path.split('.')
     if len(parts) < 1:
