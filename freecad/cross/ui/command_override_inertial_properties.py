@@ -18,7 +18,8 @@ from .inertia_calculator import OVERRIDE_MODE_DENSITY, OVERRIDE_MODE_IGNORE, OVE
 
 DO = fc.DocumentObject
 
-# Tooltips for properties imported from inertia_calculator.py 
+# Tooltips of the override properties (property names are imported from
+# inertia_calculator.py).
 # Override modes
 
 _OVERRIDE_MODE_TOOLTIP = (
@@ -30,7 +31,7 @@ _OVERRIDE_MODE_TOOLTIP = (
     ' object\'s own shape (uniform density is assumed).\n'
     f'"{OVERRIDE_MODE_MANUAL}": ignore shape and material entirely, use "{PROP_MASS}",\n'
     f' "{PROP_CENTER_OF_MASS}" and "{PROP_IXX}".."{PROP_IZZ}" as supplied.\n'
-    f'"{OVERRIDE_MODE_IGNORE}": assume zero inertia and mass.'
+    f'"{OVERRIDE_MODE_IGNORE}": ignore the object and its subtree, assume zero inertia and mass.'
 )
 
 # Other override properties.
@@ -47,7 +48,8 @@ _OVERRIDE_VALUE_PROPERTIES = [
     ),
     (
         PROP_CENTER_OF_MASS, 'App::PropertyPlacement',
-        'Center of mass, with orientation giving the principal axes of inertia.'
+        'Center of mass in the local frame of the object. Its rotation gives the axes in which'
+        f' "{PROP_IXX}".."{PROP_IZZ}" are expressed (e.g. the principal axes of inertia).'
         f' Used when "{PROP_OVERRIDE_MODE}" is "{OVERRIDE_MODE_MANUAL}". Ignored'
         ' otherwise.',
     ),
@@ -109,12 +111,12 @@ class _OverrideInertialPropertiesCommand:
                 '\n'
                 'Override properties are used in "advanced" inertia and\n'
                 'mass calculation mode (see Robot\'s "InertiaCalculationMethod"\n'
-                'property). These properties allows to override mass, density or\n'
-                'total inertia of selected object or object subtree if container\n'
-                'selected.\n'
+                'property). These properties allow overriding the mass, the density or\n'
+                'the total inertia of the selected object, or of its subtree if a\n'
+                'container is selected.\n'
                 '\n'
                 'After the properties are added, set\n'
-                f' "{PROP_OVERRIDE_MODE}" and the relevant value(s) directly in.\n'
+                f' "{PROP_OVERRIDE_MODE}" and the relevant value(s) directly in\n'
                 ' the Property panel.'
             ),
         }
@@ -149,7 +151,7 @@ class _OverrideInertialPropertiesCommand:
         all_names = [PROP_OVERRIDE_MODE] + [name for name, _, _ in _OVERRIDE_VALUE_PROPERTIES]
         pre_existing = [name for name in all_names if name in obj.PropertiesList]
 
-        # freecad_utils.add_property does not replcae existing properties.
+        # freecad_utils.add_property does not replace existing properties.
         add_property(
             obj, 'App::PropertyEnumeration', PROP_OVERRIDE_MODE, PROPERTY_GROUP,
             _OVERRIDE_MODE_TOOLTIP, default = OVERRIDE_MODES

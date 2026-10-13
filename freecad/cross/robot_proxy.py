@@ -388,12 +388,12 @@ class RobotProxy(ProxyBase):
                 '* "basic": assumes robot links have uniform density with\n' 
                 '  materials specified on the link or robot level.\n'
                 '  As alternative link mass can be specified instead of material\n'
-                '  (see "CalculateInertiaBasedOnMass" property).'
+                '  (see "CalculateInertiaBasedOnMass" property).\n'
                 '\n'
-                '* "advanced": performs walk over link objects subtree to\n'
+                '* "advanced": walks the subtree of the link Real element to\n'
                 '  calculate inertial properties. It uses per object material settings.\n'
                 '  Note that object material can be inherited from container.\n'
-                '  Method supports several override modes (mass, density, manual) on object or \n'
+                '  Method supports several override modes (density, mass, manual, ignore) on object or\n'
                 '  container level (see "OverrideInertialProperties" command).\n'
                 '  Output verbosity is controlled by "InertiaCalculatorLogLevel" property.'
             ),
@@ -401,12 +401,13 @@ class RobotProxy(ProxyBase):
         self._init_enum_property(
             obj, 'InertiaCalculatorLogLevel',  'Inertial Parameters', LOG_LEVELS, LOG_LEVEL_WARN,
             (
-                'Console verbosity of the "advanced" inertia calculation:'
-                ' * "warn" prints only warnings, mostly about incorrect material\n'
-                'or override settings.\n'
+                'Console verbosity of the "advanced" inertia calculation:\n'
                 '\n'
-                ' * "info" prints the trace of the calculation (objects, containers,\n'
-                'origin of material properties, calculated mass).'
+                '* "warn" prints only warnings, mostly about incorrect material\n'
+                '  or override settings.\n'
+                '\n'
+                '* "info" prints the trace of the calculation (objects, containers,\n'
+                '  origin of material properties, calculated mass).'
             ),
         )
 

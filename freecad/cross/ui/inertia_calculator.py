@@ -7,8 +7,8 @@ import FreeCAD as fc
 
 
 # Console output levels accepted by calculate()'s `output_level` argument.
-# LOG_LEVEL_INFO print all tree-like trace.
-# LOG_LEVEL_WARN only warinings are displayed.
+# LOG_LEVEL_INFO: the whole tree-like trace and the warnings are printed.
+# LOG_LEVEL_WARN: only warnings are printed.
 LOG_LEVEL_INFO = 'info'
 LOG_LEVEL_WARN = 'warn'
 # All log levels in the order shown in the property panel. The first one is
@@ -16,7 +16,7 @@ LOG_LEVEL_WARN = 'warn'
 LOG_LEVELS = [LOG_LEVEL_WARN, LOG_LEVEL_INFO]
 
 
-# Override properties for inertia calculator. For more information see 
+# Override properties for inertia calculator. For more information see
 # calculate() documentation.
 PROPERTY_GROUP = 'RobotCad'
 
@@ -76,7 +76,7 @@ def screw_tf_matrix(T: fc.Matrix) -> NDArray:
     R = np.array([[T.A11, T.A12, T.A13],
                   [T.A21, T.A22, T.A23],
                   [T.A31, T.A32, T.A33]])
-    # scew-symmetric matrix
+    # skew-symmetric matrix
     S = np.array([[   0.0, -T.A34,  T.A24],
                   [ T.A34,    0.0, -T.A14],
                   [-T.A24,  T.A14,    0.0]])
@@ -126,7 +126,7 @@ def inertia_matrix6d(J: fc.Matrix, Pc: fc.Vector, m: float) -> ArrayLike:
     J = np.array([[J.A11, J.A12, J.A13],
                   [J.A21, J.A22, J.A23],
                   [J.A31, J.A32, J.A33]])
-    # scew-symmetric matrix
+    # skew-symmetric matrix
     S = np.array([[  0.0, -Pc.z,    Pc.y],
                   [  Pc.z,    0.0, -Pc.x],
                   [ -Pc.y, Pc.x,    0.0]])
@@ -301,8 +301,9 @@ def calculate(
     ''' Calculate the 6x6 inertia matrix of an object.
 
     It traverses the object tree, finds solid objects with volume and calculates the total inertia matrix
-	taking in account material properties. Mass matrix (generalized 6d inertia matrix of rigid body) 
-	is calcutaed the root object container frame (root object Placement property is taken in account).
+    taking into account material properties. The mass matrix (generalized 6x6 inertia matrix of a rigid
+    body) is expressed in the frame of the root object's container: the Placement of the root object is
+    taken into account (see `ignore_placement`).
 
     Default behavior can be overridden by specifying object properties from group 'RobotCad'.
 
@@ -311,28 +312,28 @@ def calculate(
     RobotCadOverrideMode: App::PropertyEnumeration, optional
         Property specifies calculation mode for this object. If not present, 'none' mode is used.
         Possible values:
-        * 'none': Use the solid's shape and material to calculate inertia. This mode can be overridden 
-		    in subobjects.
+        * 'none': Use the solid's shape and material to calculate inertia. This mode can be overridden
+          in subobjects.
         * 'density': Material is ignored. RobotCadDensity is used for this object. Override properties
-            in child objects are ignored.
-        * 'mass': Material is ignored. Shape density is assumed uniform and with mass specified 
-		    by RobotCadMass property. Override properties in child objects are ignored.
+          in child objects are ignored.
+        * 'mass': Material is ignored. Density is assumed uniform, with the total mass given by the
+          RobotCadMass property. Override properties in child objects are ignored.
         * 'manual': Object mass, center of mass and inertia matrix are provided manually via
-            RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz properties. Override 
-			properties in child objects are ignored.
-        * 'ignore': This object and its whole subtree are not processed at all. Inertia and mass is 
-		    assumed zero.
+          RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz properties. Override
+          properties in child objects are ignored.
+        * 'ignore': This object and its whole subtree are not processed at all. Inertia and mass are
+          assumed zero.
     RobotCadMass: App::PropertyMass, optional
         Mass for 'mass' and 'manual' override mode.
     RobotCadDensity: App::PropertyDensity, optional
         Density for 'density' override mode.
     RobotCadCenterOfMass: App::PropertyPlacement, optional
-        Center of gravity coordinates for 'manual' mode (Base, in mm). The placement's Rotation
-        gives the orientation of the principal axes of inertia that RobotCadIxx..RobotCadIzz below
-        are expressed in, relative to this object's local frame.
+        Center of mass for 'manual' mode (Base, in mm, in this object's local frame). The placement's
+        Rotation gives the orientation, relative to this object's local frame, of the axes in which
+        RobotCadIxx..RobotCadIzz below are expressed (e.g. the principal axes of inertia).
     RobotCadIxx, RobotCadIxy, RobotCadIxz, RobotCadIyy, RobotCadIyz, RobotCadIzz: App::PropertyFloat, optional
-        Components of the 3x3 inertia matrix relative to center of gravity for 'manual' mode, in kg*mm^2
-        (FreeCAD's native inertia unit, same as Shape.MatrixOfInertia), expressed in the frame given by
+        Components of the 3x3 inertia matrix about the center of mass for 'manual' mode, in kg*mm^2
+        (FreeCAD's native inertia unit, same as Shape.MatrixOfInertia), expressed in the axes given by
         RobotCadCenterOfMass.Rotation.
 
     Arguments
@@ -340,13 +341,14 @@ def calculate(
     obj: DocumentObject
         Root object.
     ignore_material: bool, default False
-        Ignore material properties throughout the subtree. In this case density is assumed equal to identity (1).
+        Ignore material properties throughout the subtree. In this case density is assumed equal to 1,
+        i.e. the result is the volume matrix (mm^3 instead of kg).
     ignore_placement: bool, default False
         Ignore root object placement. Inertia matrix is calculated in the object's local frame.
     parent_material: Material, optional
         Material to use if ShapeMaterial is not provided or its name is 'Default'.
     level: int, default 0
-        Level in the tree of objects. Used to compute the debug output indentation interval.
+        Level in the tree of objects. Gives the indentation of the console log (see `log_message()`).
     output_level: str, default LOG_LEVEL_INFO
         Console verbosity: LOG_LEVEL_INFO prints both the trace of the tree walk and warnings;
         LOG_LEVEL_WARN prints only warnings. Passed unchanged to recursive calls.
@@ -354,9 +356,8 @@ def calculate(
     Return
     ------
     np.ndarray
-        6x6 mass matrix of rigid body in coordinat frame of root object container (ignore_placement = False)
-		or in local coordinate frame of root object (ignore_placement = True). 
-		.
+        6x6 mass matrix of the rigid body in the frame of the root object's container
+        (ignore_placement = False) or in the local frame of the root object (ignore_placement = True).
 
     '''
 
@@ -438,7 +439,7 @@ def calculate(
         override_mode = OVERRIDE_MODE_NONE
     else:
         calculate_volume = override_mode != OVERRIDE_MODE_NONE
-    
+
     # determine material
     material = parent_material
     material_is_inherited = True
@@ -526,7 +527,7 @@ def calculate(
         if ignore_placement:
             X = screw_tf_matrix(obj.Placement.Matrix)
             JJ = X.T @ JJ @ X
-        # determine volume
+        # normalize to volume (density 1)
         mass = (JJ[3,3] + JJ[4,4] + JJ[5,5]) / 3.0
         if mass > 0.0:
             JJ *= volume / mass
@@ -543,7 +544,7 @@ def calculate(
                 try:
                     density = fc.Units.Quantity(material.PhysicalProperties['Density']).getValueAs('kg/mm^3').Value
                 except (KeyError, AttributeError, ValueError) as e:
-                    log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) material "{material.Name}" {inherit_text} does not have "Density" property ({e}), assume zero mass.')
+                    log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) material "{material.Name}" {inherit_text} does not have "Density" property ({e}), assuming zero mass.')
                     JJ *= 0.0
                 else:
                     # apply material density
@@ -554,7 +555,7 @@ def calculate(
             # override density
             JJ *= override_density
             # logging
-            log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, override_density: {1000*override_density} g/mm^3, mass: {1000*JJ[3,3]} g')
+            log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, override_density: {1000*override_density} g/mm^3, mass: {1000*JJ[3,3]} g.')
         elif override_mode == OVERRIDE_MODE_MASS:
             # override mass
             if volume > 0.0:

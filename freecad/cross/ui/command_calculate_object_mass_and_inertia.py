@@ -71,7 +71,8 @@ def _selected_object_and_global_placement() -> tuple[Optional[DO], Optional[fc.P
     The global placement includes the placement of the object and of all its
     containers (App::Part, Assembly...) from the root of the document. If a
     sub-element (face, edge...) is selected, the object it belongs to is used.
-    Return (None, None) if not exactly one object is selected.
+    Return (None, None) if not exactly one object is selected or if the
+    selection path cannot be resolved.
 
     """
     selection = fcgui.Selection.getSelectionEx('', 0)
@@ -115,7 +116,7 @@ def _calculate_report(target_frame: str, log_level: str) -> str:
     obj, global_placement = _selected_object_and_global_placement()
     # check if object is valid
     if obj is None:
-        raise _CalculationError('Select exactly one object (not a sub-element).')
+        raise _CalculationError('Select exactly one object.')
     if is_link(obj) or is_robot(obj) or is_joint(obj):
         raise _CalculationError(
             f'Object "{obj.Label}" is a CROSS Link, Robot or Joint.'
@@ -157,8 +158,9 @@ class _CalculateObjectMassAndInertiaCommand:
                 'the selection, assign materials and calculate again.\n'
                 '\n'
                 'Tool will calculate mass, center of mass and inertia matrix of the object and show result in the window.\n'
-                'It utilizes "advanced" method (see "InertiaCalculationMethod" property for more information) which takes\n'
-                'in account the materials assigned to objects and RobotCad Override Inertial Properties.\n'
+                'It utilizes "advanced" method (see robot "InertiaCalculationMethod" property for more information) which takes\n'
+                'into account the materials assigned to objects and the RobotCad override properties\n'
+                '(see "Override inertial properties" tool).\n'
                 '\n'
                 'See tool output log in Report View for more information.'
             ),
