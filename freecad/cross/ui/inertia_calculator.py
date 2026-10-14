@@ -373,61 +373,12 @@ def calculate(
         check_func=lambda v: v in OVERRIDE_MODES,
         check_desc=f'value must be one of {OVERRIDE_MODES}',
     )
-    # get override-mode parameters
+    # get override-mode parameters and proceess ignore settings
     if override_mode is None:
         for name in OVERRIDE_VALUE_PROPERTY_NAMES:
             if name in obj.PropertiesList:
                 log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) property "{name}" is supplied but property "{PROP_OVERRIDE_MODE}" is missing.')
         override_mode = OVERRIDE_MODE_NONE
-    elif override_mode == OVERRIDE_MODE_MASS:
-        override_mass = get_property(obj, PROP_MASS, 'App::PropertyMass', units='kg')
-    elif override_mode == OVERRIDE_MODE_DENSITY:
-        override_density = get_property(obj, PROP_DENSITY, 'App::PropertyDensity', units='kg/mm^3')
-    elif override_mode == OVERRIDE_MODE_MANUAL:
-        ixx = get_property(obj, PROP_IXX, 'App::PropertyFloat')
-        ixy = get_property(obj, PROP_IXY, 'App::PropertyFloat')
-        ixz = get_property(obj, PROP_IXZ, 'App::PropertyFloat')
-        iyy = get_property(obj, PROP_IYY, 'App::PropertyFloat')
-        iyz = get_property(obj, PROP_IYZ, 'App::PropertyFloat')
-        izz = get_property(obj, PROP_IZZ, 'App::PropertyFloat')
-        com_placement = get_property(obj, PROP_CENTER_OF_MASS, 'App::PropertyPlacement')
-        m = get_property(obj, PROP_MASS, 'App::PropertyMass', units='kg')
-
-        # assembly rigid body inertia matrix
-        JJ = np.zeros((6,6))
-        JJ[0, 0:3] = ixx, ixy, ixz
-        JJ[1, 0:3] = ixy, iyy, iyz
-        JJ[2, 0:3] = ixz, iyz, izz
-        JJ[3:6, 3:6] = m*np.eye(3)
-
-        # check rotational inertia matrix: positive semidefinite, triangle ineq.
-        J = JJ[0:3, 0:3]
-        principal_moments = la.eigvalsh(J)
-        if (principal_moments < 0).any():
-            raise ValueError(
-                f'Object {obj.Label} ({obj.FullName}) properties "{PROP_IXX}".."{PROP_IZZ}"'
-                ' value check failed: matrix must be positive semi-definite'
-                ' (no negative principal moment of inertia).',
-            )
-        lam_min, lam_mid, lam_max = np.sort(principal_moments)
-        tolerance = 1.0e-9 * max(1.0, abs(lam_max))
-        if lam_max > lam_mid + lam_min + tolerance:
-            raise ValueError(
-                f'Object {obj.Label} ({obj.FullName}) properties "{PROP_IXX}".."{PROP_IZZ}"'
-                ' value check failed: principal moments of inertia must satisfy the triangle'
-                ' inequality (the largest must not exceed the sum of the other two).',
-            )
-
-        # perform transform from inertia frame to object frame
-        X = screw_tf_matrix(com_placement.Matrix.inverse())
-        JJ = X.T @ JJ @ X
-        # now apply object transform
-        if not ignore_placement and hasattr(obj, 'Placement'):
-            Y = screw_tf_matrix(obj.Placement.Matrix.inverse())
-            JJ = Y.T @ JJ @ Y
-        # return result: child objects (if any exists) are ignored
-        return JJ
-
     elif override_mode == OVERRIDE_MODE_IGNORE:
         # This object (subtree) is excluded from the calculation entirely.
         log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): ignore, subtree not processed, inertia assumed zero.')
@@ -438,7 +389,57 @@ def calculate(
         calculate_volume = True
         override_mode = OVERRIDE_MODE_NONE
     else:
-        calculate_volume = override_mode != OVERRIDE_MODE_NONE
+        # process override mode settings
+        if override_mode == OVERRIDE_MODE_MASS:
+            calculate_volume = True
+            override_mass = get_property(obj, PROP_MASS, 'App::PropertyMass', units='kg')
+        elif override_mode == OVERRIDE_MODE_DENSITY:
+            calculate_volume = True
+            override_density = get_property(obj, PROP_DENSITY, 'App::PropertyDensity', units='kg/mm^3')
+        elif override_mode == OVERRIDE_MODE_MANUAL:
+            ixx = get_property(obj, PROP_IXX, 'App::PropertyFloat')
+            ixy = get_property(obj, PROP_IXY, 'App::PropertyFloat')
+            ixz = get_property(obj, PROP_IXZ, 'App::PropertyFloat')
+            iyy = get_property(obj, PROP_IYY, 'App::PropertyFloat')
+            iyz = get_property(obj, PROP_IYZ, 'App::PropertyFloat')
+            izz = get_property(obj, PROP_IZZ, 'App::PropertyFloat')
+            com_placement = get_property(obj, PROP_CENTER_OF_MASS, 'App::PropertyPlacement')
+            m = get_property(obj, PROP_MASS, 'App::PropertyMass', units='kg')
+
+            # assembly rigid body inertia matrix
+            JJ = np.zeros((6,6))
+            JJ[0, 0:3] = ixx, ixy, ixz
+            JJ[1, 0:3] = ixy, iyy, iyz
+            JJ[2, 0:3] = ixz, iyz, izz
+            JJ[3:6, 3:6] = m*np.eye(3)
+
+            # check rotational inertia matrix: positive semidefinite, triangle ineq.
+            J = JJ[0:3, 0:3]
+            principal_moments = la.eigvalsh(J)
+            if (principal_moments < 0).any():
+                raise ValueError(
+                    f'Object {obj.Label} ({obj.FullName}) properties "{PROP_IXX}".."{PROP_IZZ}"'
+                    ' value check failed: matrix must be positive semi-definite'
+                    ' (no negative principal moment of inertia).',
+                )
+            lam_min, lam_mid, lam_max = np.sort(principal_moments)
+            tolerance = 1.0e-9 * max(1.0, abs(lam_max))
+            if lam_max > lam_mid + lam_min + tolerance:
+                raise ValueError(
+                    f'Object {obj.Label} ({obj.FullName}) properties "{PROP_IXX}".."{PROP_IZZ}"'
+                    ' value check failed: principal moments of inertia must satisfy the triangle'
+                    ' inequality (the largest must not exceed the sum of the other two).',
+                )
+
+            # perform transform from inertia frame to object frame
+            X = screw_tf_matrix(com_placement.Matrix.inverse())
+            JJ = X.T @ JJ @ X
+            # now apply object transform
+            if not ignore_placement and hasattr(obj, 'Placement'):
+                Y = screw_tf_matrix(obj.Placement.Matrix.inverse())
+                JJ = Y.T @ JJ @ Y
+            # return result: child objects (if any exists) are ignored
+            return JJ
 
     # determine material
     material = parent_material
@@ -456,9 +457,10 @@ def calculate(
         # logging
         log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): link, ignore_material: {ignore_material}, override_mode: {override_mode}.')
         # calculate inertia of linked object
-        JJ = calculate(linked_obj, ignore_material=calculate_volume, ignore_placement=not obj.LinkTransform, parent_material=material, level=level + 1, output_level=output_level)
+        ignore_placement = not obj.LinkTransform if hasattr(obj, 'LinkTransform') else False
+        JJ = calculate(linked_obj, ignore_material=calculate_volume, ignore_placement=ignore_placement, parent_material=material, level=level + 1, output_level=output_level)
         # apply link transform
-        if not ignore_placement:
+        if not ignore_placement and hasattr(obj, 'Placement'):
             X = screw_tf_matrix(obj.Placement.Matrix.inverse())
             JJ = X.T @ JJ @ X
         # override material
@@ -507,13 +509,8 @@ def calculate(
     #
     if hasattr(obj, 'Shape') and not obj.Shape.isNull():
         shape = obj.Shape
-        # determine shape type and extract inertia
-        if shape.ShapeType == 'Solid':
-            # single solid body
-            JJ = inertia_matrix6d(shape.MatrixOfInertia, shape.CenterOfMass, shape.Mass)
-            volume = shape.Volume
-        elif shape.ShapeType == 'Compound':
-            # compound object
+        # extract solids mass and inertia properties
+        if shape.Solids:
             JJ = np.zeros((6,6))
             volume = 0.0
             for solid in shape.Solids:
