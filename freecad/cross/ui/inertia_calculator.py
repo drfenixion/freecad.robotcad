@@ -170,6 +170,49 @@ def mass_com_inertia(JJ: np.ndarray) -> Tuple[float, fc.Vector, NDArray]:
     J = 0.5 * (J + J.T)
     return m, com, J
 
+def scale_inertia(JJ: NDArray, scale: fc.Vector | NDArray, copy: bool = True) -> NDArray:
+    ''' Apply scale transform to 6d rigid body mass matrix. Assume density is constant.
+
+    Arguments:
+    ---------
+    JJ: array_like
+        6x6 mass matrix to transform.
+    scale: array_like
+        3-elements scale vector.
+    copy: bool, default True
+        Return object copy instead of in-place modification.
+
+    Return
+    ------
+    NDArray:
+       Scaled around origin 6x6 mass matrix.
+    '''
+    # copy object
+    if copy:
+        JJ = np.copy(JJ)
+    # convert scale and check for identity
+    scale = np.array(scale)
+    if all(scale == 1.0):
+        return JJ
+    # update mass
+    mass_scale = abs(np.prod(scale))
+    m = (JJ[3, 3] + JJ[4, 4] + JJ[5, 5]) / 3.0
+    m *= mass_scale
+    JJ[3, 3], JJ[4, 4], JJ[5, 5] = m, m, m
+    # update inertia matrix: extract geometric moments, scale them, convert backward
+    J = JJ[0:3,0:3]
+    G = 0.5*np.trace(J)*np.eye(3) - J
+    G = scale.reshape((3,1)) * G * scale.reshape((1,3))
+    G *= mass_scale
+    JJ[0:3,0:3] = np.trace(G)*np.eye(3) - G
+    # update off-diagonal skew-symmetric blocks
+    skew_scale = np.array([[0.0,      scale[2], scale[1]],
+                           [scale[2], 0.0,      scale[0]],
+                           [scale[1], scale[0], 0      ]])
+
+    JJ[0:3,3:6] *= skew_scale*mass_scale
+    JJ[3:6,0:3] *= skew_scale*mass_scale
+    return JJ
 
 # Leader of the console log lines: tree structure of the objects.
 # Indentation added for each tree level and branch symbol in the end. ASCII alternative: '|-> '.
@@ -217,7 +260,7 @@ def log_message(output_level: str, msg_level: str, level: int, message: str) -> 
         fc.Console.PrintMessage(line + '\n')
 
 
-def get_property(obj: fc.DocumentObject, name: str, ptype: Optional[str] = None, units: Optional[str] = None, default: Optional[Any] = None, check_func: Optional[Callable[[Any], bool]] = None, check_desc: str = '') -> Any:
+def get_property(obj: fc.DocumentObject, name: str, ptype: str, units: Optional[str] = None, default: Optional[Any] = None, check_func: Optional[Callable[[Any], bool]] = None, check_desc: str = '') -> Any:
     """ Get FreeCAD object property by name.
 
     Arguments
@@ -289,10 +332,9 @@ def get_property_optional(obj: fc.DocumentObject, name: str, ptype: str, units: 
     else:
         return get_property(obj, name, ptype, units=units, check_func=check_func, check_desc=check_desc)
 
-
 def calculate(
         obj: fc.DocumentObject,
-        ignore_material: bool = False,
+        calculate_volume: bool = False,
         ignore_placement: bool = False,
         parent_material = None,
         level: int = 0,
@@ -315,11 +357,13 @@ def calculate(
         * 'none': Use the solid's shape and material to calculate inertia. This mode can be overridden
           in subobjects.
         * 'density': Material is ignored. RobotCadDensity is used for this object. Override properties
-          in child objects are ignored.
+          in child objects are ignored. The object subtree is processed in calculate volume mode:
+          only 'ignore' override mode is applied.
         * 'mass': Material is ignored. Density is assumed uniform, with the total mass given by the
-          RobotCadMass property. Override properties in child objects are ignored.
+          RobotCadMass property. The object subtree is processed in calculate volume mode:
+          only 'ignore' override mode is applied.
         * 'manual': Object mass, center of mass and inertia matrix are provided manually via
-          RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz properties. Override
+          RobotCadMass, RobotCadCenterOfMass and RobotCadIxx..RobotCadIzz properties. All override
           properties in child objects are ignored.
         * 'ignore': This object and its whole subtree are not processed at all. Inertia and mass are
           assumed zero.
@@ -340,9 +384,10 @@ def calculate(
     ---------
     obj: DocumentObject
         Root object.
-    ignore_material: bool, default False
+    calculate_volume: bool, default False
         Ignore material properties throughout the subtree. In this case density is assumed equal to 1,
-        i.e. the result is the volume matrix (mm^3 instead of kg).
+        i.e. the result is the volume matrix (mm^3 instead of kg). In volume mode only 'ignore' override
+        mode is applied.
     ignore_placement: bool, default False
         Ignore root object placement. Inertia matrix is calculated in the object's local frame.
     parent_material: Material, optional
@@ -373,7 +418,7 @@ def calculate(
         check_func=lambda v: v in OVERRIDE_MODES,
         check_desc=f'value must be one of {OVERRIDE_MODES}',
     )
-    # get override-mode parameters and proceess ignore settings
+    # get override-mode parameters and process ignore settings
     if override_mode is None:
         for name in OVERRIDE_VALUE_PROPERTY_NAMES:
             if name in obj.PropertiesList:
@@ -385,8 +430,7 @@ def calculate(
         return np.zeros((6,6))
 
     # determine calculation mode
-    if ignore_material:
-        calculate_volume = True
+    if calculate_volume:
         override_mode = OVERRIDE_MODE_NONE
     else:
         # process override mode settings
@@ -450,15 +494,20 @@ def calculate(
         material_is_inherited = False
 
     #
-    # link objects
+    # link-like objects
     #
-    linked_obj = obj.getLinkedObject()
+    # required properties: LinkedObject via getLinkedObject() != self
+    # optional properties: ScaleVector, LinkTransform
+    #
+    linked_obj = obj.getLinkedObject(recursive=False)
     if linked_obj is not obj:
         # logging
-        log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): link, ignore_material: {ignore_material}, override_mode: {override_mode}.')
+        log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): link, calculate_volume: {calculate_volume}, override_mode: {override_mode}.')
         # calculate inertia of linked object
-        ignore_placement = not obj.LinkTransform if hasattr(obj, 'LinkTransform') else False
-        JJ = calculate(linked_obj, ignore_material=calculate_volume, ignore_placement=ignore_placement, parent_material=material, level=level + 1, output_level=output_level)
+        JJ = calculate(linked_obj, calculate_volume=calculate_volume, ignore_placement=not getattr(obj, 'LinkTransform', True), parent_material=material, level=level + 1, output_level=output_level)
+        # apply link scale
+        if hasattr(obj, 'ScaleVector'):
+            JJ = scale_inertia(JJ, obj.ScaleVector)
         # apply link transform
         if not ignore_placement and hasattr(obj, 'Placement'):
             X = screw_tf_matrix(obj.Placement.Matrix.inverse())
@@ -478,16 +527,100 @@ def calculate(
     #
     # object-containers
     #
-    subnames = obj.getSubObjects()
-    if len(subnames) > 0:
-        # logging
-        log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): container, ignore_material: {ignore_material}, override_mode: {override_mode}.')
-        # process all subobjects
-        JJ = np.zeros((6,6))
-        for subname in subnames:
-            # get subobject and calculate its inertia
+    # there is four ways of processing such objects:
+    # * via Base/Linked object and ElementList
+    #    - works for expanded multi-element Links (elements are shown) and expanded LinkArrays
+    #    - do not work for not-expanded multi-element Links (elements are not shown), not-expanded LinkArrays, general Arrays
+    #    - individual scale on ElementList leve
+    #    - fused/overlapped objects is not supported
+    # * via Base/Linked object and PlacementList
+    #    - works for not-expanded multi-element Links, not-expanded LinkArrays and general Arrays
+    #    - do not work for expanded multi-element Links, expanded LinkArrays
+    #    - individual scale via ScaleList for LinkArrays
+    #    - fused/overlapped objects is not supported
+    # * via subobject list (getSubObjects()) and further walk
+    #    - works for general containers, expanded Links, expanded LinkArrays
+    #    - do not work for not-expanded Links, not-expanded LinkArrays (individual placement is missed) and Arrays
+    #    - individual on subobjects level
+    #    - fused/overlapped objects is not supported
+    # * via Shape.Solids
+    #    - works for all solids objects with Shape
+    #    - do not work correctly for not-expanded LinkArrays and multi-elements Links with individual scale
+    #    - individual scales is not supported
+    #    - fused/overlapped object support only for Arrays with Fuse set.
+    #
+    ### container type detection ###
+    container_type = None
+    base = None
+    element_list = None
+    placement_list = None
+    subname_list = None
+    # multilink -> process via ElementList
+    if hasattr(obj, 'LinkedObject') and getattr(obj, 'ElementCount', 0) > 0 and hasattr(obj, 'ShowElement'):
+        base = obj.LinkedObject
+        if obj.ShowElement and hasattr(obj, 'ElementList'):
+            container_type = 'expanded multi-element Link'
+            element_list = obj.ElementList
+        elif hasattr(obj, 'PlacementList'):
+            container_type = 'not-expanded multi-element Link'
+            placement_list = obj.PlacementList
+    # arrays
+    elif hasattr(obj, 'Base'):
+        base = obj.Base
+        # link arrays -> process via ElementList or PlacementList
+        if hasattr(obj, 'ExpandArray'):
+            if obj.ExpandArray and hasattr(obj, 'ElementList'):
+                container_type = 'expanded link array'
+                element_list = obj.ElementList
+            elif not obj.ExpandArray and hasattr(obj, 'PlacementList'):
+                container_type = 'not-expanded link array'
+                placement_list = obj.PlacementList
+        # non-fused arrays -> process via PlacementList
+        elif hasattr(obj, 'PlacementList') and not getattr(obj, 'Fuse', False):
+            container_type = 'general non-fused array'
+            placement_list = obj.PlacementList
+    # general containers -> process via subname_list
+    elif len(obj.getSubObjects()) > 0:
+        container_type = 'container'
+        subname_list = obj.getSubObjects()
+    ### container objects processing ###
+    JJ = np.zeros((6,6))
+    if (element_list is not None) or (placement_list is not None):
+        # check base if base object exists
+        if base is None:
+            log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}): {container_type} does not have Base/LinkedObject, zero mass assumed.')
+            return np.zeros((6,6))
+        # general logging
+        log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): {container_type}, calculate_volume: {calculate_volume}, override_mode: {override_mode}.')
+        # calculate base object inertia
+        JJb = calculate(base, calculate_volume=calculate_volume, ignore_placement=not getattr(obj, 'LinkTransform', False), parent_material=material, level=level + 1, output_level=output_level)
+        # process arrays
+        if element_list is not None:
+            # via ElementList
+            for element in element_list:
+                X = screw_tf_matrix(element.Placement.Matrix.inverse())
+                JJ += X.T @ scale_inertia(JJb, element.ScaleVector) @ X
+        elif hasattr(obj, 'ScaleList'):
+            # via PlacementList with ScaleList
+            for placement, scale in zip(placement_list, obj.ScaleList):
+                X = screw_tf_matrix(placement.Matrix.inverse())
+                JJ += X.T @ scale_inertia(JJb, scale) @ X
+        else:
+            # via PlacementList only
+            for placement in placement_list:
+                X = screw_tf_matrix(placement.Matrix.inverse())
+                JJ += X.T @ JJb @ X
+    elif subname_list is not None:
+        log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): {container_type}, calculate_volume: {calculate_volume}, override_mode: {override_mode}.')
+        # process arrays via subname list
+        for subname in subname_list:
             subobj = obj.getSubObject(subname, 1)
-            JJ += calculate(subobj, ignore_material=calculate_volume, ignore_placement=False, parent_material=material, level=level + 1, output_level=output_level)
+            JJ += calculate(subobj, calculate_volume=calculate_volume, ignore_placement=False, parent_material=material, level=level + 1, output_level=output_level)
+    ### finish container processing
+    if container_type is not None:
+        # apply container-level scale
+        if hasattr(obj, 'ScaleVector'):
+            JJ = scale_inertia(JJ, obj.ScaleVector)
         # apply container transform
         if not ignore_placement and hasattr(obj, 'Placement'):
             X = screw_tf_matrix(obj.Placement.Matrix.inverse())
@@ -503,6 +636,7 @@ def calculate(
                 log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) does not have volume.')
         # return result
         return JJ
+
 
     #
     # Solid objects
@@ -528,14 +662,13 @@ def calculate(
         mass = (JJ[3,3] + JJ[4,4] + JJ[5,5]) / 3.0
         if mass > 0.0:
             JJ *= volume / mass
-        # material
-        if override_mode == OVERRIDE_MODE_NONE and not calculate_volume:
-            # apply material settings
-            if material is None:
-                material_name = obj.ShapeMaterial.Name if hasattr(obj, 'ShapeMaterial') else 'None'
-                log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) material is "{material_name}", inherited material is "None", assuming zero mass.')
-                JJ *= 0.0
-            else:
+        # mode selection:
+        if override_mode == OVERRIDE_MODE_NONE:
+            if calculate_volume:
+                # volume calculation, do nothing
+                log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, volume: {volume} mm^3.')
+            elif material is not None:
+                # apply material
                 inherit_text = '(inherited)' if material_is_inherited else ''
                 # get material density
                 try:
@@ -548,6 +681,11 @@ def calculate(
                     JJ *= density
                     # logging
                     log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, material: {material.Name} {inherit_text}, density: {1000*density} g/mm^3, mass: {1000*JJ[3,3]} g.')
+            else:
+                # no material is provided
+                material_name = obj.ShapeMaterial.Name if hasattr(obj, 'ShapeMaterial') else 'None'
+                log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) material is "{material_name}", inherited material is "None", assuming zero mass.')
+                JJ *= 0.0
         elif override_mode == OVERRIDE_MODE_DENSITY:
             # override density
             JJ *= override_density
@@ -561,9 +699,6 @@ def calculate(
                 log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, override_mass: {1000*override_mass} g.')
             else:
                 log(LOG_LEVEL_WARN, f'object {obj.Label} ({obj.FullName}) does not have volume.')
-        else:
-            # volume calculation, do nothing
-            log(LOG_LEVEL_INFO, f'object {obj.Label} ({obj.FullName}): solids/compound, volume: {volume} mm^3.')
 
         # return result
         return JJ

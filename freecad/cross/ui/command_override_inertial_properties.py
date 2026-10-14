@@ -26,24 +26,30 @@ _OVERRIDE_MODE_TOOLTIP = (
     'Inertia override mode for this object.\n'
     f'"{OVERRIDE_MODE_NONE}": no override, use the object\'s own shape and material'
     ' as usual (default).\n'
-    f'"{OVERRIDE_MODE_DENSITY}": ignore material, use "{PROP_DENSITY}" instead.\n'
-    f'"{OVERRIDE_MODE_MASS}": ignore material, use "{PROP_MASS}" together with the'
-    ' object\'s own shape (uniform density is assumed).\n'
-    f'"{OVERRIDE_MODE_MANUAL}": ignore shape and material entirely, use "{PROP_MASS}",\n'
-    f' "{PROP_CENTER_OF_MASS}" and "{PROP_IXX}".."{PROP_IZZ}" as supplied.\n'
-    f'"{OVERRIDE_MODE_IGNORE}": ignore the object and its subtree, assume zero inertia and mass.'
+    f'"{OVERRIDE_MODE_DENSITY}": ignore materials, use "{PROP_DENSITY}" for the object'
+    ' and its whole subtree.\n'
+    f'"{OVERRIDE_MODE_MASS}": ignore materials, distribute "{PROP_MASS}" over the shape'
+    ' of the object and its whole subtree (uniform density is assumed).\n'
+    f'"{OVERRIDE_MODE_MANUAL}": ignore shape, materials and subtree entirely, use'
+    f' "{PROP_MASS}",\n "{PROP_CENTER_OF_MASS}" and "{PROP_IXX}".."{PROP_IZZ}" as supplied.\n'
+    f'"{OVERRIDE_MODE_IGNORE}": ignore the object and its subtree, assume zero inertia and mass.\n'
+    '\n'
+    f'Inside a "{OVERRIDE_MODE_DENSITY}" or "{OVERRIDE_MODE_MASS}" object, only the shapes of'
+    ' the children are used:\n'
+    f'their override modes are not applied, except "{OVERRIDE_MODE_IGNORE}", which still'
+    ' excludes a child.'
 )
 
 # Other override properties.
 _OVERRIDE_VALUE_PROPERTIES = [
     (
         PROP_MASS, 'App::PropertyMass',
-        f'Mass of the object. Used when "{PROP_OVERRIDE_MODE}" is "{OVERRIDE_MODE_MASS}"'
+        f'Mass of the object (including its subtree). Used when "{PROP_OVERRIDE_MODE}" is "{OVERRIDE_MODE_MASS}"'
         f' or "{OVERRIDE_MODE_MANUAL}". Ignored otherwise.',
     ),
     (
         PROP_DENSITY, 'App::PropertyDensity',
-        f'Density of the object. Used when "{PROP_OVERRIDE_MODE}" is'
+        f'Density of the object and of its subtree. Used when "{PROP_OVERRIDE_MODE}" is'
         f' "{OVERRIDE_MODE_DENSITY}". Ignored otherwise.',
     ),
     (
