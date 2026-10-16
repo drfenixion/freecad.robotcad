@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import traceback
 from typing import Optional
 import FreeCAD as fc
 import FreeCADGui as fcgui
@@ -51,6 +52,23 @@ class _LinkInertialProperties:
     izz: float
 
 
+class _LinkSkipped(Exception):
+    """The inertial properties of a link cannot be calculated, the message is for the user."""
+
+
+def error_summary(messages: list[str]) -> str:
+    """Return the text of the dialog listing the links that were skipped."""
+    lines = [f'Mass and inertia were not calculated for {len(messages)} link(s):', '']
+    lines += [f'- {message}' for message in messages]
+    lines += [
+        '',
+        'These links keep their previous inertial properties,'
+        ' which are used in the total mass of the robot.',
+        'See the Report View for details.',
+    ]
+    return '\n'.join(lines)
+
+
 def _calculate_link_basic(
         doc: fc.Document,
         link: DO,
@@ -62,23 +80,24 @@ def _calculate_link_basic(
     (or the default material of the robot) or with the mass of the link if
     `CalculateInertiaBasedOnMass` is set.
 
-    Return None (after reporting why) if the link is skipped.
+    Return None if the calculation is disabled for the link
+    (`MaterialNotCalculate`), raise `_LinkSkipped` if it fails.
 
     """
     print('Start process inertia and mass of link - Label: ', link.Label, ' Label2: ', link.Label2)
 
     # both MaterialNotCalculate and CalculateInertiaBasedOnMass cannot be true
     if link.CalculateInertiaBasedOnMass and link.MaterialNotCalculate:
-        error(f'''MaterialNotCalculate and CalculateInertiaBasedOnMass are both true for "{link.Label}"\n
-              both cannot be true \n change state of one and try again \n''')
-        return None
+        raise _LinkSkipped(
+            f'Link "{link.Label}" skipped. MaterialNotCalculate and CalculateInertiaBasedOnMass'
+            ' are both true, change one of them.',
+        )
 
     if link.MaterialNotCalculate:
         return None
 
     if not link.Real:
-        error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
-        return None
+        raise _LinkSkipped(f'Link "{link.Label}" skipped. No bound Real element for Link.')
 
     compound = get_compound(
         link.Real,
@@ -91,8 +110,7 @@ def _calculate_link_basic(
 
     if not elem_with_volume:
         doc.removeObject(compound.Name)
-        error(f'Link "{link.Label}" does not link to any child with volume.', gui=True)
-        return None
+        raise _LinkSkipped(f'Link "{link.Label}" skipped. It does not link to any child with volume.')
 
     center_of_gravity = center_of_gravity_mm(elem_with_volume)
     elem_matrix_of_inertia = matrix_of_inertia(elem_with_volume)
@@ -105,23 +123,19 @@ def _calculate_link_basic(
     #  material not calculate is false
     if (elem_material.material_name is None) and (default_material.material_name is None):
         if not link.CalculateInertiaBasedOnMass and not link.MaterialNotCalculate:
-            error(
+            raise _LinkSkipped(
                 f'Link "{link.Label}" skipped.'
-                ' No material specified for Link and no default material specified for robot element.', gui=True,
+                ' No material specified for Link and no default material specified for robot element.',
             )
-            return None
 
     if center_of_gravity is None:
-        error(
+        raise _LinkSkipped(
             f'Link "{link.Label}" skipped.'
             ' Can not get CenterOfGravity of bound Real element.',
-            gui=True,
         )
-        return None
 
     if elem_matrix_of_inertia is None:
-        error(f'Cannot get the matrix of inertia of the object bound by "{link.Label}".Real[0].', gui=True)
-        return None
+        raise _LinkSkipped(f'Link "{link.Label}" skipped. Cannot get the matrix of inertia of its Real element.')
 
     if not link.CalculateInertiaBasedOnMass:
         if elem_material.material_name is None:
@@ -132,8 +146,7 @@ def _calculate_link_basic(
 
         if ((material.density is None)
                 or (material.density.Value <= 0.0)):
-            error(f'Link "{link.Label}" skipped. Material density not strictly positive.', gui=True)
-            return None
+            raise _LinkSkipped(f'Link "{link.Label}" skipped. Material density not strictly positive.')
 
     volume = fc.Units.Quantity(elem_volume_mm3, 'mm^3')
     if not link.CalculateInertiaBasedOnMass:
@@ -141,8 +154,7 @@ def _calculate_link_basic(
         result_mass_kg = mass_kg
     else:
         if link.Mass <= 0.0:
-            error(f'Link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.', gui=True)
-            return None
+            raise _LinkSkipped(f'Link "{link.Label}" skipped. Mass ({link.Mass}) is not strictly positive.')
         mass_kg = link.Mass.Value
         result_mass_kg = None  # keep the mass entered by the user
 
@@ -166,7 +178,7 @@ def _calculate_link_basic(
 def _calculate_link_advanced(
         link: DO,
         output_level: str,
-) -> Optional[_LinkInertialProperties]:
+) -> _LinkInertialProperties:
     """Calculate inertial properties of a link with the "advanced" method.
 
     Same convention as the "basic" method (and the URDF `<inertial>` tag): the
@@ -176,7 +188,7 @@ def _calculate_link_advanced(
     mass placement is `MountedPlacement.Rotation`, i.e. the orientation of the
     inertia axes relative to the link frame.
 
-    Return None (after reporting why) if the link is skipped.
+    Raise `_LinkSkipped` if the link is skipped.
 
     """
     log_message(
@@ -185,8 +197,7 @@ def _calculate_link_advanced(
     )
 
     if not link.Real:
-        error(f'Link "{link.Label}" skipped. No bound Real element for Link.', gui=True)
-        return None
+        raise _LinkSkipped(f'Link "{link.Label}" skipped. No bound Real element for Link.')
 
     if len(link.Real) > 1:
         # A link has one Real element: a link is attached to one joint.
@@ -204,18 +215,15 @@ def _calculate_link_advanced(
             output_level=output_level,
         )
     except (ValueError, KeyError, TypeError) as e:
-        error(f'Link "{link.Label}" skipped. {e}', gui=True)
-        return None
+        raise _LinkSkipped(f'Link "{link.Label}" skipped. {e}') from e
 
     mass_kg, center_of_mass, inertia_kg_mm2 = mass_com_inertia(JJ)
     if mass_kg <= 0.0:
-        error(
+        raise _LinkSkipped(
             f'Link "{link.Label}" skipped. Calculated mass is zero.'
             ' Assign materials to the parts of the link (or set the RobotCad override properties)'
             f' and check the console log (set robot "InertiaCalculatorLogLevel" to "{LOG_LEVEL_INFO}").',
-            gui=True,
         )
-        return None
 
     inertia = inertia_kg_mm2 * _KG_MM2_TO_KG_M2
     center_of_mass_placement = center_of_mass_placement_in_link_frame(center_of_mass, link.MountedPlacement)
@@ -287,6 +295,8 @@ class _CalculateMassAndInertiaCommand:
                 'Calculation trace is printed to the Report View, its verbosity can be adjusted by\n'
                 '"InertiaCalculatorLogLevel" robot property.\n'
                 '\n'
+                'Links that cannot be calculated are listed in one dialog at the end.\n'
+                '\n'
                 'You can visually check inertia placement in Gazebo.\n'
                 'Turn on display of inertia in Gazebo and check that generated inertia blocks have\n'
                 'approximately the same size and the same position/orientation as their links.\n'
@@ -320,12 +330,28 @@ class _CalculateMassAndInertiaCommand:
         output_level = getattr(robot, 'InertiaCalculatorLogLevel', LOG_LEVEL_WARN)
         default_material = material_from_material_editor(robot.MaterialCardPath)
 
+        # Messages of the skipped links, shown in one dialog at the end.
+        failures: list[str] = []
+
         doc.openTransaction(tr('Calculate mass and inertia'))
         for link in links:
-            if method == INERTIA_METHOD_ADVANCED:
-                properties = _calculate_link_advanced(link, output_level)
-            else:
-                properties = _calculate_link_basic(doc, link, default_material)
+            try:
+                if method == INERTIA_METHOD_ADVANCED:
+                    properties = _calculate_link_advanced(link, output_level)
+                else:
+                    properties = _calculate_link_basic(doc, link, default_material)
+            except _LinkSkipped as e:
+                error(str(e))
+                failures.append(str(e))
+                continue
+            except Exception as e:
+                # Unexpected error: report it and go on with the other links,
+                # so that the transaction is always committed.
+                message = f'Link "{link.Label}" skipped. Unexpected error: {e}'
+                fc.Console.PrintError(traceback.format_exc())
+                error(message)
+                failures.append(message)
+                continue
             if properties is None:
                 continue
             _apply_to_link(link, properties)
@@ -362,6 +388,9 @@ class _CalculateMassAndInertiaCommand:
         print('Finished calculating mass and inertia.')
         doc.recompute()
         doc.commitTransaction()
+
+        if failures:
+            error(error_summary(failures), gui=True)
 
     def IsActive(self):
         return is_robot_selected() or is_link_selected()
