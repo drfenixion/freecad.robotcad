@@ -2,10 +2,10 @@
 
 Covers `transform_to_frame` and its use with `calculate(..., ignore_placement=True)`
 for an object in the local and in the global frame, the global placement of an
-object inside containers as returned by `getSubObject(subname, 3)` (which the
-command relies on), and the text output of the command module
-(`format_inertial_properties`; skipped when the GUI is not available, see
-`commands.py`).
+object inside containers as returned by `getSubObject(subname, 3)` and
+`getSubObject(subname, 2)` (object and matrix, which the command relies on),
+and the text output of the command module (`format_inertial_properties`;
+skipped when the GUI is not available, see `commands.py`).
 """
 from __future__ import annotations
 
@@ -115,7 +115,11 @@ class CommandCalculateObjectTests(InertiaCalculatorTestCase):
 
 
 class SubObjectPlacementTests(InertiaCalculatorTestCase):
-    """The command gets the global placement from `root.getSubObject(subname, 3)`."""
+    """Global placement of a nested object from `root.getSubObject(subname, 3)`.
+
+    The command uses `getSubObject(subname, 2)`, whose matrix is the same
+    (see `SubObjectTypeTests`).
+    """
 
     def test_sub_object_placement_includes_container_and_own_placement(self):
         materials.require_materials_module()

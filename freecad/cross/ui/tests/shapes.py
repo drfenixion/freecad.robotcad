@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from typing import Iterable, Optional, Sequence
 
+import numpy as np
+
 import FreeCAD as fc
+
+from . import analytic
 
 
 def make_part_box(doc: fc.Document, name: str, length: float, width: float, height: float, placement: Optional[fc.Placement] = None) -> fc.DocumentObject:
@@ -130,3 +134,25 @@ def make_link(doc: fc.Document, name: str, linked_obj: fc.DocumentObject, placem
         link.Placement = placement
     doc.recompute()
     return link
+
+
+def shape_inertia6d(shape, density: float) -> np.ndarray:
+    """Generalized 6x6 matrix of the solids of a Part shape with a uniform `density` (kg/mm^3).
+
+    Reference built from FreeCAD's own geometry (`Part.getShape(obj)` gives
+    the shape of an object with all link placements, scales and array
+    elements applied), so it captures FreeCAD's transform semantics
+    independently of `inertia_calculator.py`. Each solid's
+    `MatrixOfInertia` and `CenterOfMass` are computed by OpenCASCADE with
+    density 1 (mass == volume).
+    """
+    JJ = np.zeros((6, 6))
+    for solid in shape.Solids:
+        M = solid.MatrixOfInertia
+        J = np.array([
+            [M.A11, M.A12, M.A13],
+            [M.A21, M.A22, M.A23],
+            [M.A31, M.A32, M.A33],
+        ])
+        JJ += analytic.generalized_inertia6d(density * J, solid.CenterOfMass, density * solid.Volume)
+    return JJ

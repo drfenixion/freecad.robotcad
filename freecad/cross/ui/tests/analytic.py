@@ -131,3 +131,56 @@ def sum_inertia6d(*matrices: np.ndarray) -> np.ndarray:
     for m in matrices:
         total += m
     return total
+
+
+# -- Affine (scaled) transforms --------------------------------------------
+#
+# A body of uniform density mapped by x' = A @ x + t (A any invertible 3x3
+# matrix, e.g. rotation @ diag(scale)) has
+#
+#     mass'  = |det A| * mass
+#     com'   = A @ com + t
+#     P'     = |det A| * A @ P @ A.T
+#
+# where P = integral((x - com) (x - com)^T dm) is the second-moment matrix
+# about the center of mass, related to the inertia tensor J about the
+# center of mass by J = trace(P) * I - P, i.e. P = trace(J) / 2 * I - J.
+# This is a general linear-map formula, written independently of
+# `inertia_calculator.scale_inertia` (which only handles diagonal scales).
+
+
+def affine(placement: fc.Placement | None = None, scale=(1.0, 1.0, 1.0)):
+    """Return `(A, t)` of the map `x' = placement * (diag(scale) @ x)`.
+
+    This is how FreeCAD applies `App::Link.ScaleVector` together with the
+    link `Placement`: the scale acts in the local frame of the link, before
+    its placement.
+    """
+    if placement is None:
+        placement = fc.Placement()
+    A = rotation_matrix(placement.Rotation) @ np.diag([float(v) for v in scale])
+    t = np.array([placement.Base.x, placement.Base.y, placement.Base.z])
+    return A, t
+
+
+def compose_affine(*maps):
+    """Compose affine maps `(A, t)`; the first one is applied last.
+
+    `compose_affine(m2, m1)` is the map `x -> m2(m1(x))`.
+    """
+    A = np.eye(3)
+    t = np.zeros(3)
+    for A_i, t_i in reversed(maps):
+        A, t = A_i @ A, A_i @ t + t_i
+    return A, t
+
+
+def affine_transform_inertia6d(inertia3_com: np.ndarray, com: fc.Vector, mass: float, affine_map) -> np.ndarray:
+    """Generalized 6x6 matrix of a uniform-density body mapped by `affine_map = (A, t)`."""
+    A, t = affine_map
+    det = abs(np.linalg.det(A))
+    P = 0.5 * np.trace(inertia3_com) * np.eye(3) - inertia3_com
+    P_new = det * A @ P @ A.T
+    J_new = np.trace(P_new) * np.eye(3) - P_new
+    c = A @ np.array([com.x, com.y, com.z]) + t
+    return generalized_inertia6d(J_new, fc.Vector(*c), mass * det)

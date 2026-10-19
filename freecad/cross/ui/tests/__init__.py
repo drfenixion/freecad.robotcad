@@ -53,6 +53,40 @@ test_overrides.py
 test_material_resolution.py
     Material resolution: own material, inherited material, missing
     density, missing material entirely.
+test_link_scale.py
+    `App::Link` with `ScaleVector` / `Scale` (uniform, non-uniform with
+    shear, mirroring, `LinkTransform` on/off) and chains of links with
+    placements and scales. References: `analytic.affine_transform_inertia6d`
+    and FreeCAD's own shape (`Part.getShape`, see `shapes.shape_inertia6d`).
+test_link_element_count.py
+    `App::Link` array (`ElementCount` > 0, not a Draft array): four wheels of
+    a mobile base, element objects shown or not (`ShowElement`), array
+    placement and scale, element scales, a 'mass' override, the array in a
+    Part with a chassis; plus the FreeCAD facts the calculator relies on
+    (`LinkArrayAssumptionTests`). `LinkTransform = True`:
+    `Link.Placement * P_i * B` as displayed by FreeCAD (`Part.getShape()`
+    differs and is not used as a reference there).
+test_draft_arrays.py
+    Draft ortho arrays: link array (with placement, per-element `ScaleList`,
+    global `ScaleVector`, `ExpandArray`; material of the base object) and
+    regular array (base + `PlacementList`); the base material wins, a
+    material on the array is inherited by a base without material.
+    Overlapping copies: counted several times without `Fuse`; a fused array
+    is one solid with the material of the array.
+    References: an analytic model from the link properties of the array
+    (checked against `Part.getShape(array)` without scales), and
+    `Part.getShape(array)` / `array.Shape` for regular arrays.
+test_part_booleans.py
+    Part booleans (`Part::MultiFuse` / GUI Union, `Part::Fuse`, `Part::Cut`,
+    `Part::Common`) are solids, not containers: the result shape with the
+    material of the feature, the inputs and their materials are not used.
+test_partdesign_body.py
+    `PartDesign::Body` with several features (two additive boxes and a
+    pocket): the body is counted once, not once per feature.
+test_override_children.py
+    Children of a container (or link) in 'density' / 'mass' mode: their
+    'manual', 'density' and incomplete override properties are not used,
+    'ignore' children are still excluded.
 test_logging.py
     Smoke test: both console output levels run to completion and give the
     same numeric result (the output level only affects what is printed).
@@ -69,6 +103,11 @@ test_object_inertia.py
     (object and matrix, also with a face/edge/solid at the end of the path),
     the object and global placement of a real selection, and the text output
     (`format_inertial_properties`) of the command module.
+test_inertia_frame.py
+    "Principal axes" option of the "Calculate object mass and inertia" window:
+    `principal_axes()` (ascending moments, right-handed axes, same physical
+    inertia) and its text output; `error_summary()` of the "Calculate mass
+    and inertia" command.
 test_robot_properties.py
     Robot properties `InertiaCalculationMethod` / `InertiaCalculatorLogLevel`:
     defaults, enumerations, migration of robots saved without them.
