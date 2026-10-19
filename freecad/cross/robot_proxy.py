@@ -385,7 +385,7 @@ class RobotProxy(ProxyBase):
             (
                 'Method used by the "Calculate Mass and Inertia" tool.\n'
                 '\n'
-                '* "basic": assumes robot links have uniform density with\n' 
+                '* "basic": assumes robot links have uniform density with\n'
                 '  materials specified on the link or robot level.\n'
                 '  As alternative link mass can be specified instead of material\n'
                 '  (see "CalculateInertiaBasedOnMass" property).\n'
@@ -428,7 +428,7 @@ class RobotProxy(ProxyBase):
     @staticmethod
     def _init_enum_property(
             obj: CrossRobot,
-            name: str, 
+            name: str,
             group: str,
             values: list[str],
             default: str,
