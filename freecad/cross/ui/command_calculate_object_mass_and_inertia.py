@@ -9,6 +9,9 @@ non-modal dockable window (and printed to the console).
 
 from __future__ import annotations
 
+import itertools
+import math
+import traceback
 from typing import Optional
 
 import numpy as np
@@ -35,12 +38,59 @@ _FRAME_DESCRIPTIONS = {
 def _format_matrix(M: NDArray) -> list[str]:
     return ['    [' + ', '.join(f'{v: .6e}' for v in row) + ' ]' for row in M]
 
+def _format_fc_rotational_matrix(M: fc.Matrix) -> list[str]:
+    return ['    [' + ', '.join(f'{v: .6e}' for v in M.row(k)) + ' ]' for k in range(3)]
+
+def principal_axes(inertia: NDArray) -> tuple[NDArray, fc.Rotation]:
+    """Return the principal moments and the principal axes of an inertia matrix.
+
+    Parameters
+    ----------
+    - inertia: 3x3 symmetric inertia matrix about the center of mass.
+
+    Return `(moments, rotation)`: the principal moments in ascending order and
+    the rotation whose x, y and z axes are the corresponding principal axes,
+    expressed in the frame of `inertia`, i.e.
+    `inertia = R @ diag(moments) @ R.T` with `R` the matrix of `rotation`.
+    The axes form a right-handed frame. The sign of each axis is free; the
+    rotation with the smallest angle is returned (identity for a diagonal
+    matrix with ascending moments). For equal moments the axes are not unique.
+
+    """
+    J = np.asarray(inertia, dtype=float)
+    moments, Q = np.linalg.eigh(0.5 * (J + J.T))
+    # The proper rotation (det = +1) with the largest trace, i.e. the
+    # smallest rotation angle, among the sign choices of the axes.
+    best = None
+    for signs in itertools.product((1.0, -1.0), repeat=3):
+        R = Q * np.array(signs)
+        if np.linalg.det(R) > 0.0 and (best is None or np.trace(R) > np.trace(best)):
+            best = R
+    R = best
+    rotation = fc.Rotation(fc.Matrix(
+        R[0, 0], R[0, 1], R[0, 2], 0.0,
+        R[1, 0], R[1, 1], R[1, 2], 0.0,
+        R[2, 0], R[2, 1], R[2, 2], 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    ))
+    return moments, rotation
+
+
+def _rounded(x: float) -> float:
+    """`x` rounded to 6 decimals, without negative zero (e.g. -1e-17 -> 0.0)."""
+    return round(x, 6) + 0.0
+
+
+def _format_vector(v: fc.Vector) -> str:
+    return f'({_rounded(v.x): .6f}, {_rounded(v.y): .6f}, {_rounded(v.z): .6f})'
+
 
 def format_inertial_properties(
         mass: float,
         center_of_mass: fc.Vector,
         inertia: NDArray,
         header: str = '',
+        axes_rotation: Optional[fc.Rotation] = None,
 ) -> str:
     """Return mass, center of mass and inertia matrix with units as multi-line text.
 
@@ -50,6 +100,11 @@ def format_inertial_properties(
     - center_of_mass: center of mass in mm.
     - inertia: 3x3 inertia matrix about the center of mass in kg*mm^2.
     - header: first line of the text.
+    - axes_rotation: if given, `inertia` is expressed in the principal axes
+                     of inertia (see `principal_axes()`) and `axes_rotation`
+                     is the rotation from the axes of the frame of
+                     `center_of_mass` to the principal axes; it is printed
+                     before the matrix.
 
     """
     lines = []
@@ -60,7 +115,15 @@ def format_inertial_properties(
         f'  Center of mass: x = {center_of_mass.x:.6g} mm,'
         f' y = {center_of_mass.y:.6g} mm, z = {center_of_mass.z:.6g} mm',
     )
-    lines.append('  Inertia matrix about the center of mass, kg*mm^2:')
+    if axes_rotation is None:
+        lines.append( '  Inertia matrix about the center of mass, kg*mm^2:')
+    else:
+        yaw, pitch, roll = (_rounded(angle) for angle in axes_rotation.toEuler())
+        lines.append( '  Rotation to principal axes:')
+        lines += _format_fc_rotational_matrix(axes_rotation.toMatrix())
+        lines.append(f'    axis {_format_vector(axes_rotation.Axis)}, angle {_rounded(math.degrees(axes_rotation.Angle)):.6g} deg,')
+        lines.append(f'    yaw-pitch-roll: {yaw:.6g}, {pitch:.6g}, {roll:.6g} deg.')
+        lines.append( '  Inertia matrix about the center of mass in the principal axes, kg*mm^2:')
     lines += _format_matrix(inertia)
     return '\n'.join(lines)
 
@@ -105,7 +168,7 @@ class _CalculationError(Exception):
     """The calculation cannot be done, the message is for the user."""
 
 
-def _calculate_report(target_frame: str, log_level: str) -> str:
+def _calculate_report(target_frame: str, use_principal_axes: bool, log_level: str) -> str:
     """Calculate the selected object and return the result as text.
 
     Raise `_CalculationError` if the selection is not valid or if the
@@ -130,6 +193,11 @@ def _calculate_report(target_frame: str, log_level: str) -> str:
             JJ = transform_to_frame(JJ, global_placement)
     except (ValueError, KeyError, TypeError) as e:
         raise _CalculationError(f'Object "{obj.Label}": {e}') from e
+    except Exception as e:
+        # Unexpected error (e.g. an object with an unusual structure): show it
+        # in the window instead of losing it in the Qt slot.
+        fc.Console.PrintError(traceback.format_exc())
+        raise _CalculationError(f'Object "{obj.Label}": unexpected error: {e}') from e
     mass, center_of_mass, inertia = mass_com_inertia(JJ)
     # check result for sanity
     if mass <= 0.0:
@@ -138,11 +206,19 @@ def _calculate_report(target_frame: str, log_level: str) -> str:
             ' (or set the RobotCad override properties) and check the console log'
             f' (select the "{LOG_LEVEL_INFO}" log level).',
         )
+    axes_rotation = None
+    if use_principal_axes:
+        moments, axes_rotation = principal_axes(inertia)
+        inertia = np.diag(moments)
     return format_inertial_properties(
         mass,
         center_of_mass,
         inertia,
-        header=f'Selected body: "{obj.Label}" ({obj.FullName})\nInertia frame: {_FRAME_DESCRIPTIONS[target_frame]}',
+        header=(
+            f'Selected body: "{obj.Label}" ({obj.FullName})\n'
+            f'Inertia frame: {_FRAME_DESCRIPTIONS[target_frame]}'
+        ),
+        axes_rotation=axes_rotation,
     )
 
 
@@ -158,6 +234,8 @@ class _CalculateObjectMassAndInertiaCommand:
                 'the selection, assign materials and calculate again.\n'
                 '\n'
                 'Tool will calculate mass, center of mass and inertia matrix of the object and show result in the window.\n'
+                'With "Principal axes" checked, the inertia matrix is expressed in the principal axes\n'
+                'of inertia and the rotation from the target frame axes to them is shown.\n'
                 'It utilizes "advanced" method (see robot "InertiaCalculationMethod" property for more information) which takes\n'
                 'into account the materials assigned to objects and the RobotCad override properties\n'
                 '(see "Override inertial properties" tool).\n'
@@ -179,7 +257,7 @@ class _CalculateObjectMassAndInertiaCommand:
     @staticmethod
     def _on_calculate(dialog: CalculateObjectMassAndInertiaDialog) -> None:
         try:
-            text = _calculate_report(dialog.target_frame, dialog.log_level)
+            text = _calculate_report(dialog.target_frame, dialog.principal_axes, dialog.log_level)
         except _CalculationError as e:
             dialog.show_error(str(e))
             error(str(e))

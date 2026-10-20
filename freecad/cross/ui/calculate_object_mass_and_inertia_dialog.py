@@ -33,18 +33,15 @@ _OBJECT_NAME = 'RobotCadObjectMassAndInertiaCalculator'
 class CalculateObjectMassAndInertiaDialog:
     """A non-modal dockable window to calculate the mass and inertia of the selected object.
 
-    The window is a dock widget of the FreeCAD main window: it can be docked
-    to any side or floated, and it stays open while the user works in the
-    document (selects objects, assigns materials...). It contains the
-    calculation parameters, the "Calculate" and "Close" buttons and a zone
+    Window contains the calculation parameters (target frame and log level),
+    the "Calculate" and "Close" buttons and a zone
     where the result of the last calculation is displayed.
 
-    The `on_calculate` callback is called with the window at each click on
-    "Calculate"; it must check the selection itself and display its result
-    with `show_result()` or `show_error()`. The result zone is only updated on
-    "Calculate".
+    "Calculate" press activates `on_calculate` callback. It checks selection,
+    inwokes calulation method and displays its result with `show_result()` or `show_error()`.
+    The result zone is only updated on "Calculate".
 
-    There is a single window. "Close" hides it, so the selected parameters and
+    "Close" hides window, but the selected parameters and
     the last result are still there when it is shown again, until FreeCAD is
     closed. Use `open()` to show (or create) it.
 
@@ -75,8 +72,8 @@ class CalculateObjectMassAndInertiaDialog:
         Parameters
         ----------
         - on_calculate: called when the user presses "Calculate". The selected
-                        values are in the attributes `target_frame` and
-                        `log_level`.
+                        values are in the attributes `target_frame`,
+                        `principal_axes` and `log_level`.
 
         """
         self._on_calculate = on_calculate
@@ -89,8 +86,10 @@ class CalculateObjectMassAndInertiaDialog:
         self.form = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(self.form)
 
-        # Parameters.
+        # Parameters. The fields keep their size hint instead of being
+        # stretched to the width of the window.
         parameters = QtWidgets.QFormLayout()
+        parameters.setFieldGrowthPolicy(QtWidgets.QFormLayout.FieldGrowthPolicy.FieldsStayAtSizeHint)
         self._combo_target_frame = QtWidgets.QComboBox()
         for value in TARGET_FRAMES:
             self._combo_target_frame.addItem(tr(_TARGET_FRAME_TEXTS[value]), value)
@@ -99,7 +98,22 @@ class CalculateObjectMassAndInertiaDialog:
             '- global: global frame (document root);\n'
             '- local: local frame of the selected object (its Placement is ignored).',
         ))
-        parameters.addRow(tr('Target frame'), self._combo_target_frame)
+
+        self._check_principal_axes = QtWidgets.QCheckBox(tr('Principal axes'))
+        self._check_principal_axes.setChecked(False)
+        self._check_principal_axes.setToolTip(tr(
+            'Express the inertia matrix in the principal axes of inertia\n'
+            '(diagonal matrix of the principal moments). The rotation from the\n'
+            'target frame axes to the principal axes is shown before the matrix.\n'
+            'Unchecked: the matrix is expressed in the axes of the target frame.',
+        ))
+        # "Principal axes" on the same row as the target frame.
+        frame_row = QtWidgets.QHBoxLayout()
+        frame_row.addWidget(self._combo_target_frame)
+        frame_row.addSpacing(12)
+        frame_row.addWidget(self._check_principal_axes)
+        frame_row.addStretch(1)
+        parameters.addRow(tr('Target frame'), frame_row)
 
         self._combo_log_level = QtWidgets.QComboBox()
         for value in LOG_LEVELS:
@@ -143,6 +157,10 @@ class CalculateObjectMassAndInertiaDialog:
     @property
     def target_frame(self) -> str:
         return self._combo_target_frame.currentData()
+
+    @property
+    def principal_axes(self) -> bool:
+        return self._check_principal_axes.isChecked()
 
     @property
     def log_level(self) -> str:
