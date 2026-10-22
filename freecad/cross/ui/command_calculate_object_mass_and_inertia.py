@@ -225,7 +225,7 @@ def _calculate_report(target_frame: str, use_principal_axes: bool, log_level: st
 class _CalculateObjectMassAndInertiaCommand:
     def GetResources(self) -> dict:
         return {
-            'Pixmap': 'calculate_mass_and_inertia.svg',
+            'Pixmap': 'calculate_object_mass_and_inertia.svg',
             'MenuText': tr('Calculate: mass and inertia of the selected object'),
             'ToolTip': tr(
                 'Open the window to calculate mass and inertia of an object.\n'
