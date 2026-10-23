@@ -26,6 +26,15 @@ PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generat
 PREF_ALIGN_Z_AXIS_LCS = 'align_z_axis_lcs'  # Align Z-axis of LCS to zero rotation (affects Set Placement tools and New LCS tool)
 WORKBENCH_NAME = 'RobotCAD - ROS2'
 
+# Inertia calculation methods selectable for a Robot (property `InertiaCalculationMethod`)
+#   * INERTIA_METHOD_BASIC (default): the original method. Uses link material
+#     properties and calculates only the first Real element with volume.
+#   * INERTIA_METHOD_ADVANCED: `ui/inertia_calculator.py`. Uses materials and
+#     RobotCad* override properties of the assembly elements.
+INERTIA_METHOD_BASIC = 'basic'
+INERTIA_METHOD_ADVANCED = 'advanced'
+INERTIA_METHODS = [INERTIA_METHOD_BASIC, INERTIA_METHOD_ADVANCED] # first element is default
+
 lcs_wrapper_prefix = "LCS wrapper "
 
 XMLTODICT_ATTR_PREFIX_ORIGIN = '@'
