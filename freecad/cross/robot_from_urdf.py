@@ -27,6 +27,7 @@ from .joint_proxy import make_joint
 from .link_proxy import make_link
 from .robot_proxy import make_robot
 from .wb_utils import get_joints
+from .wb_utils import ros_name
 
 try:
     from .urdf_parser_utils import axis_to_z
@@ -543,9 +544,23 @@ def _add_ros_joint(
     ros_joint.Label2 = urdf_joint.name
     ros_joint.adjustRelativeLinks(robot)
     robot.addObject(ros_joint)
-    _set_joint_enum_lists(ros_joint, urdf_joint.parent, urdf_joint.child)
-    ros_joint.Parent = urdf_joint.parent
-    ros_joint.Child = urdf_joint.child
+    # The joint Parent/Child enumerations (see RobotProxy.set_joint_enum) are
+    # built from the link labels (ros_name), while the URDF gives the raw link
+    # names (stored in Link.Label2). When a copy of the model already exists in
+    # the document, FreeCAD uniquifies the duplicate labels (e.g. `link` ->
+    # `link001`), so storing the raw URDF names here would make the later
+    # resolution by ros_name silently fail: `_canonicalize_joint_axis` and
+    # `_set_child_placement` resolve the parent/child links through
+    # `ros_name()` and would leave the joint axis and the link MountedPlacement
+    # uncompensated, i.e. with a wrong placement. Resolve the URDF names to the
+    # labels of this robot's links and store those instead.
+    parent_link = robot.Proxy.get_link(urdf_joint.parent, label1_first = False)
+    child_link = robot.Proxy.get_link(urdf_joint.child, label1_first = False)
+    parent_name = ros_name(parent_link) if parent_link else urdf_joint.parent
+    child_name = ros_name(child_link) if child_link else urdf_joint.child
+    _set_joint_enum_lists(ros_joint, parent_name, child_name)
+    ros_joint.Parent = parent_name
+    ros_joint.Child = child_name
     ros_joint.Type = urdf_joint.type
     ros_joint.Origin = placement_along_z_from_joint(urdf_joint)
     if urdf_joint.limit is not None:

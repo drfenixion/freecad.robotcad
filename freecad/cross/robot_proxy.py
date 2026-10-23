@@ -634,7 +634,7 @@ class RobotProxy(ProxyBase):
 
                 # backward compatability with label2 Parent name
                 if joint.Parent not in parent_links:
-                    joint.ParentOldTmp = ros_name(self.get_link(joint.Parent, label1_first = False))
+                    joint.ParentOldTmp = ros_name(self.get_link(joint.Parent))
 
                 # Avoid recursive recompute.
                 # Doesn't change the value if in the new enum.
@@ -651,7 +651,7 @@ class RobotProxy(ProxyBase):
 
                 # backward compatability with label2 Child name
                 if joint.Child not in child_links and len(child_links) > 1: # len 1 is empty value - '', Child is empty if Parent not set yet
-                    joint.ChildOldTmp = ros_name(self.get_link(joint.Child, label1_first = False))
+                    joint.ChildOldTmp = ros_name(self.get_link(joint.Child))
 
                 # Avoid recursive recompute.
                 # Doesn't change the value if in the new enum.
