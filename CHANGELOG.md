@@ -1,3 +1,21 @@
+# RobotCAD — Release v12.10.4
+
+**Date:** 2026-10-23
+
+## Fixes
+
+- Fixed **joints of a re-imported model losing their parent/child links** when a copy of the same model (e.g. **fingeredu**) already exists in the document. FreeCAD uniquifies the duplicate labels (adding a `001` suffix), while [`set_joint_enum()`](freecad/cross/robot_proxy.py) builds the `Parent` / `Child` enumerations from the link labels but restored the previous value from its `Label2` (URDF) name, which is no longer part of the new enumeration. The value was therefore silently reset to `''` and the joints ended up with no parent/child. The previous value is now resolved to the label that is actually part of the new enumeration before restoring it ([`freecad/cross/robot_proxy.py`](freecad/cross/robot_proxy.py)).
+- Fixed the **wrong joint placement and link `MountedPlacement` of the duplicate copy** when the same model (e.g. **fingeredu**) is imported twice into one document (e.g. `finger_upper_to_middle_joint` off its correct position). [`_add_ros_joint()`](freecad/cross/robot_from_urdf.py) stored the raw **URDF** link names into `Parent` / `Child`, while [`_canonicalize_joint_axis()`](freecad/cross/robot_from_urdf.py) and [`_set_child_placement()`](freecad/cross/robot_from_urdf.py) resolve those links through [`ros_name()`](freecad/cross/wb_utils.py) (the label). Because FreeCAD uniquifies the duplicate labels (adding a `001` suffix), the resolution failed and the axis-canonicalization and child-placement compensation silently did nothing, leaving the joints and links of the copy with wrong `Origin` / `MountedPlacement`. The URDF names are now resolved to the labels of the robot's own links before assigning `Parent` / `Child` ([`freecad/cross/robot_from_urdf.py`](freecad/cross/robot_from_urdf.py)).
+
+---
+
+### Commits
+
+- `445cb30` — bump version
+- `e833b66` — fix error when import duplicated urdf to same document (same error occurs in models library when import model duplicate to same document)
+
+---
+
 # RobotCAD — Release v12.10.3
 
 **Date:** 2026-10-06
