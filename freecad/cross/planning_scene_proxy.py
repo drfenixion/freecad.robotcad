@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from xml.etree import ElementTree as et
 
 import FreeCAD as fc
@@ -37,7 +37,7 @@ class PlanningSceneProxy(ProxyBase):
     def __init__(
         self,
         obj: CrossPlanningScene,
-        planning_scene_msg: Optional[PlanningSceneMsg] = None,
+        planning_scene_msg: PlanningSceneMsg | None = None,
     ):
         super().__init__(
             'scene',
@@ -95,7 +95,7 @@ class PlanningSceneProxy(ProxyBase):
         if self.scene.ViewObject and self.scene.ViewObject.Proxy:
             self.scene.ViewObject.Proxy.draw()
 
-    def export_urdf(self, interactive: bool = False) -> Optional[et.Element]:
+    def export_urdf(self, interactive: bool = False) -> et.Element | None:
         """Export the scene as URDF, writing files."""
         xml = et.fromstring('<robot/>')
         return xml
@@ -240,7 +240,7 @@ class _ViewProviderPlanningScene(ProxyBase):
 def make_planning_scene(
         name: str,
         planning_scene_msg: PlanningSceneMsg,
-        doc: Optional[fc.Document] = None,
+        doc: fc.Document | None = None,
 ) -> CrossPlanningScene:
     """Add a Cross::PlanningScene to the current document."""
     if doc is None:

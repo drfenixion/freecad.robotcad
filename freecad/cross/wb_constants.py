@@ -1,6 +1,18 @@
 """Global workbench constants. Excluded from wb_globals.py with reason eliminate circular dependency"""
 
+from pathlib import Path
 import FreeCAD as fc
+
+
+# Paths.
+# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
+MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
+# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
+MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad'
+if MOD_PATH_IN_USER_SHARE_DIR.exists():
+    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
+else:
+    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
 
 
 def str_to_bool(s: str) -> bool:
@@ -11,6 +23,7 @@ def str_to_bool(s: str) -> bool:
 PREFS_CATEGORY = 'RobotCAD'  # Category in the preferences dialog.
 PREF_VHACD_PATH = 'vhacd_path'  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = 'overcross_token'  # Auth token for external code generator
+PREF_ALIGN_Z_AXIS_LCS = 'align_z_axis_lcs'  # Align Z-axis of LCS to zero rotation (affects Set Placement tools and New LCS tool)
 WORKBENCH_NAME = 'RobotCAD - ROS2'
 
 lcs_wrapper_prefix = "LCS wrapper "

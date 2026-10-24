@@ -1,0 +1,67 @@
+# syntax=docker/dockerfile:1.4
+ARG BASE_IMAGE=robotcad/base:latest
+FROM ${BASE_IMAGE}
+
+ARG USER=$USER
+ARG UID=$(id -u)
+ARG GROUP=$USER
+ARG GID=$(id -g)
+ARG PASSWD=ubuntu
+ARG CONT_PATH_WS=/home/$USER/ros2/ros2_ws_with_freecad
+
+ENV PATH_TO_WS=$CONT_PATH_WS
+ENV USER=$USER
+ENV UID=$UID
+ENV GROUP=$GROUP
+ENV GID=$GID
+ENV PASSWD=$PASSWD
+ENV HOME=/home/$USER
+
+SHELL ["/bin/bash", "-c"]
+
+
+### Make path for FreeCAD mods
+RUN echo 'Make path for FreeCAD mods'
+RUN mkdir -p $HOME/.local/share/FreeCAD/Mod
+### END Make path for FreeCAD mods
+
+WORKDIR $PATH_TO_WS
+
+### Delete user if present with same UID as local
+RUN echo 'Delete user if present with same UID as local'
+RUN deluser --remove-home $(id -un $UID); exit 0
+### End delete user if present with same UID as local
+
+### Create user
+RUN echo 'Create user: $USER'
+RUN groupadd -g 110 render && \
+    getent group $GROUP || groupadd --force -g $GID $GROUP && \
+    useradd --create-home --shell /bin/bash --groups adm,sudo,video,render --uid $UID --gid $GID $USER && \
+    echo "$USER  ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    echo "$USER:$PASSWD" | chpasswd 2> /dev/null || echo "" && \
+    if [[ -d "/dev/snd" ]] ; then chgrp -R adm /dev/snd ; fi && \
+    export UBUNTU_USER_ID=$UID && \
+    mkdir -p -m 0700 /run/user/"${UBUNTU_USER_ID}" && \
+    chown $USER:$GROUP /run/user/"${UBUNTU_USER_ID}" && \
+    echo "export XDG_RUNTIME_DIR=/run/user/${UBUNTU_USER_ID}" >> ${HOME}/.profile
+### End create user
+
+### Change owner of pip and apt packages dir for install packages without sudo
+RUN echo 'Change owner of pip and apt packages dir'
+RUN chown -R $USER:$GROUP /usr/local/lib/python3.12/dist-packages && \
+    chown -R $USER:$GROUP /var/cache/apt/archives/ && \
+    chown -R $USER:$GROUP /var/lib/dpkg/ && \
+    chown -R $USER:$GROUP ${HOME} && \
+    chown -R $USER:$GROUP ${PATH_TO_WS}
+### END Change owner of pip and apt packages dir for install packages without sudo
+
+USER $USER
+
+### Build ROS packages
+RUN echo 'Build ROS packages...'
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install && \
+    echo ". /opt/ros/${ROS_DISTRO}/setup.bash" >> ${HOME}/.profile && \
+    echo ". ${PATH_TO_WS}/install/local_setup.bash" >> ${HOME}/.profile
+### Build ROS packages
+
+CMD ["bash", "-c", ". ./install/setup.bash && freecad"]

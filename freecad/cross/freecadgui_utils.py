@@ -6,13 +6,15 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 from copy import deepcopy
 import re
+import traceback
+from typing import Optional
 
 try:
-    from PySide import QtWidgets, QtGui
+    from PySide import QtWidgets, QtGui, QtCore
     from PySide.QtWidgets import QMessageBox
 except:
-    from PySide2 import QtWidgets, QtGui
-    from PySide2.QtWidgets import QMessageBox
+    from PySide6 import QtWidgets, QtGui, QtCore
+    from PySide6.QtWidgets import QMessageBox
 
 from .freecad_utils import copy_obj_geometry, get_subobjects_by_full_name
 from .freecad_utils import first_object_with_volume
@@ -343,6 +345,149 @@ def get_sorted_concated_names(objs: list[DO]) -> str:
     return objs_names_concated
 
 
+def refresh_objects_trees(objects: list[DO]) -> None:
+    """Rebuild the construction-tree nodes that hold the given objects.
+
+    FreeCAD's tree does not always rebuild a branch after the generated
+    children of an `App::Part` are deleted and recreated (for example when the
+    Real/Visual/Collision level of detail is toggled). The children then show
+    up at the root of the construction tree until the branch is expanded by
+    hand, even though they are still children of the part.
+
+    Expanding a branch makes FreeCAD re-query its children and show the objects
+    under their actual parent. Only the nodes that match `objects` are expanded
+    and then collapsed again, so the rest of the tree and the other documents
+    are left untouched.
+
+    Parameters
+    ----------
+    - objects: the document objects whose tree nodes hold the level-of-detail
+      objects that may fall to the root (typically the `App::Part`s referenced
+      by `Link.Real` / `Link.Visual` / `Link.Collision`).
+
+    The tree is iterated through its model, which works for a `QTreeWidget` as
+    well as for a model-based `QTreeView`. Only the matched node itself is
+    expanded (to reveal its direct children, which are the level-of-detail
+    objects that may have fallen to the root) and then collapsed again; its
+    descendants and the rest of the tree are left untouched. It does nothing
+    without GUI.
+
+    """
+    if not (hasattr(fc, 'GuiUp') and fc.GuiUp):
+        return
+    try:
+        main_window = fcgui.getMainWindow()
+    except Exception:
+        fc.Console.PrintError('refresh_objects_trees: cannot get main window\n')
+        fc.Console.PrintError(traceback.format_exc())
+        return
+
+    object_names: set[str] = set()
+    if objects:
+        for o in objects:
+            try:
+                if getattr(o, 'Name', None):
+                    object_names.add(o.Name)
+                if getattr(o, 'Label', None):
+                    object_names.add(o.Label)
+            except Exception:
+                pass
+
+    def _iter_indices(model):
+        """Yield the model index of every item, depth-first."""
+        stack = [QtCore.QModelIndex()]
+        while stack:
+            parent = stack.pop()
+            try:
+                rows = model.rowCount(parent)
+            except Exception:
+                continue
+            for row in range(rows):
+                idx = model.index(row, 0, parent)
+                if not idx.isValid():
+                    continue
+                yield idx
+                stack.append(idx)
+
+    def _index_name(model, idx) -> Optional[str]:
+        """Return the object name stored in a tree index, if any."""
+        for role in (QtCore.Qt.UserRole, QtCore.Qt.UserRole + 1,
+                     QtCore.Qt.UserRole + 2):
+            try:
+                data = model.data(idx, role)
+            except Exception:
+                continue
+            if isinstance(data, str) and data:
+                return data
+        return None
+
+    def _index_text(model, idx) -> Optional[str]:
+        """Return the display text of a tree index, if any."""
+        try:
+            data = model.data(idx, QtCore.Qt.DisplayRole)
+        except Exception:
+            return None
+        return data if isinstance(data, str) else None
+
+    def _refresh_index(tree, idx) -> None:
+        """Re-query the children of `idx` and restore `idx`'s own state.
+
+        Only `idx` itself is expanded (revealing its direct children, which are
+        the level-of-detail objects that may have fallen to the root) and then
+        collapsed again, so its descendants and the rest of the tree are left
+        untouched. `idx` is finally put back in the state it had before.
+        """
+        try:
+            was_expanded = tree.isExpanded(idx)
+        except Exception:
+            was_expanded = False
+        try:
+            tree.expand(idx)
+        except Exception:
+            return
+        try:
+            tree.collapse(idx)
+        except Exception:
+            pass
+        if was_expanded:
+            try:
+                tree.expand(idx)
+            except Exception:
+                pass
+
+    def _rebuild_trees() -> None:
+        try:
+            # `findChildren(QTreeView)` also returns the `QTreeWidget`
+            # subclasses FreeCAD uses for its document tree.
+            trees = main_window.findChildren(QtWidgets.QTreeView)
+        except Exception:
+            fc.Console.PrintError('refresh_objects_trees: cannot find tree views\n')
+            fc.Console.PrintError(traceback.format_exc())
+            return
+        for tree in trees:
+            try:
+                model = tree.model()
+                if model is None:
+                    # The document tree has no items yet.
+                    continue
+                if object_names:
+                    # Refresh only the nodes of the given objects (the
+                    # level-of-detail sources). The tree is iterated through its
+                    # model, which works for a `QTreeWidget` as well as for a
+                    # model-based `QTreeView` such as `DocumentTreeItems`.
+                    for idx in _iter_indices(model):
+                        name = _index_name(model, idx)
+                        text = _index_text(model, idx)
+                        if ((name in object_names)
+                                or (text in object_names)):
+                            _refresh_index(tree, idx)
+            except Exception:
+                fc.Console.PrintError('refresh_objects_trees: rebuild failed\n')
+                fc.Console.PrintError(traceback.format_exc())
+
+    _rebuild_trees()
+
+
 def get_progress_bar(title:str = '', min: int = 0, max: int = 0, show_percents:bool = True):
     # Create a progress bar
     progressBar = QtGui.QProgressBar()
@@ -357,6 +502,18 @@ def get_progress_bar(title:str = '', min: int = 0, max: int = 0, show_percents:b
     mw.statusBar().addWidget(progressBar, stretch=1)
 
     return progressBar
+
+
+def get_report_view_text() -> str:
+    """Get all console messages currently in the FreeCAD report view."""
+    try:
+        mw = fcgui.getMainWindow()
+        report_view = mw.findChild(QtWidgets.QTextEdit, "Report view")
+        if report_view:
+            return report_view.toPlainText()
+    except Exception:
+        pass
+    return ""
 
 
 def gui_process_events():
@@ -374,3 +531,19 @@ def ask_confirmation(title:str = '', text:str = '') -> bool:
     result = msg_box.exec_()
     
     return result == QMessageBox.Yes
+
+
+def show_notification(title, message):
+    # Получаем главное окно FreeCAD
+    mw = fcgui.getMainWindow()
+    
+    # Создаем окно сообщения
+    msg_box = QtWidgets.QMessageBox(mw)
+    msg_box.setIcon(QtWidgets.QMessageBox.Information) # Или Warning, Critical
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok)
+    
+    # Показываем окно
+    msg_box.exec_()
+    

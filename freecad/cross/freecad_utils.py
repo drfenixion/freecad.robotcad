@@ -6,6 +6,7 @@ from abc import ABC
 from copy import copy
 from dataclasses import dataclass
 from itertools import dropwhile
+import random
 import string
 from typing import Any, Iterable, Optional
 from typing import Dict, List, Tuple
@@ -20,7 +21,7 @@ from . import wb_constants
 try:
     from PySide import QtCore, QtGui
 except:
-    from PySide2 import QtCore, QtGui
+    from PySide6 import QtCore, QtGui
 
 
 try:
@@ -44,6 +45,7 @@ DOList = Iterable[DO]
 
 DATUM_TYPES = {
     'PartDesign::CoordinateSystem': 'LCS',
+    'Part::LocalCoordinateSystem': 'LCS',
     'Sketcher::SketchObject': 'Sketch',
     'PartDesign::Plane': 'Plane',
     'PartDesign::Line': 'Axis',
@@ -127,8 +129,9 @@ def set_param(
 
     if type(value) not in fun_map:
         raise ValueError('Unkown type')
-    
-    value = value.strip()
+
+    if type(value) is not bool:
+        value = value.strip()
 
     getattr(group, fun_map[type(value)])(param, value)
 
@@ -463,7 +466,7 @@ def first_object_with_volume_in_deepest_part(obj):
 
 def is_lcs(obj: DO) -> bool:
     """Return True if the object is a 'PartDesign::CoordinateSystem'."""
-    return is_derived_from(obj, 'PartDesign::CoordinateSystem')
+    return is_derived_from(obj, 'PartDesign::CoordinateSystem') or is_derived_from(obj, 'Part::LocalCoordinateSystem')
 
 
 def has_placement(obj: DO) -> bool:
@@ -632,12 +635,16 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
         
         # Step 3: Try to find the target object
         # Priority 1: Search directly in document (most reliable for datums)
-        target_name = sub_path[-1]
-        target_obj = doc.getObject(target_name)
+        # target_name = sub_path[-1]
+        # target_obj = doc.getObject(target_name)
+        # if target_obj:
+        #     return target_obj
         
-        if target_obj:
-            return target_obj
-        
+        for target_name in reversed(sub_path):
+            target_obj = doc.getObject(target_name)
+            if target_obj:
+                return target_obj
+
         # Priority 2: Try getSubObject with different retType values
         for ret_type in [3, 2, 0, None]:
             try:
@@ -761,7 +768,7 @@ def parse_freecad_path(path: str | tuple, doc: Optional[Any]) -> Dict[str, Any]:
     result['sub_path_str'] = '.'.join(result['sub_path'])
     return result
 
-def get_selected_shape_object(selection_obj):
+def get_selected_shape_object(selection_obj, return_linked_obj = True, doc = None):
     """
     Extracts the underlying shape object (e.g., Part::Box) from a SelectionObject,
     even if a sub-element like a face, edge, or vertex was selected.
@@ -769,7 +776,8 @@ def get_selected_shape_object(selection_obj):
     :param selection_obj: A SelectionObject obtained from Gui.Selection.getSelectionEx()
     :return: The Part::Feature object (or similar with a 'Shape' attribute), or None if not found
     """
-    doc = selection_obj.Document
+    if not doc:
+        doc = selection_obj.Document
     sub_names = selection_obj.SubElementNames  # e.g., ['camera_plate001.Box.Face2']
 
     # If no sub-elements are selected, return None
@@ -780,19 +788,20 @@ def get_selected_shape_object(selection_obj):
     full_sub_name = sub_names[0]
     parsed_path = parse_freecad_path(full_sub_name, doc)
 
-    # parts = full_sub_name.split('.')
-    # if len(parts) < 2:
-    #     return None
 
     # # Reconstruct the path to the actual shape object (without the sub-element suffix)
     obj_name = parsed_path['base_name']
 
     # Retrieve the object using the reconstructed path
     try:
-        shape_obj = doc.getObject(obj_name)
+        if parsed_path['object'] is not None and hasattr(parsed_path['object'], 'TypeId') and parsed_path['object'].TypeId != 'Part::TopoShape':
+            shape_obj = parsed_path['object']
+        else:
+            shape_obj = doc.getObject(obj_name)
+
         # Ensure it's a valid shape-bearing object
         if shape_obj and hasattr(shape_obj, 'Shape'):
-            if is_link(shape_obj):
+            if return_linked_obj and is_link(shape_obj):
                 return shape_obj.getLinkedObject(True)
             return shape_obj
     except Exception:
@@ -854,7 +863,7 @@ def get_local_path_in_external_assembly(reference, doc):
 def validate_types(
         objects: DOList,
         types: list[str],
-        respect_order: [bool | list[bool]] = False,
+        respect_order: bool | list[bool] = False,
         respect_count: bool = False,
 ) -> DOList:
     """Sort objects by required types.
@@ -862,10 +871,10 @@ def validate_types(
     Return a list of objects sorted by the order in `types`.
     If `respect_order` is True, the required type must be in the same order as
     the objects in the input list. If `respect_order` is a list of booleans, it
-    must have the same length as `types` and the strict order is only required if
-    the corresponding boolean is True.
-    Raises a RuntimeError if a listed type has no appropriate object in the input
-    list.
+    must have the same length as `types` and the strict order is only required
+    if the corresponding boolean is True.
+    Raises a RuntimeError if a listed type has no appropriate object in the
+    input list.
 
     If 'respect_order' is False and 'respect_count' is True then
     objects order will not controlled but count will.
@@ -1111,6 +1120,18 @@ class Material:
     density: Optional[fc.Units.Quantity] = None
 
 
+def getFreeCADversion():
+    # Get FreeCAD version: fc.Version() returns something like ['1', '0', '0', '1.0.0']
+    fc_version = fc.Version()
+    try:
+        major = int(fc_version[0])
+        minor = int(fc_version[1])
+    except:
+        major = 0
+        minor = 0
+    return major, minor
+
+
 def material_from_material_editor(
         card_path: str,
 ) -> Material:
@@ -1122,8 +1143,15 @@ def material_from_material_editor(
     """
     material = Material(card_path)
     material.card_path = card_path
+    from freecad.cross.vendor.fc_material_editor import MaterialEditor as MaterialEditor_1_1
     import MaterialEditor
-    material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+
+    major, minor = getFreeCADversion()
+    if (major, minor) >= (1, 1):
+        material_editor = MaterialEditor_1_1.MaterialEditor(card_path=card_path)
+    else:
+        material_editor = MaterialEditor.MaterialEditor(card_path=card_path)
+
     try:
         divider = 'Material/Resources/Materials/'
         first_key = next(iter(material_editor.cards))
@@ -1231,7 +1259,16 @@ def matrix_of_inertia(
                 commonMatrixOfInertia += parallel_axis_theorem(solid.Volume, r, solid.MatrixOfInertia)
         return commonMatrixOfInertia
     except (AttributeError, IndexError, RuntimeError):
-        pass
+        try:
+            check_shell_exist = obj.Shape.Shells[0]
+            commonMatrixOfInertia = fc.Matrix()
+            for shell in obj.Shape.Shells:
+                if shell.Volume > 0.0:
+                    r = shell.CenterOfGravity - obj.Shape.CenterOfGravity
+                    commonMatrixOfInertia += parallel_axis_theorem(shell.Volume, r, shell.MatrixOfInertia)
+            return commonMatrixOfInertia
+        except (AttributeError, IndexError, RuntimeError):  
+            pass
     return None
 
 
@@ -1363,3 +1400,8 @@ def get_compound(
     part_tmp.removeObjectsFromDocument()
     doc.removeObject(part_tmp.Name)
     return compound
+
+
+def get_random_postfix(random_str_len:int = 6):
+
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(random_str_len))

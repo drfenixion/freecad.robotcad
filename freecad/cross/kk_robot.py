@@ -576,15 +576,18 @@ class KKRobot:
         for i in range(len(self.kk_frames)):
             kk_joint = self.kk_frames[i]
             cross_joint = cross_joints[i]
-            parent_link, child_link = next(link_pair_iterator)
-            parent_name = ros_name(parent_link)
-            if cross_joint.Parent != parent_name:
-                # Implementation note: avoid recursion.
-                cross_joint.Parent = parent_name
-            child_name = ros_name(child_link)
-            if cross_joint.Child != child_name:
-                # Implementation note: avoid recursion.
-                cross_joint.Child = ros_name(child_link)
+
+            # DISABLED because works with it incorect (wrong Child/Parent) and looks like it works without it
+            # parent_link, child_link = next(link_pair_iterator)
+            # parent_name = ros_name(parent_link)
+            # if cross_joint.Parent != parent_name:
+            #     # Implementation note: avoid recursion.
+            #     cross_joint.Parent = parent_name
+            # child_name = ros_name(child_link)
+            # if cross_joint.Child != child_name:
+            #     # Implementation note: avoid recursion.
+            #     cross_joint.Child = ros_name(child_link)
+
             type_ = 'prismatic' if kk_joint.prismatic else 'revolute'
             if cross_joint.Type != type_:
                 # Implementation note: avoid recursion.

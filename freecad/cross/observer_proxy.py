@@ -53,6 +53,7 @@ class ObserverViewProxy:
     def on_attach(self) -> None:
         # `self.position` is not yet initialized, use `self.default_position`
         # for now. The view object will be updated in `on_start`.
+        # TODO: use a `disc_2d` instead of `text_2d`.
         (
             self.root_node,
             self.text_node,
@@ -89,7 +90,7 @@ class ObserverViewProxy:
     def on_position_changed(
             self,
     ) -> None:
-        """Callback when the `Position` property changes."""
+        """Callback after the `Position` property changed."""
         self.matrix_transform_node.matrix = coin.SbMatrix(
                0.0097401002,             0.0,             0.0, 0.0,
                         0.0,      0.00974009,     1.16877e-05, 0.0,
@@ -117,7 +118,7 @@ def make_observer(
         name: str,
         doc: Optional[fc.Document] = None,
 ) -> CrossObserver:
-    """Add a CrCrossObserver to the current document."""
+    """Add a CrossObserver to the current document."""
     if doc is None:
         doc = fc.activeDocument()
     if doc is None:

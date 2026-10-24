@@ -7,8 +7,9 @@ try:
     from .dynamic_ui.models_library import ModelsLibraryModalClass
     imports_ok = True
 except ImportError as e:
-    # TODO: Warn the user more nicely.
-    warn(str(e) + '. Models library tool is disabled.', gui=False)
+    # Reported when the workbench is activated, not at FreeCAD start-up.
+    from ..deferred_messages import add_message
+    add_message(str(e) + '. Models library tool is disabled.')
     imports_ok = False
 
 

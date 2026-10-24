@@ -792,9 +792,16 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
         # some types required to be replaced to more suited because can be more convenient to use
         replacement = wb_constants.ROS2_CONTROLLERS_PARAMS_TYPES_REPLACEMENTS
         for param_name, param in params.items():
-            try:
-                # param['type'] - KeyError trigger to recursion because type present only in leaf element
-                params[param_name]['type_fc'] = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[param['type']]
+            # leaf element has 'type' key, nested container does not
+            if isinstance(param, dict) and 'type' in param:
+                try:
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[param['type']]
+                except KeyError:
+                    # unknown type (f.e. 'none' for filter chains) - fallback to string
+                    warn('Unknown parameter type "' + str(param['type']) + '" for parameter "' + param_name + '". Using string type.')
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP['string']
+
+                params[param_name]['type_fc'] = type_fc
                 params[param_name]['type_fc_origin'] = param['type_fc']
                 if 'default_value' in param:
                     params[param_name]['default_value_origin'] = param['default_value']
@@ -806,10 +813,14 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
                     # some types of replaced params must have other default value
                     if 'default_value_replace' in replacement[full_param_name]:
                         params[param_name]['default_value'] = replacement[full_param_name]['default_value_replace']
-            except KeyError:
+            elif isinstance(param, dict):
+                # nested container without type - go recursion
                 param_name_prefix.append(param_name)
                 params[param_name] = add_fc_types_based_on_params_types(param, param_name_prefix)
                 param_name_prefix.pop()
+            else:
+                # unexpected scalar value - skip
+                warn('Unexpected parameter value for "' + param_name + '". Parameter was skipped.')
 
         return params
 

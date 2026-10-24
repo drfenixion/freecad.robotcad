@@ -42,7 +42,7 @@ def _add_fc_links(
     Parameters
     ----------
     - attached_collision_object: a FreeCAD object of type
-                                 Cross::CrossAttachedCollisionObject.
+                                 Cross::AttachedCollisionObject.
     - objects: the list of objects to potentially add.
 
     """
@@ -90,7 +90,7 @@ _OBJECT_TYPE = 'Cross::AttachedCollisionObject'
 )
 class AttachedCollisionObjectViewProxy:
 
-    def on_change(self, event: fpo.events.PropertyChangedEvent):
+    def on_change(self, event: fpo.events.PropertyChangedEvent) -> None:
         if event.property_name == 'Visibility':
             for o in event.view_provider.Object.Group:
                 o.ViewObject.Visibility = event.view_provider.Visibility

@@ -1,7 +1,8 @@
 import FreeCAD as fc
 
 import FreeCADGui as fcgui
-from freecad.cross.freecad_utils import is_assembly_from_assembly_wb
+from freecad.cross.freecad_utils import getFreeCADversion, is_assembly_from_assembly_wb
+from freecad.cross.freecadgui_utils import show_notification
 
 from ..gui_utils import tr
 from ..robot_proxy import make_filled_robot, make_filled_robot_from_assembly
@@ -38,10 +39,15 @@ class _NewRobotCommand:
         robot_name = 'Robot'
         sel = fcgui.Selection.getSelection()
         if len(sel) and is_assembly_from_assembly_wb(sel[0]):
-            doc.openTransaction(tr('Convert assembly to robot'))
-            assembly = fcgui.Selection.getSelection()[0]
-            make_filled_robot_from_assembly(assembly)
-            doc.commitTransaction()
+            major, minor = getFreeCADversion()
+            if (major, minor) >= (1, 1):
+                doc.openTransaction(tr('Convert assembly to robot'))
+                assembly = fcgui.Selection.getSelection()[0]
+                make_filled_robot_from_assembly(assembly)
+                doc.commitTransaction()
+            else:
+                show_notification(title='FreeCAD is not supported in this version.', message='Assembly to Robot is not supported in this FreeCAD version.\nUpdate FreeCAD to 1.1 or upper.')
+
         elif len(sel):
             doc.openTransaction(tr('Make filled robot'))
             make_filled_robot(robot_name)

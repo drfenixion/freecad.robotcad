@@ -172,7 +172,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 obj_to_subobj_middle_wrap_diff = fc.Placement()
 
             bound = createBound(collision_source_obj)
-            doc.removeObject(collision_source_obj.Name)
+            collision_source_obj.Document.removeObject(collision_source_obj.Name)
             
             if bound:
                 boundWrapper, bound = make_bound_obj_wrapper(
@@ -186,6 +186,7 @@ def createBoundObjects(createBoundFunc = createBoundBox):
                 warn('Can not create collision for object - '+obj.Label+'('+obj.Name+'). Maybe it does not contain any body.')
 
         doc.commitTransaction()
+        doc.recompute()
     else:
         fc.Console.PrintMessage("Select an object !"+"\n")
 
@@ -208,12 +209,14 @@ class WbSettingsGetter:
         self.ros_workspace = self._old_ros_workspace
         self.vhacd_path = _get_vhacd_path(self, self._old_vhacd_path)
         self.overcross_token = get_workbench_param(wb_globals.PREF_OVERCROSS_TOKEN, '')
+        self.align_z_axis_lcs = get_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, True)
 
     def get_settings(
         self,
         get_ros_workspace: bool = True,
         get_vhacd_path: bool = True,
         get_overcross_token: bool = True,
+        get_align_z_axis_lcs: bool = True,
     ) -> bool:
         """Get the settings for this workbench.
 
@@ -231,6 +234,8 @@ class WbSettingsGetter:
             self.form.widget_vhacd_path.hide()
         if not get_overcross_token:
             self.form.widget_overcross_token.hide()
+        if not get_align_z_axis_lcs:
+            self.form.widget_align_z_axis_lcs.hide()
         self.form.adjustSize()
 
         self.form.lineedit_workspace.setText(str(self.ros_workspace))
@@ -245,8 +250,18 @@ class WbSettingsGetter:
 
         self.form.lineedit_overcross_token.setText(str(self.overcross_token))
 
+        self.form.checkbox_align_z_axis_lcs.setChecked(self.align_z_axis_lcs)
+
         self.form.button_box.accepted.connect(self.on_ok)
         self.form.button_box.rejected.connect(self.on_cancel)
+
+        if hasattr(self.form, 'button_check_dependencies'):
+            self.form.button_check_dependencies.clicked.connect(
+                self.on_button_check_dependencies,
+            )
+        
+        # Hook for subclasses to add extra connections before exec_()
+        self._on_form_loaded()
 
         if self.form.exec_():
             return True
@@ -254,6 +269,13 @@ class WbSettingsGetter:
         # FreeCAD.
         self.form.close()
         return False
+    
+    def _on_form_loaded(self):
+        """Hook method called after form is loaded but before exec_().
+        
+        Override this in subclasses to add extra UI elements or connections.
+        """
+        pass
 
     def get_ros_workspace(
         self,
@@ -274,6 +296,15 @@ class WbSettingsGetter:
         if self.get_settings(get_ros_workspace=False, get_vhacd_path=True):
             return self.vhacd_path
         return self._old_vhacd_path
+
+    def on_button_check_dependencies(self):
+        """Open the interactive dependencies check/install dialog.
+
+        The dialog only lists the packages; installation starts when the user
+        clicks the "Install missing" button.
+        """
+        from .ui.dependencies_dialog import open_dependencies_dialog
+        open_dependencies_dialog(parent=self.form, auto_install=False)
 
     def on_button_browse_workspace(self):
         path = QtGui.QFileDialog.getExistingDirectory(
@@ -308,6 +339,8 @@ class WbSettingsGetter:
             self.vhacd_path = vhacd_path
 
         self.overcross_token = self.form.lineedit_overcross_token.text()
+
+        self.align_z_axis_lcs = bool(self.form.checkbox_align_z_axis_lcs.isChecked())
 
     def on_cancel(self):
         if hasattr(self, '_old_ros_workspace'):

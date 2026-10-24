@@ -1,19 +1,5 @@
-#  This library is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU Lesser General Public
-#  License as published by the Free Software Foundation; either
-#  version 2.1 of the License, or (at your option) any later version.
-#
-#  This library is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-#  Lesser General Public License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public
-#  License along with this library; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-#
-#  (c) 2024 Frank David Martínez Muñoz.
-#
+# SPDX-License: LGPL-3.0-or-later
+# (c) 2024 Frank David Martínez Muñoz. <mnesarco at gmail.com>
 
 # ruff: noqa: A002
 # ruff: noqa: D102, D106, D401
@@ -28,9 +14,10 @@ from __future__ import annotations
 __author__ = "Frank David Martínez Muñoz"
 __copyright__ = "(c) 2024 Frank David Martínez Muñoz."
 __license__ = "LGPL 2.1"
-__version__ = "1.0.0-beta5"
+__version__ = "1.0.0-beta6"
 __min_python__ = "3.10"
 __min_freecad__ = "0.22"
+__contributors__ = "Gaël Écorchard"
 
 
 # Conventions for sections in this file:
@@ -53,13 +40,13 @@ import re
 import sys
 import textwrap
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
     Generic,
     Protocol,
@@ -74,7 +61,7 @@ from FreeCAD import (  # type: ignore[all]
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import Generator, Hashable, Iterable
 
     from Part import Shape  # type: ignore[all]
 
@@ -118,7 +105,7 @@ class events:
     @dataclass
     class AttachEvent:
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class CreateEvent:
@@ -127,7 +114,7 @@ class events:
     @dataclass
     class StartEvent:
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class DocumentRestoredEvent:
@@ -142,29 +129,29 @@ class events:
     @dataclass
     class PropertyChangedEvent(Generic[PT]):
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
         property_name: str
         old_value: events.PT | None
         new_value: events.PT | None
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class PropertyWillChangeEvent(Generic[PT]):
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
         property_name: str
         value: events.PT | None
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class SerializeEvent:
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
         state: dict[str, Any]
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class DeserializeEvent:
         source: DocumentObject
-        view_provider: ViewProviderDocumentObject | None
         state: dict[str, Any]
+        view_provider: ViewProviderDocumentObject | None = None
 
     @dataclass
     class RemoveEvent:
@@ -222,84 +209,6 @@ class events:
         view_provider: ViewProviderDocumentObject
         dragged_object: DocumentObject
 
-
-##: Typing For documentation purposes
-##: ────────────────────────────────────────────────────────────────────────────
-class DataProxy(Protocol):
-    """
-    Documentation only protocol to illustrate the method signatures.
-
-    All methods are optional. And Events are also optional in most cases.
-    """
-
-    def on_create(self, event: events.CreateEvent) -> None: ...
-    def on_extension(self, event: events.ExtensionEvent) -> None: ...
-    def on_attach(self, event: events.AttachEvent) -> None: ...
-    def on_start(self, event: events.StartEvent) -> None: ...
-    def on_restore(self, event: events.DocumentRestoredEvent) -> None: ...
-    def on_execute(self, event: events.ExecuteEvent) -> None: ...
-    def on_change(self, event: events.PropertyChangedEvent) -> None: ...
-    def on_before_change(self, event: events.PropertyWillChangeEvent) -> None: ...
-    def on_serialize(self, event: events.SerializeEvent) -> None: ...
-    def on_deserialize(self, event: events.DeserializeEvent) -> None: ...
-    def on_remove(self, event: events.RemoveEvent) -> None: ...
-    def is_dirty(self) -> bool: ...
-    def on_migrate_class(self, event: events.MigrationEvent) -> None: ...
-    def on_migrate_upgrade(self, event: events.MigrationEvent) -> None: ...
-    def on_migrate_downgrade(self, event: events.MigrationEvent) -> None: ...
-    def on_migrate_complete(self, event: events.MigrationEvent) -> None: ...
-    def on_migrate_error(self, event: events.MigrationEvent) -> None: ...
-
-    @property
-    def Object(self) -> DocumentObject: ...
-
-    @property
-    def ViewObject(self) -> ViewProviderDocumentObject: ...
-
-
-class ViewProxy(Protocol):
-    """
-    Documentation only protocol to illustrate the method signatures.
-
-    All methods are optional. And Events are also optional in most cases.
-    """
-
-    def on_create(self, event: events.CreateEvent) -> None: ...
-    def on_attach(self, event: events.AttachEvent) -> None: ...
-    def on_start(self, event: events.StartEvent) -> None: ...
-    def on_serialize(self, event: events.SerializeEvent) -> None: ...
-    def on_deserialize(self, event: events.DeserializeEvent) -> None: ...
-    def on_change(self, event: events.PropertyChangedEvent) -> None: ...
-    def on_before_change(self, event: events.PropertyWillChangeEvent) -> None: ...
-
-    def on_context_menu(self, event: events.ContextMenuEvent) -> None: ...
-    def icon(self) -> str | None: ...
-    def set_display_mode(self, mode: str) -> str: ...
-    def display_modes(self) -> list[str]: ...
-    def default_display_mode(self) -> str: ...
-
-    def on_claim_children(self, event: events.ClaimChildrenEvent) -> None: ...
-    def on_edit_start(self, event: events.EditStartEvent) -> bool | None: ...
-    def on_edit_end(self, event: events.EditEndEvent) -> bool | None: ...
-    def on_delete(self, event: events.DeleteEvent) -> bool: ...
-    def on_dbl_click(self, event: events.DoubleClickEvent) -> bool: ...
-    def on_object_change(self, event: events.DataChangedEvent) -> None: ...
-
-    def can_drag_objects(self) -> bool: ...
-    def can_drop_objects(self) -> bool: ...
-    def can_drag_object(self, event: events.DragAndDropEvent) -> bool: ...
-    def can_drop_object(self, event: events.DragAndDropEvent) -> bool: ...
-    def on_drag_object(self, event: events.DragAndDropEvent) -> None: ...
-    def on_drop_object(self, event: events.DragAndDropEvent) -> None: ...
-
-    @property
-    def Object(self) -> DocumentObject: ...
-
-    @property
-    def ViewObject(self) -> ViewProviderDocumentObject: ...
-
-
-Proxy: TypeAlias = DataProxy | ViewProxy
 
 ##: Defined symbols
 ##: ────────────────────────────────────────────────────────────────────────────
@@ -367,7 +276,11 @@ def _f_arity(func: Callable) -> int:
 # ──────────────────────────────────────────────────────────────────────────────
 def _m_arity(method: Callable) -> int:
     """Return the number of arguments of a method (arity - 1)."""
-    return _f_arity(method) - 1
+    n = _f_arity(method) - 1
+    if n < 0:
+        msg = "Invalid method signature"
+        raise ValueError(msg)
+    return n
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -379,7 +292,7 @@ def _call(obj: Any, name: str, *args: tuple, **kwargs: dict) -> Any:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-def _snake_to_camel(text: str) -> str | None:
+def _snake_to_camel(text: str | None) -> str | None:
     """Transform text from snake naming to camel case."""
     if text:
         return "".join(token.capitalize() for token in text.split("_"))
@@ -396,31 +309,58 @@ def _resolve_uri(path: str, base_dir: Path | None = None) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-def _prop_constructor(prop_type: str) -> Callable:
+_Pct = TypeVar("_Pct")
+
+
+def _property_and_meta(prop: Property) -> tuple[Property, property]:
+    """Create an additional property to retrieve the property meta."""
+
+    @property
+    def _get_meta(target: Proxy) -> PropertyMeta:
+        """Return updatable metadata of the property."""
+        return PropertyMeta(prop, target.__so_ref__)
+
+    return prop, _get_meta
+
+
+class _prop_constructor(Generic[_Pct]):  # Allow return inferred return type
     """Create a constructor for a specific Property Type."""
 
-    def constructor(
+    def __init__(self, prop_type: str, py_type: type[_Pct] = str) -> None:
+        self.prop_type = prop_type
+        self.py_type = py_type
+
+    def __call__(
+        self,
         *,
         name: str | None = None,
         section: str = "Data",
-        default: Any = None,
+        default: _Pct | None = None,
         description: str = "",
-        mode: PropertyMode = PropertyMode.Default,
+        mode: PropertyMode | None = None,
         observer_func: Callable | None = None,
         link_property: str | bool = False,
-    ) -> Property:
-        return Property(
-            type=prop_type,
+        meta: bool = False,
+    ) -> Property[_Pct] | tuple[Property[_Pct], PropertyMeta]:
+        """
+        Real Type is: Property[_Pct] | tuple[Property[_Pct], property].
+
+        Function type is faked to allow property code completion.
+        """
+        prop = Property(
+            type=self.prop_type,
             section=section,
             observer_func=observer_func,
             name=name,
             link_property=link_property,
             default=default,
             description=description,
-            mode=mode,
+            mode=PropertyMode.Default if mode is None else mode,
         )
 
-    return constructor
+        if meta:
+            return _property_and_meta(prop)
+        return prop
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -506,22 +446,69 @@ class FeatureState(_DocIntEnum):
 class PropertyMode(_DocIntEnum):
     """Property mode flags."""
 
-    Default = 0, "No special property type"
-    ReadOnly = 1, "Property is read-only in the editor"
-    Transient = 2, "Property won't be saved to file"
-    Hidden = 4, "Property won't appear in the editor"
-    Output = 8, "Modified property doesn't touch its parent container"
-    NoRecompute = 16, "Modified property doesn't touch its container for recompute"
-    NoPersist = 32, "Property won't be saved to file at all"
+    # fmt: off
+    Default = 0,       "No special property type"
+    ReadOnly = 1,      "Property is read-only in the editor"
+    Transient = 2,     "Property won't be saved to file"
+    Hidden = 4,        "Property won't appear in the editor"
+    Output = 8,        "Modified property doesn't touch its parent container"
+    NoRecompute = 16,  "Modified property doesn't touch its container for recompute"
+    NoPersist = 32,    "Property won't be saved to file at all"
+    # fmt: on
 
 
 ##% ────────────────────────────────────────────────────────────────────────────
 class PropertyEditorMode(_DocIntEnum):
     """Editor Modes."""
 
-    Default = 0, "No special mode"
-    ReadOnly = 1, "Property is read only in the editor"
-    Hidden = 2, "Property is hidden in the editor"
+    # fmt: off
+    Default = 0,   "No special mode"
+    ReadOnly = 1,  "Property is read only in the editor"
+    Hidden = 2,    "Property is hidden in the editor"
+    # fmt: on
+
+
+class PropertyStatus(_DocIntEnum):
+    """Property status managed by setPropertyStatus/getPropertyStatus."""
+
+    # fmt: off
+    Touched = 0,             "touched property"
+    Immutable = 1,           "can't modify property"
+    ReadOnly = 2,            "for property editor"
+    Hidden = 3,              "for property editor"
+    Transient = 4,           "for property container save"
+    MaterialEdit = 5,        "to turn ON PropertyMaterial edit"
+    NoMaterialListEdit = 6,  "to turn OFF PropertyMaterialList edit"
+    Output = 7,              "same effect as Prop_Output"
+    LockDynamic = 8,         "prevent being removed from dynamic property"
+    NoModify = 9,            "prevent causing Gui::Document::setModified()"
+    PartialTrigger = 10,     "allow change in partial doc"
+    NoRecompute = 11,        "don't touch owner for recompute on property change"
+    Single = 12,             "for save/load of floating point numbers"
+    Ordered = 13,            "for PropertyLists whether the order of the elements is relevant for the container using it"  # noqa: E501
+    EvalOnRestore = 14,      "In case of expression binding, evaluate the expression on restore and touch the object on value change."  # noqa: E501
+    Busy = 15,               "internal use to avoid recursive signaling"
+    CopyOnChange = 16,       "for Link to copy the linked object on change of the property with this flag"  # noqa: E501
+    UserEdit = 17,           "cause property editor to create button for user defined editing"
+
+    # The following bits are corresponding to PropertyType set when the
+    # property added. These types are meant to be static, and cannot be
+    # changed in runtime. It is mirrored here to save the linear search
+    # required in PropertyContainer::getPropertyType()
+
+    PropDynamic = 21,      "indicating the property is dynamically added"
+    PropNoPersist = 22,    "corresponding to Prop_NoPersist"
+    PropNoRecompute = 23,  "corresponding to Prop_NoRecompute"
+    PropReadOnly = 24,     "corresponding to Prop_ReadOnly"
+    PropTransient = 25,    "corresponding to Prop_Transient"
+    PropHidden = 26,       "corresponding to Prop_Hidden"
+    PropOutput = 27,       "corresponding to Prop_Output"
+
+    User1 = 28,  "user-defined status"
+    User2 = 29,  "user-defined status"
+    User3 = 30,  "user-defined status"
+    User4 = 31,  "user-defined status"
+    # fmt: on
 
 
 ##% ────────────────────────────────────────────────────────────────────────────
@@ -551,7 +538,10 @@ class EditMode(_DocIntEnum):
 
 
 ##% ────────────────────────────────────────────────────────────────────────────
-class Property:
+_PT = TypeVar("_PT")
+
+
+class Property(Generic[_PT]):
     """
     Proxy object to create, access and manipulate remote freecad properties.
 
@@ -565,11 +555,12 @@ class Property:
     name: str  # Actual name of the property
     link_property: str | bool  # Name of the Link Property to configure
     section: str  # Capitalized single word due to FC limitations
-    default: Any  # Initial value
+    default: _PT  # Initial value
     description: str  # GUI description
     mode: PropertyMode  # PropertyEditor mode for the property
-    enum: Enum  # Type of enum used by "App::PropertyEnumeration"
-    options: Callable  # Callable that provides a list of options
+    enum: type[Enum]  # Type of enum used by "App::PropertyEnumeration"
+    options: Callable  # Callable that provides a list of options, either
+                       # as options() or options(obj)
 
     # ──────────
     def __init__(  # noqa: D107
@@ -581,10 +572,10 @@ class Property:
         observer_func: Callable | None = None,
         name: str | None = None,
         link_property: str | bool = False,
-        default: Any = None,
+        default: _Pct | None = None,
         description: str = "",
         mode: PropertyMode = PropertyMode.Default,
-        enum: Enum | None = None,
+        enum: type[Enum] | None = None,
         options: Callable | None = None,
     ) -> None:
         self.type = type
@@ -597,7 +588,7 @@ class Property:
         self.link_property = link_property
         self.default = default
         self.description = description
-        self.mode = mode
+        self.mode = PropertyMode.Default if mode is None else mode
         self.enum = enum
         self.options = options
 
@@ -619,7 +610,10 @@ class Property:
             if self.enum:
                 setattr(fp, self.name, [str(e.value) for e in list(self.enum)])
             elif self.options:
-                setattr(fp, self.name, self.options())
+                if _f_arity(self.options) == 0:
+                    setattr(fp, self.name, self.options())
+                else:
+                    setattr(fp, self.name, self.options(fp))
             self.reset(fp)
 
     # ──────────
@@ -629,20 +623,24 @@ class Property:
             self.update(fp, self.default)
 
     # ──────────
-    def update(self, obj: ObjectRef, value: Any) -> None:
+    def update(self, obj: ObjectRef, value: _PT) -> None:
         """Set the value of the property in the remote object."""
-        if hasattr(obj, self.name):
-            if self.enum:
-                setattr(obj, self.name, str(value.value))
+        if not hasattr(obj, self.name):
+            return
+        if self.enum:
+            setattr(obj, self.name, str(value.value))
+            return
+        attr = getattr(obj, self.name)
+        if hasattr(attr, "Value"):
+            if isinstance(value, str):
+                attr.Value = App.Units.Quantity(value)
             else:
-                attr = getattr(obj, self.name)
-                if hasattr(attr, "Value"):
-                    attr.Value = value
-                else:
-                    setattr(obj, self.name, value)
+                attr.Value = value
+            return
+        setattr(obj, self.name, value)
 
     # ──────────
-    def read(self, obj: ObjectRef) -> Any:
+    def read(self, obj: ObjectRef) -> _PT:
         """Get the value of the property from the remote object."""
         if hasattr(obj, self.name):
             v = getattr(obj, self.name)
@@ -658,16 +656,80 @@ class Property:
         return None
 
     # ──────────
-    def set_mode(self, obj: ObjectRef, mode: PropertyEditorMode) -> None:
+    def set_mode(self, obj: ObjectRef, mode: PropertyEditorMode | int | str | list[str]) -> None:
         """Change editor mode for the property."""
         if hasattr(obj, self.name):
             obj.setEditorMode(self.name, mode)
 
     # ──────────
-    def set_status(self, obj: ObjectRef, status: str) -> None:
+    def set_status(
+        self,
+        obj: ObjectRef,
+        status: str | int | PropertyStatus | list[str | int | PropertyStatus],
+    ) -> None:
         """Change editor status for the property."""
         if hasattr(obj, self.name):
             obj.setPropertyStatus(self.name, status)
+
+    if TYPE_CHECKING:
+        # This fake typing here is to allow code completion to infer the property type
+        def __get__(self, obj, obj_type=None) -> _PT: ...  # noqa: ANN001, D105
+        def __set__(self, obj, value: _PT) -> None: ...  # noqa: ANN001, D105
+
+
+##% ────────────────────────────────────────────────────────────────────────────
+class PropertyMeta:
+    """Property metadata proxy."""
+
+    prop: Property
+    target: ObjectRef
+
+    def __init__(self, property: Property, target: ObjectRef) -> None:
+        """Bounded property proxy to ObjectRef."""
+        self.prop = property
+        self.target = target
+
+    @property
+    def mode(self) -> list[str]:
+        return self.target.getEditorMode(self.prop.name)
+
+    @mode.setter
+    def mode(self, value: PropertyEditorMode | int | str | list[str]) -> None:
+        self.prop.set_mode(self.target, value)
+
+    @property
+    def status(self) -> list[PropertyStatus]:
+        return list(map(PropertyStatus, self.target.getPropertyStatus(self.prop.name)))
+
+    @status.setter
+    def status(self, value: str | int | PropertyStatus | list[str | int | PropertyStatus]) -> None:
+        self.prop.set_status(self.target, value)
+
+    @property
+    def enum(self) -> type[Enum] | None:
+        return self.prop.enum
+
+    @enum.setter
+    def enum(self, value: type[Enum]) -> None:
+        self.prop.enum = value
+        setattr(self.target, self.prop.name, [str(e.value) for e in list(value)])
+
+    @property
+    def options(self) -> list[str | int] | None:
+        return self.target.getEnumerationsOfProperty(self.prop.name)
+
+    @options.setter
+    def options(self, value: list[str | int]) -> None:
+        setattr(self.target, self.prop.name, list(map(str, value)))
+
+    @property
+    def description(self) -> str:
+        return self.target.getDocumentationOfProperty(self.prop.name)
+
+    @description.setter
+    def description(self, value: str) -> None:
+        self.prop.description = value
+        self.target.setDocumentationOfProperty(self.prop.name, value)
 
 
 ##% ────────────────────────────────────────────────────────────────────────────
@@ -1037,6 +1099,35 @@ class TypeMeta:
 
 
 ##% ────────────────────────────────────────────────────────────────────────────
+class UIValidator(Protocol):
+    """Validator for preferences."""
+
+    def setup(self, ui: Any) -> None: ...
+    def validate(self, value: Any) -> str | None: ...
+
+
+@dataclass
+class PreferencePreset:
+    """Preference variant under a preset name."""
+
+    preference: Preference
+    preset: str
+
+    def __post_init__(self) -> None:
+        """Sanitize preset name."""
+        if "/" in self.preset:
+            self.preset = self.preset.replace("/", "-")
+
+    def __call__(self, *, update: Any | None = None, default: Any = None):  # noqa: ANN204
+        return self.preference(update=update, default=default, preset=self.preset)
+
+    def read(self, default: Any = None) -> Any:
+        return self.preference.read(preset=self.preset, default=default)
+
+    def write(self, value: bool | float | str | None) -> None:
+        self.preference.write(value, preset=self.preset)
+
+
 @dataclass
 class Preference:
     """FreeCAD Preference."""
@@ -1047,11 +1138,24 @@ class Preference:
     value_type: type = None
     root: str = "BaseApp"
     many: bool = False
+    label: str | None = None
+    description: str | None = None
+    unit: str | None = None
+    options: dict[str, Hashable] | None = None
+    parser: Callable[[str], Any] | None = None
+    ui: str | None = None
+    ui_group: str | None = None
+    ui_page: str | None = None
+    ui_section: str | None = None
+    ui_exclude: bool = False
+    ui_validators: list[UIValidator] | None = None
 
     # ─────────
     def __post_init__(self) -> None:  # noqa: D105
         if self.value_type is None:
             self.value_type = type(self.default) if self.default is not None else str
+        if not self.label:
+            self.label = self.name
 
     # ─────────
     @property
@@ -1059,43 +1163,56 @@ class Preference:
         return f"User parameter:{self.root}/{self.group}"
 
     # ─────────
-    def read(self) -> Any:
-        group = App.ParamGet(self.group_key)
+    def read(self, *, preset: str | None = None, default: Any = None) -> Any:
+        if preset:
+            group = App.ParamGet(f"{self.group_key}/presets/{preset}")
+        else:
+            group = App.ParamGet(self.group_key)
+
         try:
             if self.value_type is bool:
                 v = group.GetBool(self.name)
-                return self.default if v is None else v
+                return (default or self.default) if v is None else v
             if self.value_type is int:
-                return group.GetInt(self.name) or self.default
+                return group.GetInt(self.name) or default or self.default
             if self.value_type is float:
-                return group.GetFloat(self.name) or self.default
+                return group.GetFloat(self.name) or default or self.default
             if self.value_type is str:
-                return group.GetString(self.name) or self.default
+                return group.GetString(self.name) or default or self.default
         except Exception:  # noqa: BLE001
             print_err(f"Error reading preference: {self}")
-        return self.default
+        return default or self.default
 
     # ─────────
     # Read/Write shortcut
-    def __call__(self, *args: tuple, **kwargs: dict) -> Any:
-        n = len(args)
-        if n == 0:
-            value = self.read()
-            if value is None and len(kwargs) > 0:
-                if len(kwargs) == 1 and "default" in kwargs:
-                    return kwargs["default"]
-                msg = "only 'default' named argument is acceptable"
-                raise NameError(msg)
+    # Changed in 1.0.0-beta5: for write, update name only arg is required
+    def __call__(
+        self,
+        *,
+        update: Any | None = None,
+        preset: str | None = None,
+        default: Any = None,
+    ) -> Any:
+        if update is None:
+            value = self.read(preset=preset)
+            if value is None and default:
+                return default
             return value
-        if n > 1:
-            msg = "This function accepts only one argument"
-            raise ValueError(msg)
-        self.write(args[0])
+        self.write(update, preset=preset)
         return None
 
     # ─────────
-    def write(self, value: bool | float | str | None) -> None:  # noqa: PLR0912
-        group = App.ParamGet(self.group_key)
+    def write(  # noqa: C901, PLR0912
+        self,
+        value: bool | float | str | None,
+        *,
+        preset: str | None = None,
+    ) -> None:
+        if preset:
+            group = App.ParamGet(f"{self.group_key}/presets/{preset}")
+        else:
+            group = App.ParamGet(self.group_key)
+
         try:
             if self.value_type is bool:
                 if value is None:
@@ -1118,7 +1235,19 @@ class Preference:
                 else:
                     group.SetString(self.name, self.value_type(value))
         except Exception:  # noqa: BLE001
-            print_err(f"Error writing preference: {self}")
+            print_err(
+                f"Error writing preference: {group}/{self.name} {self.value_type} = {value} {type(value)}",  # noqa: E501
+            )
+
+    # ─────────
+    def preset(self, name: str) -> PreferencePreset:
+        """Returns a new Preference based on self but stored in a different preset."""
+        return PreferencePreset(self, name)
+
+    # ─────────
+    def preset_names(self) -> list[str]:
+        group = App.ParamGet(f"{self.group_key}/presets")
+        return list(group.GetGroups())
 
     ##% ─────────
     class ParamObserver:
@@ -1160,13 +1289,61 @@ class Preference:
         return wrapper
 
 
+class Preferences:
+    """A set of preferences under a preset name."""
+
+    def __init__(
+        self,
+        preset: str = "Default",
+        copy_from: Preferences | None = None,
+    ) -> None:
+        """
+        Create a preferences preset proxy.
+
+        :param str preset: name of the preset, defaults to "Default"
+        :param Preferences | None copy_from: optional name of an existing preset, defaults to None
+        """
+        self.preset = preset
+        for name, pref in self.declared_preferences():
+            setattr(self, name, pref.preset(preset))
+
+        if isinstance(copy_from, str):
+            copy_from = self.__class__(copy_from)
+
+        if isinstance(copy_from, Preferences):
+            copy_from.copy_to(self)
+
+    def copy_to(self, to: Preferences | str) -> Preferences:
+        to = self.__class__(to) if isinstance(to, str) else to
+        target = to.preset
+        for _name, pref in self.declared_preferences():
+            pref.write(pref.read(preset=self.preset), preset=target)
+        return to
+
+    @classmethod
+    def declared_preferences(cls) -> tuple[tuple[str, Preference], ...]:
+        if (value := getattr(cls, "_cached_preferences", None)) is not None:
+            return value
+
+        value = tuple(inspect.getmembers(cls, _is(Preference)))
+        cls._cached_preferences = value
+        return value
+
+    def preset_names(self) -> list[str]:
+        presets: set[str] = {"Default"}
+        update = presets.update
+        for _name, pref in self.declared_preferences():
+            update(pref.preset_names())
+        return sorted(presets)
+
+
 ##@ ┌───────────────────────────────────────────────────────────────────────────┐
 ##@ │ Decorators                                                                │
 ##@ └───────────────────────────────────────────────────────────────────────────┘
 
 
 ##@ ────────────────────────────────────────────────────────────────────────────
-def proxy(
+def proxy(  # noqa: ANN201
     *,
     object_type: str = "App::FeaturePython",
     subtype: str | None = None,
@@ -1174,7 +1351,7 @@ def proxy(
     extensions: Iterable[str] | None = None,
     view_provider_name_override: str | None = None,
     version: int = 1,
-) -> Callable[[type], DataProxy]:
+):
     """
     Main decorator for DataProxy creation.
 
@@ -1183,8 +1360,12 @@ def proxy(
     # base dir is useful for relative resource lookup
     base_dir = Path(inspect.stack()[1].filename).parent
 
+    # Ensure object_type suffix
+    if not object_type.endswith("Python"):
+        object_type = f"{object_type}Python"
+
     # Actual decorator that applies all the required transformations to the class
-    def transformer(cls: type) -> DataProxy:
+    def transformer(cls: type):  # noqa: ANN202
         meta = TypeMeta(
             cls,
             object_type,
@@ -1215,6 +1396,7 @@ def proxy(
         t_dumps(meta)
         t_proxy_view_provider_name_override(meta)
         t_proxy_dirty(meta)
+        t_proxy_is_active(meta)
         return cls
 
     return transformer
@@ -1435,7 +1617,7 @@ def t_proxy_attach(_, meta: TypeMeta) -> GeneratedMethod:
 
         meta.apply_extensions(self, obj, _ON_ATTACH)
         if handler := _event_handler(meta.cls, _ON_ATTACH):
-            handler(self, events.AttachEvent(obj, obj.ViewObject))
+            handler(self, events.AttachEvent(obj, getattr(obj, "ViewObject", None)))
 
         self.__so_state__ = FeatureState.Creating
 
@@ -1450,7 +1632,7 @@ def t_proxy_attach(_, meta: TypeMeta) -> GeneratedMethod:
 
         meta.apply_extensions(self, obj, _ON_START)
         if handler := _event_handler(meta.cls, _ON_START):
-            handler(self, events.StartEvent(obj, obj.ViewObject))
+            handler(self, events.StartEvent(obj, getattr(obj, "ViewObject", None)))
 
         self.__so_state__ = FeatureState.Active
 
@@ -1524,7 +1706,7 @@ def t_proxy_restore(_, meta: TypeMeta) -> GeneratedMethod:
         meta.apply_extensions(self, obj, _ON_START)
         meta.ensure_properties(self, obj)
         if handler := _event_handler(meta.cls, _ON_START):
-            handler(self, events.StartEvent(obj))
+            handler(self, events.StartEvent(obj, getattr(obj, "ViewObject", None)))
 
         self.__so_state__ = FeatureState.Active
 
@@ -1554,7 +1736,15 @@ def t_proxy_before_change(_, meta: TypeMeta) -> GeneratedMethod:
             old_value = getattr(obj, prop_name, None)
             self.__so_old__[prop_name] = old_value
             if handler:
-                handler(self, events.PropertyWillChangeEvent(obj, None, prop_name, old_value))
+                handler(
+                    self,
+                    events.PropertyWillChangeEvent(
+                        obj,
+                        prop_name,
+                        old_value,
+                        getattr(obj, "ViewObject", None),
+                    ),
+                )
 
     return onBeforeChange
 
@@ -1569,7 +1759,13 @@ def t_proxy_change(_, meta: TypeMeta) -> GeneratedMethod:
             if new_value != old_value:
                 meta.apply_extensions(self, obj, _ON_CHANGE, prop_name)
                 prop = meta.property_lookup.get(prop_name, None)
-                event = events.PropertyChangedEvent(obj, None, prop_name, old_value, new_value)
+                event = events.PropertyChangedEvent(
+                    obj,
+                    prop_name,
+                    old_value,
+                    new_value,
+                    getattr(obj, "ViewObject", None),
+                )
                 if prop and prop.observer_func:
                     args = (self, event)[0 : prop.observer_arity]
                     prop.observer_func(*args)
@@ -1655,7 +1851,7 @@ def t_dumps(_, meta: TypeMeta) -> GeneratedMethod:
         if hasattr(self, "Type"):
             state["_Type"] = self.Type
         if handler := _event_handler(meta.cls, _ON_SERIALIZE):
-            handler(self, events.SerializeEvent(self.Object, self.ViewObject, state))
+            handler(self, events.SerializeEvent(self.Object, state, self.ViewObject))
         return state
 
     return dumps
@@ -1671,7 +1867,7 @@ def t_loads(_, meta: TypeMeta) -> GeneratedMethod:
         if isinstance(state, dict) and (_type := state.get("_Type")):
             self.Type = _type
         if handler := _event_handler(meta.cls, _ON_DESERIALIZE):
-            handler(self, events.DeserializeEvent(self.Object, self.ViewObject, state))
+            handler(self, events.DeserializeEvent(self.Object, state, self.ViewObject))
 
     return loads
 
@@ -1714,6 +1910,17 @@ def t_proxy_view_provider_name_override(_, meta: TypeMeta) -> GeneratedMethod:
     return None
 
 
+##$ ────────────────────────────────────────────────────────────────────────────
+@template(name="is_active", allow_override=True)
+def t_proxy_is_active(overridden: Any, _: TypeMeta) -> GeneratedMethod:
+    if overridden:
+        return overridden
+
+    def is_active(self: Any) -> bool:
+        return getattr(self, "__so_state__", None) == FeatureState.Active
+    return is_active
+
+
 ##$ ┌───────────────────────────────────────────────────────────────────────────┐
 ##$ │ ViewProxy Templates                                                       │
 ##$ └───────────────────────────────────────────────────────────────────────────┘
@@ -1722,7 +1929,8 @@ def t_proxy_view_provider_name_override(_, meta: TypeMeta) -> GeneratedMethod:
 ##$ ────────────────────────────────────────────────────────────────────────────
 @template(name="__init__", allow_override=True)
 def t_view_proxy_constructor(overridden: Any, _: TypeMeta) -> GeneratedMethod:
-    """Create the constructor for the ViewProxy.
+    """
+    Create the constructor for the ViewProxy.
 
     Calls the user defined constructor if any.
     If there is a user defined __init__, it must
@@ -1885,10 +2093,14 @@ def t_view_proxy_dbl_click(_, meta: TypeMeta) -> GeneratedMethod:
 @template(name="onChanged", override_error_msg=f"Use {_ON_CHANGE} instead")
 def t_view_proxy_change(_, meta: TypeMeta) -> GeneratedMethod:
     def onChanged(self: Any, vp: ViewProviderDocumentObject, prop_name: str) -> None:
+        data_proxy = getattr(vp.Object, "Proxy", None)
+        if getattr(data_proxy, "__so_state__", None) != FeatureState.Active:
+            return
+
         new_value = getattr(vp, prop_name, None)
         meta.apply_extensions(self, vp, _ON_CHANGE, prop_name)
         prop = meta.property_lookup.get(prop_name, None)
-        event = events.PropertyChangedEvent(vp.Object, vp, prop_name, None, new_value)
+        event = events.PropertyChangedEvent(vp.Object, prop_name, None, new_value, vp)
 
         if prop and prop.observer_func:
             args = (self, event)[0 : prop.observer_arity]
@@ -2207,141 +2419,174 @@ ExtensionSupport("PartGui::ViewProviderSplineExtensionPython")
 ##: Generated from <FreeCAD_sources>/src/App/Application.cpp
 ##: Supported Property types
 ##: ────────────────────────────────────────────────────────────────────────────
-PropertyAcceleration = _prop_constructor("App::PropertyAcceleration")
-PropertyAmountOfSubstance = _prop_constructor("App::PropertyAmountOfSubstance")
-PropertyAngle = _prop_constructor("App::PropertyAngle")
-PropertyArea = _prop_constructor("App::PropertyArea")
-PropertyBool = _prop_constructor("App::PropertyBool")
-PropertyBoolList = _prop_constructor("App::PropertyBoolList")
-PropertyColor = _prop_constructor("App::PropertyColor")
-PropertyColorList = _prop_constructor("App::PropertyColorList")
-PropertyComplexGeoData = _prop_constructor("App::PropertyComplexGeoData")
-PropertyCompressiveStrength = _prop_constructor("App::PropertyCompressiveStrength")
-PropertyCurrentDensity = _prop_constructor("App::PropertyCurrentDensity")
-PropertyDensity = _prop_constructor("App::PropertyDensity")
-PropertyDirection = _prop_constructor("App::PropertyDirection")
-PropertyDissipationRate = _prop_constructor("App::PropertyDissipationRate")
-PropertyDistance = _prop_constructor("App::PropertyDistance")
-PropertyDynamicViscosity = _prop_constructor("App::PropertyDynamicViscosity")
-PropertyElectricCharge = _prop_constructor("App::PropertyElectricCharge")
-PropertyElectricCurrent = _prop_constructor("App::PropertyElectricCurrent")
-PropertyElectricPotential = _prop_constructor("App::PropertyElectricPotential")
-PropertyElectricalCapacitance = _prop_constructor("App::PropertyElectricalCapacitance")
-PropertyElectricalConductance = _prop_constructor("App::PropertyElectricalConductance")
-PropertyElectricalConductivity = _prop_constructor("App::PropertyElectricalConductivity")
-PropertyElectricalInductance = _prop_constructor("App::PropertyElectricalInductance")
-PropertyElectricalResistance = _prop_constructor("App::PropertyElectricalResistance")
-PropertyExpressionEngine = _prop_constructor("App::PropertyExpressionEngine")
-PropertyFile = _prop_constructor("App::PropertyFile")
-PropertyFileIncluded = _prop_constructor("App::PropertyFileIncluded")
-PropertyFloat = _prop_constructor("App::PropertyFloat")
-PropertyFloatConstraint = _prop_constructor("App::PropertyFloatConstraint")
-PropertyFloatList = _prop_constructor("App::PropertyFloatList")
-PropertyFont = _prop_constructor("App::PropertyFont")
-PropertyForce = _prop_constructor("App::PropertyForce")
-PropertyFrequency = _prop_constructor("App::PropertyFrequency")
-PropertyGeometry = _prop_constructor("App::PropertyGeometry")
-PropertyHeatFlux = _prop_constructor("App::PropertyHeatFlux")
-PropertyInteger = _prop_constructor("App::PropertyInteger")
-PropertyIntegerConstraint = _prop_constructor("App::PropertyIntegerConstraint")
-PropertyIntegerList = _prop_constructor("App::PropertyIntegerList")
-PropertyIntegerSet = _prop_constructor("App::PropertyIntegerSet")
-PropertyInverseArea = _prop_constructor("App::PropertyInverseArea")
-PropertyInverseLength = _prop_constructor("App::PropertyInverseLength")
-PropertyInverseVolume = _prop_constructor("App::PropertyInverseVolume")
-PropertyKinematicViscosity = _prop_constructor("App::PropertyKinematicViscosity")
-PropertyLength = _prop_constructor("App::PropertyLength")
-PropertyLink = _prop_constructor("App::PropertyLink")
-PropertyLinkChild = _prop_constructor("App::PropertyLinkChild")
-PropertyLinkGlobal = _prop_constructor("App::PropertyLinkGlobal")
-PropertyLinkHidden = _prop_constructor("App::PropertyLinkHidden")
-PropertyLinkList = _prop_constructor("App::PropertyLinkList")
-PropertyLinkListChild = _prop_constructor("App::PropertyLinkListChild")
-PropertyLinkListGlobal = _prop_constructor("App::PropertyLinkListGlobal")
-PropertyLinkListHidden = _prop_constructor("App::PropertyLinkListHidden")
-PropertyLinkSub = _prop_constructor("App::PropertyLinkSub")
-PropertyLinkSubChild = _prop_constructor("App::PropertyLinkSubChild")
-PropertyLinkSubGlobal = _prop_constructor("App::PropertyLinkSubGlobal")
-PropertyLinkSubHidden = _prop_constructor("App::PropertyLinkSubHidden")
-PropertyLinkSubList = _prop_constructor("App::PropertyLinkSubList")
-PropertyLinkSubListChild = _prop_constructor("App::PropertyLinkSubListChild")
-PropertyLinkSubListGlobal = _prop_constructor("App::PropertyLinkSubListGlobal")
-PropertyLinkSubListHidden = _prop_constructor("App::PropertyLinkSubListHidden")
-PropertyLuminousIntensity = _prop_constructor("App::PropertyLuminousIntensity")
-PropertyMagneticFieldStrength = _prop_constructor("App::PropertyMagneticFieldStrength")
-PropertyMagneticFlux = _prop_constructor("App::PropertyMagneticFlux")
-PropertyMagneticFluxDensity = _prop_constructor("App::PropertyMagneticFluxDensity")
-PropertyMagnetization = _prop_constructor("App::PropertyMagnetization")
-PropertyMap = _prop_constructor("App::PropertyMap")
-PropertyMass = _prop_constructor("App::PropertyMass")
-PropertyMaterial = _prop_constructor("App::PropertyMaterial")
-PropertyMaterialList = _prop_constructor("App::PropertyMaterialList")
-PropertyMatrix = _prop_constructor("App::PropertyMatrix")
-PropertyMoment = _prop_constructor("App::PropertyMoment")
-PropertyPath = _prop_constructor("App::PropertyPath")
-PropertyPercent = _prop_constructor("App::PropertyPercent")
-PropertyPersistentObject = _prop_constructor("App::PropertyPersistentObject")
-PropertyPlacement = _prop_constructor("App::PropertyPlacement")
-PropertyPlacementLink = _prop_constructor("App::PropertyPlacementLink")
-PropertyPlacementList = _prop_constructor("App::PropertyPlacementList")
-PropertyPosition = _prop_constructor("App::PropertyPosition")
-PropertyPower = _prop_constructor("App::PropertyPower")
-PropertyPrecision = _prop_constructor("App::PropertyPrecision")
-PropertyPressure = _prop_constructor("App::PropertyPressure")
-PropertyPythonObject = _prop_constructor("App::PropertyPythonObject")
-PropertyQuantity = _prop_constructor("App::PropertyQuantity")
-PropertyQuantityConstraint = _prop_constructor("App::PropertyQuantityConstraint")
-PropertyRotation = _prop_constructor("App::PropertyRotation")
-PropertyShearModulus = _prop_constructor("App::PropertyShearModulus")
-PropertySpecificEnergy = _prop_constructor("App::PropertySpecificEnergy")
-PropertySpecificHeat = _prop_constructor("App::PropertySpecificHeat")
-PropertySpeed = _prop_constructor("App::PropertySpeed")
-PropertyStiffness = _prop_constructor("App::PropertyStiffness")
-PropertyStiffnessDensity = _prop_constructor("App::PropertyStiffnessDensity")
-PropertyStress = _prop_constructor("App::PropertyStress")
-PropertyString = _prop_constructor("App::PropertyString")
-PropertyStringList = _prop_constructor("App::PropertyStringList")
-PropertyTemperature = _prop_constructor("App::PropertyTemperature")
-PropertyThermalConductivity = _prop_constructor("App::PropertyThermalConductivity")
-PropertyThermalExpansionCoefficient = _prop_constructor("App::PropertyThermalExpansionCoefficient")
-PropertyThermalTransferCoefficient = _prop_constructor("App::PropertyThermalTransferCoefficient")
-PropertyTime = _prop_constructor("App::PropertyTime")
-PropertyUUID = _prop_constructor("App::PropertyUUID")
-PropertyUltimateTensileStrength = _prop_constructor("App::PropertyUltimateTensileStrength")
-PropertyVacuumPermittivity = _prop_constructor("App::PropertyVacuumPermittivity")
-PropertyVector = _prop_constructor("App::PropertyVector")
-PropertyVectorDistance = _prop_constructor("App::PropertyVectorDistance")
-PropertyVectorList = _prop_constructor("App::PropertyVectorList")
-PropertyVelocity = _prop_constructor("App::PropertyVelocity")
-PropertyVolume = _prop_constructor("App::PropertyVolume")
-PropertyVolumeFlowRate = _prop_constructor("App::PropertyVolumeFlowRate")
+PropertyAcceleration = _prop_constructor("App::PropertyAcceleration", float)
+PropertyAmountOfSubstance = _prop_constructor("App::PropertyAmountOfSubstance", float)
+PropertyAngle = _prop_constructor("App::PropertyAngle", float)
+PropertyArea = _prop_constructor("App::PropertyArea", float)
+PropertyBool = _prop_constructor("App::PropertyBool", bool)
+PropertyBoolList = _prop_constructor("App::PropertyBoolList", list[bool])
+PropertyColor = _prop_constructor("App::PropertyColor", tuple[float, float, float])
+PropertyColorList = _prop_constructor("App::PropertyColorList", list[tuple[float, float, float]])
+PropertyComplexGeoData = _prop_constructor("App::PropertyComplexGeoData", object)
+PropertyCompressiveStrength = _prop_constructor("App::PropertyCompressiveStrength", float)
+PropertyCurrentDensity = _prop_constructor("App::PropertyCurrentDensity", float)
+PropertyDensity = _prop_constructor("App::PropertyDensity", float)
+PropertyDirection = _prop_constructor("App::PropertyDirection", App.Vector)
+PropertyDissipationRate = _prop_constructor("App::PropertyDissipationRate", float)
+PropertyDistance = _prop_constructor("App::PropertyDistance", float)
+PropertyDynamicViscosity = _prop_constructor("App::PropertyDynamicViscosity", float)
+PropertyElectricCharge = _prop_constructor("App::PropertyElectricCharge", float)
+PropertyElectricCurrent = _prop_constructor("App::PropertyElectricCurrent", float)
+PropertyElectricPotential = _prop_constructor("App::PropertyElectricPotential", float)
+PropertyElectricalCapacitance = _prop_constructor("App::PropertyElectricalCapacitance", float)
+PropertyElectricalConductance = _prop_constructor("App::PropertyElectricalConductance", float)
+PropertyElectricalConductivity = _prop_constructor("App::PropertyElectricalConductivity", float)
+PropertyElectricalInductance = _prop_constructor("App::PropertyElectricalInductance", float)
+PropertyElectricalResistance = _prop_constructor("App::PropertyElectricalResistance", float)
+PropertyExpressionEngine = _prop_constructor("App::PropertyExpressionEngine", list[tuple[str, str]])
+PropertyFile = _prop_constructor("App::PropertyFile", str)
+PropertyFileIncluded = _prop_constructor("App::PropertyFileIncluded", str)
+PropertyFloat = _prop_constructor("App::PropertyFloat", float)
+PropertyFloatConstraint = _prop_constructor("App::PropertyFloatConstraint", float)
+PropertyFloatList = _prop_constructor("App::PropertyFloatList", list[float])
+PropertyFont = _prop_constructor("App::PropertyFont", object)
+PropertyForce = _prop_constructor("App::PropertyForce", float)
+PropertyFrequency = _prop_constructor("App::PropertyFrequency", float)
+PropertyGeometry = _prop_constructor("App::PropertyGeometry", object)
+PropertyHeatFlux = _prop_constructor("App::PropertyHeatFlux", float)
+PropertyInteger = _prop_constructor("App::PropertyInteger", int)
+PropertyIntegerConstraint = _prop_constructor("App::PropertyIntegerConstraint", int)
+PropertyIntegerList = _prop_constructor("App::PropertyIntegerList", list[int])
+PropertyIntegerSet = _prop_constructor("App::PropertyIntegerSet", set[int])
+PropertyInverseArea = _prop_constructor("App::PropertyInverseArea", float)
+PropertyInverseLength = _prop_constructor("App::PropertyInverseLength", float)
+PropertyInverseVolume = _prop_constructor("App::PropertyInverseVolume", float)
+PropertyKinematicViscosity = _prop_constructor("App::PropertyKinematicViscosity", float)
+PropertyLength = _prop_constructor("App::PropertyLength", float)
+PropertyLink = _prop_constructor("App::PropertyLink", DocumentObject)
+PropertyLinkChild = _prop_constructor("App::PropertyLinkChild", DocumentObject)
+PropertyLinkGlobal = _prop_constructor("App::PropertyLinkGlobal", DocumentObject)
+PropertyLinkHidden = _prop_constructor("App::PropertyLinkHidden", DocumentObject)
+PropertyLinkList = _prop_constructor("App::PropertyLinkList", list[DocumentObject])
+PropertyLinkListChild = _prop_constructor("App::PropertyLinkListChild", list[DocumentObject])
+PropertyLinkListGlobal = _prop_constructor("App::PropertyLinkListGlobal", list[DocumentObject])
+PropertyLinkListHidden = _prop_constructor("App::PropertyLinkListHidden", list[DocumentObject])
+PropertyLinkSub = _prop_constructor("App::PropertyLinkSub", tuple[DocumentObject, list[str]])
+PropertyLinkSubChild = _prop_constructor(
+    "App::PropertyLinkSubChild",
+    tuple[DocumentObject, list[str]],
+)
+PropertyLinkSubGlobal = _prop_constructor(
+    "App::PropertyLinkSubGlobal",
+    tuple[DocumentObject, list[str]],
+)
+PropertyLinkSubHidden = _prop_constructor(
+    "App::PropertyLinkSubHidden",
+    tuple[DocumentObject, list[str]],
+)
+PropertyLinkSubList = _prop_constructor(
+    "App::PropertyLinkSubList",
+    list[tuple[DocumentObject, list[str]]],
+)
+PropertyLinkSubListChild = _prop_constructor(
+    "App::PropertyLinkSubListChild",
+    list[tuple[DocumentObject, list[str]]],
+)
+PropertyLinkSubListGlobal = _prop_constructor(
+    "App::PropertyLinkSubListGlobal",
+    list[tuple[DocumentObject, list[str]]],
+)
+PropertyLinkSubListHidden = _prop_constructor(
+    "App::PropertyLinkSubListHidden",
+    list[tuple[DocumentObject, list[str]]],
+)
+PropertyLuminousIntensity = _prop_constructor("App::PropertyLuminousIntensity", float)
+PropertyMagneticFieldStrength = _prop_constructor("App::PropertyMagneticFieldStrength", float)
+PropertyMagneticFlux = _prop_constructor("App::PropertyMagneticFlux", float)
+PropertyMagneticFluxDensity = _prop_constructor("App::PropertyMagneticFluxDensity", float)
+PropertyMagnetization = _prop_constructor("App::PropertyMagnetization", float)
+PropertyMap = _prop_constructor("App::PropertyMap", dict)
+PropertyMass = _prop_constructor("App::PropertyMass", float)
+PropertyMaterial = _prop_constructor("App::PropertyMaterial", object)
+PropertyMaterialList = _prop_constructor("App::PropertyMaterialList", list[object])
+PropertyMatrix = _prop_constructor("App::PropertyMatrix", App.Matrix)
+PropertyMoment = _prop_constructor("App::PropertyMoment", float)
+PropertyPath = _prop_constructor("App::PropertyPath", str)
+PropertyPercent = _prop_constructor("App::PropertyPercent", float)
+PropertyPersistentObject = _prop_constructor("App::PropertyPersistentObject", object)
+PropertyPlacement = _prop_constructor("App::PropertyPlacement", App.Placement)
+PropertyPlacementLink = _prop_constructor("App::PropertyPlacementLink", App.Placement)
+PropertyPlacementList = _prop_constructor("App::PropertyPlacementList", list[App.Placement])
+PropertyPosition = _prop_constructor("App::PropertyPosition", App.Vector)
+PropertyPower = _prop_constructor("App::PropertyPower", float)
+PropertyPrecision = _prop_constructor("App::PropertyPrecision", float)
+PropertyPressure = _prop_constructor("App::PropertyPressure", float)
+PropertyPythonObject = _prop_constructor("App::PropertyPythonObject", object)
+PropertyQuantity = _prop_constructor("App::PropertyQuantity", float)
+PropertyQuantityConstraint = _prop_constructor("App::PropertyQuantityConstraint", float)
+PropertyRotation = _prop_constructor("App::PropertyRotation", App.Rotation)
+PropertyShearModulus = _prop_constructor("App::PropertyShearModulus", float)
+PropertySpecificEnergy = _prop_constructor("App::PropertySpecificEnergy", float)
+PropertySpecificHeat = _prop_constructor("App::PropertySpecificHeat", float)
+PropertySpeed = _prop_constructor("App::PropertySpeed", float)
+PropertyStiffness = _prop_constructor("App::PropertyStiffness", float)
+PropertyStiffnessDensity = _prop_constructor("App::PropertyStiffnessDensity", float)
+PropertyStress = _prop_constructor("App::PropertyStress", float)
+PropertyString = _prop_constructor("App::PropertyString", str)
+PropertyStringList = _prop_constructor("App::PropertyStringList", list[str])
+PropertyTemperature = _prop_constructor("App::PropertyTemperature", float)
+PropertyThermalConductivity = _prop_constructor("App::PropertyThermalConductivity", float)
+PropertyThermalExpansionCoefficient = _prop_constructor(
+    "App::PropertyThermalExpansionCoefficient",
+    float,
+)
+PropertyThermalTransferCoefficient = _prop_constructor(
+    "App::PropertyThermalTransferCoefficient",
+    float,
+)
+PropertyTime = _prop_constructor("App::PropertyTime", float)
+PropertyUUID = _prop_constructor("App::PropertyUUID", str)
+PropertyUltimateTensileStrength = _prop_constructor("App::PropertyUltimateTensileStrength", float)
+PropertyVacuumPermittivity = _prop_constructor("App::PropertyVacuumPermittivity", float)
+PropertyVector = _prop_constructor("App::PropertyVector", App.Vector)
+PropertyVectorDistance = _prop_constructor("App::PropertyVectorDistance", float)
+PropertyVectorList = _prop_constructor("App::PropertyVectorList", list[App.Vector])
+PropertyVelocity = _prop_constructor("App::PropertyVelocity", float)
+PropertyVolume = _prop_constructor("App::PropertyVolume", float)
+PropertyVolumeFlowRate = _prop_constructor("App::PropertyVolumeFlowRate", float)
 PropertyVolumetricThermalExpansionCoefficient = _prop_constructor(
     "App::PropertyVolumetricThermalExpansionCoefficient",
+    float,
 )
-PropertyWork = _prop_constructor("App::PropertyWork")
-PropertyXLink = _prop_constructor("App::PropertyXLink")
-PropertyXLinkList = _prop_constructor("App::PropertyXLinkList")
-PropertyXLinkSub = _prop_constructor("App::PropertyXLinkSub")
-PropertyXLinkSubHidden = _prop_constructor("App::PropertyXLinkSubHidden")
-PropertyXLinkSubList = _prop_constructor("App::PropertyXLinkSubList")
-PropertyYieldStrength = _prop_constructor("App::PropertyYieldStrength")
-PropertyYoungsModulus = _prop_constructor("App::PropertyYoungsModulus")
+PropertyWork = _prop_constructor("App::PropertyWork", float)
+PropertyXLink = _prop_constructor("App::PropertyXLink", DocumentObject)
+PropertyXLinkList = _prop_constructor("App::PropertyXLinkList", DocumentObject)
+PropertyXLinkSub = _prop_constructor("App::PropertyXLinkSub", DocumentObject)
+PropertyXLinkSubHidden = _prop_constructor("App::PropertyXLinkSubHidden", DocumentObject)
+PropertyXLinkSubList = _prop_constructor("App::PropertyXLinkSubList", list[DocumentObject])
+PropertyYieldStrength = _prop_constructor("App::PropertyYieldStrength", float)
+PropertyYoungsModulus = _prop_constructor("App::PropertyYoungsModulus", float)
 
 
 ##: Special constructor for Enumeration property type
 ##: ────────────────────────────────────────────────────────────────────────────
+_ET = TypeVar("_ET")
+
+
 def PropertyEnumeration(
-    enum: Enum,
+    enum: type[_ET],
+    *,
     name: str | None = None,
     section: str = "Data",
-    default: Any = None,
+    default: _ET | None = None,
     description: str = "",
     mode: PropertyMode = PropertyMode.Default,
     observer_func: Callable | None = None,
     link_property: str | None = None,
-) -> Property:
+    meta: bool = False,
+) -> Property[_ET] | tuple[Property[_ET], PropertyMeta]:
     """Create Enumeration Property."""
-    return Property(
+    prop = Property(
         type="App::PropertyEnumeration",
         section=section,
         observer_func=observer_func,
@@ -2353,11 +2598,16 @@ def PropertyEnumeration(
         enum=enum,
     )
 
+    if meta:
+        return _property_and_meta(prop)
+    return prop
+
 
 ##: Special constructor for Options property type
 ##: ────────────────────────────────────────────────────────────────────────────
 def PropertyOptions(
     options_provider: Callable,
+    *,
     name: str | None = None,
     section: str = "Data",
     default: Any = None,
@@ -2365,9 +2615,10 @@ def PropertyOptions(
     mode: PropertyMode = PropertyMode.Default,
     observer_func: Callable | None = None,
     link_property: str | None = None,
-) -> Property:
+    meta: bool = False,
+) -> Property[str] | tuple[Property[str], PropertyMeta]:
     """Create Options Property."""
-    return Property(
+    prop = Property(
         type="App::PropertyEnumeration",
         section=section,
         observer_func=observer_func,
@@ -2378,6 +2629,10 @@ def PropertyOptions(
         mode=mode,
         options=options_provider,
     )
+
+    if meta:
+        return _property_and_meta(prop)
+    return prop
 
 
 # ┌───────────────────────────────────────────────────────────────────────────┐
@@ -2596,7 +2851,10 @@ class TransactionAbortException(Exception):  # noqa: N818
 class TransactionCtrl:
     """Controller to signal transaction abort."""
 
+    aborted: bool = False
+
     def abort(self) -> None:
+        self.aborted = True
         raise TransactionAbortException()  # noqa: RSE102
 
 
@@ -2628,3 +2886,99 @@ def transaction(name: str, doc: Document = None) -> Generator[TransactionCtrl, A
         _doc.abortTransaction()
         print_err(f"Transaction '{name}' aborted unexpectedly")
         raise
+
+
+##: Typing For documentation purposes
+##: ────────────────────────────────────────────────────────────────────────────
+if TYPE_CHECKING:
+
+    class DataProxy(Protocol):
+        """
+        Documentation only protocol to illustrate the method signatures.
+
+        All methods are optional. And Events are also optional in most cases.
+        """
+
+        def on_create(self, event: events.CreateEvent) -> None: ...
+        def on_extension(self, event: events.ExtensionEvent) -> None: ...
+        def on_attach(self, event: events.AttachEvent) -> None: ...
+        def on_start(self, event: events.StartEvent) -> None: ...
+        def on_restore(self, event: events.DocumentRestoredEvent) -> None: ...
+        def on_execute(self, event: events.ExecuteEvent) -> None: ...
+        def on_change(self, event: events.PropertyChangedEvent) -> None: ...
+        def on_before_change(self, event: events.PropertyWillChangeEvent) -> None: ...
+        def on_serialize(self, event: events.SerializeEvent) -> None: ...
+        def on_deserialize(self, event: events.DeserializeEvent) -> None: ...
+        def on_remove(self, event: events.RemoveEvent) -> None: ...
+        def is_dirty(self) -> bool: ...
+        def is_active(self) -> bool: ...
+        def on_migrate_class(self, event: events.MigrationEvent) -> None: ...
+        def on_migrate_upgrade(self, event: events.MigrationEvent) -> None: ...
+        def on_migrate_downgrade(self, event: events.MigrationEvent) -> None: ...
+        def on_migrate_complete(self, event: events.MigrationEvent) -> None: ...
+        def on_migrate_error(self, event: events.MigrationEvent) -> None: ...
+
+        @property
+        def Object(self) -> DocumentObject: ...
+
+        @property
+        def ViewObject(self) -> ViewProviderDocumentObject: ...
+
+        @classmethod
+        def create(
+            cls,
+            name: str | None = None,
+            label: str | None = None,
+            doc: Document | None = None,
+        ) -> DocumentObject: ...
+
+    class ViewProxy(Protocol):
+        """
+        Documentation only protocol to illustrate the method signatures.
+
+        All methods are optional. And Events are also optional in most cases.
+        """
+
+        def on_create(self, event: events.CreateEvent) -> None: ...
+        def on_attach(self, event: events.AttachEvent) -> None: ...
+        def on_start(self, event: events.StartEvent) -> None: ...
+        def on_serialize(self, event: events.SerializeEvent) -> None: ...
+        def on_deserialize(self, event: events.DeserializeEvent) -> None: ...
+        def on_change(self, event: events.PropertyChangedEvent) -> None: ...
+        def on_before_change(self, event: events.PropertyWillChangeEvent) -> None: ...
+        def on_object_change(self, event: events.DataChangedEvent) -> None: ...
+
+        def on_context_menu(self, event: events.ContextMenuEvent) -> None: ...
+        def icon(self) -> str | None: ...
+        def set_display_mode(self, mode: str) -> str: ...
+        def display_modes(self) -> list[str]: ...
+        def default_display_mode(self) -> str: ...
+
+        def on_claim_children(self, event: events.ClaimChildrenEvent) -> list[DocumentObject]: ...
+        def on_edit_start(self, event: events.EditStartEvent) -> bool | None: ...
+        def on_edit_end(self, event: events.EditEndEvent) -> bool | None: ...
+        def on_delete(self, event: events.DeleteEvent) -> bool: ...
+        def on_dbl_click(self, event: events.DoubleClickEvent) -> bool: ...
+
+        def can_drag_objects(self) -> bool: ...
+        def can_drop_objects(self) -> bool: ...
+        def can_drag_object(self, event: events.DragAndDropEvent) -> bool: ...
+        def can_drop_object(self, event: events.DragAndDropEvent) -> bool: ...
+        def on_drag_object(self, event: events.DragAndDropEvent) -> None: ...
+        def on_drop_object(self, event: events.DragAndDropEvent) -> None: ...
+
+        @property
+        def Object(self) -> DocumentObject: ...
+
+        @property
+        def ViewObject(self) -> ViewProviderDocumentObject: ...
+
+
+if not TYPE_CHECKING:
+
+    class DataProxy: ...  # noqa: D101
+
+    class ViewProxy: ...  # noqa: D101
+
+
+Proxy: TypeAlias = DataProxy | ViewProxy

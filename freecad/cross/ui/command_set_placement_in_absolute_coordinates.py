@@ -89,7 +89,44 @@ class _SetCROSSPlacementInAbsoluteCoordinatesCommand:
         # for work with subelement
         sel = fcgui.Selection.getSelectionEx("", 0)
         orienteer1_sub_element = sel[1]
-        orienteer2_sub_element = sel[2]
+
+        try:
+            orienteer2_sub_element = sel[2]
+        except:
+            # split groupped selection
+            base_obj = sel[1]
+
+            class SubElementProxy:
+                """Pseudo-SelectionObject."""
+                
+                __slots__ = ('BaseObj', 'Object', 'TypeId', 'SubElementNames', 'PickedPoint')
+                
+                def __init__(self, base_obj, obj, sub_element_name, picked_point=None):
+                    self.BaseObj = base_obj
+                    self.Object = obj
+                    self.TypeId = obj.TypeId
+                    self.SubElementNames = sub_element_name
+                    self.PickedPoint = picked_point
+                
+                def isDerivedFrom(self, type_name: str) -> bool:
+                    return self.BaseObj.isDerivedFrom(type_name)
+                              
+                def __repr__(self):
+                    return f"SubElementProxy({self.TypeId}.{self.SubElementNames})"
+
+            orienteer1_sub_element = SubElementProxy(
+                base_obj,
+                base_obj.Object,
+                base_obj.SubElementNames[0],
+                base_obj.PickedPoints[0] if hasattr(base_obj, 'PickedPoints') and len(base_obj.PickedPoints) > 0 else None
+            )
+
+            orienteer2_sub_element = SubElementProxy(
+                base_obj,
+                base_obj.Object,
+                base_obj.SubElementNames[1],
+                base_obj.PickedPoints[1] if hasattr(base_obj, 'PickedPoints') and len(base_obj.PickedPoints) > 1 else None
+            )   
 
         if not is_lcs(orienteer1) and not is_joint(orienteer1) and not is_link(orienteer1):
             orienteer1 = orienteer1_sub_element

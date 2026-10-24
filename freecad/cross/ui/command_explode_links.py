@@ -10,6 +10,7 @@ from ..freecad_utils import is_lcs
 from ..gui_utils import tr
 from ..link_proxy import explode_link
 from ..wb_utils import is_robot
+from ..wb_utils import is_link, get_links
 
 
 # Stubs and type hints.
@@ -44,20 +45,25 @@ class _ExplodeLinksCommand:
         return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
-        doc = fc.activeDocument()
+        from ..ui.explode_links_dialog import ExplodeLinksDialog
 
+        doc = fc.activeDocument()
         selection = fcgui.Selection.getSelection()
 
-        doc.openTransaction(tr("Explode links"))
         if len(selection) and is_robot(selection[0]):
             robot = selection[0]
-            selection = robot.Proxy.get_links()
+            links = robot.Proxy.get_links()
+        else:
+            # Filter selection to only include Cross::Link objects
+            links = [obj for obj in selection if is_link(obj)]
 
-        for i in range(len(selection)):
-            explode_link(selection[i], i)
-        doc.commitTransaction()
+        if not links:
+            message('No links selected.')
+            return
 
-        doc.recompute()
+        # Show the dialog with the slider
+        dialog = ExplodeLinksDialog(links)
+        dialog.exec_()
 
 
 fcgui.addCommand('ExplodeLinks', _ExplodeLinksCommand())

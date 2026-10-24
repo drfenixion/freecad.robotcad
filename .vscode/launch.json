@@ -21,6 +21,70 @@
             "justMyCode": true
         },
         {
+            "name": "Python AppImage 1.1: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "${userHome}/.local/share/FreeCAD/v1-1/Mod/freecad.robotcad"
+                } 
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "Python AppImage 1.2: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "${userHome}/.local/share/FreeCAD/v1-2/Mod/freecad.robotcad"
+                } 
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "Python3 PX4 fly: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/chassis_new_copter3",
+                    "remoteRoot": "${userHome}/ros2/ws/src/chassis_new_copter3"
+                } 
+            ],
+            "justMyCode": true
+        },     
+        {
+            "name": "Python3 rqt_joint_trajectory_controller: Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/tmp/rqt_joint_trajectory_controller",
+                    "remoteRoot": "/opt/ros/jazzy/lib/python3.12/site-packages/rqt_joint_trajectory_controller/"
+                } 
+            ],
+            "justMyCode": false
+        }, 
+        {
             "name": "Python Conda Mod: Remote Attach",
             "type": "debugpy",
             "request": "attach",
@@ -59,6 +123,51 @@
                 } 
             ],
             "justMyCode": false
-        }
-    ]
+        },
+        {
+            "name": "C++: pipeTransport Attach gz-sim (vacuum_gripper_plugin)",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/bin/sh",
+            "processId": "${command:pickRemoteProcess}", // pick 'gz sim server'
+            "sourceFileMap": {
+                "${userHome}/ros2/ws/src": "${workspaceFolder}/docker/ros2_ws/src",
+            },
+            "MIMode": "gdb",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "ros2_jazzy_desktop_px4_air3", "bash", "-c"],
+                "debuggerPath": "gdb"
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Wait for library to load",
+                    "text": "set stop-on-solib-events 1",
+                    "ignoreFailures": false
+                }
+            ],
+        },
+        {
+            "name": "Python3: Mission packager Remote Attach",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5688
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/docker/ros2_ws/src/mission",
+                    "remoteRoot": "${userHome}/ros2/ws/src/mission"
+                }
+            ],
+            "justMyCode": true
+        },
+    ],
 }

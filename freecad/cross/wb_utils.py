@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
+from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_random_postfix, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -29,10 +29,12 @@ from .freecad_utils import is_lcs
 from .freecad_utils import is_part
 from .freecad_utils import is_link as is_fc_link
 from .freecad_utils import message
+from .freecad_utils import quantity_as
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
 from .freecadgui_utils import get_placement, get_progress_bar, gui_process_events
+from .ros.utils import _add_robotcad_venv_to_sys_path
 from .ros.utils import get_ros_workspace_from_file
 from .ros.utils import without_ros_workspace
 from .utils import attr_equals, calc_md5
@@ -54,20 +56,10 @@ from .sensors.sensor import Sensor as CrossSensor  # A Cross::Sensor, i.e. a Doc
 DO = fc.DocumentObject
 CrossBasicElement = Union[CrossJoint, CrossLink]
 CrossObject = Union[CrossJoint, CrossLink, CrossRobot, CrossXacroObject, CrossWorkcell, CrossController, CrossSensor]
+CrossVacuumGripper = DO  # A Cross::VacuumGripper, i.e. a DocumentObject with Proxy "VacuumGripperProxy".
 DOList = List[DO]
 
-# get  workebnch path 
-p=Path(__file__).parent.parent.parent
-# /home/use/.local/share/FreeCAD/Mod/ # this used when RobotCAD installed like Addon Manager do
-# MOD_PATH_IN_USER_SHARE_DIR = Path(fc.getUserAppDataDir()) / 'Mod/freecad.robotcad'
-MOD_PATH_IN_USER_SHARE_DIR = p
-# near basic modules like Part, BIM # this used when RobotCAD packed with root modules for install via 1 archive
-MOD_PATH_IN_ROOT_MODULES_DIR = p
-# MOD_PATH_IN_ROOT_MODULES_DIR = Path(fc.getResourceDir()) / 'Mod/freecad.robotcad' 
-if os.path.exists(MOD_PATH_IN_USER_SHARE_DIR):
-    MOD_PATH = MOD_PATH_IN_USER_SHARE_DIR
-else:
-    MOD_PATH = MOD_PATH_IN_ROOT_MODULES_DIR
+from .wb_constants import MOD_PATH
 
 RESOURCES_PATH = MOD_PATH / 'resources'
 UI_PATH = RESOURCES_PATH / 'ui'
@@ -127,62 +119,72 @@ def set_workbench_param(
 
 def is_attached_collision_object(obj: DO) -> bool:
     """Return True if the object is a Cross::AttachedCollisionObject."""
-    return _has_ros_type(obj, 'Cross::AttachedCollisionObject')
+    return has_cross_type(obj, 'Cross::AttachedCollisionObject')
 
 
 def is_robot(obj: DO) -> bool:
     """Return True if the object is a Cross::Robot."""
-    return _has_ros_type(obj, 'Cross::Robot')
+    return has_cross_type(obj, 'Cross::Robot')
 
 
 def is_link(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Link')
+    return has_cross_type(obj, 'Cross::Link')
 
 
 def is_joint(obj: DO) -> bool:
     """Return True if the object is a Cross::Link."""
-    return _has_ros_type(obj, 'Cross::Joint')
+    return has_cross_type(obj, 'Cross::Joint')
 
 
 def is_xacro_object(obj: DO) -> bool:
     """Return True if the object is a Cross::Xacro."""
-    return _has_ros_type(obj, 'Cross::XacroObject')
+    return has_cross_type(obj, 'Cross::XacroObject')
 
 
 def is_workcell(obj: DO) -> bool:
     """Return True if the object is a Cross::Workcell."""
-    return _has_ros_type(obj, 'Cross::Workcell')
+    return has_cross_type(obj, 'Cross::Workcell')
+
+
+def is_pose(obj: DO) -> bool:
+    """Return True if the object is a Cross::Pose."""
+    return has_cross_type(obj, 'Cross::Pose')
 
 
 def is_controller(obj: DO) -> bool:
     """Return True if the object is a Cross::Controller."""
-    return _has_ros_type(obj, 'Cross::Controller')
+    return has_cross_type(obj, 'Cross::Controller')
 
 
 def is_broadcaster(obj: DO) -> bool:
     """Return True if the object is a Cross::Broadcaster."""
-    return _has_ros_type(obj, 'Cross::Broadcaster')
+    return has_cross_type(obj, 'Cross::Broadcaster')
 
 
 def is_sensor(obj: DO) -> bool:
     """Return True if the object is a Cross::Sensor."""
-    return is_sensor_link(obj) or is_sensor_joint(obj) or _has_ros_type(obj, 'Cross::Sensor')
+    return is_sensor_link(obj) or is_sensor_joint(obj) or has_cross_type(obj, 'Cross::Sensor')
 
 
 def is_sensor_link(obj: DO) -> bool:
     """Return True if the object is a Cross::SensorLink."""
-    return _has_ros_type(obj, 'Cross::SensorLink')
+    return has_cross_type(obj, 'Cross::SensorLink')
 
 
 def is_sensor_joint(obj: DO) -> bool:
     """Return True if the object is a Cross::SensorJoint."""
-    return _has_ros_type(obj, 'Cross::SensorJoint')
+    return has_cross_type(obj, 'Cross::SensorJoint')
+
+
+def is_vacuum_gripper(obj: DO) -> bool:
+    """Return True if the object is a Cross::VacuumGripper."""
+    return has_cross_type(obj, 'Cross::VacuumGripper')
 
 
 def is_planning_scene(obj: DO) -> bool:
     """Return True if the object is a Cross::PlanningScene."""
-    return _has_ros_type(obj, 'Cross::PlanningScene')
+    return has_cross_type(obj, 'Cross::PlanningScene')
 
 
 def is_simple_joint(obj: DO) -> bool:
@@ -254,6 +256,11 @@ def is_workcell_selected() -> bool:
     return is_selected_from_lambda(is_workcell)
 
 
+def is_vacuum_gripper_selected() -> bool:
+    """Return True if the first selected object is a Cross::VacuumGripper."""
+    return is_selected_from_lambda(is_vacuum_gripper)
+
+
 def is_planning_scene_selected() -> bool:
     """Return True if the first selected object is a Cross::PlanningScene."""
     return is_selected_from_lambda(is_planning_scene)
@@ -271,7 +278,7 @@ def get_links(objs: DOList) -> list[CrossLink]:
 
 def get_joints(objs: DOList) -> list[CrossJoint]:
     """Return only the objects that are Cross::Joint instances."""
-    return [o for o in objs if is_joint(o)]
+    return [o for o in objs if is_joint(o) and o is not None and hasattr(o, 'Name')] #  and o is not None and hasattr(o, 'Name') is check obj was not removed
 
 
 def get_child_joints(link_or_joint: DO) -> list[CrossJoint] | bool:
@@ -279,7 +286,7 @@ def get_child_joints(link_or_joint: DO) -> list[CrossJoint] | bool:
     if is_joint(link_or_joint):
         link_name = link_or_joint.Child
     elif is_link(link_or_joint):
-        link_name = link_or_joint.Name
+        link_name = ros_name(link_or_joint)
     else:
         return False
 
@@ -301,6 +308,11 @@ def get_link_sensors(objs: DOList) -> list[CrossSensor]:
 def get_joint_sensors(objs: DOList) -> list[CrossSensor]:
     """Return only the objects that are Cross::SensorJoint instances."""
     return [o for o in objs if is_sensor_joint(o)]
+
+
+def get_vacuum_grippers(objs: DOList) -> list[CrossVacuumGripper]:
+    """Return only the objects that are Cross::VacuumGripper instances."""
+    return [o for o in objs if is_vacuum_gripper(o)]
 
 
 def get_controllers(objs: DOList) -> list[CrossController]:
@@ -369,17 +381,58 @@ def get_chain(link: CrossLink) -> list[CrossBasicElement]:
         # A root link.
         return [link]
     if not ref_joint.Parent:
-        warn(f'Joint `{ros_name(ref_joint)}` has no parent', False)
+        # warn(f'Joint `{ros_name(ref_joint)}` has no parent', False) # too many notifies when changes Parent/Child
         # Return only ref_joint to indicate an error.
         return [ref_joint]
     robot = ref_joint.Proxy.get_robot()
     parent_link = robot.Proxy.get_link(ref_joint.Parent)
+    if parent_link is None:
+        # Return only ref_joint to indicate an error.
+        return [ref_joint]
     subchain = get_chain(parent_link)
     if subchain and is_joint(subchain[0]):
         # Propagate the error of missing joint.Parent.
         return subchain
     chain += subchain + [ref_joint] + [link]
     return chain
+
+
+def get_chain_from_to(
+        robot: CrossRobot,
+        from_link: str,
+        to_link: str,
+) -> list[CrossBasicElement]:
+    """Return the chain from `from_link` to `to_link`, excluded.
+
+    Return an empty list if no chain exists between the two links.
+    Return an empty list if `to_link` is closer to the base link (root link of
+    the tree structure) than `from_link`.
+    """
+    if not is_robot(robot):
+        return []
+    from_ = robot.Proxy.get_link(from_link)
+    if not from_:
+        return []
+    to = robot.Proxy.get_link(to_link)
+    if not to:
+        return []
+    if from_ is to:
+        return []
+    chains = robot.Proxy.get_chains()
+    for chain in chains:
+        try:
+            from_index = chain.index(from_)
+        except ValueError:
+            continue
+        try:
+            # Implementation note: if `to_link` is before
+            # `from_link`, this raises ValueError and eventually fallbacks to
+            # `[]` after the loop.
+            to_index = chain.index(to, from_index)
+        except ValueError:
+            continue
+        return chain[from_index:to_index]
+    return []
 
 
 def is_subchain(subchain: DOList, chain: DOList) -> bool:
@@ -469,17 +522,29 @@ def get_xacro_chains(
     return chains
 
 
-def ros_name(obj: DO) -> str:
+def ros_name(obj: DO, label1_first:bool = True, add_random_postfix_to_not_fc_obj:bool = True) -> str:
     """Return in order obj.Label2, obj.Label, obj.Name."""
     if ((
         not hasattr(obj, 'isDerivedFrom')
         or (not obj.isDerivedFrom('App::DocumentObject'))
-    )):
-        return 'not_a_FreeCAD_object'
-    if obj.Label2:
-        return obj.Label2
-    if obj.Label:
-        return obj.Label
+    )): 
+        name = 'not_a_FreeCAD_object'
+        if add_random_postfix_to_not_fc_obj:
+            # Generate random characters (English letters and digits)
+            random_chars = get_random_postfix()
+            # Append the random characters to the end of the string
+            name = name + '_' + random_chars        
+        return name
+    if label1_first:
+        if obj.Label:
+            return obj.Label    
+        if obj.Label2:
+            return obj.Label2
+    else:
+        if obj.Label2:
+            return obj.Label2  
+        if obj.Label:
+            return obj.Label  
     return obj.Name
 
 
@@ -611,11 +676,19 @@ def export_templates(
         output_path.write_text(txt)
 
 
-def _has_ros_type(obj: DO, type_: str) -> bool:
+def has_cross_type(obj: DO, type_: str) -> bool:
     """Return True if the object is an object from this workbench."""
     if not isinstance(obj, DO):
         return False
-    return attr_equals(obj, '_Type', type_)
+    # Old CROSS objects.
+    if attr_equals(obj, '_Type', type_):
+        return True
+    # CROSS objects created with `fpo`.
+    if not hasattr(obj, 'Proxy'):
+        return False
+    if not hasattr(obj.Proxy, 'Type'):
+        return False
+    return obj.Proxy.Type == type_
 
 
 def _has_meshes_directory(
@@ -795,7 +868,7 @@ def set_placement_by_orienteer(doc: DO, link_or_joint: DO,
             joint.Origin = old_placement_diff.inverse() * joint.Origin
 
         if is_joint(link_or_joint):
-            child_link = doc.getObject(link_or_joint.Child)
+            child_link = link_or_joint.Proxy._robot.Proxy.get_link(link_or_joint.Child)
             child_link.MountedPlacement  = old_placement_diff.inverse() * child_link.MountedPlacement
 
     doc.recompute()
@@ -842,9 +915,8 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     orienteer_object = orienteer
     if is_selection_object(orienteer):
         orienteer_object = orienteer.Object
-        parsed_path = parse_freecad_path(orienteer.SubElementNames, orienteer.Document)
+        parsed_path = parse_freecad_path(orienteer.SubElementNames, orienteer.Object.getLinkedObject(True).Document)
         obj = parsed_path['object']
-
     if is_lcs(orienteer):
         placement = get_placement(orienteer)
     elif is_selection_object(orienteer) and parsed_path['datum_type'] in ['LCS', 'Point']:
@@ -855,7 +927,15 @@ def get_placement_of_orienteer(orienteer, delete_created_objects:bool = True, lc
     elif is_placement(orienteer_object):
         placement = orienteer_object
     else:
-        lcs, body_lcs_wrapper, placement = make_lcs_at_link_body(orienteer, delete_created_objects, lcs_concentric_reversed)
+        lcs, body_lcs_wrapper, lcs_placement, doc = make_lcs_at_link_body(orienteer, False, lcs_concentric_reversed, True)
+        fcgui.Selection.addSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        placement = get_placement(lcs)
+        
+        if hasattr(fcgui.Selection, 'removeSelection'):
+            fcgui.Selection.removeSelection(orienteer.Document.Name, orienteer.Object.Name, body_lcs_wrapper.Name + '.' + lcs.Name + '.X')
+        if delete_created_objects:
+            doc.removeObject(body_lcs_wrapper.Name)
+            doc.removeObject(lcs.Name)
 
     return placement
 
@@ -864,10 +944,13 @@ def make_lcs_at_link_body(
         orienteer,
         delete_created_objects:bool = True,
         lcs_concentric_reversed:bool = False,
-        deactivate_after_map_mode:bool = True,
+        deactivate_after_map_mode:bool = False,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
     '''Make LCS at face of body of robot link.
     orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
+
+    # Get align_z_axis setting from workbench preferences
+    align_z_axis = get_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, True)
 
     # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
     #     orienteer_parents_reversed = reversed(obj.Parents)
@@ -890,6 +973,8 @@ def make_lcs_at_link_body(
     original_obj = None
     dynamic_link_of_robot_link = None
     original_obj_wrapper = None
+    link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+    is_orienteer_link = False
     try:
         # if is_fc_link(orienteer.Object):
         #     # link to object (like Part::Feature)
@@ -940,11 +1025,22 @@ def make_lcs_at_link_body(
         # works inside SetPlacement tools
         if is_fc_link(orienteer.Object) and orienteer.Object.Name.startswith('real_'):
             dynamic_link_of_robot_link = orienteer.Object
-            if is_part(dynamic_link_of_robot_link.LinkedObject):
-                original_obj_wrapper = dynamic_link_of_robot_link.LinkedObject
+            linkedObject = dynamic_link_of_robot_link.getLinkedObject(True)
+            if is_part(linkedObject):
+                original_obj_wrapper = linkedObject
             if is_selection_object(orienteer):
-                original_obj = get_selected_shape_object(orienteer)
-            link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
+                doc = dynamic_link_of_robot_link.Document
+                if dynamic_link_of_robot_link.Document.Name != linkedObject.Document.Name:
+                    #link to another doc case
+                    doc = linkedObject.Document
+                original_obj = get_selected_shape_object(orienteer, doc = doc)
+                original_obj_link_candidate =  get_selected_shape_object(orienteer, return_linked_obj = False, doc = doc)
+                if is_fc_link(original_obj_link_candidate):
+                    # placement works only for 1 level deep link
+                    # for more deeper links need calc cumulative placement
+                    link_to_obj_placement = original_obj_link_candidate.Placement
+                    is_orienteer_link = True
+            
             
         # # parents_reversed = reversed(obj_for_getting_parents.Parents)
         # parents_reversed = reversed(obj_for_getting_parents.InListRecursive)
@@ -959,7 +1055,7 @@ def make_lcs_at_link_body(
         pass
 
     if not original_obj_wrapper:
-        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part.', gui=True)
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part. Check you selected Real elements of links for placement.', gui=True)
         raise RuntimeError()
 
     if not original_obj:
@@ -980,13 +1076,15 @@ def make_lcs_at_link_body(
     except (AttributeError, IndexError):
         pass
 
-    body_lcs_wrapper = fc.ActiveDocument.addObject("PartDesign::Body", "Body")
+    if not doc:
+        doc = fc.ActiveDocument
+    body_lcs_wrapper = doc.addObject("PartDesign::Body", "Body")
 
     body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
 
     original_obj_wrapper.addObject(body_lcs_wrapper)
 
-    lcs = fc.ActiveDocument.addObject( 'PartDesign::CoordinateSystem', 'LCS')
+    lcs = doc.addObject( 'PartDesign::CoordinateSystem', 'LCS')
     body_lcs_wrapper.addObject(lcs)
 
     setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
@@ -1005,27 +1103,33 @@ def make_lcs_at_link_body(
     else:
         lcs.MapMode = 'InertialCS'
 
+    
+
     if deactivate_after_map_mode:
         # prevent automove back to InertialCS rotation
         lcs.MapMode = 'Deactivated'
 
     # remove placement of origin obj (mean in zero point of original obj)
-    lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+    if is_orienteer_link:
+        lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
     # add placement of link of origin obj (mean in same place at face of link as at original obj)
     lcs.Placement = link_to_obj_placement * lcs.Placement
-    # fix Z rotation to 0 in frame of origin
-    lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
+    # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
+    if align_z_axis:
+        lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
-    placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+    # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+    # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
 
     if delete_created_objects:
-        fc.ActiveDocument.removeObject(body_lcs_wrapper.Name)
-        fc.ActiveDocument.removeObject(lcs.Name)
+        doc.removeObject(body_lcs_wrapper.Name)
+        doc.removeObject(lcs.Name)
 
-    fc.activeDocument().recompute()
+    doc.recompute()
+    if doc.Name != fc.activeDocument().Name:
+        fc.activeDocument().recompute()
 
-    return lcs, body_lcs_wrapper, placement
+    return lcs, body_lcs_wrapper, lcs.Placement, doc
 
 
 def rotate_placement(
@@ -1194,41 +1298,128 @@ def git_init_submodules(
 
     def git_deinit_submodules():
         message('Deinit git submodules.')
-        p = subprocess.run(
+        progressBar.setValue(5)
+        gui_process_events()
+        p = subprocess.Popen(
             ["git submodule deinit -f ."],
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=MOD_PATH,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
 
 
     def git_update_submodules(update_from_remote_branch_param: str = ''):
         message('Update git submodules.')
-        p = subprocess.run(
+        if not (MOD_PATH / '.git').exists():
+            progressBar.setValue(10)
+            gui_process_events()
+            message('Git directory not found. Cloning repository to get .git.')
+            import tempfile
+            import shutil
+            repo_url = 'https://github.com/drfenixion/freecad.robotcad'
+            tmp_parent = Path(tempfile.gettempdir()) / 'robotcad_git_clone'
+            tmp_parent.mkdir(parents=True, exist_ok=True)
+            clone_dest = tmp_parent / 'freecad.robotcad'
+            if clone_dest.exists():
+                shutil.rmtree(clone_dest)
+            p = subprocess.Popen(
+                ["git clone --depth 1 " + repo_url + ' ' + str(clone_dest)],
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(tmp_parent),
+                text=True,
+            )
+            for line in p.stdout:
+                print(line, end='')
+            p.wait()
+            shutil.copytree(
+                clone_dest / '.git',
+                MOD_PATH / '.git',
+                dirs_exist_ok=True,
+            )
+            shutil.rmtree(tmp_parent)
+            message('.git directory copied from cloned repository.')
+        progressBar.setValue(25)
+        gui_process_events()
+
+        message('Updating git submodules...')
+        p = subprocess.Popen(
             ["git submodule update --init " + update_from_remote_branch_param],
             shell=True,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=MOD_PATH,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
+        progressBar.setValue(45)
+        gui_process_events()
 
-        for pip_deps_installmodule_path in pip_deps_install_submodule_paths:
+        total_pip = len(pip_deps_install_submodule_paths)
+        for i, pip_deps_installmodule_path in enumerate(pip_deps_install_submodule_paths):
             pip_install_dependencies_of_module(pip_deps_installmodule_path)
+            if total_pip > 0:
+                pip_progress = 45 + int((i + 1) / total_pip * 45)
+                progressBar.setValue(pip_progress)
+                gui_process_events()
 
 
     def pip_install_dependencies_of_module(target_module_path: str):
         message('Pip install dependencies of module.')
-        p = subprocess.run(
-            ["pip install ."],
-            shell=True,
-            capture_output=True,
+        import sys as fc_sys
+        python_exe = fc_sys.executable
+        if not os.path.basename(python_exe).startswith('python'):
+            python_exe = os.path.join(fc_sys.base_prefix, 'bin', 'python')
+        # Shared virtual environment at the root of freecad.robotcad.
+        venv_path = MOD_PATH / '.venv'
+        venv_bin = str(venv_path / 'bin')
+        venv_python = str(venv_path / 'bin' / 'python')
+        if not os.path.exists(venv_python):
+            message('Creating shared virtual environment at MOD_PATH/.venv.')
+            try:
+                p = subprocess.run(
+                    [python_exe, '-m', 'venv', str(venv_path)],
+                    shell=False,
+                    capture_output=True,
+                    cwd=MOD_PATH,
+                    check=False,
+                )
+                if p.returncode != 0:
+                    raise subprocess.CalledProcessError(p.returncode, p.args)
+                print(p.stdout.decode() if p.stdout else '')
+                print(p.stderr.decode() if p.stderr else '')
+            except subprocess.CalledProcessError:
+                message('virtualenv not available, creating minimal venv manually.')
+                os.makedirs(venv_bin, exist_ok=True)
+                os.makedirs(str(venv_path / 'lib' / 'python'), exist_ok=True)
+                try:
+                    os.symlink(python_exe, venv_python)
+                except FileExistsError:
+                    pass
+
+        # Always run pip install --target to install/update packages,
+        # regardless of whether the venv already existed or was just created.
+        message(f'Running pip install in {target_module_path}...')
+        p = subprocess.Popen(
+            [python_exe, '-m', 'pip', 'install', '--target', str(venv_path / 'lib' / 'python' / 'site-packages'), '.'],
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             cwd=target_module_path,
-            check=True,
+            text=True,
         )
-        print('process:', p)
+        for line in p.stdout:
+            print(line, end='')
+        p.wait()
+        _add_robotcad_venv_to_sys_path()
 
 
     progressBar = get_progress_bar(
@@ -1238,7 +1429,7 @@ def git_init_submodules(
         show_percents = False,
     )
     progressBar.show()
-    progressBar.setValue(0)
+    progressBar.setValue(10)
     gui_process_events()
 
 
@@ -1437,14 +1628,14 @@ def set_placement_fast(
         for child_joint in root_link_child_joints:
             root_link_child_joints_backup.append({'Name': child_joint.Name, 'Origin': child_joint.Origin})
 
-        parent_joint_of_child_link_origin_backup = parent_joint_of_child_link.Origin
         set_placement_by_orienteer(doc, parent_joint_of_child_link, 'Origin', parent_orienteer)
+        child_orienteer_placement_after_set_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
         move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
+        child_orienteer_placement_after_move_placement_backup = get_placement_of_orienteer(child_orienteer, delete_created_objects=True)
 
         if child_link_child_joints:
             for child_joint in child_link_child_joints:
-                move_placement(doc, child_joint, 'Origin', parent_joint_of_child_link.Origin, parent_joint_of_child_link_origin_backup)
-                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_backup, parent_orienteer_placement_backup)
+                move_placement(doc, child_joint, 'Origin', child_orienteer_placement_after_set_placement_backup, child_orienteer_placement_after_move_placement_backup)
         
         if parent_tree_to_child_branch:
             for child_joint in root_link_child_joints:
@@ -1509,3 +1700,51 @@ def get_comulative_assemblies_placement(obj_name_list: list) -> DO | None:
             break
 
     return comulative_assemblies_placement
+def joint_quantities_from_si_units(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, fc.Units.Quantity]:
+    """Convert joint values in SI units to quantities.
+
+    Convert joint values in SI units (meters and radians) to quantities.
+    """
+    source_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    joint_quantities: dict[CrossJoint, fc.Units.Quantity] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, fc.Units.Quantity):
+            joint_quantities[joint] = value
+        else:
+            # A scalar value.
+            quantity = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+            joint_quantities[joint] = quantity
+    return joint_quantities
+
+
+def joint_values_si_units_from_freecad(
+        joint_values: dict[CrossJoint, float | fc.Units.Quantity],
+) -> dict[CrossJoint, float]:
+    """Convert joint values in FreeCAD units or as quantities to SI units.
+
+    Convert joint values in FreeCAD units (millimeters and degrees) or as
+    quantities to SI units (meters and radians).
+    """
+    source_units = {
+            'Length': 'mm',
+            'Angle': 'deg',
+    }
+    target_units = {
+            'Length': 'm',
+            'Angle': 'rad',
+    }
+    out_joint_values: dict[CrossJoint, float] = {}
+    for joint, value in joint_values.items():
+        unit_type = joint.Proxy.get_unit_type()
+        if isinstance(value, float) or isinstance(value, int):
+            # Convert to Quantity first.
+            value = fc.Units.Quantity(f'{value} {source_units[unit_type]}')
+        value = quantity_as(value, target_units[unit_type])
+        out_joint_values[joint] = value
+    return out_joint_values

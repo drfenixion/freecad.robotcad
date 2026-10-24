@@ -3,12 +3,93 @@ import os
 from pathlib import Path
 import re
 import sys
+import threading
 from PySide import QtGui, QtCore, QtWidgets
 import FreeCAD as fc
 from freecad.cross.freecad_utils import message
 from freecad.cross.freecadgui_utils import get_progress_bar
 from freecad.cross.robot_from_urdf import robot_from_urdf_path
 from ...wb_utils import ROBOT_DESCRIPTIONS_MODULE_PATH, ROBOT_DESCRIPTIONS_REPO_PATH, git_init_submodules
+
+
+class _CloneProgressEmitter(QtCore.QObject):
+    """Thread-safe bridge for git clone progress updates.
+
+    GitPython reports clone progress from background "pump" threads, so the
+    value is forwarded to the widgets through a queued signal connection.
+    """
+
+    value_changed = QtCore.Signal(int)
+
+
+def _get_robot_descriptions_cache_module():
+    """Return the ``robot_descriptions._cache`` module used by descriptions.
+
+    Description modules are loaded by file path under the top-level package
+    name ``robot_descriptions``, so their relative ``from ._cache import ...``
+    resolves to ``robot_descriptions._cache`` loaded from
+    ``ROBOT_DESCRIPTIONS_MODULE_PATH``. This helper loads that exact module so
+    that patching ``CloneProgressBar`` takes effect.
+    """
+    parent_name = 'robot_descriptions'
+    parent_init = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, '__init__.py')
+    parent_spec = importlib.util.spec_from_file_location(parent_name, parent_init)
+    parent_module = importlib.util.module_from_spec(parent_spec)
+    sys.modules[parent_name] = parent_module
+    parent_spec.loader.exec_module(parent_module)
+
+    cache_name = 'robot_descriptions._cache'
+    cache_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, '_cache.py')
+    cache_spec = importlib.util.spec_from_file_location(cache_name, cache_path)
+    cache_module = importlib.util.module_from_spec(cache_spec)
+    sys.modules[cache_name] = cache_module
+    cache_spec.loader.exec_module(cache_module)
+    return cache_module
+
+
+def install_clone_progress_hook(progress_bar):
+    """Route robot_descriptions git clone progress to a Qt progress bar.
+
+    The repository download percentage is mapped to the 5-95% range of the
+    given progress bar. Must be called before the robot description module is
+    imported, because the clone happens at import time.
+
+    Returns the emitter that must be kept alive by the caller for the duration
+    of the clone.
+    """
+    rd_cache = _get_robot_descriptions_cache_module()
+
+    emitter = _CloneProgressEmitter()
+    # Use a queued connection so the progress bar is always updated in the GUI
+    # thread, even though the signal is emitted from GitPython's worker threads.
+    emitter.value_changed.connect(
+        progress_bar.setValue,
+        QtCore.Qt.QueuedConnection,
+    )
+    state = {'last': 5}
+
+    class QtCloneProgressBar(rd_cache.RemoteProgress):
+        """RemoteProgress that reports the download ratio to a Qt widget."""
+
+        def update(self, op_code, cur_count, max_count=None, message=''):
+            # Only follow the network download stage (RECEIVING). Other stages
+            # (resolving deltas, checkout, ...) are ignored so the bar keeps
+            # reflecting the download percentage.
+            if not (op_code & self.RECEIVING):
+                return
+            if not max_count:
+                return
+            try:
+                fraction = float(cur_count) / float(max_count)
+            except (TypeError, ValueError, ZeroDivisionError):
+                return
+            value = max(5, min(95, 5 + int(fraction * 90)))
+            if value != state['last']:
+                state['last'] = value
+                emitter.value_changed.emit(value)
+
+    rd_cache.CloneProgressBar = QtCloneProgressBar
+    return emitter
 
 
 class ModelsLibraryModalClass(QtGui.QDialog):
@@ -26,9 +107,33 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
 
     def initUI(self):
-        self.resize(400, 350)
+        # Size the dialog to 75% of the FreeCAD main window.
+        preferred_width = 800
+        preferred_height = 1000
+        import FreeCADGui as fcg
+        main_window = fcg.getMainWindow()
+        if main_window is not None:
+            preferred_width = max(200, main_window.width() * 3 // 4)
+            preferred_height = max(200, main_window.height() * 3 // 4)
+        self.resize(preferred_width, preferred_height)
         self.setWindowTitle("Models library")
+
+        # The whole content lives inside a scroll area so the models list can
+        # be scrolled vertically when it does not fit into the window height.
+        self.content_widget = QtWidgets.QWidget()
         self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+        self.content_widget.setLayout(self.main_layout)
+
+        self.scroll_area = QtWidgets.QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setWidget(self.content_widget)
+
+        # Root layout: scrollable content on top, action buttons fixed below.
+        self.root_layout = QtWidgets.QVBoxLayout()
+        self.root_layout.setContentsMargins(10, 10, 10, 10)
+        self.root_layout.addWidget(self.scroll_area, 1)
 
         # prepare data
         from modules.robot_descriptions.robot_descriptions._descriptions import DESCRIPTIONS
@@ -36,7 +141,7 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.packages_grouped_by_tags = {}
         for name in sorted(list(DESCRIPTIONS)):
             desc = DESCRIPTIONS[name]
-            if desc.has_urdf:
+            if desc.has_urdf or desc.has_mjcf:
 
                 vendor = ''
                 #get module code for parse
@@ -65,27 +170,38 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 #QtWidgets.QLabel()
                 vendor = re.sub(r"face\Sook", '', vendor, flags=re.IGNORECASE)
                 package_label = name.replace('_description', '').capitalize() + ' ' + vendor.capitalize()
-                setattr(desc, 'package_label', package_label)
-                setattr(desc, 'show', True)
+                model_name = name.replace('_description', '')
+                package = {
+                    'desc': desc,
+                    'package_label': package_label,
+                    # Semantic model name from the library, used as the robot
+                    # name when importing MJCF/xacro models.
+                    'model_name': model_name,
+                    # Lower-cased haystack for the live search: model name + manufacturer.
+                    'search': (package_label + ' ' + model_name).lower(),
+                }
                 for tag in desc.tags:
                     if tag in self.packages_grouped_by_tags:
-                        self.packages_grouped_by_tags[tag]['packages'].append(desc)
+                        self.packages_grouped_by_tags[tag]['packages'].append(package)
                     else:
-                        self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[desc]}
+                        self.packages_grouped_by_tags[tag] = {'show': True, 'packages':[package]}
 
 
+        # Live search state (combined with the tag filter).
+        self.search_text = ''
+        self.current_tag_filter = 'all'
         self.display_filter_block()
         self.display_packages_block()
 
         self.button = QtWidgets.QPushButton('Open model variants')
         self.button.clicked.connect(self.get_selected_value)
-        self.main_layout.addWidget(self.button)
+        self.root_layout.addWidget(self.button)
 
         self.update_models_list_button = QtWidgets.QPushButton('Update models list')
         self.update_models_list_button.clicked.connect(self.update_models_list)
         if self.__class__.is_models_list_updated:
             self.update_models_list_button.setEnabled(False)
-        self.main_layout.addWidget(self.update_models_list_button)
+        self.root_layout.addWidget(self.update_models_list_button)
 
         # link to docks
         weblink = QtWidgets.QLabel()
@@ -115,11 +231,11 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         # description
         self.main_layout.addWidget(QtWidgets.QLabel())
         description = QtWidgets.QLabel()
-        description.setText("Use models without creating solids only for fast view. Solids is needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
+        description.setText("Use models without creating solids only for fast view. Solids are needed for ineartia/mass calculation, placement tools, collisions adding, etc.")
         self.main_layout.addWidget(description)
 
-        # adding widgets to main layout
-        self.setLayout(self.main_layout)
+        # adding widgets to root layout
+        self.setLayout(self.root_layout)
         self.show()
 
 
@@ -135,29 +251,36 @@ class ModelsLibraryModalClass(QtGui.QDialog):
             layout.addWidget(radio_button, row_val, column_val)
 
 
-        formGroupBox = QtWidgets.QGroupBox('Filter by tag')
+        formGroupBox = QtWidgets.QGroupBox('Filter')
+        outer_layout = QtWidgets.QVBoxLayout()
+
+        # Live search by model name and manufacturer. The clear button is shown
+        # inside the field, on the right, only while it contains text.
+        self.search_field = QtWidgets.QLineEdit()
+        self.search_field.setPlaceholderText('Search by model or manufacturer')
+        self.search_field.setClearButtonEnabled(True)
+        self.search_field.textChanged.connect(self.on_search_changed)
+        outer_layout.addWidget(self.search_field)
+
         row_val = 0
         column_val = 0
         self.tags_radio_buttons = []
         self.tags_button_group = QtWidgets.QButtonGroup()
-        layout = QtWidgets.QGridLayout()
+        grid_layout = QtWidgets.QGridLayout()
         for tag_name, packages in self.packages_grouped_by_tags.items():
-            add_tag_button(layout, tag_name)
+            add_tag_button(grid_layout, tag_name)
             column_val += 1
             if column_val > 3:
                 column_val = 0
                 row_val += 1
-        add_tag_button(layout, 'all')
-        column_val += 1
-        if column_val > 3:
-            column_val = 0
-            row_val += 1
+        add_tag_button(grid_layout, 'all')
+        # Default to showing all tags.
+        self.tags_radio_buttons[-1].setChecked(True)
 
-        for i in range(layout.columnCount()):
-            layout.setColumnStretch(i, 1)
-        # for i in range(layout.rowCount()):
-        #     layout.setRowStretch(i, 1)
-        formGroupBox.setLayout(layout)
+        for i in range(grid_layout.columnCount()):
+            grid_layout.setColumnStretch(i, 1)
+        outer_layout.addLayout(grid_layout)
+        formGroupBox.setLayout(outer_layout)
         self.main_layout.addWidget(formGroupBox)
 
 
@@ -171,19 +294,29 @@ class ModelsLibraryModalClass(QtGui.QDialog):
         self.radio_buttons = []
         self.button_group = QtWidgets.QButtonGroup()
         layout = QtWidgets.QGridLayout()
+        search_text = getattr(self, 'search_text', '')
+        added_packages = set()
         for tag_name, tag in self.packages_grouped_by_tags.items():
+            # The tag filter and the text search are applied together.
+            if not tag['show']:
+                continue
             for package in tag['packages']:
-                if tag['show']:
-                    radio_button = QtWidgets.QRadioButton(
-                        package.package_label,
-                    )
-                    self.radio_buttons.append(radio_button)
-                    self.button_group.addButton(radio_button)
-                    layout.addWidget(radio_button, row_val, column_val)
-                    column_val += 1
-                    if column_val > 3:
-                        column_val = 0
-                        row_val += 1
+                if search_text and search_text not in package.get('search', ''):
+                    continue
+                # A package may belong to several tags; show it only once.
+                if id(package) in added_packages:
+                    continue
+                added_packages.add(id(package))
+                radio_button = QtWidgets.QRadioButton(
+                    package['package_label'],
+                )
+                self.radio_buttons.append(radio_button)
+                self.button_group.addButton(radio_button)
+                layout.addWidget(radio_button, row_val, column_val)
+                column_val += 1
+                if column_val > 3:
+                    column_val = 0
+                    row_val += 1
         for i in range(layout.columnCount()):
             layout.setColumnStretch(i, 1)
         for i in range(layout.rowCount()):
@@ -195,15 +328,21 @@ class ModelsLibraryModalClass(QtGui.QDialog):
     def filter_by_tag(self):
         for radio_button in self.tags_radio_buttons:
             if radio_button.isChecked():
-                filter_tag_name = radio_button.text()
-                for tag_name, tag in self.packages_grouped_by_tags.items():
-                    if filter_tag_name == 'all':
-                        self.packages_grouped_by_tags[tag_name]['show'] = True
-                    else:
-                        if filter_tag_name != tag_name:
-                            self.packages_grouped_by_tags[tag_name]['show'] = False
-                        else:
-                            self.packages_grouped_by_tags[tag_name]['show'] = True
+                self.current_tag_filter = radio_button.text()
+        self.apply_filters()
+
+    def on_search_changed(self, text):
+        """Filter the models list letter by letter as the user types."""
+        self.search_text = text.strip().lower()
+        self.apply_filters()
+
+    def apply_filters(self):
+        """Recompute the visible tags from the tag filter and rebuild the list."""
+        for tag_name, tag in self.packages_grouped_by_tags.items():
+            if self.current_tag_filter == 'all':
+                tag['show'] = True
+            else:
+                tag['show'] = (tag_name == self.current_tag_filter)
         self.display_packages_block()
 
 
@@ -238,8 +377,10 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 )
                 progressBar.show()
 
-                i = 0
-                progressBar.setValue(i)
+                # Show 5% immediately, then follow the actual repository
+                # download percentage reported by the git clone.
+                progressBar.setValue(5)
+                self._clone_progress_emitter = install_clone_progress_hook(progressBar)
                 QtGui.QApplication.processEvents()
 
                 #module = import_module(f"robot_descriptions.{description_name}") #in case of direct pip module import
@@ -253,31 +394,62 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                     spec.loader.exec_module(module)
 
                     return module
-                # override global robot_descriptions module if present
-                import_robot_desc_module_by_path(
-                    f"robot_descriptions",
-                    os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'__init__.py'),
-                )
-                module_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name}.py')
-                module_path_alternative = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name_alternative}.py')
-                try:
-                    module = import_robot_desc_module_by_path(
-                        f"robot_descriptions.{description_name}",
-                        module_path,
+
+                def load_robot_desc_module():
+                    """Import the description module (this clones the repo).
+
+                    Runs in a worker thread, so the git clone progress is
+                    reported while the GUI thread keeps processing events.
+                    """
+                    # override global robot_descriptions module if present
+                    import_robot_desc_module_by_path(
+                        f"robot_descriptions",
+                        os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'__init__.py'),
                     )
-                except FileNotFoundError:
+                    module_path = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name}.py')
+                    module_path_alternative = os.path.join(ROBOT_DESCRIPTIONS_MODULE_PATH, f'{description_name_alternative}.py')
                     try:
-                        module = import_robot_desc_module_by_path(
-                            f"robot_descriptions.{description_name_alternative}",
+                        return import_robot_desc_module_by_path(
+                            f"robot_descriptions.{description_name}",
                             module_path,
                         )
                     except FileNotFoundError:
-                        module = import_robot_desc_module_by_path(
-                            f"robot_descriptions.{description_name_alternative}",
-                            module_path_alternative,
-                        )
-                i = 100
-                progressBar.setValue(i)
+                        try:
+                            return import_robot_desc_module_by_path(
+                                f"robot_descriptions.{description_name_alternative}",
+                                module_path,
+                            )
+                        except FileNotFoundError:
+                            return import_robot_desc_module_by_path(
+                                f"robot_descriptions.{description_name_alternative}",
+                                module_path_alternative,
+                            )
+
+                # Run the blocking clone/import in a worker thread and keep
+                # pumping GUI events here so the queued progress updates are
+                # applied while the repository is being downloaded.
+                load_result = {}
+                load_error = {}
+
+                def _load_target():
+                    try:
+                        load_result['module'] = load_robot_desc_module()
+                    except Exception as error:  # noqa: BLE001
+                        load_error['error'] = error
+
+                load_thread = threading.Thread(target=_load_target, daemon=True)
+                load_thread.start()
+                while load_thread.is_alive():
+                    QtGui.QApplication.processEvents()
+                    load_thread.join(0.05)
+
+                if 'error' in load_error:
+                    progressBar.close()
+                    self.setEnabled(True)
+                    raise load_error['error']
+                module = load_result['module']
+
+                progressBar.setValue(100)
                 QtGui.QApplication.processEvents()
                 progressBar.close()
                 QtGui.QApplication.processEvents()
@@ -287,9 +459,62 @@ class ModelsLibraryModalClass(QtGui.QDialog):
                 for attr_name in dir(module):
                     if attr_name.startswith("URDF_PATH"):
                         attr_value = getattr(module, attr_name)
-                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = attr_value
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': False,
+                            'xacro_args': None,
+                            'is_mjcf': False,
+                        }
+                    elif attr_name.startswith("XACRO_PATH"):
+                        attr_value = getattr(module, attr_name)
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': True,
+                            'xacro_args': None,
+                            'is_mjcf': False,
+                        }
+                    elif attr_name.startswith("MJCF_PATH"):
+                        attr_value = getattr(module, attr_name)
+                        variants[attr_name + ' (' + Path(attr_value).name + ')'] = {
+                            'path': attr_value,
+                            'is_xacro': False,
+                            'xacro_args': None,
+                            'is_mjcf': True,
+                        }
 
-                dialog = LoadURDFDialog(module, variants, parrent_window = self, package_name = radio_button.text())
+                # Add variants for additional XACRO_ARGS_* argument sets
+                # (e.g. XACRO_ARGS_NO_HAND, XACRO_ARGS_LEFT_ARM)
+                if hasattr(module, "XACRO_PATH"):
+                    for attr_name in dir(module):
+                        if attr_name.startswith("XACRO_ARGS") and attr_name != "XACRO_ARGS":
+                            xacro_args = getattr(module, attr_name)
+                            if isinstance(xacro_args, dict):
+                                variant_suffix = attr_name[len("XACRO_ARGS"):].strip('_').replace('_', ' ')
+                                variant_label = f"XACRO_PATH ({Path(module.XACRO_PATH).name}) [{variant_suffix}]"
+                                variants[variant_label] = {
+                                    'path': module.XACRO_PATH,
+                                    'is_xacro': True,
+                                    'xacro_args': xacro_args,
+                                    'is_mjcf': False,
+                                }
+
+                # Find the semantic model name of the selected package.
+                model_name = None
+                for tag in self.packages_grouped_by_tags.values():
+                    for package in tag['packages']:
+                        if package['package_label'] == radio_button.text():
+                            model_name = package.get('model_name')
+                            break
+                    if model_name:
+                        break
+
+                dialog = LoadURDFDialog(
+                    module,
+                    variants,
+                    parrent_window = self,
+                    package_name = radio_button.text(),
+                    model_name = model_name,
+                )
                 dialog.setModal(True)
                 self.setEnabled(True)
                 dialog.exec_()
@@ -300,14 +525,25 @@ class ModelsLibraryModalClass(QtGui.QDialog):
 
 
 class LoadURDFDialog(QtWidgets.QDialog):
-    def __init__(self, module, variants, parrent_window, package_name, parent=None):
+    def __init__(
+            self,
+            module,
+            variants,
+            parrent_window,
+            package_name,
+            model_name = None,
+            parent = None,
+    ):
         super(LoadURDFDialog, self).__init__(parent)
         self.module = module
         self.variants = variants
         self.parrent_window = parrent_window
         self.package_name = package_name
-        self.create_without_solids = False
-        self.remove_solid_splitter = False
+        # Semantic model name from the library, used as the robot name for
+        # MJCF/xacro imports (instead of ``converted_robot``).
+        self.model_name = model_name
+        self.create_without_solids = True
+        self.remove_solid_splitter = True
         self.initUI()
 
 
@@ -323,7 +559,7 @@ class LoadURDFDialog(QtWidgets.QDialog):
         self.radio_button_group.setExclusive(True)
 
         first = True
-        for name, path in self.variants.items():
+        for name, variant in self.variants.items():
             radio_button = QtWidgets.QRadioButton(name)
             if first:
                 radio_button.setChecked(True)
@@ -331,11 +567,12 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.radio_button_group.addButton(radio_button)
             self.layout.addWidget(radio_button)
 
-        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Don`t create solids (fast but only for view)")
+        self.create_without_solids_checkbox = QtWidgets.QCheckBox("Don`t create solids (quick view only)")
+        self.create_without_solids_checkbox.setChecked(self.create_without_solids)
         self.create_without_solids_checkbox.stateChanged.connect(self.update_create_without_solids)
         self.layout.addWidget(self.create_without_solids_checkbox)
 
-        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitters (edges) from solids")
+        self.remove_solid_splitter_checkbox = QtWidgets.QCheckBox("Remove splitters (edges) from solid`s faces (usefull for Set Placement but increases import time)")
         if self.remove_solid_splitter:
             self.remove_solid_splitter_checkbox.setChecked(True)
         self.remove_solid_splitter_checkbox.stateChanged.connect(self.update_remove_solid_splitter)
@@ -367,6 +604,32 @@ class LoadURDFDialog(QtWidgets.QDialog):
             self.remove_solid_splitter = False
 
 
+    def _ensure_active_document(self) -> bool:
+        """Return the active document, creating one if needed.
+
+        If the active document already contains objects, ask the user for
+        confirmation before adding the model to it. Return ``None`` when the
+        user cancels.
+        """
+        doc = fc.activeDocument()
+        if doc is None:
+            doc = fc.newDocument()
+            return doc
+
+        if len(doc.Objects):
+            answer = QtWidgets.QMessageBox.question(
+                self,
+                "Document is not empty",
+                "Are you sure you want to create the model in this document?"
+                " It already contains objects.",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No,
+            )
+            if answer != QtWidgets.QMessageBox.Yes:
+                return None
+        return doc
+
+
     def load_urdf(self):
         # get choosed variant
         selected_variant = None
@@ -380,13 +643,44 @@ class LoadURDFDialog(QtWidgets.QDialog):
 
         # Create model
         if selected_variant:
+            # Check that there is an active document and confirm adding the
+            # model to a non-empty document.
+            doc = self._ensure_active_document()
+            if doc is None:
+                self.setEnabled(True)
+                return
+
+            urdf_path = selected_variant['path']
+            if selected_variant['is_xacro']:
+                # Convert xacro to URDF using robot_descriptions._xacro
+                # (which uses xacrodoc) and process it by the URDF scenario.
+                from robot_descriptions._xacro import get_urdf_path as get_urdf_path_from_xacro
+                urdf_path = get_urdf_path_from_xacro(
+                    self.module,
+                    xacro_args=selected_variant['xacro_args'],
+                )
+            elif selected_variant['is_mjcf']:
+                # Convert MJCF to URDF using the MuJoCo converter and process it
+                # by the URDF scenario.
+                from freecad.cross.mjcf_utils import get_urdf_path as get_urdf_path_from_mjcf
+                urdf_path = get_urdf_path_from_mjcf(
+                    selected_variant['path'],
+                    package_path=self.module.PACKAGE_PATH,
+                    repository_path=self.module.REPOSITORY_PATH,
+                )
+            # For MJCF/xacro the generated URDF is named 'converted_robot', so
+            # use the semantic model name from the library instead.
+            name = self.model_name if (
+                selected_variant['is_xacro'] or selected_variant['is_mjcf']
+            ) else None
             robot_from_urdf_path(
-                fc.activeDocument(),
-                selected_variant,
+                doc,
+                urdf_path,
                 self.module.PACKAGE_PATH,
                 self.module.REPOSITORY_PATH,
                 create_without_solids=self.create_without_solids,
                 remove_solid_splitter=self.remove_solid_splitter,
+                name=name,
             )
             # enable buttons
             self.setEnabled(True)

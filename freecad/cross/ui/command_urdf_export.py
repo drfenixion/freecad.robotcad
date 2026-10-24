@@ -65,7 +65,9 @@ class _UrdfExportCommand:
         return {
             'Pixmap': 'urdf_export.svg',
             'MenuText': tr('Export to URDF'),
-            'ToolTip': tr('Export selected elements to URDF.\nIf robot selected create ROS2 package.'),
+            'ToolTip': tr('Export selected elements to URDF.' \
+            '\n\nIf robot selected create ROS2 package' \
+            '\n(it includes sensors, controllers config, vacuum gripper, etc.).'),
         }
 
     def Activated(self):

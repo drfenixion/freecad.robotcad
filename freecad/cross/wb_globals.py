@@ -11,6 +11,7 @@ from . import wb_constants
 PREFS_CATEGORY = wb_constants.PREFS_CATEGORY  # Category in the preferences dialog.
 PREF_VHACD_PATH = wb_constants.PREF_VHACD_PATH  # Path to the V-HACD executable.
 PREF_OVERCROSS_TOKEN = wb_constants.PREF_OVERCROSS_TOKEN  # Auth token for external code generator
+PREF_ALIGN_Z_AXIS_LCS = wb_constants.PREF_ALIGN_Z_AXIS_LCS  # Align Z-axis of LCS to zero rotation (affects Set Placement tools and New LCS tool)
 
 # Session-wide globals.
 g_ros_distro = get_ros_distro_from_env_or_default()

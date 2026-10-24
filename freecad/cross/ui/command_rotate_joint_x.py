@@ -46,7 +46,7 @@ class _RotateJointXCommand:
         doc = fc.activeDocument()
 
         doc.openTransaction(tr("Rotate joint origin by X axis"))
-        rotate_origin(x = 90, y = None, z = None)
+        rotate_origin(x = 45, y = None, z = None)
         doc.commitTransaction()
 
         doc.recompute()

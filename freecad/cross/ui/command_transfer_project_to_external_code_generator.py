@@ -46,7 +46,11 @@ class _TransferProjectToExternalCodeGeneratorCommand:
                 '     - ROS 2 package files\n'
                 '     - etc.\n'
                 '\n'
-                'Provided by robotcad.ru',
+                'Provided by robotcad.ru\n\n'
+                'It can be not accessible in some countries.\n' \
+                'If it is your case i believe you know how to do with it.\n' \
+                'If not and you want to use it with paid subscription\n' \
+                'it is possible to add hosting in your region (for request it.project.devel@gmail.com).',
             ),
         }
 
@@ -145,6 +149,7 @@ class _TransferProjectToExternalCodeGeneratorCommand:
               data={'token': token},
               files={'file': f},
               allow_redirects=True,
+              timeout=(10, 30)  # 10 sec to connect, 30 to read answer
           )
 
       if r.status_code == 402:

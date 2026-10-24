@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from math import degrees
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
@@ -16,16 +17,17 @@ from freecad.cross.urdf_loader import UrdfLoader
 try:
     from PySide import QtGui, QtCore, QtWidgets
 except:
-    from PySide2 import QtGui, QtCore, QtWidgets
+    from PySide6 import QtGui, QtCore, QtWidgets
 
 from freecad.cross.freecadgui_utils import get_progress_bar, set_collision_appearance
-from .freecad_utils import add_object
+from .freecad_utils import add_object, message
 from .freecad_utils import make_group
 from .freecad_utils import warn
 from .joint_proxy import make_joint
 from .link_proxy import make_link
 from .robot_proxy import make_robot
 from .wb_utils import get_joints
+from .wb_utils import ros_name
 
 try:
     from .urdf_parser_utils import axis_to_z
@@ -108,6 +110,32 @@ def get_urdf_robot_from_urdf_filename(
     return urdf_robot
 
 
+def _log_import_time(
+        start: datetime,
+        end: datetime,
+        source: str,
+) -> None:
+    """Log the model import duration to the Report view (info level).
+
+    Parameters
+    ----------
+    - start: import start time.
+    - end: import end time.
+    - source: description of the import source, e.g. the model name or file.
+
+    """
+    duration = end - start
+    total_seconds = duration.total_seconds()
+    minutes = int(total_seconds // 60)
+    seconds = total_seconds - minutes * 60
+    message(
+        f'[info] Model import "{source}":\n'
+        f'  start: {start.strftime("%H:%M:%S")}\n'
+        f'  end:   {end.strftime("%H:%M:%S")}\n'
+        f'  duration: {minutes} min {seconds:.1f} s\n',
+    )
+
+
 def robot_from_urdf_path(
         doc: fc.Document,
         filename_path,
@@ -115,13 +143,18 @@ def robot_from_urdf_path(
         repository_path = None,
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
+        name: str = None,
 ) -> CrossRobot:
+    start = datetime.now()
     urdf_robot = get_urdf_robot_from_urdf_filename(
         filename_path,
         package_path,
         repository_path,
     )
-    robot = robot_from_urdf(doc, urdf_robot, create_without_solids, remove_solid_splitter)
+    robot = robot_from_urdf(
+        doc, urdf_robot, create_without_solids, remove_solid_splitter, name,
+    )
+    _log_import_time(start, datetime.now(), str(filename_path))
 
     return robot
 
@@ -132,12 +165,14 @@ def assembly_from_urdf_path(
         package_path = None,
         repository_path = None,
 ) -> CrossRobot:
+    start = datetime.now()
     urdf_robot = get_urdf_robot_from_urdf_filename(
         filename_path,
         package_path,
         repository_path,
     )
     robot = assembly_from_urdf(doc, urdf_robot)
+    _log_import_time(start, datetime.now(), str(filename_path))
 
     return robot
 
@@ -171,13 +206,35 @@ def get_real_pkg_path(
 
 
 
+def _update_progress(progressBar, i: int, throttle: int = 5) -> None:
+    """Update the progress bar, throttling GUI event processing.
+
+    Calling `processEvents()` after every single object creation is very
+    expensive for models with many links/joints, so it is only done every
+    `throttle` steps.
+    """
+    progressBar.setValue(i)
+    if i % throttle == 0:
+        QtGui.QApplication.processEvents()
+
+
 def robot_from_urdf(
         doc: fc.Document,
         urdf_robot: UrdfRobot,
         create_without_solids: bool = False,
         remove_solid_splitter: bool = False,
+        name: str = None,
 ) -> CrossRobot:
-    """Creates a CROSS::Robot from URDF."""
+    """Creates a CROSS::Robot from URDF.
+
+    Parameters
+    ----------
+    - name: optional robot name override. When not given, the name from the
+      URDF description (``urdf_robot.name``) is used. The models library
+      passes the semantic model name here so converted MJCF/xacro robots are
+      not called ``converted_robot``.
+
+    """
     doc.openTransaction(tr('Robot from URDF'))
 
     pkg_name = ''
@@ -191,11 +248,10 @@ def robot_from_urdf(
     progressBar.show()
 
     i = 0
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 1
 
-    robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, urdf_robot.name)
+    robot, parts_group, solids_meshes_group, collision_group, real_group, visual_group = _make_robot(doc, name or urdf_robot.name)
     # Change the Show properties before having added all links.
     # Disable show of all for not creating any link to real, visial, collision
     # in progress of creating robot links
@@ -204,13 +260,17 @@ def robot_from_urdf(
         robot.ViewObject.ShowVisual = False
         robot.ViewObject.ShowCollision = False
 
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    # Defer the expensive `execute()` (joint enums, joint variables, poses)
+    # until all links and joints have been added. Otherwise `onChanged` runs
+    # it after every single `addObject`, which is O(N^2) overall and makes
+    # the import slower and slower as the robot grows.
+    robot.Proxy.set_batch_mode(True)
+
+    _update_progress(progressBar, i)
     i += 1
 
     colors = _get_colors(urdf_robot)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 1
 
     convert_mesh_to_solid = True
@@ -218,8 +278,7 @@ def robot_from_urdf(
         convert_mesh_to_solid = False
 
     for urdf_link in urdf_robot.links:
-        progressBar.setValue(i)
-        QtGui.QApplication.processEvents()
+        _update_progress(progressBar, i)
         i += 1
         ros_link, visual_part, collision_part, real_part = _add_ros_link(
             urdf_link, robot, collision_group, real_group, visual_group,
@@ -254,21 +313,18 @@ def robot_from_urdf(
 
     joint_map: dict[str, CrossJoint] = {}
     for urdf_joint in urdf_robot.joints:
-        progressBar.setValue(i)
-        QtGui.QApplication.processEvents()
+        _update_progress(progressBar, i)
         i += 1
         ros_joint = _add_ros_joint(urdf_joint, robot)
         joint_map[urdf_joint.name] = ros_joint
     # Mimic joints must be handled after creating all joints because the
     # mimicking joint can be defined before the mimicked joint in URDF.
     _define_mimic_joints(urdf_robot, joint_map)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 2
 
-    _compensate_joint_placement(robot, urdf_robot, joint_map)
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _canonicalize_joint_axis(robot, urdf_robot, joint_map)
+    _update_progress(progressBar, i)
     i += 3
 
     # Change the visual properties after having added all links.
@@ -276,13 +332,18 @@ def robot_from_urdf(
         robot.ViewObject.ShowReal = False
         robot.ViewObject.ShowVisual = True
         robot.ViewObject.ShowCollision = False
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
     i += 2
 
+    # All links and joints have been added. Run the deferred `execute()`
+    # (joint enums, joint variables, poses) once and re-enable the normal
+    # onChanged behavior.
+    robot.Proxy.set_batch_mode(False)
+    _update_progress(progressBar, i)
+    i += 1
+
     doc.recompute()
-    progressBar.setValue(i)
-    QtGui.QApplication.processEvents()
+    _update_progress(progressBar, i)
 
     progressBar.close()
     QtGui.QApplication.processEvents()
@@ -298,8 +359,9 @@ def _make_robot(
 
     Return (robot object, parts group).
 
-    The group called 'URDF Parts' is potentially created and returned. If the object
-    'URDF Parts' is not a group, a different name will be given.
+    The group called 'URDF Parts' is potentially created and returned.
+    If the object 'URDF Parts' is not a group, a different name will
+    be given.
 
     """
 
@@ -450,6 +512,29 @@ def _set_link_inertial(
         ros_link.Izz = urdf_link.inertial.inertia.izz
 
 
+def _set_joint_enum_lists(
+        ros_joint: CrossJoint,
+        parent: str,
+        child: str,
+) -> None:
+    """Set minimal Parent/Child enum lists so the values can be assigned.
+
+    In batch mode `RobotProxy.set_joint_enum()` is deferred, so the enum
+    lists would be empty when assigning `Parent`/`Child` in `_add_ros_joint`.
+    Setting the lists explicitly (a list assignment sets the enumeration)
+    allows the values to be assigned without triggering the O(N^2) recompute.
+    The full enum lists are set by `set_joint_enum()` when batch mode is
+    disabled.
+
+    """
+    parent_links: list[str] = [''] + ([parent] if parent else [])
+    child_links: list[str] = [''] + ([child] if child else [])
+    if ros_joint.getEnumerationsOfProperty('Parent') != parent_links:
+        ros_joint.Parent = parent_links
+    if ros_joint.getEnumerationsOfProperty('Child') != child_links:
+        ros_joint.Child = child_links
+
+
 def _add_ros_joint(
         urdf_joint: UrdfJoint,
         robot: CrossRobot,
@@ -459,8 +544,23 @@ def _add_ros_joint(
     ros_joint.Label2 = urdf_joint.name
     ros_joint.adjustRelativeLinks(robot)
     robot.addObject(ros_joint)
-    ros_joint.Parent = urdf_joint.parent
-    ros_joint.Child = urdf_joint.child
+    # The joint Parent/Child enumerations (see RobotProxy.set_joint_enum) are
+    # built from the link labels (ros_name), while the URDF gives the raw link
+    # names (stored in Link.Label2). When a copy of the model already exists in
+    # the document, FreeCAD uniquifies the duplicate labels (e.g. `link` ->
+    # `link001`), so storing the raw URDF names here would make the later
+    # resolution by ros_name silently fail: `_canonicalize_joint_axis` and
+    # `_set_child_placement` resolve the parent/child links through
+    # `ros_name()` and would leave the joint axis and the link MountedPlacement
+    # uncompensated, i.e. with a wrong placement. Resolve the URDF names to the
+    # labels of this robot's links and store those instead.
+    parent_link = robot.Proxy.get_link(urdf_joint.parent, label1_first = False)
+    child_link = robot.Proxy.get_link(urdf_joint.child, label1_first = False)
+    parent_name = ros_name(parent_link) if parent_link else urdf_joint.parent
+    child_name = ros_name(child_link) if child_link else urdf_joint.child
+    _set_joint_enum_lists(ros_joint, parent_name, child_name)
+    ros_joint.Parent = parent_name
+    ros_joint.Child = child_name
     ros_joint.Type = urdf_joint.type
     ros_joint.Origin = placement_along_z_from_joint(urdf_joint)
     if urdf_joint.limit is not None:
@@ -473,8 +573,8 @@ def _add_ros_joint(
         # All attributes of `limit` are compulsory.
         ros_joint.LowerLimit = factor * urdf_joint.limit.lower
         ros_joint.UpperLimit = factor * urdf_joint.limit.upper
-        ros_joint.Effort = urdf_joint.limit.effort
-        ros_joint.Velocity = urdf_joint.limit.velocity
+        ros_joint.Effort = urdf_joint.limit.effort  # Nm or N also in CROSS.
+        ros_joint.Velocity = factor * urdf_joint.limit.velocity
     return ros_joint
 
 
@@ -520,19 +620,23 @@ def _define_mimic_joints(
         ros_joint.Offset = offset
 
 
-def _compensate_joint_placement(
+def _canonicalize_joint_axis(
         robot: CrossRobot,
         urdf_robot: UrdfRobot,
         joint_map: dict[str, CrossJoint],
 ) -> None:
     """Make all joints about/around the z axis."""
+    # Build a reverse map once instead of scanning the dict for every joint.
+    ros_joint_to_name = {ros_joint: name for name, ros_joint in joint_map.items()}
     chains = robot.Proxy.get_chains()
     already_compensated_joints: set[CrossJoint] = set()
     for chain in chains:
         ros_joints = get_joints(chain)
         previous_rotation_to_z = fc.Rotation()
         for ros_joint in ros_joints:
-            name = list(joint_map.keys())[list(joint_map.values()).index(ros_joint)]
+            name = ros_joint_to_name.get(ros_joint)
+            if name is None:
+                continue
             urdf_joint = urdf_robot.joint_map[name]
             rotation_to_z = axis_to_z(urdf_joint)
             if ros_joint in already_compensated_joints:
@@ -693,7 +797,7 @@ def _add_geometries(
 
     `geometries` is either `visuals` or `collisions` and the geometry itself is
     `geometries[?].geometry`.
-    If `name_linked_geom` is empty, not FC link is created in `link`.
+    If `name_linked_geom` is empty, no FC link is created in `link`.
 
     Return the list of objects representing the geometries and the list of
     FreeCAD links.

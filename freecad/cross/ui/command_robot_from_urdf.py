@@ -11,8 +11,9 @@ try:
     from ..robot_from_urdf import robot_from_urdf_path
     imports_ok = True
 except ImportError as e:
-    # TODO: Warn the user more nicely.
-    warn(str(e) + '. Robot from URDF tool is disabled.', gui=False)
+    # Reported when the workbench is activated, not at FreeCAD start-up.
+    from ..deferred_messages import add_message
+    add_message(str(e) + '. Robot from URDF tool is disabled.')
     imports_ok = False
 
 

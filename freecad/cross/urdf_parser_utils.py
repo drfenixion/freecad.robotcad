@@ -1,10 +1,6 @@
 # Utility function depending on the `urdf_parser_py` module (provided by ROS).
 
-from __future__ import annotations
-
-import gc
 from pathlib import Path
-from typing import Optional
 
 import FreeCAD as fc
 
@@ -22,7 +18,7 @@ from .freecad_utils import add_object, is_part_feature
 from .freecad_utils import is_group
 from .freecad_utils import is_mesh
 from .freecad_utils import warn
-from .mesh_utils import read_mesh_dae
+from .mesh_utils import read_obj_dae
 from .mesh_utils import scale_mesh_object
 from .ros.utils import abs_path_from_ros_path
 from .ros.utils import pkg_and_file_from_ros_path
@@ -32,16 +28,16 @@ from .urdf_utils import rotation_from_rpy
 # Typing hints.
 Doc = fc.Document
 DO = fc.DocumentObject
-Shape = [Box, Cylinder, Mesh, Sphere]
+Shape = Box | Cylinder | Mesh | Sphere
 
 
 def obj_from_geometry(
         geometry: Shape,
-        doc_or_group: [Doc | DO],
+        doc_or_group: Doc | DO,
         convert_mesh_to_solid: bool = False,
         min_vol_instead_zero: bool = False,
         remove_solid_splitter: bool = False,
-) -> tuple[Optional[DO], Optional[Path]]:
+) -> tuple[DO | None, Path | None]:
     """Return a FreeCAD object for the URDF shape with the path for meshes."""
     if isinstance(geometry, Box):
         return obj_from_box(geometry, doc_or_group, min_vol_instead_zero)
@@ -115,9 +111,9 @@ def placement_along_z_from_joint(
 
 def obj_from_box(
         geometry: Box,
-        doc_or_group: [Doc | DO],
+        doc_or_group: Doc | DO,
         min_vol_instead_zero: bool = False,
-) -> tuple[Optional[DO], None]:
+) -> tuple[DO, None]:
     """Return a `Part::Box` object and None.
 
     Return a `Part::Box` object for the URDF shape.
@@ -132,6 +128,7 @@ def obj_from_box(
         if geometry.size[2] <= 0:
             geometry.size[2] = 0.000001
 
+    # A box with its reference point at the lower-left-front corner.
     obj = add_object(doc_or_group, 'Part::Box', 'box')
     obj.Length = geometry.size[0] * 1000.0  # m to mm.
     obj.Width = geometry.size[1] * 1000.0
@@ -140,11 +137,26 @@ def obj_from_box(
     return obj, None
 
 
+def obj_from_sphere(
+        geometry: Sphere,
+        doc_or_group: Doc | DO,
+        min_vol_instead_zero: bool = False,
+) -> tuple[DO, None]:
+
+    if min_vol_instead_zero:
+        if geometry.radius <= 0:
+            geometry.radius = 0.000001
+
+    obj = add_object(doc_or_group, 'Part::Sphere', 'sphere')
+    obj.Radius = geometry.radius * 1000.0  # m to mm.
+    return obj, None
+
+
 def obj_from_cylinder(
         geometry: Cylinder,
-        doc_or_group: [Doc | DO],
+        doc_or_group: Doc | DO,
         min_vol_instead_zero: bool = False,
-) -> tuple[Optional[DO], None]:
+) -> tuple[DO, None]:
     """Return a `Part::Cylinder` object and None.
 
     Return a `Part::Cylinder` object for the URDF shape.
@@ -157,6 +169,8 @@ def obj_from_cylinder(
         if geometry.length <= 0:
             geometry.length = 0.000001
 
+    # A cylinder along the z-axis with its reference point at the middle of the
+    # bottom disc.
     obj = add_object(doc_or_group, 'Part::Cylinder', 'cylinder')
     obj.Radius = geometry.radius * 1000.0  # m to mm.
     obj.Height = geometry.length * 1000.0  # m to mm.
@@ -166,21 +180,22 @@ def obj_from_cylinder(
 
 def obj_from_mesh(
         geometry: Mesh,
-        doc_or_group: [Doc | DO],
+        doc_or_group: Doc | DO,
         convert_mesh_to_solid: bool = False,
         remove_solid_splitter: bool = False,
-) -> tuple[Optional[DO], Optional[Path]]:
-    """Return a `Mesh::Feature` object and the path to its file.
+) -> tuple[DO | None, Path | None]:
+    """
+    Return a document object and the path to the original file.
 
-    Return a `Mesh::Feature` object for the URDF shape and the path to its
-    file.
+    Return a `Mesh::Feature` or a `App::Part` object for the URDF shape
+    and the absolute path to the associated file.
+
     If the same file was already imported, return the corresponding existing
     object.
-
     """
     mesh_path = abs_path_from_ros_path(geometry.filename)
     if not mesh_path:
-        pkg, rel_path = pkg_and_file_from_ros_path(mesh_path)
+        pkg, _ = pkg_and_file_from_ros_path(geometry.filename)
         if pkg:
             warn(f'ROS package {pkg} not found, cannot read {geometry.filename}')
         else:
@@ -207,79 +222,92 @@ def obj_from_mesh(
             if obj.Label2 == mesh_ros_path:
                 return obj, mesh_path
 
-    if mesh_path.suffix.lower() == '.dae':
-        raw_mesh = read_mesh_dae(mesh_path)
-    else:
-        raw_mesh = fcmesh.read(str(mesh_path))
-
     if not mesh_ros_path:
         warn(f'Empty mesh_ros_path. Skip mesh file - ' + str(mesh_path))
         return None, None
 
-    mesh_obj = doc.addObject('Mesh::Feature', mesh_path.name)
-    mesh_obj.Label = mesh_path.name
-    mesh_obj.Label2 = mesh_ros_path
-    mesh_obj.Mesh = raw_mesh
+    # Import a new mesh.
+    if mesh_path.suffix.lower() == '.dae':
+        mesh_objects = read_obj_dae(mesh_path, doc)
+        for obj in mesh_objects:
+            scale_mesh_object(obj, geometry.scale)
+        if not mesh_objects:
+            return None, None
+        if len(mesh_objects) == 1:
+            mesh_obj = mesh_objects[0]
+            mesh_obj.Label2 = mesh_ros_path
+        if len(mesh_objects) > 1:
+            part_with_mesh_objs = add_object(doc_or_group, 'App::Part', mesh_path.stem)
+            part_with_mesh_objs.Label = mesh_path.name
+            part_with_mesh_objs.Label2 = mesh_ros_path
+            for mesh_obj in mesh_objects:
+                part_with_mesh_objs.addObject(mesh_obj)
+            mesh_obj = part_with_mesh_objs # unify processing
+    else: #other format.
+        raw_mesh = fcmesh.read(str(mesh_path))
+        mesh_obj = doc.addObject('Mesh::Feature', mesh_path.name)
+        mesh_obj.Label = mesh_path.name
+        mesh_obj.Label2 = mesh_ros_path
+        mesh_obj.Mesh = raw_mesh
 
     if mesh_path.suffix.lower() in ['.stl', '.obj']:
         scale_mesh_object(mesh_obj, 1000.0)  # m to mm.
-    if ((geometry.scale is not None)
-            and (
-                not (geometry.scale == 1.0)
-                or geometry.scale == [1.0, 1.0, 1.0]
-            )):
         scale_mesh_object(mesh_obj, geometry.scale)
 
-    mesh_or_solid_obj = mesh_obj
-
     if convert_mesh_to_solid:
-        import Part
         try:
-            ### Begin command Part_ShapeFromMesh
-            mesh_obj_shape = doc.addObject('Part::Feature', mesh_obj.Label2 + '_shape')
-            __shape__ = Part.Shape()
-            __shape__.makeShapeFromMesh(mesh_obj.Mesh.Topology, 0.100000, False)
-            mesh_obj_shape.Shape = __shape__
-            mesh_obj_shape.purgeTouched()
-            del __shape__
-            ### Begin command Part_MakeSolid
-            mesh_obj_solid = doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
-            mesh_obj_solid.Label = mesh_path.name
-            mesh_obj_solid.Label2 = mesh_ros_path
-            shell = Part.Shell(mesh_obj_shape.Shape.Faces)
-            if remove_solid_splitter:
-                try:
-                    shell = shell.removeSplitter()
-                except:
-                    warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
-                    pass
-            mesh_obj_solid.Shape = Part.Solid(shell)
-            mesh_obj_solid.purgeTouched()
-            mesh_or_solid_obj = mesh_obj_solid
-            del mesh_obj_solid, shell
-            # Remove intermediate objects
-            doc.removeObject(mesh_obj_shape.Name)
-            doc.removeObject(mesh_obj.Name)
-            gc.collect()
+            if mesh_obj.TypeId == 'App::Part':
+                
+                for el in mesh_obj.Group:
+                   solid_obj = mesh_to_solid(doc, el, mesh_path, mesh_ros_path, remove_solid_splitter)
+                   mesh_obj.addObject(solid_obj)
+                if group:
+                    group.addObject(solid_obj)
+            else:
+                solid_obj = mesh_to_solid(doc, mesh_obj, mesh_path, mesh_ros_path, remove_solid_splitter)
+                if group:
+                    group.addObject(solid_obj)
+                mesh_obj = solid_obj
+                
+            return mesh_obj, mesh_path
         except Exception as e:
             warn(f'Can`t create solid for mesh. Skip creating solid. ' + str(e))
             return None, None
-    if group:
-        group.addObject(mesh_or_solid_obj)
+    else:
+        if group:
+            group.addObject(mesh_obj)
 
-    return mesh_or_solid_obj, mesh_path
+    return mesh_obj, mesh_path
 
 
-def obj_from_sphere(
-        geometry: Sphere,
-        doc_or_group: [Doc | DO],
-        min_vol_instead_zero: bool = False,
-) -> tuple[Optional[DO], None]:
+def mesh_to_solid(doc, mesh_obj, mesh_path, mesh_ros_path, remove_solid_splitter):
+    import Part
+    import gc
+    ### Begin command Part_ShapeFromMesh
+    mesh_obj_shape = doc.addObject('Part::Feature', mesh_obj.Label2 + '_shape')
+    __shape__ = Part.Shape()
+    __shape__.makeShapeFromMesh(mesh_obj.Mesh.Topology, 0.100000, False)
+    mesh_obj_shape.Shape = __shape__
+    mesh_obj_shape.purgeTouched()
+    del __shape__
+    ### Begin command Part_MakeSolid
+    mesh_obj_solid = doc.addObject("Part::Feature", mesh_obj.Label2 + '_solid')
+    mesh_obj_solid.Label = mesh_path.name
+    mesh_obj_solid.Label2 = mesh_ros_path
+    shell = Part.Shell(mesh_obj_shape.Shape.Faces)
+    if remove_solid_splitter:
+        try:
+            shell = shell.removeSplitter()
+        except:
+            warn('Can`t remove splitter from body - ' + mesh_obj_solid.Label)
+            pass
+    mesh_obj_solid.Shape = Part.Solid(shell)
+    mesh_obj_solid.purgeTouched()
+    mesh_or_solid_obj = mesh_obj_solid
+    del mesh_obj_solid, shell
+    # Remove intermediate objects
+    doc.removeObject(mesh_obj_shape.Name)
+    doc.removeObject(mesh_obj.Name)
+    gc.collect()
 
-    if min_vol_instead_zero:
-        if geometry.radius <= 0:
-            geometry.radius = 0.000001
-
-    obj = add_object(doc_or_group, 'Part::Sphere', 'sphere')
-    obj.Radius = geometry.radius * 1000.0  # m to mm.
-    return obj, None
+    return mesh_or_solid_obj

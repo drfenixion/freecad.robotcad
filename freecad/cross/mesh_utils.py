@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 from typing import Iterable
 
 import FreeCAD as fc
-
-import Mesh  # FreeCAD
+import Mesh as fcmesh  # FreeCAD
+from importers.importDAE import insert as insert_dae  # FreeCAD's BIM workbench
 
 from . import wb_globals
 from .deep_copy import deep_copy_object
-from .freecad_utils import is_mesh
-from .freecad_utils import warn
+from .freecad_utils import is_mesh, warn
 from .import_dae import export as export_dae
-from .import_dae import read as read_dae
 from .wb_gui_utils import WbSettingsGetter
-from .wb_utils import get_workbench_param
-from .wb_utils import set_workbench_param
+from .wb_utils import get_workbench_param, set_workbench_param
 
 # Typing hints.
 DO = fc.DocumentObject
@@ -28,16 +25,17 @@ DOList = Iterable[DO]
 
 def read_mesh_dae(
         filename: Path | str,
-) -> Mesh.Mesh:
+) -> fcmesh.Mesh:
+    """Read a mesh from a Collada file."""
     current_doc = fc.activeDocument()
     path = Path(filename)
-    # `read_dae` does not export its object, so we need to let it create an
+    # `insert_dae` does not return its objects, so we need to let it create an
     # object in a temporary document.
     tmp_doc = fc.newDocument(hidden=True, temp=True)
     fc.setActiveDocument(tmp_doc.Name)
-    read_dae(str(path))
+    insert_dae(str(path), tmp_doc.Name)
     tmp_doc.recompute()
-    merged_raw_mesh = Mesh.Mesh()
+    merged_raw_mesh = fcmesh.Mesh()
     for mesh_obj in tmp_doc.Objects:
         if hasattr(mesh_obj, 'Mesh'):
             merged_raw_mesh.addMesh(mesh_obj.Mesh)
@@ -65,7 +63,7 @@ def save_mesh_dae(
 
 def read_mesh(
         filename: Path | str,
-) -> Mesh.Mesh:
+) -> fcmesh.Mesh:
     """Read a mesh from a file.
 
     All files format supported by the Mesh module are supported.
@@ -77,9 +75,9 @@ def read_mesh(
     # object in a temporary document.
     tmp_doc = fc.newDocument(hidden=True, temp=True)
     fc.setActiveDocument(tmp_doc.Name)
-    Mesh.insert(str(path))
+    fcmesh.insert(str(path))
     tmp_doc.recompute()
-    merged_raw_mesh = Mesh.Mesh()
+    merged_raw_mesh = fcmesh.Mesh()
     for mesh_obj in tmp_doc.Objects:
         if hasattr(mesh_obj, 'Mesh'):
             merged_raw_mesh.addMesh(mesh_obj.Mesh)
@@ -101,7 +99,33 @@ def save_mesh(
     """
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     # TODO: scale to meters.
-    Mesh.export([obj], str(filename))
+    fcmesh.export([obj], str(filename))
+
+
+def read_obj_dae(
+        filename: Path | str,
+        doc: fc.Document,
+) -> list[DO]:
+    """Read a mesh from a Collada file and return Mesh::Feature objects."""
+    path = Path(filename)
+    # `insert_dae` does not return its objects, so we need to let it create an
+    # object in a temporary document.
+    tmp_doc = fc.newDocument(hidden=True, temp=True)
+    fc.setActiveDocument(tmp_doc.Name)
+    insert_dae(str(path), tmp_doc.Name)
+    tmp_doc.recompute()
+    mesh_objects: list[DO] = []
+    for mesh_obj in tmp_doc.Objects:
+        mesh_obj_copy = doc.addObject('Mesh::Feature', mesh_obj.Name)
+        mesh_obj_copy.Label = mesh_obj.Label
+        mesh_obj_copy.Mesh = mesh_obj.Mesh
+        # Must recompute before applying colors.
+        doc.recompute()
+        mesh_obj_copy.ViewObject.ShapeAppearance = mesh_obj.ViewObject.ShapeAppearance
+        mesh_objects.append(mesh_obj_copy)
+    fc.setActiveDocument(doc.Name)
+    fc.closeDocument(tmp_doc.Name)
+    return mesh_objects
 
 
 def scale_mesh_object(obj: DO, scale_factor: float | Iterable[float]) -> None:
@@ -113,6 +137,13 @@ def scale_mesh_object(obj: DO, scale_factor: float | Iterable[float]) -> None:
     - scale_factor: a single float or a list of 3 floats.
 
     """
+    if not ((scale_factor is not None)
+            and (
+                not (scale_factor == 1.0)
+                or scale_factor == [1.0, 1.0, 1.0]
+            )):
+        return
+
     if not is_mesh(obj):
         raise RuntimeError(
             'First argument must be `Mesh::Feature` FreeCAD object',
@@ -136,7 +167,7 @@ def scale_mesh_object(obj: DO, scale_factor: float | Iterable[float]) -> None:
 
 def get_simplified_mesh(
         obj: DO,
-) -> Mesh.Mesh:
+) -> fcmesh.Mesh:
     """Create a simplified mesh from a FreeCAD object.
 
     Create an approximate-convex-decomposition mesh with V-HACD.
@@ -180,7 +211,7 @@ def get_simplified_mesh(
     tmp_dir = tempfile.TemporaryDirectory(prefix='cross-vhacd-')
     # Input for V-HACD, must be an OBJ file.
     tmp_input_obj = tempfile.NamedTemporaryFile(suffix='.obj', dir=tmp_dir.name, delete=False)
-    Mesh.export([obj], tmp_input_obj.name)
+    fcmesh.export([obj], tmp_input_obj.name)
     # The name of the output file cannot be specified with V-HACD as of
     # 2022-11-22 (commit 454913f), it is 'decomp.obj', along other files.
     try:

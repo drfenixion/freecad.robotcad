@@ -1,6 +1,6 @@
 # RobotCAD
 
-RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2]. RobotCAD also known as OVERCROSS.
+RobotCAD is a FreeCAD workbench to generate robot description packages (xacro or URDF) for the Robot Operating System, [ROS2].
 
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank">RobotCAD 3.0.0 workflow demo</a>
 <a href="https://youtu.be/T_OGQFc9IMk" target="_blank"><img src="https://github.com/user-attachments/assets/2a85ad00-bfe0-4242-bbc1-178cf92cfc0e" alt="RobotCAD 3.0.0 workflow video"/></a>
@@ -27,6 +27,7 @@ Video of creating controllable models: <br />
 1. Autoinstall and run by startup script.
 1. Modeling parts (in FreeCAD).
 1. Converter Assembly WB (default) to RobotCAD structure. You can use converter or manually create robot structure in RobotCAD.
+1. AI Generator of robot structure from primitives by text description (fast stend prototyping). 
 1. Creating robot structure (joints, links, elements of link (Collisions, Visuals, Reals), etc)
     1. Automatic creating links by selected objects
     1. Automatic creating joints by selected links
@@ -43,30 +44,59 @@ Video of creating controllable models: <br />
 1. Collisions automatic making tools (based on Real element of robot link)
 1. Controllers and sensor data broadcasters based on ros2_controllers (ros2_control)
     1. Add the necessary controllers and broadcasters to the robot and you have a robot ready to be controlled in the simulation
-1. Sensors based on Gazebo sensors
+1. Sensors based on Gazebo sensors. Field of view visualization depends on sensor parameters.
     1. Add the necessary sensors and use it in Gazebo.
 1. Integrated ready to use models library
+1. Explode View with adjustable offset and states memory.
+1. Agentic assembling - MCP server.
 1. Basic code generator:
-    1. ROS2 package with launchers for Gazebo, RViz
+    1. ROS2 package with launchers for Gazebo, RViz, PX4, Sverk
     1. URDF (kinematics, mass, inertia, sensors, etc.)
     1. Meshes
     1. SDF maps created by "Custom world" tool (map editor)
     1. Controllers config (use extended generator if need all ready to use controllers code)
-1. Tool for use external extended code generating service (startup script, docker, multicopters, all required code for controllers)
-    1. External code generator:
+1. Tool for use External Extended Code Generating service (startup script, docker, multicopters, all required code for controllers, AI VLM agent package)
+    1. External Code Generator:
         1. all of basic code generator
-        1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker)
+        1. AI agent package for manage robot (local or cloud Ollama VLM integarated in project startup script via docker). You can control robot by chat with it.
         1. Project structure
         1. Startup script for build and run docker container with all dependencies of project
         1. Init Git with submodules for dependencies management
         1. Docker related code (dockerfiles, etc) (you dont need to manually install ROS2 or Gazebo, it will be installed automatically in docker)
         1. ros2_controllers (integrated in your package with ros2_control launcher)
-        1. Specific robot types code (multicopter - PX4 + Gazebo + ROS2)
+        1. Multicopter - PX4 or Sverk (PX4 based framework) + Gazebo + ROS2, all required code for your custom model and dependencies.
         1. Nvidia video cards container support
         1. README instruction how to use
-1. all features from CROSS workbench
 
-# Fast install and run
+# Here various installation options (choose one):
+Recomended FreeCAD version is 1.1.* AppImage. FreeCAD 1.2.*dev also can be used.
+
+## FreeCAD Addon Manager - Recommended
+_Some tools (MoveIt integration, Gazebo map editor) will requires installed ROS2 or Gazebo, but other tools will works._
+
+Open FreeCAD
+
+Click the Edit -> Preferencies -> Addon Manager Options
+
+Go to the Custom repositories block
+
+Click + button and enter the repository URL: https://github.com/drfenixion/freecad.robotcad, branch: 'main'
+
+Click OK to save the settings
+
+Go to Tools → Addon Manager
+
+Search for RobotCAD in the Addon Manager
+
+Click Install
+
+Restart FreeCAD
+
+<img width="2560" height="1576" alt="addon_manager" src="https://github.com/user-attachments/assets/9530e6e9-aa07-47b8-bb73-35971f3b2520" />
+
+## Fast install and run script
+_Script installs also ROS2 + Gazebo in Docker, its required for some tools. FreeCAD will be run from inside the Docker._
+
 If you have Docker (buildx, compose plugins) installed or have Ubuntu OS (Docker will be autoinstalled) just do:
 ```
 cd ~/
@@ -81,6 +111,10 @@ cd ~/ && git clone https://github.com/drfenixion/freecad.robotcad.git && cd free
 Tested on Ubuntu 24.04, 22.04, 20.04 and Windows 10 via WSL2 (Ubuntu 22.04).
 
 If Docker is not installed and OS is Ubuntu script will try to install Docker automatically in other case you must install docker manually. In case of manually Docker installation look at [docker/README.md](https://github.com/drfenixion/freecad.robotcad/blob/main/docker/README.md). There is also additional information about folders where you should store projects files.
+
+## Fast install and run script with FreeCAD 1.1 AppImage - Recommended
+Do same as **Fast install and run script** section.
+Place FreeCAD 1.1 AppImage to docker/freecad/freecad_custom_appimage_dir and do `bash run.bash -cif` (in docker dir) one time and then for regular run `bash run.bash -ci`. Dont forget to update RobotCAD before and make FreeCAD 1.1 AppImage executable.
 
 **You also can install RobotCAD manually via FreeCAD Addon manager by** [Installation](https://github.com/drfenixion/freecad.robotcad#Installation) **section.**
 
@@ -228,7 +262,7 @@ Compatible with ROS2.
 - Get the current planning scene (relies on the /get_planning_scene service of type `moveit_msgs/srv/GetPlanningScene`)
 - Define a pose and possibly bring a specific link to it. All links that are fixed to this link will follow but the inverse kinematic solutions are not shown.
 
-## Installation 
+## OLD Installation
 
 You need a recent version of FreeCAD (v1 or above) with the ability to configure custom repositories for the Addon Manager to install the workbench via the Addon Manager. On earlier version you're on your own, see instructions for local install below.
 
@@ -292,7 +326,7 @@ If you want to work on this workbench you have the following options (choose one
 ```
 git clone https://github.com/drfenixion/freecad.robotcad.git
 cd freecad.robotcad/docker
-bash run.bash -d
+bash run.bash -dfc
 ```
 - Install RobotCAD manually via Conda, see installation section. Run FreeCAD with DEBUG=1 env.
 ```
