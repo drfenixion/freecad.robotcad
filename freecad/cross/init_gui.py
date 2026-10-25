@@ -400,11 +400,6 @@ class CrossWorkbench(fcgui.Workbench):
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
             'DuplicateRobot',  # Defined in ./ui/command_duplicate_robot.py.
-            'Separator',
-            # # CROSS sensors
-            # 'NewRgbCamera',  # Defined in ./ui/command_new_rgb_camera.py.
-            # 'NewLidar2d',  # Defined in ./ui/command_new_lidar2d.py.
-            # 'NewUltrasound',  # Defined in ./ui/command_new_ultrasound.py.
             ])
         self.appendMenu(['RobotCAD',"Placement"],[
             # Placement
