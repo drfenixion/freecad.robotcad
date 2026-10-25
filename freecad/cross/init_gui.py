@@ -229,6 +229,39 @@ class export_command_group:
         return {'MenuText':"export n import", 'ToolTip': "export n import commands"}
 fcgui.addCommand("ExportCommandGroup",export_command_group())
 
+class Rotation_command_group():
+    def __init__(self):
+        pass
+    
+    def GetCommands(self):
+        return (
+            'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
+                        'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
+                        'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
+        )
+    def GetResources(self):
+        return {"MenuText":"Rotation","ToolTip":"link Rotation Commands"}
+
+fcgui.addCommand("RotationCommandGroup",Rotation_command_group())
+
+class collision_command_group():
+    def __init__(self):
+        pass
+    
+    def GetCommands(self):
+        return (
+            'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
+            'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
+            'ZAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_z_aligned_from_bounding_box.py.
+            'XAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_x_aligned_from_bounding_box.py.
+            'YAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_y_aligned_from_bounding_box.py.
+            'CreateCollisionCopyObj',  # Defined in ./ui/command_create_collision_copy_obj.py.
+        )
+        
+    def GetResources(self):
+        return {"MenuText":"collisions","ToolTip":"Rotate links"}
+    
+fcgui.addCommand("CollisionsCommandGroup",collision_command_group())
 ############
 #############
 #########################
@@ -280,6 +313,7 @@ class CrossWorkbench(fcgui.Workbench):
             'NewXacroObject',  # Defined in ./ui/command_new_xacro_object.py.
             'ManageLinkDisplay',  # Defined in ./ui/command_manage_link_display.py.
             'KKEdit',  # Defined in ./ui/command_kk_edit.py.
+            'Separator',
             
         ]
         self.appendToolbar("creation n editing",creation_n_editing)
@@ -288,18 +322,13 @@ class CrossWorkbench(fcgui.Workbench):
         ]
         placement=[
             "NewPlacementCommandGroup",
-            'RotateJointX',  # Defined in ./ui/command_rotate_joint_x.py.
-            'RotateJointY',  # Defined in ./ui/command_rotate_joint_y.py.
-            'RotateJointZ',  # Defined in ./ui/command_rotate_joint_z.py.
+            "RotationCommandGroup",
+            
         ]
         self.appendToolbar("placement",placement)
         collision=[
-            'BoxFromBoundingBox',  # Defined in ./ui/command_box_from_bounding_box.py.
-            'SphereFromBoundingBox',  # Defined in ./ui/command_sphere_from_bounding_box.py.
-            'ZAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_z_aligned_from_bounding_box.py.
-            'XAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_x_aligned_from_bounding_box.py.
-            'YAlignedCylinderFromBoundingBox',  # Defined in ./ui/command_cylinder_y_aligned_from_bounding_box.py.
-            'CreateCollisionCopyObj',  # Defined in ./ui/command_create_collision_copy_obj.py.
+            "CollisionsCommandGroup",
+            'Separator',
         ]
         self.appendToolbar("collision",collision)
         live_debugging=[
@@ -317,6 +346,7 @@ class CrossWorkbench(fcgui.Workbench):
             'SimplifyMesh',  # Defined in ./ui/command_simplify_mesh.py.
             'Separator',
         ]
+        self.appendToolbar("Mesh Simplification",mesh_simplification)
         physical_properties=[
             'SetMaterial',  # Defined in ./ui/command_set_material.py.
             'CalculateMassAndInertia',  # Defined in ./ui/command_calculate_mass_and_inertia.py.
@@ -340,8 +370,8 @@ class CrossWorkbench(fcgui.Workbench):
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
             # 'Reload',  # Developer tool, hidden from toolbar.
         ]
-        self.appendToolbar('RobotCAD', _registered_commands(toolbar_commands))
-
+        # self.appendToolbar('RobotCAD', _registered_commands(toolbar_commands))
+        self.appendToolbar("settings",settings)
         # Same as commands but with NewObserver and without Reload.
         menu_commands = [
             # Mesh simplification.
@@ -434,12 +464,12 @@ class CrossWorkbench(fcgui.Workbench):
             # About.
             'AboutRobotCAD',  # Defined in ./ui/command_about.py.
         ]
-
+        )
         self.appendMenu('RobotCAD', _registered_commands(menu_commands))
 
         # Kept so the toolbar/menu can be rebuilt after the dependencies are
         # installed (see reactivate_commands_and_workspace).
-        self._toolbar_commands = toolbar_commands
+        # self._toolbar_commands = toolbar_commands
         self._menu_commands = menu_commands
 
         fcgui.addIconPath(str(ICON_PATH))
