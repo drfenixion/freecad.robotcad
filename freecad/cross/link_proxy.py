@@ -1381,28 +1381,54 @@ def make_robot_link_filled(obj:fc.DO, create_parts_group:bool = False, assembly_
     return link
 
 
+def get_selected_objects_of_all_documents() -> list[DO]:
+    """Return the selected objects of all open documents, without duplicates.
+
+    `FreeCADGui.Selection.getSelection()` without arguments only returns the
+    selection of the active document, so an object selected in the tree of
+    another (external) document would be ignored.
+
+    """
+    objects: list[DO] = []
+    for obj in fcgui.Selection.getSelection('*'):
+        if not any(obj is o for o in objects):
+            objects.append(obj)
+    return objects
+
+
 def make_robot_links_filled(objects:list[fc.DO] = [], robot:CrossRobot | None = None, create_parts_group:bool = True) -> list[CrossLink] | False :
-    ''' Make robot links and fill Real and Visual of it by selected objects  '''
+    """Make robot links and fill Real and Visual of it by selected objects.
+
+    The objects may live in another document than the active one (external
+    objects), like the objects used by the import of an Assembly. The element
+    wrapper (created in the active document) then links directly to the
+    external object. The external object is left untouched: it is not hidden
+    (its document is not modified) and not stored in `robot_parts_origins`,
+    which only stores the parts designed in the active document.
+
+    """
 
     if len(objects):
         selection = objects
     else:
-        selection = fcgui.Selection.getSelection()
+        selection = get_selected_objects_of_all_documents()
 
+    doc = fc.ActiveDocument
     links:list[CrossLink] = []
     for el in selection:
         res = make_robot_link_filled(el, create_parts_group)
         if is_link(res):
             link = res
             links.append(link)
-            el.Visibility = False
-            
+
             if robot:
                 link.adjustRelativeLinks(robot)
                 robot.addObject(link)
 
-            if create_parts_group:
-                _store_robot_link_element_origin(el, fc.ActiveDocument)
+            if el.Document is doc:
+                el.Visibility = False
+                if create_parts_group:
+                    _store_robot_link_element_origin(el, doc)
     return links
 
 

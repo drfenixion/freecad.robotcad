@@ -20,7 +20,7 @@ if typing.TYPE_CHECKING:
         Pose = Any
 
 from . import wb_globals
-from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_random_postfix, get_selected_shape_object, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
+from .freecad_utils import get_objs_from_selection_objs, get_param, get_parents_names, get_random_postfix, is_link_to_assembly_from_assembly_wb, is_selection_object, parse_freecad_path
 from .gui_utils import tr
 from .freecad_utils import is_box
 from .freecad_utils import is_cylinder
@@ -946,190 +946,118 @@ def make_lcs_at_link_body(
         lcs_concentric_reversed:bool = False,
         deactivate_after_map_mode:bool = False,
 ) -> list[fc.DO, fc.DO, fc.Placement] :
-    '''Make LCS at face of body of robot link.
-    orienteer body must be wrapper by App::Part and be any of Real, Collision, Visual element of robot link'''
+    '''Make LCS at sub-element (face, edge, vertex) of body of robot link.
+
+    `orienteer` is a selection object (item of `getSelectionEx('', 0)`) whose
+    `Object` is the dynamic link (`real_*`) of a Real, Visual or Collision
+    element of a robot link and whose first sub-element name is the path to
+    the selected sub-element, e.g. `Link.Box.Face6`. The dynamic link must
+    link to the App::Part wrapper of the element.
+
+    The LCS is created in a `PartDesign::Body` inside the wrapper App::Part.
+    It never references objects inside the element geometry (which may live
+    in another document): the selected sub-element is copied, in the frame of
+    the wrapper, to a temporary static `Part::Feature` inside the wrapper, the
+    LCS is attached to this copy (Translate for a vertex, Concentric for a
+    circle or B-spline edge, InertialCS otherwise), then the LCS placement is
+    frozen (MapMode 'Deactivated', empty attachment support) and the copy is
+    removed. The LCS placement is relative to the wrapper.
+
+    `deactivate_after_map_mode` is kept for compatibility: the LCS is always
+    deactivated, because it keeps no reference to attach to.
+
+    Return (lcs, body_lcs_wrapper, lcs placement, document of the LCS).'''
 
     # Get align_z_axis setting from workbench preferences
     align_z_axis = get_workbench_param(wb_globals.PREF_ALIGN_Z_AXIS_LCS, True)
 
-    # def getParentsPlacementRecursively(obj, placement = fc.Placement()):
-    #     orienteer_parents_reversed = reversed(obj.Parents)
-    #     parent_obj = None
-    #     for parent in orienteer_parents_reversed:
-    #         parent_splited = parent[1].split('.')
-    #         if len(parent_splited) > 2:
-    #             parent_obj = fc.ActiveDocument.getObject(parent_splited[0])
-    #         break
-
-    #     if parent_obj:
-    #         placement = placement * parent_obj.Placement
-    #         return getParentsPlacementRecursively(parent_obj, placement)
-    #     else:
-    #         return obj, placement
-
-
-    link_to_obj = None
     dynamic_link_of_robot_link = None
-    original_obj = None
-    dynamic_link_of_robot_link = None
-    original_obj_wrapper = None
-    link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
-    is_orienteer_link = False
-    try:
-        # if is_fc_link(orienteer.Object):
-        #     # link to object (like Part::Feature)
-        #     link_to_obj = orienteer.Object
-        #     original_obj = link_to_obj.getLinkedObject(True)
-        #     obj_for_getting_parents = link_to_obj
-        #     link_to_obj_placement = link_to_obj.Placement
-        # else:
-        #     # consider fc_link to part design obj. In that case link will be deeper
-        #     inListRecursive = orienteer.Object.InListRecursive
-        #     inListRecursiveWithoutRobotAndRealLink = list(inListRecursive)[:-2]
-        #     inListRecursiveWithoutRobotAndRealLink_dict = {index: value for index, value in enumerate(inListRecursiveWithoutRobotAndRealLink)}
-        #     inListRecursiveWithoutRobotAndRealLink_dict_reversed = sorted(inListRecursiveWithoutRobotAndRealLink_dict.items(), reverse=True)
-        #     inListRecursiveWithoutRobotAndRealLink_list_reversed = [item[1] for item in inListRecursiveWithoutRobotAndRealLink_dict_reversed]
-        #     fc_link = next(
-        #         filter(
-        #             lambda element: is_fc_link(element),
-        #             inListRecursiveWithoutRobotAndRealLink_list_reversed
-        #         ),
-        #         None
-        #     )
-        #     robot_link = next(
-        #         filter(
-        #             lambda element: is_link(element),
-        #             inListRecursiveWithoutRobotAndRealLink_list_reversed
-        #         ),
-        #         None
-        #     )
-        #     try:
-        #         # check correct fc_link is found
-        #         if fc_link.LinkedObject.Name != robot_link.Real[0].Group[0].LinkedObject.Name:
-        #             fc_link = None
-        #     except (IndexError, AttributeError):
-        #         fc_link = None
-        #         pass
-
-        #     if fc_link:
-        #         link_to_obj = fc_link
-        #         original_obj = link_to_obj.getLinkedObject(True)
-        #         obj_for_getting_parents = link_to_obj
-        #         link_to_obj_placement = link_to_obj.Placement                
-        #     else:
-        #         #no found fc link
-        #         original_obj = orienteer.Object
-        #         obj_for_getting_parents = original_obj
-        #         link_to_obj_placement = fc.Placement() # zero placement because of origin obj is selected
-
-        # works inside SetPlacement tools
-        if is_fc_link(orienteer.Object) and orienteer.Object.Name.startswith('real_'):
-            dynamic_link_of_robot_link = orienteer.Object
-            linkedObject = dynamic_link_of_robot_link.getLinkedObject(True)
-            if is_part(linkedObject):
-                original_obj_wrapper = linkedObject
-            if is_selection_object(orienteer):
-                doc = dynamic_link_of_robot_link.Document
-                if dynamic_link_of_robot_link.Document.Name != linkedObject.Document.Name:
-                    #link to another doc case
-                    doc = linkedObject.Document
-                original_obj = get_selected_shape_object(orienteer, doc = doc)
-                original_obj_link_candidate =  get_selected_shape_object(orienteer, return_linked_obj = False, doc = doc)
-                if is_fc_link(original_obj_link_candidate):
-                    # placement works only for 1 level deep link
-                    # for more deeper links need calc cumulative placement
-                    link_to_obj_placement = original_obj_link_candidate.Placement
-                    is_orienteer_link = True
-            
-            
-        # # parents_reversed = reversed(obj_for_getting_parents.Parents)
-        # parents_reversed = reversed(obj_for_getting_parents.InListRecursive)
-        # for p in parents_reversed:
-        #     # p = p[0]
-        #     if not dynamic_link_of_robot_link and is_fc_link(p) and p.Name.startswith('real_'):
-        #         dynamic_link_of_robot_link = p
-        #     elif not original_obj_wrapper and is_part(p):
-        #         original_obj_wrapper = p
-
-    except (AttributeError, IndexError, RuntimeError):
-        pass
-
-    if not original_obj_wrapper:
-        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part. Check you selected Real elements of links for placement.', gui=True)
-        raise RuntimeError()
-
-    if not original_obj:
-        message('Can not find original object for getting reference.', gui=True)
-        raise RuntimeError()
+    if is_selection_object(orienteer):
+        obj = orienteer.Object
+        if is_fc_link(obj) and obj.Name.startswith('real_'):
+            dynamic_link_of_robot_link = obj
 
     if not dynamic_link_of_robot_link:
         message('Can not find dynamic link of (real, visual, collision). Make robot structure first', gui=True)
         raise RuntimeError()
 
-    sub_element_name = ''
-    sub_element_type = ''
-    sub_element = None
+    original_obj_wrapper = dynamic_link_of_robot_link.getLinkedObject(True)
+    if not is_part(original_obj_wrapper):
+        message('Can not find object wrapper for adding LCS. Original object or link to original object must be wrapped by App::Part. Check you selected Real elements of links for placement.', gui=True)
+        raise RuntimeError()
+
     try:
-        sub_element_name = '.'.join(orienteer.SubElementNames[0].split('.')[-1:])
-        sub_element_type = orienteer.SubObjects[0].ShapeType
-        sub_element = orienteer.SubObjects[0]
+        sub_name = orienteer.SubElementNames[0]
     except (AttributeError, IndexError):
-        pass
+        sub_name = ''
+    sub_element = None
+    if sub_name:
+        try:
+            # Sub-element in the frame of the content of the dynamic link,
+            # i.e. in the frame of the wrapper (the dynamic link replaces the
+            # wrapper placement). Followed through links and documents.
+            sub_element = dynamic_link_of_robot_link.getSubObject(sub_name, transform=False)
+        except Exception:
+            sub_element = None
+    sub_element_type = getattr(sub_element, 'ShapeType', '')
+    if sub_element_type not in ('Vertex', 'Edge', 'Face') or sub_element.isNull():
+        message('Can not get selected sub-element (face, edge, vertex) for getting reference.', gui=True)
+        raise RuntimeError()
 
-    if not doc:
-        doc = fc.ActiveDocument
+    doc = original_obj_wrapper.Document
+    sub_element_label = sub_name.split('.')[-1]
+
     body_lcs_wrapper = doc.addObject("PartDesign::Body", "Body")
-
-    body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_name + ' '
-
+    body_lcs_wrapper.Label = wb_constants.lcs_wrapper_prefix + orienteer.Object.Label + '(' + orienteer.Object.Name + ') ' + sub_element_label + ' '
     original_obj_wrapper.addObject(body_lcs_wrapper)
 
     lcs = doc.addObject( 'PartDesign::CoordinateSystem', 'LCS')
     body_lcs_wrapper.addObject(lcs)
 
-    setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
+    # Static copy of the sub-element: no link to the geometry, so no external
+    # object in AttachmentSupport and no dependency of the LCS on the geometry.
+    # Must be in the same container (wrapper) as the LCS body for the attacher
+    # to give the placement in the wrapper frame.
+    sub_element_copy = doc.addObject('Part::Feature', 'tmp_lcs_reference')
+    try:
+        sub_element_copy.Shape = sub_element
+        original_obj_wrapper.addObject(sub_element_copy)
 
-    if sub_element_type == 'Vertex':
-        lcs.MapMode = 'Translate'
-    elif sub_element_type == 'Edge' \
-        and (
-            sub_element.Curve.TypeId == 'Part::GeomCircle' \
-            or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'
-        ):
+        setattr(lcs, lcs_attachmentsupport_name(), [(sub_element_copy, sub_element_type + '1')])
+        if sub_element_type == 'Vertex':
+            lcs.MapMode = 'Translate'
+        elif sub_element_type == 'Edge' \
+            and (
+                sub_element.Curve.TypeId == 'Part::GeomCircle' \
+                or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'
+            ):
+            lcs.MapMode = 'Concentric'
+            if lcs_concentric_reversed:
+                lcs.MapReversed = True
+        else:
+            lcs.MapMode = 'InertialCS'
+        lcs.positionBySupport()
 
-        lcs.MapMode = 'Concentric'
-        if lcs_concentric_reversed:
-            lcs.MapReversed = True
-    else:
-        lcs.MapMode = 'InertialCS'
-
-    
-
-    if deactivate_after_map_mode:
-        # prevent automove back to InertialCS rotation
+        # Freeze the placement and drop the reference to the temporary copy.
         lcs.MapMode = 'Deactivated'
+        setattr(lcs, lcs_attachmentsupport_name(), None)
+    finally:
+        doc.removeObject(sub_element_copy.Name)
 
-    # remove placement of origin obj (mean in zero point of original obj)
-    if is_orienteer_link:
-        lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
-    # add placement of link of origin obj (mean in same place at face of link as at original obj)
-    lcs.Placement = link_to_obj_placement * lcs.Placement
     # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
     if align_z_axis:
         lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
-
-    # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
-    # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+    lcs_placement = lcs.Placement
 
     if delete_created_objects:
         doc.removeObject(body_lcs_wrapper.Name)
         doc.removeObject(lcs.Name)
 
     doc.recompute()
-    if doc.Name != fc.activeDocument().Name:
+    if fc.activeDocument() and doc.Name != fc.activeDocument().Name:
         fc.activeDocument().recompute()
 
-    return lcs, body_lcs_wrapper, lcs.Placement, doc
+    return lcs, body_lcs_wrapper, lcs_placement, doc
 
 
 def rotate_placement(

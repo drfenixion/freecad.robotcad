@@ -8,6 +8,7 @@ from ..freecad_utils import message
 from ..freecad_utils import validate_types
 from ..freecad_utils import is_lcs
 from ..gui_utils import tr
+from ..link_proxy import get_selected_objects_of_all_documents
 from ..link_proxy import make_robot_links_filled
 
 
@@ -34,11 +35,16 @@ class _NewLinksFilledCommand:
                               '\n'
                               'Will be created robot links with filled Real and Visual properties by selected objects.\n'
                               'Each link for each object.\n'
-                              'Will be created part-wrapper for each object if object is not a part.'
+                              'Will be created part-wrapper for each object if object is not a part.\n'
+                              '\n'
+                              'Objects of other (external) documents can be selected too\n'
+                              '(e.g. in the tree of the external document).\n'
+                              'The part-wrapper (in the active document) links directly to them.'
                               )}
 
     def IsActive(self):
-        return bool(fcgui.Selection.getSelection())
+        # Selection of all documents: objects of external documents are allowed.
+        return bool(fc.activeDocument()) and bool(get_selected_objects_of_all_documents())
 
     def Activated(self):
         doc = fc.activeDocument()
