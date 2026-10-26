@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC
+from contextlib import contextmanager
 from copy import copy
 from dataclasses import dataclass
 from itertools import dropwhile
 import random
 import string
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Iterator, Optional
 from typing import Dict, List, Tuple
 import sys
 import numpy as np
@@ -163,40 +164,112 @@ def label_or(
     return obj.Label if hasattr(obj, 'Label') else alternative
 
 
+# When an automated caller (the MCP agent) drives the workbench, the modal
+# ``QMessageBox`` dialogs opened by ``message``/``warn``/``error`` would block
+# the GUI thread — and therefore the very call waiting for it — until a human
+# clicks "OK". The MCP bridge sets this flag while a tool runs so the dialogs
+# are suppressed and only the console output is produced (the MCP tool returns
+# the error text to the agent instead).
+_gui_messages_suppressed: bool = False
+# Messages emitted while suppression is active, so the MCP tool can report them
+# back to the agent. ``_record_messages`` is enabled by the MCP bridge.
+_recorded_messages: list[dict] = []
+_record_messages: bool = False
+
+
+def set_gui_messages_suppressed(suppressed: bool, record: bool = False) -> None:
+    """Enable/disable the suppression of the modal GUI message boxes.
+
+    When ``suppressed`` is true, ``message``/``warn``/``error`` still write to
+    the FreeCAD console but do not open a ``QMessageBox``. This is used by the
+    MCP bridge so an automated agent is never blocked by a modal dialog.
+
+    ``record`` additionally starts/stops recording of the emitted messages.
+    """
+    global _gui_messages_suppressed, _record_messages
+    _gui_messages_suppressed = suppressed
+    if record and suppressed:
+        _record_messages = True
+    elif not suppressed:
+        _record_messages = False
+
+
+def consume_recorded_messages() -> list[dict]:
+    """Return and clear the messages emitted while suppression was active."""
+    global _record_messages
+    recorded = list(_recorded_messages)
+    _recorded_messages.clear()
+    _record_messages = False
+    return recorded
+
+
+def _record_message(level: str, text: str) -> None:
+    if _record_messages:
+        _recorded_messages.append({'level': level, 'text': text})
+
+
+def _message_box(icon, text: str) -> None:
+    """Open a modal message box, unless GUI output is suppressed."""
+    if not fc.GuiUp or _gui_messages_suppressed:
+        return
+    diag = QtGui.QMessageBox(icon, wb_constants.WORKBENCH_NAME, text)
+    diag.setWindowModality(QtCore.Qt.ApplicationModal)
+    diag.exec_()
+
+
 def message(text: str, gui: bool = False) -> None:
     """Inform the user."""
     fc.Console.PrintMessage(text + '\n')
-    if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(
-            QtGui.QMessageBox.Information,
-            wb_constants.WORKBENCH_NAME, text,
-        )
-        diag.setWindowModality(QtCore.Qt.ApplicationModal)
-        diag.exec_()
+    _record_message('info', text)
+    if gui:
+        _message_box(QtGui.QMessageBox.Information, text)
 
 
 def warn(text: str, gui: bool = False) -> None:
     """Warn the user."""
     fc.Console.PrintWarning(text + '\n')
-    if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(
-            QtGui.QMessageBox.Warning,
-            wb_constants.WORKBENCH_NAME, text,
-        )
-        diag.setWindowModality(QtCore.Qt.ApplicationModal)
-        diag.exec_()
+    _record_message('warning', text)
+    if gui:
+        _message_box(QtGui.QMessageBox.Warning, text)
+
+
+@contextmanager
+def suppress_console_warnings() -> Iterator[None]:
+    """Silence the FreeCAD console ``Wrn`` stream for the enclosed block.
+
+    Some FreeCAD C++ algorithms emit console warnings from a place the
+    workbench can not intercept from Python (e.g. ``AttachEngine3D`` in the
+    ``InertialCS`` map mode prints "inertia tensor has axis of symmetry. Second
+    and third axes of inertia are undefined."). This context manager
+    temporarily disables the ``Wrn`` stream of the ``Console`` observer so such
+    messages do not reach the report view / terminal, and restores the previous
+    state on exit.
+    """
+    console = getattr(fc, 'Console', None)
+    previous_status: Optional[bool] = None
+    if console is not None:
+        try:
+            previous_status = console.GetStatus('Console', 'Wrn')
+            console.SetStatus('Console', 'Wrn', False)
+        except Exception:
+            # ``SetStatus`` is unavailable (e.g. ``freecadcmd``): just run.
+            previous_status = None
+    try:
+        yield
+    finally:
+        if console is not None and previous_status is not None:
+            try:
+                console.SetStatus('Console', 'Wrn', bool(previous_status))
+            except Exception:
+                pass
 
 
 def error(text: str, gui: bool = False) -> None:
     """Log an error to the user."""
     fc.Console.PrintError(text + '\n')
-    if gui and fc.GuiUp:
-        diag = QtGui.QMessageBox(
-            QtGui.QMessageBox.Critical,
-            wb_constants.WORKBENCH_NAME, text,
-        )
-        diag.setWindowModality(QtCore.Qt.ApplicationModal)
-        diag.exec_()
+    _record_message('error', text)
+    if gui:
+        _message_box(QtGui.QMessageBox.Critical, text)
 
 
 def strip_subelement(sub_fullpath: str) -> str:

@@ -41,7 +41,7 @@ ROS2_CONTROLLERS_ROS_VERSIONS = [
     {'ros_version': 'iron', 'controllers_branch': 'iron'},
 ]
 
-ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
+ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP = {
     'bool': 'App::PropertyBool',
     'bool_array': 'App::PropertyBoolList',
     'int': 'App::PropertyInteger',
@@ -53,6 +53,11 @@ ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP = {
     'double_array': 'App::PropertyFloatList',
     'string': 'App::PropertyString',
     'string_array': 'App::PropertyStringList',
+    # The ROS 2 'none' type is used by map-like parameters that have no scalar
+    # FreeCAD representation (f.e. filter chains: 'sensor_filter_chain',
+    # 'filter_chain'). They are exposed as a plain string property; their real
+    # (nested map) value is edited through the exported controllers config file.
+    'none': 'App::PropertyString',
 }
 
 TYPE_CONVERT_FUNCTIONS = {

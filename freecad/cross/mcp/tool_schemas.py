@@ -73,15 +73,34 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         'required': ['robot', 'link_names_in_order'],
     },
-    'create_collision': {
+    'create_collisions': {
         'properties': {
-            'link_or_robot': {'type': 'string', 'description': 'Link or robot name or Label'},
-            'type': {
-                'type': 'string',
-                'enum': ['copy', 'box', 'sphere', 'cylinder_z', 'cylinder_x', 'cylinder_y'],
+            'link_or_robot': {
+                'type': 'array',
+                'items': {'type': 'string'},
                 'description': (
-                    'Default "copy" (exact geometry copy). Primitives (from the '
-                    'bounding box) ONLY on explicit user request.'
+                    'Link/robot names or Labels. A robot covers all its links; '
+                    'its links passed explicitly are skipped (no duplicates).'
+                ),
+            },
+            'type': {
+                'oneOf': [
+                    {
+                        'type': 'string',
+                        'enum': ['copy', 'box', 'sphere', 'cylinder_z', 'cylinder_x', 'cylinder_y'],
+                    },
+                    {
+                        'type': 'array',
+                        'items': {
+                            'type': 'string',
+                            'enum': ['copy', 'box', 'sphere', 'cylinder_z', 'cylinder_x', 'cylinder_y'],
+                        },
+                    },
+                ],
+                'description': (
+                    'One type for every element, or a list parallel to '
+                    'link_or_robot. Default "copy" (exact geometry). Primitives '
+                    '(from the bounding box) ONLY on explicit user request.'
                 ),
             },
         },
@@ -92,30 +111,35 @@ TOOL_SCHEMAS: dict[str, dict] = {
     # 'set_object_placement': { ... },
     'set_placement_between': {
         'properties': {
-            'target': {'type': 'string', 'description': 'Link or joint to position'},
+            'target': {
+                'type': 'string',
+                'description': (
+                    'Link or joint to position. NEVER on a sensor link hosting a '
+                    'camera or similar forward-looking sensor (use '
+                    'set_placement_between_sensor_link_and_parent). EXCEPTION: a '
+                    'link hosting only a horizontal lidar IS positioned with this '
+                    'tool, then its parent joint is rotated about Z.'
+                ),
+            },
             'ref1': {
                 'type': 'string',
                 'description': (
-                    'Ref 1 (PRIMARY method): face/edge/vertex/circle of a link '
+                    'Reference on the PARENT link: face/edge/vertex/circle of its '
                     "Real element as '<real_link>.<inner_link_name>.<feature>."
                     "<subelement>' (e.g. 'real_l_chassis001_.chassis001.Box."
-                    "Face3') or an already existing LCS. <inner_link_name> is "
-                    'the Name of the App::Link inside the Real element (e.g. '
-                    "'chassis001', 'wheel001') — NOT the source body name "
-                    "(e.g. 'chassis', 'wheel'). A robot link (l_...) cannot be "
-                    'a ref. Must lie on the parent link. Do NOT create LCS '
-                    'objects — plain subelement references are enough.'
+                    "Face3'), or an existing LCS. <inner_link_name> is the Name "
+                    'of the App::Link inside the Real element (e.g. '
+                    "'chassis001'), NOT the source body name. A robot link "
+                    '(l_...) cannot be a ref. Do NOT create LCS objects.'
                 ),
             },
             'ref2': {
                 'type': 'string',
                 'description': (
-                    'Ref 2: same format; must lie on the child link. If the call '
-                    "returns no error but the target's coordinates did NOT "
-                    'change, you have most likely moved it into its own '
-                    'coordinates (the two references resolved to the same '
-                    'point) — verify with get_object_info(target) and pick '
-                    'different references (e.g. a face instead of a vertex).'
+                    'Reference on the CHILD link, same format. If the call '
+                    "succeeds but the target did NOT move, both references "
+                    'resolved to the same point — verify with '
+                    'get_objects_info([target]) and pick different ones.'
                 ),
             },
             'move': {
@@ -133,13 +157,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'type': 'string',
                 'enum': ['x', 'y', 'z'],
                 'description': (
-                    'Rotation axis. To orient a jointed link, rotate the JOINT '
-                    "(its local Z is the functional axis). To MIRROR a link to "
-                    'the other side of the parent, rotate the LINK 180° about '
-                    "the X axis (NOT Z): the link is aligned along its local Z, "
-                    'so rotating about Z would only spin it around its own '
-                    'functional axis, while rotating about X flips it across Z '
-                    'to the opposite side.'
+                    'Rotation axis. Orient a jointed link by rotating the JOINT '
+                    '(its local Z is the functional axis). MIRROR a link to the '
+                    'other side of the parent by rotating the LINK 180° about X '
+                    '(NOT Z: that only spins it around its own functional axis).'
                 ),
             },
             'angle_deg': {'type': 'number', 'description': 'Angle in degrees'},
@@ -154,14 +175,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': (
                     "Subelement of the link Real element: '<real_link>."
                     "<inner_link_name>.<feature>.<subelement>' (e.g. "
-                    "'real_l_chassis001_.chassis001.Box.Face3'); "
-                    '<inner_link_name> is the Name of the App::Link inside the '
-                    "Real element (e.g. 'chassis001'), NOT the source body "
-                    "name (e.g. 'chassis'); short forms 'chassis001.Box.Face3' "
-                    "/ 'Box.Face3' accepted; empty = Real origin. ONLY on "
-                    'explicit user request: the default positioning workflow '
-                    'never needs an LCS — use plain subelement references in '
-                    'set_placement_between instead.'
+                    "'real_l_chassis001_.chassis001.Box.Face3'); short forms "
+                    "'chassis001.Box.Face3' / 'Box.Face3' accepted; empty = Real "
+                    'origin. ONLY on explicit user request — the default '
+                    'workflow uses plain references in set_placement_between.'
                 ),
             },
         },
@@ -216,16 +233,20 @@ TOOL_SCHEMAS: dict[str, dict] = {
         'properties': {},
         'required': [],
     },
-    'get_object_info': {
+    'get_objects_info': {
         'properties': {
-            'object_name': {'type': 'string', 'description': 'Object name or label'},
+            'object_names': {
+                'type': 'array',
+                'items': {'type': 'string'},
+                'description': 'List of object names or labels to describe in one call',
+            },
             'max_internal_geometry_items': {
                 'type': 'integer',
                 'minimum': 100,
-                'description': 'Max faces/vertices returned (default 1000, minimum 100)',
+                'description': 'Max faces/vertices returned per object (default 1000, minimum 100)',
             },
         },
-        'required': ['object_name'],
+        'required': ['object_names'],
     },
     'check_overlap': {
         'properties': {
@@ -243,8 +264,125 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'width': {'type': 'integer', 'description': 'Width (default 1024)'},
             'height': {'type': 'integer', 'description': 'Height (default 768)'},
             'format': {'type': 'string', 'enum': ['png', 'jpg', 'bmp'], 'description': 'Image format'},
+            'object_name': {
+                'type': 'string',
+                'description': (
+                    'Object/joint name or Label: select it and fit the view onto '
+                    'it so its axes are shown up close (e.g. a sensor\'s joint to '
+                    'check its frame). Empty = fit the whole scene.'
+                ),
+            },
         },
         'required': [],
+    },
+    'list_controller_types': {
+        'properties': {},
+        'required': [],
+    },
+    'create_controller': {
+        'properties': {
+            'robot': {'type': 'string', 'description': 'Cross::Robot name or Label'},
+            'type': {
+                'type': 'string',
+                'description': (
+                    'ROS controller name (e.g. "diff_drive_controller") or plugin '
+                    'class full name; see list_controller_types()'
+                ),
+            },
+            'name': {'type': 'string', 'description': 'Optional Label for the created object'},
+            'kind': {
+                'type': 'string',
+                'enum': ['controller', 'broadcaster'],
+                'description': "Kind to create (default 'controller')",
+            },
+        },
+        'required': ['robot', 'type'],
+    },
+    'get_robot_controllers': {
+        'properties': {
+            'robot': {'type': 'string', 'description': 'Cross::Robot name or Label'},
+        },
+        'required': ['robot'],
+    },
+    'list_controller_parameters': {
+        'properties': {
+            'controller': {'type': 'string', 'description': 'Controller/broadcaster name or Label'},
+        },
+        'required': ['controller'],
+    },
+    'set_controller_parameter': {
+        'properties': {
+            'controller': {'type': 'string', 'description': 'Controller/broadcaster name or Label'},
+            'parameter': {
+                'type': 'string',
+                'description': 'Full parameter name (nested names joined with "___")',
+            },
+            'value': {
+                'description': (
+                    'New value: scalar for plain parameters, object name(s) for '
+                    'link/joint parameters'
+                ),
+            },
+        },
+        'required': ['controller', 'parameter', 'value'],
+    },
+    'set_controller_parameters': {
+        'properties': {
+            'controller': {'type': 'string', 'description': 'Controller/broadcaster name or Label'},
+            'values': {
+                'type': 'object',
+                'description': 'Parameter full name -> value',
+            },
+        },
+        'required': ['controller', 'values'],
+    },
+    'list_sensor_types': {
+        'properties': {},
+        'required': [],
+    },
+    'create_sensor': {
+        'properties': {
+            'element': {
+                'type': 'string',
+                'description': 'Parent Cross::Link, Cross::Joint or Cross::Robot name or Label',
+            },
+            'type': {
+                'type': 'string',
+                'description': (
+                    'Sensor name (e.g. "camera", "gpu_lidar", "imu", '
+                    '"force_torque"); see list_sensor_types()'
+                ),
+            },
+            'name': {'type': 'string', 'description': 'Optional Label for the created object'},
+        },
+        'required': ['element', 'type'],
+    },
+    'set_placement_between_sensor_link_and_parent': {
+        'properties': {
+            'sensor': {
+                'type': 'string',
+                'description': (
+                    'Link-attached forward-looking sensor (camera or vertical '
+                    'lidar) name or Label. A HORIZONTAL lidar does NOT use this '
+                    'tool — use set_placement_between + a Z rotation of its '
+                    'parent joint.'
+                ),
+            },
+            'ref_parent': {
+                'type': 'string',
+                'description': (
+                    'Reference on the parent link: '
+                    '"<real_link>.<inner_link_name>.<feature>.<Face|Edge|VertexN>" or an LCS name'
+                ),
+            },
+            'ref_sensor': {
+                'type': 'string',
+                'description': (
+                    'Matching reference on the sensor link, same format'
+                ),
+            },
+        },
+        'required': ['sensor', 'ref_parent', 'ref_sensor'],
     },
     'instructions_to_work_with_tools': {
         'properties': {
@@ -258,6 +396,8 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     'joints',
                     'collisions',
                     'materials',
+                    'controllers',
+                    'sensors',
                     'inspection',
                     'best_practices',
                 ],

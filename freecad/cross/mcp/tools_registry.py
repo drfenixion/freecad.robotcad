@@ -5,7 +5,8 @@ document. Tools are registered with the MCP server in ``server.py``. All
 FreeCAD calls are executed on the main GUI thread via ``run_on_main_thread``.
 
 Tools accept object identifiers as strings (``Name`` or ``Label``) and return
-JSON-serializable dictionaries.
+JSON-serializable dictionaries, except ``get_snapshot`` which returns MCP
+content blocks (a text line plus an image).
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import json
 import math
 import os
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional
@@ -27,8 +29,11 @@ try:
 except ImportError:
     from PySide6 import QtGui
 
+from ..controller_proxy import get_controllers_data, make_broadcaster, make_controller
 from ..freecad_utils import is_link as is_freecad_link
 from ..freecad_utils import is_lcs
+from ..sensors.sensor_factory import make_sensor
+from ..sensors.sensor_proxy import get_sensors_data
 from ..freecadgui_utils import (
     createBoundBox,
     createBoundSphere,
@@ -41,14 +46,20 @@ from ..joint_proxy import make_joint, make_robot_joint_filled, make_robot_joints
 from ..link_proxy import make_link, make_robot_links_filled
 from ..robot_proxy import make_robot
 from ..wb_gui_utils import createBoundObjects
+from .. import wb_constants
 from ..wb_utils import (
     get_parent_link_of_obj,
+    is_broadcaster,
+    is_controller,
     is_joint,
     is_link,
     is_robot,
+    is_sensor,
     make_lcs_at_link_body,
+    ros_name,
     rotate_origin,
     set_placement_fast,
+    set_placement_sensor,
 )
 from .main_thread import run_on_main_thread
 
@@ -293,14 +304,23 @@ _COLLISION_TYPES: dict[str, tuple[Any, str]] = {
 }
 
 
-def create_collision(link_or_robot: str, type: str = 'copy') -> dict[str, Any]:
-    """Create a collision for a link or robot. Default `type='copy'` (exact
-    geometry copy — the default). Primitives (`box`, `sphere`,
-    `cylinder_z/x/y` from the bounding box) ONLY on explicit user request."""
+def _validate_collision_type(type: str) -> tuple[Any, str]:
+    """Return ``(bound_func, label)`` for a collision type or raise."""
     if type not in _COLLISION_TYPES:
         valid = ', '.join(f"'{t}'" for t in sorted(_COLLISION_TYPES))
         raise ValueError(f'Unknown collision type {type!r}. Valid types: {valid}.')
-    bound_func, label = _COLLISION_TYPES[type]
+    return _COLLISION_TYPES[type]
+
+
+def create_collision(link_or_robot: str, type: str = 'copy') -> dict[str, Any]:
+    """Create a collision for a single link or robot. Default `type='copy'`
+    (exact geometry copy — the default). Primitives (`box`, `sphere`,
+    `cylinder_z/x/y` from the bounding box) ONLY on explicit user request.
+
+    NOTE: this single-object function is NOT exposed to the agent as an MCP
+    tool; it is called internally by ``create_collisions`` (once per element).
+    """
+    bound_func, label = _validate_collision_type(type)
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -312,6 +332,98 @@ def create_collision(link_or_robot: str, type: str = 'copy') -> dict[str, Any]:
             createBoundObjects(createBoundFunc=bound_func)
         fcgui.Selection.clearSelection()
         return {'status': 'ok', 'created_for': obj.Name, 'method': label, 'type': type}
+
+    return run_on_main_thread(_impl)
+
+
+def create_collisions(
+    link_or_robot: list[str],
+    type: list[str] | str = 'copy',
+) -> dict[str, Any]:
+    """Create collisions for several links/robots in ONE call.
+
+    ``link_or_robot`` is a list of link/robot Names or Labels. ``type`` is either
+    a single collision type applied to every element, or a list parallel to
+    ``link_or_robot`` (one type per element). Default ``type='copy'`` (exact
+    geometry copy — the default). Primitives (``box``, ``sphere``,
+    ``cylinder_z/x/y`` from the bounding box) ONLY on explicit user request.
+
+    A robot name covers the robot AS A WHOLE (all its links). When a robot and
+    some of its own links are passed together, the robot's links are removed
+    from the list FIRST (so they are not collision-ised twice): the pass runs
+    over all the robot's links, then over the remaining explicitly-listed
+    elements.
+
+    Internally this calls ``create_collision`` for each element.
+    """
+    # Normalise `type` into a per-element list.
+    if isinstance(type, str):
+        types = [type]
+    else:
+        types = list(type)
+    if not types:
+        types = ['copy']
+    for t in set(types):
+        _validate_collision_type(t)
+
+    elements = list(link_or_robot)
+    if not elements:
+        raise ValueError('link_or_robot must contain at least one link or robot name.')
+
+    def _type_for(index: int) -> str:
+        # A single type applies to every element; otherwise it is positional.
+        return types[0] if len(types) == 1 else types[index]
+
+    def _impl() -> dict[str, Any]:
+        # Resolve everything up front (an unknown name aborts the whole call).
+        resolved: list[tuple[str, fc.DocumentObject]] = []
+        for name in elements:
+            resolved.append((name, _resolve_object(name)))
+
+        # Robot-link de-duplication: a robot covers all its links. Any
+        # explicitly-passed link that belongs to a passed robot is removed from
+        # the list, so it gets exactly one collision (via the robot).
+        robot_links: set[str] = set()
+        for _, obj in resolved:
+            if is_robot(obj):
+                for link in obj.Proxy.get_links():
+                    robot_links.add(link.Name)
+
+        created: list[dict[str, Any]] = []
+        skipped: list[str] = []
+        for index, (name, obj) in enumerate(resolved):
+            coll_type = _type_for(index)
+            if is_robot(obj):
+                kind = 'robot'
+            elif is_link(obj):
+                kind = 'link'
+            else:
+                raise RuntimeError(
+                    f'"{name}" is not a Cross::Link or Cross::Robot.',
+                )
+            # Covered by a robot passed in the same call -> avoid duplication.
+            if kind == 'link' and obj.Name in robot_links:
+                skipped.append(obj.Name)
+                continue
+            # Delegate the actual work to the single-object create_collision
+            # (it re-enters on the main thread, so this is a direct call).
+            single = create_collision(name, coll_type)
+            created.append({
+                'name': name,
+                'object': single.get('created_for', obj.Name),
+                'kind': kind,
+                'type': coll_type,
+                'method': single.get('method'),
+            })
+
+        result: dict[str, Any] = {
+            'status': 'ok',
+            'count': len(created),
+            'created': created,
+        }
+        if skipped:
+            result['skipped'] = skipped
+        return result
 
     return run_on_main_thread(_impl)
 
@@ -732,17 +844,48 @@ def _select_reference(doc: fc.Document, ref: str) -> dict[str, str]:
     )
 
 
+def _is_lidar_sensor(obj: fc.DocumentObject) -> bool:
+    """Return True if `obj` is a sensor whose type is a lidar (e.g. `gpu_lidar`)."""
+    return 'lidar' in str(getattr(obj, 'attr_type', '') or '').lower()
+
+
 def set_placement_between(
     target: str,
     ref1: str,
     ref2: str,
     move: str = 'leaf',
 ) -> dict[str, Any]:
-    """Position a link/joint by snapping the contact zones of two neighbouring links via two subelement references (one on the parent, one on the child)."""
+    """Position a link/joint by snapping the contact zones of two neighbouring links via two subelement references (one on the parent, one on the child). The two references are joined BY THEIR CENTERS: the child is moved so that the center of ``ref2`` coincides with the center of ``ref1``.
+
+    A link hosting a **camera or similar forward-looking** sensor (a "sensor
+    link") must NOT be joined with this tool — it needs the sensor-specific
+    orientation applied by
+    ``set_placement_between_sensor_link_and_parent``. A link hosting
+    **only a lidar mounted horizontally** to scan all around IS positioned with
+    this tool (its parent joint is then turned about Z to aim the sector)."""
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
         target_obj = _resolve_object(target)
+        # A link that hosts a forward-looking sensor (a "sensor link", camera or
+        # similar) must NOT be joined with this tool: it needs the
+        # sensor-specific orientation applied by
+        # set_placement_between_sensor_link_and_parent. A link that
+        # hosts only lidar(s) IS positioned with this tool (see the docstring).
+        non_lidar_sensors = [
+            child for child in target_obj.OutList
+            if is_sensor(child) and not _is_lidar_sensor(child)
+        ]
+        if is_link(target_obj) and non_lidar_sensors:
+            raise RuntimeError(
+                f'"{target}" hosts a forward-looking sensor (a camera or '
+                'similar) and is therefore a sensor link. Such a sensor link '
+                'must be connected to its parent link ONLY with '
+                'set_placement_between_sensor_link_and_parent, never '
+                'with set_placement_between. (A link hosting only a lidar '
+                'mounted horizontally to scan around is the exception and IS '
+                'positioned with set_placement_between.)',
+            )
         # set_placement_fast reads the selection: select only the two
         # orienteers (ref1, ref2); the target is NOT selected.
         fcgui.Selection.clearSelection()
@@ -1064,6 +1207,490 @@ def set_joint_values(robot: str, values: dict[str, float]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Controllers and broadcasters (ros2_control)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_controller(name: str) -> fc.DocumentObject:
+    obj = _resolve_object(name)
+    if not (is_controller(obj) or is_broadcaster(obj)):
+        raise RuntimeError(f'Object "{name}" is not a Cross::Controller or Cross::Broadcaster.')
+    return obj
+
+
+def _find_controller_entry(
+    type_name: str,
+) -> tuple[Optional[dict], Optional[str]]:
+    """Resolve a controller type, returning ``(controller_data, kind)``.
+
+    ``type_name`` may be the ROS controller name (e.g. ``diff_drive_controller``)
+    or the plugin class full name. ``kind`` is ``'controllers'`` or
+    ``'broadcasters'`` (i.e. one of the ``get_controllers_data()`` keys).
+    ``(None, None)`` is returned when nothing matches.
+    """
+    data = get_controllers_data()
+    kinds = ('controllers', 'broadcasters')
+    for kind in kinds:
+        if type_name in data.get(kind, {}):
+            return data[kind][type_name], kind
+    for kind in kinds:
+        for controller_data in data.get(kind, {}).values():
+            if controller_data['controller_plugin_class_name'] == type_name:
+                return controller_data, kind
+    # Tolerate a "name (controller)" / "name (broadcaster)" suffix.
+    base = type_name.replace(' (controller)', '').replace(' (broadcaster)', '')
+    if base != type_name:
+        return _find_controller_entry(base)
+    return None, None
+
+
+def _find_controller_data(type_name: str) -> Optional[dict]:
+    """Resolve a controller type by ROS name or plugin class name."""
+    return _find_controller_entry(type_name)[0]
+
+
+def _controller_info(obj: fc.DocumentObject) -> dict[str, Any]:
+    """Return ``_obj_basic_info(obj)`` plus controller/broadcaster details."""
+    info = _obj_basic_info(obj)
+    info['Kind'] = 'broadcaster' if is_broadcaster(obj) else 'controller'
+    info['PluginClassName'] = getattr(obj, 'plugin_class_name', '')
+    info['ControllerName'] = ros_name(obj)
+    return info
+
+
+def _iter_controller_parameters(controller_data: dict) -> Iterator[dict[str, Any]]:
+    """Yield the flattened leaf parameters of a controller with metadata."""
+    for full_name, param in controller_data.get('parameters_flatten', {}).items():
+        if not isinstance(param, dict) or 'type_fc' not in param:
+            continue
+        yield {
+            'full_name': full_name,
+            'type_fc': param.get('type_fc', ''),
+            'type': param.get('type', ''),
+            'default_value': param.get('default_value'),
+            'description': param.get('description', ''),
+        }
+
+
+def _coerce_parameter_value(prop_type: str, value: Any) -> Any:
+    """Coerce a JSON value to the Python type expected by a FreeCAD property."""
+    if prop_type in ('App::PropertyLinkGlobal',):
+        return _resolve_object(value) if isinstance(value, str) else value
+    if prop_type in ('App::PropertyLinkListGlobal',):
+        if isinstance(value, str):
+            value = [value]
+        return [_resolve_object(v) if isinstance(v, str) else v for v in value]
+    if prop_type == 'App::PropertyBool':
+        if isinstance(value, str):
+            return value.strip().lower() in ('1', 'true', 'yes', 'on')
+        return bool(value)
+    if prop_type == 'App::PropertyInteger':
+        return int(value)
+    if prop_type == 'App::PropertyFloat':
+        return float(value)
+    if prop_type == 'App::PropertyVector':
+        if isinstance(value, str):
+            return fc.Vector(*[float(v) for v in value.replace(',', ' ').split()])
+        return fc.Vector(*value)
+    if prop_type == 'App::PropertyPosition':
+        if isinstance(value, str):
+            return fc.Vector(*[float(v) for v in value.replace(',', ' ').split()])
+        return fc.Vector(*value)
+    if prop_type in (
+        'App::PropertyString',
+        'App::PropertyStringList',
+        'App::PropertyIntegerList',
+        'App::PropertyFloatList',
+        'App::PropertyBoolList',
+    ):
+        return value
+    return value
+
+
+def list_controller_types() -> dict[str, Any]:
+    """List the available controllers and broadcasters (ros2_control) to add."""
+
+    def _impl() -> dict[str, Any]:
+        data = get_controllers_data()
+
+        def _summarize(kind: str) -> list[dict[str, Any]]:
+            result = []
+            for name, controller_data in data.get(kind, {}).items():
+                result.append({
+                    'name': name,
+                    'description': controller_data.get('description', ''),
+                    'plugin_class_name': controller_data.get('controller_plugin_class_name', ''),
+                    'parameter_count': len(
+                        [p for p in _iter_controller_parameters(controller_data)],
+                    ),
+                })
+            return sorted(result, key=lambda item: item['name'])
+
+        return {
+            'controllers': _summarize('controllers'),
+            'broadcasters': _summarize('broadcasters'),
+        }
+
+    return run_on_main_thread(_impl)
+
+
+def create_controller(
+    robot: str,
+    type: str,
+    name: str = '',
+    kind: str = 'controller',
+) -> dict[str, Any]:
+    """Add a controller (or broadcaster) to a robot.
+
+    ``type`` is the ROS controller name (e.g. ``joint_state_broadcaster``,
+    ``diff_drive_controller``) or its plugin class full name. ``kind`` is
+    ``'controller'`` or ``'broadcaster'``. ``name`` overrides the Label of the
+    created object.
+    """
+
+    def _impl() -> dict[str, Any]:
+        doc = _active_doc()
+        robot_obj = _resolve_robot(robot)
+        controller_data, data_kind = _find_controller_entry(type)
+        if controller_data is None:
+            raise RuntimeError(
+                f'Controller type "{type}" not found. '
+                'Use list_controller_types() to see the available types.',
+            )
+        is_broadcaster_type = kind == 'broadcaster' or data_kind == 'broadcasters'
+        with _transaction(doc, 'MCP: create controller'):
+            if is_broadcaster_type:
+                controller = make_broadcaster(controller_data, doc=doc)
+            else:
+                controller = make_controller(controller_data, doc=doc)
+            if controller is None:
+                raise RuntimeError(
+                    f'Failed to create controller of type "{type}".',
+                )
+            if name:
+                controller.Label = name
+            robot_obj.addObject(controller)
+        return _controller_info(controller)
+
+    return run_on_main_thread(_impl)
+
+
+def list_controller_parameters(controller: str) -> dict[str, Any]:
+    """List the configurable parameters of a controller on a robot."""
+
+    def _impl() -> dict[str, Any]:
+        controller_obj = _resolve_controller(controller)
+        controller_data = _find_controller_data(getattr(controller_obj, 'plugin_class_name', ''))
+        info = _controller_info(controller_obj)
+        parameters = []
+        if controller_data is not None:
+            for param in _iter_controller_parameters(controller_data):
+                full_name = param['full_name']
+                entry = dict(param)
+                if hasattr(controller_obj, full_name):
+                    try:
+                        entry['current_value'] = getattr(controller_obj, full_name)
+                    except Exception:  # noqa: BLE001
+                        entry['current_value'] = None
+                parameters.append(entry)
+        info['parameters'] = parameters
+        return info
+
+    return run_on_main_thread(_impl)
+
+
+def set_controller_parameter(
+    controller: str,
+    parameter: str,
+    value: Any,
+) -> dict[str, Any]:
+    """Set a single parameter of a controller on a robot.
+
+    ``parameter`` is the full parameter name (nested names are joined with
+    ``'___'``). For link/joint parameters pass the object name (Name or Label)
+    or a list of names. Distance parameters are in **metres** unless the
+    parameter's description says otherwise — convert a model measurement to the
+    parameter's unit before setting it (check the ``description`` from
+    ``list_controller_parameters``).
+    """
+
+    def _impl() -> dict[str, Any]:
+        doc = _active_doc()
+        controller_obj = _resolve_controller(controller)
+        if not hasattr(controller_obj, parameter):
+            raise RuntimeError(
+                f'Parameter "{parameter}" not found on "{controller}". '
+                'Use list_controller_parameters() to see the available parameters.',
+            )
+        prop_type = controller_obj.getTypeIdOfProperty(parameter)
+        with _transaction(doc, 'MCP: set controller parameter'):
+            setattr(controller_obj, parameter, _coerce_parameter_value(prop_type, value))
+        return {
+            'status': 'ok',
+            'controller': controller_obj.Name,
+            'parameter': parameter,
+            'property_type': prop_type,
+        }
+
+    return run_on_main_thread(_impl)
+
+
+def set_controller_parameters(
+    controller: str,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    """Set several parameters of a controller on a robot.
+
+    ``values`` maps parameter full names to values.
+    """
+
+    def _impl() -> dict[str, Any]:
+        doc = _active_doc()
+        controller_obj = _resolve_controller(controller)
+        missing = [name for name in values if not hasattr(controller_obj, name)]
+        if missing:
+            raise RuntimeError(
+                'Parameters not found on "' + controller + '": '
+                + ', '.join(missing) + '. '
+                'Use list_controller_parameters() to see the available parameters.',
+            )
+        with _transaction(doc, 'MCP: set controller parameters'):
+            for name, value in values.items():
+                prop_type = controller_obj.getTypeIdOfProperty(name)
+                setattr(controller_obj, name, _coerce_parameter_value(prop_type, value))
+        return {'status': 'ok', 'controller': controller_obj.Name, 'values': values}
+
+    return run_on_main_thread(_impl)
+
+
+def get_robot_controllers(robot: str) -> dict[str, Any]:
+    """List the controllers and broadcasters present on a robot."""
+
+    def _impl() -> dict[str, Any]:
+        robot_obj = _resolve_robot(robot)
+        controllers = [
+            _controller_info(obj) for obj in (robot_obj.Proxy.get_controllers() or [])
+        ]
+        broadcasters = [
+            _controller_info(obj) for obj in (robot_obj.Proxy.get_broadcasters() or [])
+        ]
+        return {
+            'robot': robot_obj.Name,
+            'controllers': controllers,
+            'broadcasters': broadcasters,
+        }
+
+    return run_on_main_thread(_impl)
+
+
+# ---------------------------------------------------------------------------
+# Sensors
+# ---------------------------------------------------------------------------
+
+
+#: Glue used to join the parts of a nested sensor parameter full name.
+_SENSOR_PARAM_GLUE = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
+
+
+def _resolve_sensor(name: str) -> fc.DocumentObject:
+    obj = _resolve_object(name)
+    if not is_sensor(obj):
+        raise RuntimeError(f'Object "{name}" is not a Cross::Sensor.')
+    return obj
+
+
+def _find_sensor_entry(
+    type_name: str,
+) -> tuple[Optional[dict], Optional[str]]:
+    """Resolve a sensor type, returning ``(sensor_data, sensor_dir_name)``.
+
+    ``sensor_dir_name`` is the directory a sensor can be attached to:
+    ``'link'`` or ``'joint'`` (and any future directory such as ``'robot'``).
+    ``(None, None)`` is returned when nothing matches.
+    """
+    data = get_sensors_data()
+    for sensor_dir_name, sensor_dir in data.items():
+        if not isinstance(sensor_dir, dict):
+            continue
+        for sensor_name, sensor_data in sensor_dir.items():
+            if sensor_name == type_name:
+                return sensor_data, sensor_dir_name
+    # Tolerate a "name (link)" / "name (joint)" suffix.
+    base = type_name
+    for suffix in (' (link)', ' (joint)', ' (robot)'):
+        base = base.replace(suffix, '')
+    if base != type_name:
+        return _find_sensor_entry(base)
+    return None, None
+
+
+def _find_sensor_data(type_name: str) -> Optional[dict]:
+    """Resolve a sensor type by name."""
+    return _find_sensor_entry(type_name)[0]
+
+
+def _sensor_info(obj: fc.DocumentObject) -> dict[str, Any]:
+    """Return ``_obj_basic_info(obj)`` plus sensor details."""
+    info = _obj_basic_info(obj)
+    info['SensorName'] = ros_name(obj)
+    info['SensorType'] = getattr(obj, 'attr_type', '')
+    info['IsLinkSensor'] = getattr(obj, '_Type', '') == 'Cross::SensorLink'
+    info['IsJointSensor'] = getattr(obj, '_Type', '') == 'Cross::SensorJoint'
+    parts = []
+    for parent in getattr(obj, 'InList', []):
+        if is_link(parent) or is_joint(parent) or is_robot(parent):
+            parts.append({'name': parent.Name, 'type': getattr(parent, '_Type', '')})
+    info['AttachedTo'] = parts
+    return info
+
+
+def list_sensor_types() -> dict[str, Any]:
+    """List the available sensors to add, grouped by the element they attach to."""
+
+    def _impl() -> dict[str, Any]:
+        data = get_sensors_data()
+
+        def _summarize(sensor_dir: dict) -> list[dict[str, Any]]:
+            result = []
+            for name, sensor_data in sensor_dir.items():
+                if not isinstance(sensor_data, dict):
+                    continue
+                result.append({
+                    'name': name,
+                    'type': sensor_data.get('type', ''),
+                    'description': sensor_data.get('description', ''),
+                })
+            return sorted(result, key=lambda item: item['name'])
+
+        return {
+            sensor_dir_name: _summarize(sensor_dir)
+            for sensor_dir_name, sensor_dir in data.items()
+            if isinstance(sensor_dir, dict)
+        }
+
+    return run_on_main_thread(_impl)
+
+
+def create_sensor(
+    element: str,
+    type: str,
+    name: str = '',
+) -> dict[str, Any]:
+    """Add a sensor to a link, joint or robot.
+
+    ``element`` is the Name or Label of the parent ``Cross::Link``,
+    ``Cross::Joint`` or ``Cross::Robot``. On a **joint** the sensor needs no
+    position (it is oriented by the joint). On a **link** it becomes a child
+    "sensor link" that must ALREADY be connected to the parent link by a joint
+    (build the chain first with ``create_links_filled``/``create_link`` +
+    ``create_joint``), then positioned with
+    ``set_placement_between_sensor_link_and_parent`` (camera / vertical lidar)
+    or ``set_placement_between`` + a Z rotation of its parent joint (horizontal
+    lidar). If the sensor link already exists, do NOT create it again.
+    """
+    doc = _active_doc()
+
+    def _impl() -> dict[str, Any]:
+        parent = _resolve_object(element)
+        if not (is_link(parent) or is_joint(parent) or is_robot(parent)):
+            raise RuntimeError(
+                f'Object "{element}" is not a Cross::Link, Cross::Joint or '
+                'Cross::Robot.',
+            )
+        sensor_data, sensor_dir_name = _find_sensor_entry(type)
+        if sensor_data is None:
+            raise RuntimeError(
+                f'Sensor type "{type}" not found. '
+                'Use list_sensor_types() to see the available types.',
+            )
+        if sensor_dir_name == 'link' and not is_link(parent):
+            raise RuntimeError(
+                f'Sensor "{type}" attaches to a link; "{element}" is not a '
+                'Cross::Link. Select a link (the sensor will be its child '
+                'sensor link), or choose a joint sensor type.',
+            )
+        if sensor_dir_name == 'joint' and not is_joint(parent):
+            raise RuntimeError(
+                f'Sensor "{type}" attaches to a joint; "{element}" is not a '
+                'Cross::Joint. Select a joint, or choose a link sensor type.',
+            )
+        with _transaction(doc, 'MCP: create sensor'):
+            sensor = make_sensor(sensor_data, sensor_dir_name, doc=doc)
+            if sensor is None:
+                raise RuntimeError(
+                    f'Failed to create sensor of type "{type}".',
+                )
+            if name:
+                sensor.Label = name
+            parent.addObject(sensor)
+        return _sensor_info(sensor)
+
+    return run_on_main_thread(_impl)
+
+
+def set_placement_between_sensor_link_and_parent(
+    sensor: str,
+    ref_parent: str,
+    ref_sensor: str,
+) -> dict[str, Any]:
+    """Position a **link**-attached forward-looking sensor by connecting it to its parent link.
+
+    The ONLY tool that may join a **camera (or similar forward-looking)**
+    sensor link to its parent link — never ``set_placement_between`` for that.
+    Mirrors the "Set placement - sensor" tool. ``ref_parent`` is a
+    face/edge/vertex/circle reference on the parent link, ``ref_sensor`` the
+    matching reference on the sensor link; the two are joined BY THEIR CENTERS.
+
+    ORIENTATION: the sensor link's **parent joint** is turned so that the
+    sensor's front follows the joint's local X (red arrow) = the look
+    direction. The ROLL about X is NOT set: you MUST still rotate the joint
+    about X until Z (blue) points perpendicularly UP relative to the parent
+    part (skip it and the image lies on its side). Verify with
+    ``get_snapshot('<joint>')`` and check **ALL THREE axes — X, Y and Z — one
+    by one**: X = look direction, Z = UP relative to the parent part, Y = the
+    frame's LEFT seen from behind (a wrong Y means the frame is rolled about
+    the look axis). If the sensor looks the OPPOSITE way, verify with
+    ``check_overlap`` and rotate the joint 180 deg about Y.
+
+    Joint sensors need no position and are rejected here. EXCEPTION: a
+    **horizontal lidar** is NOT positioned with this tool — use
+    ``set_placement_between`` + a Z rotation of its parent joint.
+    """
+    doc = _active_doc()
+
+    def _impl() -> dict[str, Any]:
+        sensor_obj = _resolve_sensor(sensor)
+        if getattr(sensor_obj, '_Type', '') == 'Cross::SensorJoint':
+            raise RuntimeError(
+                f'Sensor "{sensor}" is attached to a joint and needs no '
+                'position; this tool only applies to link sensors.',
+            )
+        fcgui.Selection.clearSelection()
+        ref1_info = _select_reference(doc, ref_parent)
+        ref2_info = _select_reference(doc, ref_sensor)
+        with _transaction(doc, 'MCP: set sensor position'):
+            result = set_placement_sensor()
+            if result is False:
+                raise RuntimeError(
+                    'set_placement_sensor failed. Check the selection order '
+                    '(parent reference first, sensor reference second) and '
+                    'that the sensor link and the parent link are connected '
+                    'by a joint.',
+                )
+            joint = result[0] if isinstance(result, tuple) else None
+        fcgui.Selection.clearSelection()
+        return {
+            'status': 'ok',
+            'sensor': sensor_obj.Name,
+            'joint': joint.Name if joint is not None else '',
+            'ref_parent': ref1_info,
+            'ref_sensor': ref2_info,
+        }
+
+    return run_on_main_thread(_impl)
+
+
+# ---------------------------------------------------------------------------
 # Scene tools
 # ---------------------------------------------------------------------------
 
@@ -1076,6 +1703,9 @@ def list_scene_objects() -> dict[str, Any]:
         robots = []
         links = []
         joints = []
+        controllers = []
+        broadcasters = []
+        sensors = []
         others = []
         for obj in doc.Objects:
             if is_robot(obj):
@@ -1092,6 +1722,12 @@ def list_scene_objects() -> dict[str, Any]:
                 info['Child'] = getattr(obj, 'Child', '')
                 info['Type'] = getattr(obj, 'Type', '')
                 joints.append(info)
+            elif is_controller(obj):
+                controllers.append(_controller_info(obj))
+            elif is_broadcaster(obj):
+                broadcasters.append(_controller_info(obj))
+            elif is_sensor(obj):
+                sensors.append(_sensor_info(obj))
             else:
                 others.append(_obj_basic_info(obj))
         return {
@@ -1099,6 +1735,9 @@ def list_scene_objects() -> dict[str, Any]:
             'robots': robots,
             'links': links,
             'joints': joints,
+            'controllers': controllers,
+            'broadcasters': broadcasters,
+            'sensors': sensors,
             'other_objects': others,
         }
 
@@ -1452,51 +2091,81 @@ def _object_geometry_info(
     return result
 
 
-def get_object_info(
+def _object_info_impl(
     object_name: str,
+    max_internal_geometry_items: int,
+) -> dict[str, Any]:
+    """Describe a single object (raw logic, runs on the main thread)."""
+    obj = _resolve_object(object_name)
+    info = _obj_basic_info(obj)
+    # The composition of the object's Group (children in the tree).
+    group = getattr(obj, 'Group', None)
+    if group is not None:
+        info['Group'] = [
+            {
+                'Name': o.Name,
+                'Label': o.Label,
+                'TypeId': o.TypeId,
+            }
+            for o in group
+        ]
+    if is_link(obj):
+        info['Real'] = [r.Name for r in getattr(obj, 'Real', [])]
+        info['Visual'] = [v.Name for v in getattr(obj, 'Visual', [])]
+        info['Collision'] = [c.Name for c in getattr(obj, 'Collision', [])]
+        info['MountedPlacement'] = _placement_to_dict(obj.MountedPlacement)
+        # Mass is a Base.Quantity, convert to a JSON-serializable string.
+        mass = getattr(obj, 'Mass', None)
+        info['Mass'] = str(mass) if mass is not None else None
+        info['MaterialCardName'] = getattr(obj, 'MaterialCardName', '')
+        # Exact subelement-reference prefix for set_placement_between.
+        reference = _reference_paths(obj)
+        if reference:
+            info['Reference'] = reference
+    elif is_joint(obj):
+        info['Parent'] = getattr(obj, 'Parent', '')
+        info['Child'] = getattr(obj, 'Child', '')
+        info['Type'] = getattr(obj, 'Type', '')
+        info['Origin'] = _placement_to_dict(getattr(obj, 'Origin', fc.Placement()))
+        # Limits are Base.Quantity, convert to JSON-serializable strings.
+        lower = getattr(obj, 'LowerLimit', None)
+        upper = getattr(obj, 'UpperLimit', None)
+        info['LowerLimit'] = str(lower) if lower is not None else None
+        info['UpperLimit'] = str(upper) if upper is not None else None
+    info['Geometry'] = _object_geometry_info(obj, max_internal_geometry_items)
+    return _round_floats(info)
+
+
+def get_objects_info(
+    object_names: list[str],
     max_internal_geometry_items: int = 1000,
 ) -> dict[str, Any]:
-    """Return detailed information about a single object, including a ``Geometry`` entry with the global-coordinate description of every face and vertex."""
+    """Return detailed information for several objects in ONE call.
+
+    ``object_names`` is a list of Names or Labels. Each entry is resolved and
+    described (basic info, ``Group``, and — for links/joints — Real/Visual/
+    Collision/Mass/Reference or Parent/Child/limits, plus a ``Geometry`` entry
+    with the global-coordinate description of every face and vertex) and the
+    descriptions are merged into one result. ALWAYS use this batch tool instead
+    of looking up objects one by one.
+
+    Returns ``{'status': 'ok', 'objects': {<name>: <info>, ...}}``. A name that
+    cannot be resolved does not abort the call: it is collected under ``errors``
+    as ``{<name>: <message>}``.
+    """
 
     def _impl() -> dict[str, Any]:
-        obj = _resolve_object(object_name)
-        info = _obj_basic_info(obj)
-        # The composition of the object's Group (children in the tree).
-        group = getattr(obj, 'Group', None)
-        if group is not None:
-            info['Group'] = [
-                {
-                    'Name': o.Name,
-                    'Label': o.Label,
-                    'TypeId': o.TypeId,
-                }
-                for o in group
-            ]
-        if is_link(obj):
-            info['Real'] = [r.Name for r in getattr(obj, 'Real', [])]
-            info['Visual'] = [v.Name for v in getattr(obj, 'Visual', [])]
-            info['Collision'] = [c.Name for c in getattr(obj, 'Collision', [])]
-            info['MountedPlacement'] = _placement_to_dict(obj.MountedPlacement)
-            # Mass is a Base.Quantity, convert to a JSON-serializable string.
-            mass = getattr(obj, 'Mass', None)
-            info['Mass'] = str(mass) if mass is not None else None
-            info['MaterialCardName'] = getattr(obj, 'MaterialCardName', '')
-            # Exact subelement-reference prefix for set_placement_between.
-            reference = _reference_paths(obj)
-            if reference:
-                info['Reference'] = reference
-        elif is_joint(obj):
-            info['Parent'] = getattr(obj, 'Parent', '')
-            info['Child'] = getattr(obj, 'Child', '')
-            info['Type'] = getattr(obj, 'Type', '')
-            info['Origin'] = _placement_to_dict(getattr(obj, 'Origin', fc.Placement()))
-            # Limits are Base.Quantity, convert to JSON-serializable strings.
-            lower = getattr(obj, 'LowerLimit', None)
-            upper = getattr(obj, 'UpperLimit', None)
-            info['LowerLimit'] = str(lower) if lower is not None else None
-            info['UpperLimit'] = str(upper) if upper is not None else None
-        info['Geometry'] = _object_geometry_info(obj, max_internal_geometry_items)
-        return _round_floats(info)
+        objects: dict[str, Any] = {}
+        errors: dict[str, str] = {}
+        for name in object_names:
+            try:
+                objects[name] = _object_info_impl(name, max_internal_geometry_items)
+            except Exception as exc:  # noqa: BLE001
+                errors[name] = str(exc)
+        result: dict[str, Any] = {'status': 'ok', 'objects': objects}
+        if errors:
+            result['errors'] = errors
+        return result
 
     return run_on_main_thread(_impl)
 
@@ -1540,14 +2209,71 @@ def check_overlap(
 # ---------------------------------------------------------------------------
 
 
+def _snapshot_content_blocks(
+    width: int,
+    height: int,
+    format: str,
+    data: bytes,
+) -> list[Any]:
+    """Build the MCP content blocks for a captured 3D view.
+
+    A plain ``dict`` return value is JSON-dumped by the MCP SDK into a single
+    *text* block (``_convert_to_content``), so a base64 ``data:`` URI would
+    reach the agent as text - truncated when large - instead of as an image.
+    Returning real content blocks (a ``TextContent`` line with the image size
+    plus an ``ImageContent`` carrying the pixels) is what a vision agent can
+    actually look at.
+
+    The ``mcp`` SDK is imported on demand: it is a lazily pip-installed
+    dependency, so it must not be required at module import time.
+    """
+    from mcp.types import ImageContent, TextContent
+
+    mime = 'image/png' if format == 'png' else f'image/{format}'
+    return [
+        TextContent(
+            type='text',
+            text=f'3D view snapshot: {width}x{height} {format} ({mime}).',
+        ),
+        ImageContent(
+            type='image',
+            data=base64.b64encode(data).decode('ascii'),
+            mime_type=mime,
+        ),
+    ]
+
+
 def get_snapshot(
     width: int = 1024,
     height: int = 768,
     format: str = 'png',
-) -> dict[str, Any]:
-    """Capture the active 3D view and return it as a base64 data URI."""
+    object_name: str = '',
+) -> list[Any]:
+    """Capture the active 3D view and return it as MCP content blocks.
 
-    def _impl() -> dict[str, Any]:
+    Returns a ``TextContent`` (image dimensions) and an ``ImageContent`` (the
+    pixels), so vision agents get an actual image instead of base64. Registered
+    *unstructured* (see ``server.py``), so the blocks are forwarded as-is.
+
+    ``object_name`` selects the framing: empty (default) fits the WHOLE scene
+    (``ViewFit``); an object's ``Name``/``Label`` (typically a **joint**)
+    selects it and fits the view onto the SELECTION (``Std_ViewFitSelection``)
+    so its axes are shown up close — use this before correcting a sensor's
+    orientation. The view is then always switched to an ISOMETRIC orientation
+    before the capture.
+
+    When ``object_name`` is a **joint**, every OTHER joint is hidden for the
+    capture (restored right after, success or not) and, because the visibility
+    was just changed, the tool waits ONE SECOND (pumping the Qt event loop) so
+    the render is up to date.
+
+    AXIS COLORS follow the framing: WITH ``object_name`` (selection palette)
+    **Z (longest) = light-blue/cyan, X = pink, Y = turquoise**; with NO
+    ``object_name`` **Z (longest) = blue, X = red, Y = green**. Z (up) is always
+    the longest arrow.
+    """
+
+    def _impl() -> list[Any]:
         if not fc.GuiUp:
             raise RuntimeError('FreeCAD GUI is not available.')
         doc = _active_doc()
@@ -1565,33 +2291,76 @@ def get_snapshot(
                 view = gui_doc.ActiveView
         if view is None:
             raise RuntimeError('No active 3D view available.')
-        # Fit the view to the scene so the whole robot is visible.
-        fcgui.SendMsgToActiveView('ViewFit')
-        # Let the GUI process the view fit / redraw before capturing.
-        QtGui.QApplication.processEvents()
-        # saveImage() writes to a file, so use a temporary one and read it back.
-        fd, save_path = tempfile.mkstemp(suffix=f'.{format}')
-        os.close(fd)
+        # Visibility of the joints, saved to restore it after the snapshot.
+        saved_joint_visibility: dict[str, bool] = {}
         try:
-            # saveImage() may return None even on success (it saves the file
-            # directly), so verify the file on disk instead of the return value.
-            view.saveImage(save_path, width, height, 'White')
-            if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
-                raise RuntimeError('Failed to capture the 3D view.')
-            with open(save_path, 'rb') as f:
-                data = f.read()
-        finally:
+            # Always switch to an isometric orientation so the snapshot is taken
+            # from a stable, readable angle. It is applied AFTER the fit/selection
+            # so it keeps the framing just computed and only changes the viewpoint.
+            view.viewIsometric()
+            if object_name:
+                # Frame a single object: select it and fit the camera to the
+                # SELECTION. ``ViewSelection`` is what Std_ViewFitSelection
+                # sends; ``ViewFit`` would instead fit the whole scene.
+                obj = _resolve_object(object_name)
+                if is_joint(obj):
+                    # Show ONLY the requested joint: hide every other joint in
+                    # the document so the requested joint's axes are not
+                    # obscured. The previous visibility is saved and restored
+                    # in the ``finally`` block below.
+                    for other in doc.Objects:
+                        other_vo = getattr(other, 'ViewObject', None)
+                        if other_vo is None or not is_joint(other):
+                            continue
+                        saved_joint_visibility[other.Name] = other_vo.Visibility
+                        other_vo.Visibility = (other.Name == obj.Name)
+                fcgui.Selection.clearSelection()
+                fcgui.Selection.addSelection(doc.Name, obj.Name)
+                fcgui.SendMsgToActiveView('ViewSelection')
+            else:
+                # Fit the view to the scene so the whole robot is visible.
+                fcgui.SendMsgToActiveView('ViewFit')
+
+            # Let the GUI process the view changes / redraw before capturing.
+            QtGui.QApplication.processEvents()
+            if saved_joint_visibility:
+                # The joints' visibility was just changed: wait one second, all
+                # the while pumping the Qt event loop, so the 3D view has time to
+                # finish rendering before the snapshot. Without this the captured
+                # image may still show the previous visibility state.
+                deadline = time.monotonic() + 1.0
+                while time.monotonic() < deadline:
+                    QtGui.QApplication.processEvents()
+                    time.sleep(0.05)
+            # saveImage() writes to a file, so use a temporary one and read it
+            # back.
+            fd, save_path = tempfile.mkstemp(suffix=f'.{format}')
+            os.close(fd)
             try:
-                os.remove(save_path)
-            except OSError:
-                pass
-        mime = 'image/png' if format == 'png' else f'image/{format}'
-        return {
-            'width': width,
-            'height': height,
-            'format': format,
-            'data_uri': f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}',
-        }
+                # saveImage() may return None even on success (it saves the
+                # file directly), so verify the file on disk instead of the
+                # return value.
+                view.saveImage(save_path, width, height, 'White')
+                if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
+                    raise RuntimeError('Failed to capture the 3D view.')
+                with open(save_path, 'rb') as f:
+                    data = f.read()
+            finally:
+                try:
+                    os.remove(save_path)
+                except OSError:
+                    pass
+        finally:
+            # Restore the joints' visibility to its state before the snapshot.
+            for name, visible in saved_joint_visibility.items():
+                other = doc.getObject(name)
+                other_vo = getattr(other, 'ViewObject', None) if other is not None else None
+                if other_vo is not None:
+                    other_vo.Visibility = visible
+            if saved_joint_visibility:
+                # Refresh the view so the restored state is shown immediately.
+                QtGui.QApplication.processEvents()
+        return _snapshot_content_blocks(width, height, format, data)
 
     return run_on_main_thread(_impl)
 
@@ -1620,107 +2389,99 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
     'general_algorithm': """\
 ## General algorithm (source of truth)
 
-0. PLAN FIRST. Before touching the document, write an explicit step-by-step
-   plan and keep it updated as you go. The plan MUST list every robot link,
-   the parent/child topology and the reference (face/vertex) chosen for each
-   placement — and it MUST include an explicit **mirroring check**: for every
-   child link decide, up front, whether it may end up on the wrong side of its
-   parent and therefore need mirroring (`rotate_object(child_link, 'x', 180)`,
-   see e-bis). Never skip this item: symmetric parts on opposite sides of a
-   parent (e.g. left/right wheels) are the usual mirroring candidates. The
-   plan is a checklist, not prose — reuse the steps below as its backbone.
+0. PLAN FIRST. Write the plan AS A TODO LIST before touching the document and
+   keep it updated: every step below is a separate checklist item (break step 6
+   into per-link items), marked DONE right after it is completed. Following this
+   algorithm MEANS working through that list in order — never skip, reorder or
+   batch items. The plan MUST list every link, the parent/child topology, the
+   reference chosen for each placement, and an explicit **mirroring check** per
+   child (decide up front whether it may land on the wrong side of its parent
+   and need `rotate_object(child_link, 'x', 180)`, see e-bis) — symmetric parts
+   on opposite sides of a parent (e.g. left/right wheels) are the usual
+   candidates.
 1. No active document? `create_document(name)`.
 2. `create_robot(name)`.
-3. `create_links_filled(robot, object_names)` — create links from existing
-   bodies; the same body may be reused for several links.
-4. Create joints: select 2 neighbouring links at a time, root link first.
+3. `create_links_filled(robot, object_names)` — links from existing bodies; the
+   same body may be reused for several links.
+4. Create joints: 2 neighbouring links at a time, root link first.
 5. `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision.
-6. Position links pairwise along the chain. Default method:
-   `set_placement_between(target, ref1, ref2)` — snap the contact zones of
-   two neighbouring links. Per pair:
-   a. Choose one reference on the parent link and one on the child link: a
-      face/edge/vertex/circle of the link Real element as
+6. Position links pairwise along the chain with
+   `set_placement_between(target, ref1, ref2)`. Per pair:
+   a. Pick one reference on the parent and one on the child: a
+      face/edge/vertex/circle of the link Real element, written
       `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
       `real_l_chassis001_.chassis001.Box.Face3`). `<inner_link_name>` is the
-      Name of the App::Link inside the Real element (e.g. `chassis001`,
-      `wheel001`) — NOT the source body name (e.g. `chassis`, `wheel`) and
-      NOT the robot link name.
-      **NEVER guess this path.** Call `get_object_info(link)` (or
-      `list_scene_objects()`) and read the `Reference` block: use
-      `Reference.prefix` and append `.FaceN` / `.VertexN` / `.EdgeN`.
-      IMPORTANT: links filled from the **same** source body share one wrapper
-      and therefore one inner link name — e.g. four wheels made from one
-      `wheel` body all have `inner_link = "wheel001"`; the per-link suffix
-      (`wheel002`, `wheel003`, ...) is NOT a valid inner link name.
-      Do NOT create LCS objects —
-      plain subelement references are enough. To pick the right face/vertex,
-      use the geometric information from `get_object_info(link)`
-      (`center_of_mass`, `surface_type`, `vertices`, `point`) to understand
-      where each face/vertex actually lies — do not guess from the index
-      alone.
-   b. `set_placement_between(target, ref1, ref2)` — only the two references
-      go into the selection.
-      IMPORTANT: if `set_placement_between` returns no error but the target's
-      coordinates did NOT change, you have most likely moved it into its own
-      coordinates (the two references resolved to the same point). Verify the
-      target's placement with `get_object_info(target)` after the call and
-      pick different references (e.g. a face instead of a vertex) if nothing
-      moved.
+      Name of the App::Link inside the Real element (e.g. `chassis001`), NOT the
+      source body name and NOT the robot link name. **NEVER guess this path**:
+      read `Reference.prefix` from `get_objects_info([link])` and append
+      `.FaceN`/`.VertexN`/`.EdgeN`. Links filled from the SAME source body share
+      one inner link name (four wheels from one `wheel` body all have
+      `wheel001`; `wheel002` is NOT valid). Do NOT create LCS objects — plain
+      subelement references are enough. Choose the face/vertex from the
+      `Geometry` data (`center_of_mass`, `surface_type`, `vertices`, `point`),
+      never from the index alone.
+   b. `set_placement_between(target, ref1, ref2)` — only the two references go
+      into the selection. If it returns no error but the target did NOT move,
+      the two references most likely resolved to the same point: verify with
+      `get_objects_info([target])` and pick different references.
    c. Control snapshot: `get_snapshot(...)`.
-   d. Orient the JOINT so its local Z axis lies along the child link's
-      functional axis (a revolute/continuous joint always rotates around its
-      local Z, a prismatic joint always moves along its local Z). Do this ONLY
-      by rotating the JOINT with `rotate_object(joint_name, axis, angle_deg)`.
-      NEVER rotate the LINK to achieve this: the link is mounted on the joint
-      and follows it, so rotating the link would break its alignment with the
-      joint's local Z. A wheel whose axle is not along the joint's local Z
-      will not roll.
-   e. Aim the whole assembly by rotating the JOINT with
-      `rotate_object(object_name, axis, angle_deg)`: rotating the joint turns
-      its local Z (and with it the child kinematic chain and end link) into
-      the required direction. Do NOT rotate the link to fix the final pose —
-      rotate the joint.
-   e-ter. For a chassis (a parent with several symmetric wheels), all wheels'
-      joint local Z axes (the wheel axles) MUST point in the SAME direction —
-      to the LEFT. Do not mirror the joints so that opposite wheels point in
-      opposite directions: every wheel's Z axis must be parallel and point the
-      same way (left), so that all wheels roll consistently. If a wheel's Z
-      axis points the other way, rotate its JOINT (not the link) to flip it
-      into the common left direction.
-   e-bis. Mirroring a link to the other side of the parent: if the joint is
-      oriented correctly AND the link is oriented correctly, but the link's
-      body penetrates the parent link's body through its full height (the
-      link should sit on the opposite side), rotate the LINK 180° about the
-      X axis: `rotate_object(link_name, 'x', 180)`. The link is aligned along
-      its local Z (the functional axis), so rotating it about X mirrors it
-      about Z — the link flips to the other side of the joint while its
-      Z-axis alignment and the joint orientation stay intact. Use the X axis,
-      NOT Z: rotating the link about Z would only spin it around its own
-      functional axis and would not mirror it at all. Use this for wheels on
-      one side, or generally to place symmetric links on opposite sides of a
-      parent kinematic chain.
+   d. Orient the JOINT so its local Z lies along the child's functional axis
+      (revolute/continuous rotate around local Z, prismatic moves along local
+      Z) — ONLY with `rotate_object(joint_name, axis, angle_deg)`. NEVER rotate
+      the LINK for this: the link follows the joint, so rotating it breaks the
+      alignment (a wheel whose axle is not along the joint's local Z will not
+      roll).
+   e. Aim the assembly by rotating the JOINT (`rotate_object`): that turns its
+      local Z and with it the child chain. Do NOT rotate the link to fix the
+      final pose.
+   e-ter. For a chassis with several symmetric wheels, ALL wheels' joint local
+      Z axes (the axles) MUST be parallel and point the SAME way — to the LEFT.
+      Never mirror the joints into opposite directions; flip a wrong one by
+      rotating its JOINT.
+   e-bis. Mirroring: if the joint and the link are both oriented correctly but
+      the link's body penetrates the parent through its full height (it belongs
+      on the opposite side), rotate the LINK 180° about X:
+      `rotate_object(link_name, 'x', 180)`. The link is aligned along its local
+      Z, so an X rotation mirrors it about Z — it flips to the other side while
+      its Z alignment and the joint orientation stay intact. Use X, NOT Z
+      (a Z rotation would only spin it around its own functional axis).
    e-quater. MANDATORY OVERLAP CHECK — HARD GATE. Run it for EACH child
-      individually, ONLY AFTER the child's joint has been oriented (steps d,
-      e and e-ter above) and after every later `rotate_object` on that joint —
-      the orientation changes the child's global ranges, so a check performed
-      before it is meaningless. Run it BEFORE collisions / materials. Never batch
-      or assume symmetry: opposite corners often put some children inside the
-      parent (overlap). Get the GLOBAL min/max of child and parent on ALL THREE
-      axes X/Y/Z via `get_object_info(...)` `Geometry` (do NOT check one axis
-      only, do NOT judge by eye). If the child's range on ANY axis is CONTAINED
-      inside the parent's on that axis → OVERLAP FAILURE: mirror the child with
-      `rotate_object(child_link, 'x', 180)` (see e-bis), then re-check. PRINT for
-      every child: `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..]
+      individually, ONLY AFTER its joint is oriented (d, e, e-ter) and after
+      every later `rotate_object` on that joint (orientation changes the child's
+      global ranges), and BEFORE collisions/materials. Never batch or assume
+      symmetry. Compare the GLOBAL min/max of child and parent on ALL THREE axes
+      X/Y/Z from `get_objects_info(...)` `Geometry` (never one axis, never by
+      eye). If the child's range on ANY axis is CONTAINED in the parent's on
+      that axis → OVERLAP FAILURE: mirror the child (e-bis) and re-check. PRINT
+      per child: `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..]
       Z[..] -> OUTSIDE` (or `OVERLAP -> mirrored`). Never proceed until every
       child passes and the numbers are printed.
    f. Verify with another snapshot.
-7. Add collisions: `create_collision(link_or_robot)` — default WITHOUT `type`
-   (type `copy`). Primitive `type` values (`box`, `sphere`, `cylinder_x/y/z`)
-   ONLY on explicit user request.
-8. `set_material(...)`; if not specified, use `ABS-Generic`.
-9. `calculate_mass_and_inertia(robot)`.
-10. Use `list_scene_objects()`, `get_object_info(...)`, `get_snapshot(...)`
-    as needed to inspect and verify.
+7. Sensors: MANDATORY — never skip. Choose the set by priority: (a) the user
+   asked something specific → do exactly that; (b) else the source objects
+   already contain specific sensors (a `Cross::Sensor` or a sensor link) → add
+   THOSE; (c) else add the DEFAULT set (forward RGB-D camera + 360° lidar on
+   the chassis, RGB-D camera on the manipulator aimed at the end tool). Attach
+   each sensor to the link/joint it BELONGS to by meaning (never the root link
+   by default). If a sensor link ALREADY exists, do NOT recreate it — position
+   it. Then verify the sensor FRAME (MANDATORY): X (red) = look direction,
+   Z (blue) = perpendicularly UP relative to the parent part, Y (green) = the
+   frame's LEFT. See the **Sensors** section.
+8. Controllers and broadcasters: choose them from the robot's PURPOSE and its
+   ACTUATED joints (see **Controllers and broadcasters**). Actuated joints
+   require a `joint_state_broadcaster`; a chassis gets a drive controller suited
+   to its wheels; a manipulator/gripper gets the matching trajectory/gripper
+   controllers.
+9. Collisions: ONE `create_collisions([link1, link2, ...])` call, default
+   WITHOUT `type` (type `copy`). A robot name covers the whole robot; its links
+   passed in the same call are skipped. Primitive types (`box`, `sphere`,
+   `cylinder_x/y/z`) ONLY on explicit user request. Never call it once per link.
+10. `set_material(...)`; if not specified, use `ABS-Generic`.
+11. `calculate_mass_and_inertia(robot)`.
+12. Inspect and verify with `list_scene_objects()`, `get_objects_info(...)`,
+    `get_snapshot(...)`. Prefer ONE `get_objects_info([...])` call with many
+    names; pass an element (e.g. a sensor's joint) to
+    `get_snapshot(object_name=...)` to frame it up close.
 """,
     'create_robot': """\
 ## Creating a robot
@@ -1736,44 +2497,53 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 
 ### Positioning algorithm (step by step)
 
-1. Get information about the parent link and its child links with
-   `get_object_info(...)` (geometry of the Real element: faces, vertices,
-   `center_of_mass`, `surface_type`).
-2. Choose the faces or vertices on which the child link will be placed by their
-   geometry. Take the robot's link topology into account — it can be understood
-   from the robot's name or from the context (e.g. a 4-wheeled chassis: the
-   parent is the chassis, the children are the four wheels). If you select a
-   face, the attachment is anchored to the coordinates of that face's center of
+1. Get the parent and its child links with ONE
+   `get_objects_info([parent, child1, child2, ...])` call (Real geometry:
+   faces, vertices, `center_of_mass`, `surface_type`).
+2. Choose the faces/vertices to place each child on by their geometry, taking
+   the link topology into account (e.g. a 4-wheeled chassis: parent = chassis,
+   children = the four wheels). A face anchors the attachment at its center of
    mass.
-3. Print a statement naming the parent link, the index of the face/vertex on
-   it, the child link that will be attached to that face/vertex, and the
-   face/vertex of the child link that will be joined to the parent. Format:
-   `parent_robot_link_name face1/vertex1 - child_robot_link_name face1/vertex1`
-4. Perform `set_placement_between` for the parent/child robot link pair.
-5. Orient the JOINT of the child link so its local Z axis lies along the
-   child's functional axis, and — for a parent with several symmetric wheels —
-   make ALL wheels' joint local Z axes point in the SAME direction (left); see
-   steps d–e-ter of the General algorithm.
-6. ONLY AFTER the joint orientation of step 5 above, run the MANDATORY OVERLAP
-   CHECK for this child — EACH child on its own, on ALL THREE axes X/Y/Z (not
-   just one), and PRINT the numeric min/max evidence. Mirror the child if it is
-   contained on any axis. Do NOT start collisions or materials until every
-   child passes.
+3. Print `parent_robot_link_name face1/vertex1 - child_robot_link_name
+   face1/vertex1` naming the parent reference and the child reference that will
+   be joined.
+4. `set_placement_between` for the parent/child pair.
+5. Orient the child's JOINT so its local Z lies along the child's functional
+   axis; for a parent with several symmetric wheels make ALL wheels' joint
+   local Z axes point the SAME way (left) — see steps d–e-ter of the General
+   algorithm.
+6. ONLY AFTER step 5, run the MANDATORY OVERLAP CHECK for this child on ALL
+   THREE axes X/Y/Z and PRINT the numeric evidence; mirror the child if it is
+   contained on any axis. Do not start collisions/materials until every child
+   passes.
 
-For the detailed rules of steps 4-6 — reference building, joint orientation,
-mirroring and the overlap-check procedure — follow the **General algorithm**
-(source of truth).
+Reference building, joint orientation, mirroring and the overlap procedure are
+specified in the **General algorithm** (source of truth).
 
 - `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps
-  the contact zones of two neighbouring links by two references (one on the
-  parent link, one on the child link): a face/edge/vertex/circle of the link
-  Real element as `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
-  `real_l_chassis001_.chassis001.Box.Face3`) or an already existing LCS; a
-  robot link (`l_...`) cannot be a reference. `move='leaf'` (default) — only
-  for the final chain element; `child_branch`/`parent_tree` are advanced.
-  Only the two references go into the selection (the target is not selected).
-- `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision;
-  call before positioning.
+  two neighbouring links by two references (one on the parent, one on the
+  child): a face/edge/vertex/circle of the link Real element as
+  `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
+  `real_l_chassis001_.chassis001.Box.Face3`) or an existing LCS; a robot link
+  (`l_...`) cannot be a reference. `move='leaf'` (default) — only for the final
+  chain element; `child_branch`/`parent_tree` are advanced. Only the two
+  references go into the selection (the target is not selected).
+  CONNECTION MODEL: the references are joined **by their CENTERS** — the child
+  moves so that the center of `ref2` coincides with the center of `ref1` (e.g.
+  a hole/boss center lands on the mating hole/boss center). Pick ref1/ref2 so
+  that the points which must touch are exactly those centers.
+  NEVER use it on a **sensor link** hosting a camera or similar forward-looking
+  sensor — use `set_placement_between_sensor_link_and_parent` (see the sensors
+  topic). EXCEPTION: a link hosting only a **horizontal lidar** IS positioned
+  with `set_placement_between` (then rotate its parent joint about Z to aim the
+  sector).
+- `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision; call
+  before positioning.
+- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
+  — positions a **link**-attached forward-looking sensor (see the sensors
+  topic): joins the two links by the centers of the references and turns the
+  parent joint so the sensor's front follows its local X (look direction). The
+  roll about X must still be corrected afterwards.
 - `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`,
   link `MountedPlacement` or LCS; correct orientation after a snapshot.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
@@ -1800,10 +2570,18 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
     'collisions': """\
 ## Collisions
 
-- `create_collision(link_or_robot, type)` — default WITHOUT `type` (type
-  `copy` = exact geometry copy; the only allowed default). Primitive types
-  ONLY on explicit user request: `box`, `sphere`, `cylinder_x/y/z` (from the
-  bounding box).
+- `create_collisions(link_or_robot, type)` — create collisions for SEVERAL
+  links/robots in ONE call. `link_or_robot` is a LIST of link/robot names or
+  Labels. `type` is either a single collision type applied to every element or
+  a LIST parallel to `link_or_robot` (one type per element). Default WITHOUT
+  `type` (type `copy` = exact geometry copy; the only allowed default).
+  Primitive types ONLY on explicit user request: `box`, `sphere`,
+  `cylinder_x/y/z` (from the bounding box).
+  Passing a **robot** covers the robot AS A WHOLE (all its links). When a robot
+  and some of its OWN links are passed together, those links are removed from
+  the list first and the pass runs over all the robot's links, then over the
+  remaining explicitly-listed elements — so no link gets a duplicate collision.
+  ALWAYS use this batch tool; never call it once per link.
 """,
     'materials': """\
 ## Materials and inertia
@@ -1814,66 +2592,246 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
 - `calculate_mass_and_inertia(robot_or_link_names)` — mass, inertia, center
   of mass; robot name or list of link names.
 """,
+    'controllers': """\
+## Controllers and broadcasters (ros2_control)
+
+Give the robot the controllers its PURPOSE and its ACTUATED joints require
+(`Cross::Controller` / `Cross::Broadcaster` from `ros2_controllers`). Decide
+from the robot's topology and actuated joints — not from a fixed list — and
+configure each controller for exactly its functional joint group:
+
+- **Any robot with actuated joints**: a `joint_state_broadcaster`
+  (`kind='broadcaster'`), otherwise joint states are not published.
+- **Chassis / mobile base**: a drive controller chosen by the wheel layout —
+  `diff_drive_controller` for two driven wheels/sides (`left_wheel_names`,
+  `right_wheel_names`, wheel separation, radius); `ackermann_steering_controller`
+  (or steering + traction) for a car-like base; the matching omni controller for
+  mecanum/swerve. Set `wheel_*_names` / `left/right_wheel_names` /
+  `steering_*_names` and `base_frame_id` / `odom_frame_id` to the real names.
+  - **LEFT/RIGHT wheels**: derive each side from the robot's direction-defining
+    parts (forward-looking sensors, end effector), not from an arbitrary axis;
+    with no such feature use the base convention (local +X forward, +Y left).
+  - **Wheel separation**: the distance between the **nearest (facing inner)
+    faces** of the right and left wheel on one axis — not between centers and
+    not between outer faces.
+- **Manipulator arm**: a `joint_trajectory_controller` over the arm's
+  revolute/prismatic joints (`joints`, `base_frame_id`).
+- **Gripper / end effector**: `gripper_action_controller` /
+  `position_controllers` (or `joint_trajectory_controller`) over the gripper
+  joints.
+- **Other groups** (pan-tilt, lift, conveyor, ...): a
+  `joint_trajectory_controller` (or a suitable velocity/position controller).
+- **Parameter units**: distance parameters are in **metres** unless the
+  parameter's `description` says otherwise — convert model measurements
+  (wheel separation, radius, offsets, limits) before setting them.
+
+### Tools
+
+- `list_controller_types()` — available controllers and broadcasters
+  (`name`, `description`, `plugin_class_name`, `parameter_count`).
+- `create_controller(robot, type, name, kind)` — `type` is the ROS controller
+  name (e.g. `diff_drive_controller`, `joint_state_broadcaster`) or a plugin
+  class full name; `kind` = `'controller'` (default) or `'broadcaster'`
+  (auto-detected for broadcaster types).
+- `get_robot_controllers(robot)` — controllers and broadcasters on a robot.
+- `list_controller_parameters(controller)` — `full_name`, `type_fc`, `type`,
+  `default_value`, `description`, `current_value`.
+- `set_controller_parameter(controller, parameter, value)` — one parameter by
+  `full_name`; nested names are joined with `'___'` (e.g.
+  `linear__x__has_velocity_limits`). Joint/link parameters (`joints`,
+  `left_wheel_names`) accept a Name/Label, a list of names or a ROS name.
+- `set_controller_parameters(controller, values)` — several at once
+  (`full_name` -> value).
+
+### Typical workflow
+
+1) Robot, links and joints first.
+2) Identify the functional joint groups (chassis, arm, gripper, ...).
+3) Actuated joints → `create_controller(robot, 'joint_state_broadcaster')`.
+4) Per group: `list_controller_types()`, `create_controller(robot, type)`,
+   `list_controller_parameters(controller)`, then set `joints` /
+   `*_wheel_names` / frame parameters with `set_controller_parameter(...)`.
+""",
+    'sensors': """\
+## Sensors
+
+Adding sensors is a MANDATORY part of the general algorithm — never skip it.
+Decide WHICH set to add FIRST; the three cases are mutually exclusive and are
+checked in this order:
+
+1. **The user asked something specific** (type, count, placement) → add exactly
+   that, INSTEAD of the default set.
+2. **The source objects already contain specific sensors** (a `Cross::Sensor`,
+   a sensor link, or a plain camera/lidar part) → add THOSE INSTEAD of the
+   default set.
+3. **The user said nothing about sensors** and you follow the general algorithm
+   → add the DEFAULT SENSOR SET below.
+
+A robot hosts `Cross::Sensor` objects (Gazebo sensors from `resources/sensors`),
+attached to a `Cross::Link`, `Cross::Joint` or `Cross::Robot`. **A sensor has no
+position of its own**: it is oriented by the parent joint of the element it is
+attached to (X = look, Z = up, Y = left). **Attach each sensor where it BELONGS
+BY MEANING** — a camera on the head/end-tool link, a lidar on the chassis, a
+wheel encoder on the wheel's joint, an IMU on the base; never the root link by
+default.
+
+### Default sensor set (case 3)
+
+- **RGB-D camera** (`rgbd_camera`) on the chassis, looking FORWARD.
+- **360-degree lidar** (`gpu_lidar`, circular scan) on the chassis.
+- **RGB-D camera** (`rgbd_camera`) on the manipulator's end (tool-flange) link,
+  aimed at the END TOOL.
+
+No manipulator → skip that camera; no chassis → put the chassis sensors on the
+base link. Adapt the set to what the robot actually has.
+
+### Positioning an existing sensor link
+
+A **sensor link** is a normal link that also hosts a `Cross::Sensor`. **Before
+adding one, CHECK whether it already exists** (its whole chain from the robot
+down to it — see the workflow below); if it does, do NOT recreate it, just
+POSITION it:
+
+- **Camera / vertical (forward-looking) lidar** →
+  `set_placement_between_sensor_link_and_parent(...)` — the ONLY way to connect
+  such a sensor link to its parent link; never `set_placement_between`. It turns
+  the parent joint so the sensor's front follows its local X (look direction);
+  the roll about X must still be corrected (see below).
+- **Horizontal lidar** (scans all around) → the EXCEPTION: position it with
+  `set_placement_between(...)`, then aim its sector by rotating its **parent
+  joint** about **Z** until the sector front (the joint's positive X) points
+  where it must.
+
+### Check the sensor frame orientation (X = look, Y = left, Z = up)
+
+After positioning, ALWAYS verify the frame of the sensor's **parent joint** —
+MANDATORY and the step most often skipped, leaving the image LYING ON ITS SIDE.
+Check **ALL THREE axes — X, Y AND Z — one by one**; do NOT stop after X and Z:
+
+- **X (red) = the look direction**;
+- **Z (blue) = the top of the frame** — **perpendicularly UP relative to the
+  parent part**, NOT relative to the world and NOT along the look direction;
+- **Y (green) = the frame's LEFT** seen when looking at the sensor **from
+  behind**. A wrong Y means the frame is rolled about the look axis even when X
+  and Z look plausible.
+
+**Axis colors depend on the framing** — identify axes by LENGTH when in doubt
+(Z, up, is ALWAYS the longest arrow): **WITH `object_name`** (selection palette)
+Z = light-blue/cyan, X = pink, Y = turquoise; **NO `object_name`** (whole scene)
+Z = blue, X = red, Y = green.
+
+To judge the triad, zoom in on the sensor's **parent joint**:
+`get_snapshot('<joint>')` selects it, fits the view onto it, switches to
+ISOMETRIC, hides every OTHER joint for the capture (restored right after) and
+waits ONE SECOND (Qt events pumped) so the render is up to date. A snapshot with
+no argument fits the whole scene and is too far away to see the arrows.
+
+Corrections — rotate the sensor's **parent joint** (never its link) with
+`rotate_object(joint_name, axis, angle_deg)`:
+
+- about **X** — tilts the frame forward/back; fixes Z (up). After
+  `set_placement_between_sensor_link_and_parent` this is the roll you almost
+  always still need: rotate until Z points perpendicularly up (a sideways blue
+  arrow means the image is on its side).
+- about **Z** — spins the frame left/right; aims a forward-looking sensor or the
+  front of a horizontal lidar's sector.
+- about **Y** — rolls the frame; fixes Y (left). If the sensor looks the
+  OPPOSITE way, verify with `check_overlap` and rotate **180 deg about Y**.
+
+Rotations combine: aim X with a Z rotation, then bring Z up with an X rotation.
+Re-check with `get_snapshot('<joint>')` after each rotation and confirm ALL
+THREE axes again before finishing.
+
+### Tools
+
+- `list_sensor_types()` — available sensors grouped by attachment directory
+  (`link`, `joint`), each with `name`, `type`, `description`.
+- `create_sensor(element, type, name)` — add a sensor to a link, joint or robot.
+  On a **joint** it needs no position. On a **link** it becomes a child "sensor
+  link" that must already be connected to the parent link by a joint, then
+  positioned (see above). If the sensor link ALREADY exists, do NOT create it
+  again.
+- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
+  — position a **link**-attached **forward-looking** sensor (details above).
+  Joint sensors are rejected; a horizontal lidar uses `set_placement_between` +
+  a Z rotation.
+
+### Workflow for a link sensor (e.g. a camera, lidar)
+
+Creating the sensor does NOT build its kinematic structure. BEFORE creating it,
+CHECK whether the sensor's chain already exists (the sensor link plus every link
+and joint from the robot down to it) with `list_scene_objects()` /
+`get_objects_info(...)`. If the source objects (bodies / `App::Link`s) are
+present, BUILD the chain from them and only THEN attach the sensor; if they are
+absent, say so instead of attaching a sensor that has nothing to connect to.
+
+1) (if missing) build the chain: `create_links_filled(robot, [<object>])` (or
+   `create_link(robot, ...)` with no geometry to reuse) for the sensor link and
+   any intermediate links, connected with
+   `create_joint(robot, name, parent_link=..., child_link=...)`. The sensor link
+   must be a proper child of the parent link before you continue.
+2) `create_sensor('<sensor link>', '<sensor type>')` — skip if it already exists.
+3) Position it by its mounting (see "Positioning an existing sensor link"):
+   camera / vertical lidar → `set_placement_between_sensor_link_and_parent(...)`;
+   horizontal lidar → `set_placement_between(...)` + a Z rotation of the parent
+   joint.
+4) Verify the frame with `get_snapshot('<joint>')` and correct it until ALL
+   THREE axes (X, Y and Z) are right. Aim until the sensor looks where it must:
+   chassis camera forward / lidar all-round, manipulator camera toward the end
+   tool.
+
+### Joint sensor
+
+For a joint sensor (e.g. a force-torque sensor) just
+`create_sensor('<joint>', 'force_torque')` — no positioning needed.
+""",
     'inspection': """\
 ## Inspection
 
 - `list_scene_objects()` — scene description (robots, links, joints, other
   objects) with placements.
-- `get_object_info(object_name, max_internal_geometry_items)` — one object details
-  (Real, Visual, Collision, Mass, joint limits, ...). It always returns
-  `Geometry`: the spatial description of every face and vertex in
-  **global** coordinates. A face has a 1-based `index` (`Face1`, `Face2`, ...),
-  its `center_of_mass`, its `surface_type`
-  (`Plane`, `Cylinder`, `Sphere`, `Cone`, `Torus`, ...), `area`
-  and the coordinates of its `vertices`; a vertex has a 1-based `index`
-  (`Vertex1`, ...) and its `point`. For a `Cross::Link` the geometry of its
-  `Real` element is reported, so the indices can be used directly in
-  positioning references (e.g. `real_l_...Face3`).
-
-  For a `Cross::Link` the result also contains a `Reference` block with the
-  exact positioning-reference path: `real_link`, `inner_link`, `feature`,
-  `prefix` and `example`. Use `Reference.prefix` + `.FaceN`/`.VertexN` for
-  `set_placement_between`; never guess the inner link name.
-
-  IMPORTANT: to understand the spatial arrangement of faces and vertices —
-  which face is on top, which faces are parallel, which vertex is a corner,
-  where a face lies on the object's surface — ALWAYS use this geometric
-  information (`center_of_mass`, `surface_type`, `vertices`, `point`), NOT
-  the face/vertex index alone. The index only identifies the subelement; the
-  coordinates tell you where it actually is.
-  Call `get_object_info(...)` before choosing
-  positioning references, so the reference is picked from real coordinates
-  rather than guessed.
-- `get_snapshot(width, height, format)` — 3D view capture; returns a base64
-  `data:` URI.
+- `get_objects_info(object_names, max_internal_geometry_items)` — details for
+  SEVERAL objects in ONE call (a LIST of names/Labels), merged into
+  `{'status': 'ok', 'objects': {<name>: <info>, ...}}`; unresolvable names go
+  under `errors`. ALWAYS prefer this batch call over repeated single lookups.
+  Each entry has the basic info (Real, Visual, Collision, Mass, joint limits,
+  ...) plus `Geometry`: every face and vertex in **global** coordinates — a face
+  with a 1-based `index` (`Face1`, ...), `center_of_mass`, `surface_type`
+  (`Plane`, `Cylinder`, ...), `area` and its `vertices`; a vertex with a 1-based
+  `index` and its `point`. For a `Cross::Link` the `Real` element's geometry is
+  reported, so the indices are usable directly in positioning references, and a
+  `Reference` block gives the exact path (`real_link`, `inner_link`, `feature`,
+  `prefix`, `example`): use `Reference.prefix` + `.FaceN`/`.VertexN` and never
+  guess the inner link name.
+  IMPORTANT: judge the spatial arrangement (which face is on top, which are
+  parallel, which vertex is a corner) from `center_of_mass`, `surface_type`,
+  `vertices` and `point` — NOT from the index alone, which only identifies the
+  subelement. Call `get_objects_info(...)` before choosing references.
+- `get_snapshot(width, height, format, object_name)` — 3D view capture as an MCP
+  image block (not base64). `object_name` (e.g. a **joint**) selects it and fits
+  the camera onto it so its axes fill the frame; empty = fit the WHOLE scene.
+  Always ISOMETRIC; a **joint** target hides every other joint for the capture
+  (restored right after) and waits one second so the render is up to date. Axis
+  colors depend on the framing — see the sensors topic.
 """,
     'best_practices': """\
 ## Best practices
 
-- Start with a written plan (see step 0 of the General algorithm): list the
-  links, the parent/child topology and the reference for each placement, and
-  include an explicit **mirroring check** per child — decide in advance which
-  children are symmetric and may need `rotate_object(child, 'x', 180)`.
-- Resolve exact names with `list_scene_objects()` / `get_object_info()` before
-  positioning.
-- Order: robot and links -> joints -> positioning -> collisions/materials.
-- `set_placement_vision_mode()` before positioning.
+- Work through the **General algorithm** (source of truth) as a TODO list,
+  marking items done one by one; include the per-child **mirroring check**.
+- Order: robot and links -> joints -> positioning -> sensors -> controllers ->
+  collisions/materials.
+- Resolve exact names with `list_scene_objects()` / `get_objects_info()` and
+  call `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
-  `get_snapshot()`; fix orientation with `rotate_object()` if needed.
-- Follow the **General algorithm** (source of truth) for reference building,
-  joint orientation, the mandatory overlap check and mirroring.
-- The overlap check is a HARD GATE: run it for EACH child ONLY AFTER its joint
-  has been oriented (all wheels' axles pointing the same, left, direction),
-  then examine ALL THREE axes (X, Y, Z) of the child's vs the parent's global
-  coordinate ranges, and print the numbers. A child contained inside the parent
-  on any axis is a failure and must be mirrored
-  (`rotate_object(child, 'x', 180)`). Never inspect only one axis.
-- Do NOT create LCS objects: `create_lcs()` only on explicit user request;
-  plain subelement references are enough.
-- Never guess the inner link name of a reference: read `Reference.prefix`
-  from `get_object_info(link)` / `list_scene_objects()` and append the
-  subelement. Links filled from the same source body share one inner link
-  name (e.g. all four wheels → `wheel001`).
+  `get_snapshot()`; fix orientation with `rotate_object()`.
+- Never guess the inner link name: read `Reference.prefix` from
+  `get_objects_info([link])` and append the subelement (links from the same
+  source body share one inner link name, e.g. all four wheels → `wheel001`).
+- Error reporting: tools never block on a GUI dialog. A failure raises and the
+  error text (with the workbench reason) is returned — read it and fix the call,
+  do not retry blindly. A successful tool may return a `messages` field with
+  non-fatal warnings; inspect it too.
 """,
 }
 
@@ -1885,6 +2843,8 @@ _INSTRUCTIONS_FULL_TOPIC_ORDER: list[str] = [
     'joints',
     'collisions',
     'materials',
+    'controllers',
+    'sensors',
     'inspection',
     'best_practices',
 ]
@@ -1901,21 +2861,12 @@ _INSTRUCTIONS_FULL = _INSTRUCTIONS_HEADER + '\n'.join(
 def instructions_to_work_with_tools(topic: str = 'all') -> dict[str, Any]:
     """Return step-by-step instructions for the agent on how to use the tools.
 
-    Guides the agent through creating a robot, positioning its parts and
-    working with the other MCP tools. ``topic`` selects a focused section:
+    ``topic`` selects a section: ``'all'`` (default, the full workflow) or one
+    of ``'general_algorithm'`` (source of truth), ``'create_robot'``,
+    ``'positioning'``, ``'joints'``, ``'collisions'``, ``'materials'``,
+    ``'controllers'``, ``'sensors'``, ``'inspection'``, ``'best_practices'``.
 
-    - ``'all'`` (default): the full workflow guide.
-    - ``'general_algorithm'``: the source-of-truth step-by-step workflow.
-    - ``'create_robot'``: creating documents, robots and links.
-    - ``'positioning'``: set_placement_vision_mode / contact-zone selection /
-      set_placement_between / rotate_object / create_lcs.
-    - ``'joints'``: creating joints and setting joint values.
-    - ``'collisions'``: collision geometry tools.
-    - ``'materials'``: materials and mass/inertia.
-    - ``'inspection'``: scene, object info, selection and snapshots.
-    - ``'best_practices'``: general recommendations.
-
-    This tool is pure information: it does not modify the document.
+    Pure information: it does not modify the document.
     """
     if topic == 'all':
         text = _INSTRUCTIONS_FULL
@@ -1936,13 +2887,13 @@ def instructions_to_work_with_tools(topic: str = 'all') -> dict[str, Any]:
 
 #: Ordered list of (tool_name, callable) pairs. The MCP server registers these.
 TOOLS: list[tuple[str, Any]] = [
-    ('create_document', create_document),
+    # ('create_document', create_document),
     ('create_robot', create_robot),
     ('create_link', create_link),
     ('create_links_filled', create_links_filled),
     ('create_joint', create_joint),
     ('create_joints_filled', create_joints_filled),
-    ('create_collision', create_collision),
+    ('create_collisions', create_collisions),
     # set_object_placement is disabled: set_placement_between is the default
     # positioning method (see the instructions above). Re-enable only on
     # explicit request.
@@ -1954,8 +2905,17 @@ TOOLS: list[tuple[str, Any]] = [
     ('set_material', set_material),
     ('calculate_mass_and_inertia', calculate_mass_and_inertia),
     ('set_joint_values', set_joint_values),
+    ('list_controller_types', list_controller_types),
+    ('create_controller', create_controller),
+    ('get_robot_controllers', get_robot_controllers),
+    ('list_controller_parameters', list_controller_parameters),
+    ('set_controller_parameter', set_controller_parameter),
+    ('set_controller_parameters', set_controller_parameters),
+    ('list_sensor_types', list_sensor_types),
+    ('create_sensor', create_sensor),
+    ('set_placement_between_sensor_link_and_parent', set_placement_between_sensor_link_and_parent),
     ('list_scene_objects', list_scene_objects),
-    ('get_object_info', get_object_info),
+    ('get_objects_info', get_objects_info),
     ('check_overlap', check_overlap),
     ('get_snapshot', get_snapshot),
     ('instructions_to_work_with_tools', instructions_to_work_with_tools),

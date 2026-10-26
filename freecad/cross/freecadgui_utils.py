@@ -521,8 +521,18 @@ def gui_process_events():
     QtGui.QApplication.processEvents()
 
 
+def _gui_messages_suppressed() -> bool:
+    """True when an automated (MCP) caller asked to silence modal dialogs."""
+    from .freecad_utils import _gui_messages_suppressed as suppressed
+    return suppressed
+
+
 def ask_confirmation(title:str = '', text:str = '') -> bool:
     """Display confirmation popup to user."""
+    if _gui_messages_suppressed():
+        # No human to answer (MCP caller): do not block, behave as "Yes".
+        fc.Console.PrintWarning(text + '\n')
+        return True
     msg_box = QMessageBox()
     msg_box.setWindowTitle(title)
     msg_box.setText(text)
@@ -534,6 +544,9 @@ def ask_confirmation(title:str = '', text:str = '') -> bool:
 
 
 def show_notification(title, message):
+    if _gui_messages_suppressed():
+        fc.Console.PrintMessage(message + '\n')
+        return
     # Получаем главное окно FreeCAD
     mw = fcgui.getMainWindow()
     

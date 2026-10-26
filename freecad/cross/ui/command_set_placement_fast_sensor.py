@@ -5,7 +5,7 @@ import FreeCAD as fc
 import FreeCADGui as fcgui
 
 from ..gui_utils import tr
-from ..wb_utils import rotate_origin, rotate_placement, set_placement_fast
+from ..wb_utils import set_placement_sensor
 
 
 # Stubs and type hints.
@@ -46,27 +46,12 @@ class _SetCROSSPlacementFastSensorCommand:
         return bool(fcgui.Selection.getSelection())
 
     def Activated(self):
-        doc = fc.activeDocument()
-
-        # set placement of sensor link
-        try:
-            joint, child_link, parent_link = set_placement_fast()
-            doc.recompute()
-        except TypeError:
-            return
-
-        # make x-oriented sensor joint
-        doc.openTransaction(tr("Rotate joint origin"))
-        x = None
-        y = 270
-        z = None
-        joint.Origin = rotate_placement(joint.Origin, x, y, z)
-        doc.recompute()
-
-        # correct mountedPlacement of sensor link
-        set_placement_fast(joint_origin = False)
-        # after correction link can have x-positive or x-negative direction dependent of object form
-        # user should corrects MountedPlacement if wrong direction is set
+        # Snap the sensor link to the parent link and make the sensor joint
+        # positive-X oriented, then correct the sensor link MountedPlacement.
+        # After the correction the link can be x-positive or x-negative
+        # depending on the object's form; the user should correct the
+        # MountedPlacement if the direction is wrong.
+        set_placement_sensor()
 
 
 fcgui.addCommand('SetCROSSPlacementFastSensor', _SetCROSSPlacementFastSensorCommand())

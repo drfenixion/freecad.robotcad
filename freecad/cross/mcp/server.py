@@ -117,7 +117,13 @@ def _build_mcp_server():
         ),
     )
     for name, fn in get_tools():
-        mcp.tool(name=name)(fn)
+        # ``get_snapshot`` returns MCP content blocks (a text line + an image).
+        # An unstructured tool forwards them as-is; a structured one would
+        # re-serialize the image back into truncated text.
+        if name == 'get_snapshot':
+            mcp.tool(name=name, structured_output=False)(fn)
+        else:
+            mcp.tool(name=name)(fn)
     return mcp
 
 

@@ -111,14 +111,19 @@ class _RemoteClient:
             await self._session.initialize()
         return self._session
 
-    async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        """Call a remote tool and return its content blocks.
+
+        The blocks are forwarded as-is (not flattened to text): a remote tool
+        may return an image block (e.g. ``get_snapshot``), which must reach
+        the agent as an image, not as base64 text.
+        """
         session = await self._ensure()
         result = await session.call_tool(name, arguments)
-        if result.is_error:
-            texts = [c.text for c in result.content if hasattr(c, 'text')]
-            raise RuntimeError('Remote error: ' + '\n'.join(texts))
         texts = [c.text for c in result.content if hasattr(c, 'text')]
-        return '\n'.join(texts)
+        if result.is_error:
+            raise RuntimeError('Remote error: ' + '\n'.join(texts))
+        return list(result.content)
 
     async def close(self) -> None:
         if self._session is not None:
@@ -158,11 +163,12 @@ def _build_stdio_server():
         return tools
 
     @server.call_tool()
-    async def on_call_tool(name: str, arguments: dict) -> list[TextContent]:
+    async def on_call_tool(name: str, arguments: dict) -> list[Any]:
         if name not in schemas:
             raise RuntimeError(f'Unknown tool: {name}')
-        text = await client.call_tool(name, arguments)
-        return [TextContent(type='text', text=text)]
+        # Forward the remote content blocks unchanged, so image results stay
+        # images instead of being stringified into base64 text.
+        return await client.call_tool(name, arguments)
 
     return server, client
 

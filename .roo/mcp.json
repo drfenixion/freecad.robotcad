@@ -7,22 +7,31 @@
 			"alwaysAllow": [
 				"list_scene_objects",
 				"set_object_placement",
-				"get_snapshot",
 				"create_robot",
 				"create_links_filled",
 				"create_joint",
 				"set_placement_vision_mode",
 				"create_lcs",
-				"rotate_object",
-				"create_collision",
+				"create_collisions",
 				"create_link",
 				"set_material",
 				"calculate_mass_and_inertia",
 				"create_joints_filled",
-				"get_object_info",
-				"set_placement_between",
 				"instructions_to_work_with_tools",
-				"check_overlap"
+				"check_overlap",
+				"list_controller_types",
+				"create_controller",
+				"get_robot_controllers",
+				"list_controller_parameters",
+				"set_controller_parameter",
+				"set_controller_parameters",
+				"list_sensor_types",
+				"create_sensor",
+				"set_placement_between_sensor_link_and_parent",
+				"rotate_object",
+				"get_objects_info",
+				"set_placement_between",
+				"get_snapshot"
 			]
 		}
 	}

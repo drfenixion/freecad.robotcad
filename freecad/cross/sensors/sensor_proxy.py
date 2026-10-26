@@ -1068,10 +1068,10 @@ def separate_sensors_from_dirs(sensors_dirs: dict) -> dict :
                     except (KeyError, TypeError):
                         type_value = type
 
-                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[type_value]
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP[type_value]
                 except KeyError:
                     type = 'string'
-                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[type]
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP[type]
 
                 params[param_name]['type_fc'] = type_fc
                 params[param_name]['type_fc_origin'] = param['type_fc']

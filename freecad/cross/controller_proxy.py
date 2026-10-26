@@ -795,11 +795,11 @@ def separate_controllers_from_dirs(controllers_dirs: dict) -> dict :
             # leaf element has 'type' key, nested container does not
             if isinstance(param, dict) and 'type' in param:
                 try:
-                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP[param['type']]
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP[param['type']]
                 except KeyError:
-                    # unknown type (f.e. 'none' for filter chains) - fallback to string
+                    # a genuinely unknown type - fallback to string
                     warn('Unknown parameter type "' + str(param['type']) + '" for parameter "' + param_name + '". Using string type.')
-                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP['string']
+                    type_fc = wb_constants.ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP['string']
 
                 params[param_name]['type_fc'] = type_fc
                 params[param_name]['type_fc_origin'] = param['type_fc']

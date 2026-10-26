@@ -33,6 +33,7 @@ from .freecad_utils import quantity_as
 from .freecad_utils import set_param
 from .freecad_utils import warn
 from .freecad_utils import lcs_attachmentsupport_name
+from .freecad_utils import suppress_console_warnings
 from .freecadgui_utils import get_placement, get_progress_bar, gui_process_events
 from .ros.utils import _add_robotcad_venv_to_sys_path
 from .ros.utils import get_ros_workspace_from_file
@@ -1089,47 +1090,57 @@ def make_lcs_at_link_body(
 
     setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
 
-    if sub_element_type == 'Vertex':
-        lcs.MapMode = 'Translate'
-    elif sub_element_type == 'Edge' \
-        and (
-            sub_element.Curve.TypeId == 'Part::GeomCircle' \
-            or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'
-        ):
+    # The ``InertialCS`` map mode makes FreeCAD's ``AttachEngine3D`` print a
+    # console warning ("inertia tensor has axis of symmetry. Second and third
+    # axes of inertia are undefined.") every time the attachment is evaluated:
+    # already when ``MapMode`` is assigned (the attachment is recomputed
+    # immediately) and again on ``doc.recompute()``. This method is shared by
+    # the dedicated LCS tool and by the automatic LCS creation of the
+    # ``set_placement`` tools, so the whole block that may trigger the
+    # evaluation is silenced here for all callers.
+    with suppress_console_warnings():
 
-        lcs.MapMode = 'Concentric'
-        if lcs_concentric_reversed:
-            lcs.MapReversed = True
-    else:
-        lcs.MapMode = 'InertialCS'
+        if sub_element_type == 'Vertex':
+            lcs.MapMode = 'Translate'
+        elif sub_element_type == 'Edge' \
+            and (
+                sub_element.Curve.TypeId == 'Part::GeomCircle' \
+                or sub_element.Curve.TypeId == 'Part::GeomBSplineCurve'
+            ):
 
-    
+            lcs.MapMode = 'Concentric'
+            if lcs_concentric_reversed:
+                lcs.MapReversed = True
+        else:
+            lcs.MapMode = 'InertialCS'
 
-    if deactivate_after_map_mode:
-        # prevent automove back to InertialCS rotation
-        lcs.MapMode = 'Deactivated'
+        if deactivate_after_map_mode:
+            # prevent automove back to InertialCS rotation
+            lcs.MapMode = 'Deactivated'
 
-    # remove placement of origin obj (mean in zero point of original obj)
-    if is_orienteer_link:
-        lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
-    # add placement of link of origin obj (mean in same place at face of link as at original obj)
-    lcs.Placement = link_to_obj_placement * lcs.Placement
-    # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
-    if align_z_axis:
-        lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
+        # remove placement of origin obj (mean in zero point of original obj)
+        if is_orienteer_link:
+            lcs.Placement = original_obj.Placement.inverse() * lcs.Placement
+        # add placement of link of origin obj (mean in same place at face of link as at original obj)
+        lcs.Placement = link_to_obj_placement * lcs.Placement
+        # fix Z rotation to 0 in frame of origin (if align_z_axis is enabled)
+        if align_z_axis:
+            lcs.Placement = rotate_placement(lcs.Placement, x = None, y = None, z = 0)
 
-    # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
-    # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
+        # # find placement of lcs at dynamic link of obj. lcs.Placement is placement at original object or it is link if present
+        # placement = dynamic_link_of_robot_link.Placement * lcs.Placement
 
-    if delete_created_objects:
-        doc.removeObject(body_lcs_wrapper.Name)
-        doc.removeObject(lcs.Name)
+        if delete_created_objects:
+            doc.removeObject(body_lcs_wrapper.Name)
+            doc.removeObject(lcs.Name)
 
-    doc.recompute()
-    if doc.Name != fc.activeDocument().Name:
-        fc.activeDocument().recompute()
+        doc.recompute()
+        if doc.Name != fc.activeDocument().Name:
+            fc.activeDocument().recompute()
 
-    return lcs, body_lcs_wrapper, lcs.Placement, doc
+        final_placement = lcs.Placement
+
+    return lcs, body_lcs_wrapper, final_placement, doc
 
 
 def rotate_placement(
@@ -1654,6 +1665,43 @@ def set_placement_fast(
             move_placement(doc, child_link, 'MountedPlacement', child_orienteer, parent_orienteer)
 
         doc.commitTransaction()
+
+    return joint, child_link, parent_link
+
+
+def set_placement_sensor() -> tuple[DO, DO, DO] | bool:
+    ''' Set the placement of a sensor link (encapsulates the
+        "Set placement - sensor" workflow).
+
+        The two current selection entries must be, in order, a reference on
+        the parent link and a reference on the sensor link. The sensor link is
+        snapped to the parent link (``set_placement_fast``) and its parent
+        joint is then made positive-X oriented (rotated 270 deg about Y) so the
+        front of the sensor follows the joint's local X (red arrow).
+
+        Returns ``(joint, child_link, parent_link)`` on success,
+        ``False`` if the selection is invalid.
+    '''
+    doc = fc.activeDocument()
+
+    # set placement of sensor link
+    try:
+        joint, child_link, parent_link = set_placement_fast()
+        doc.recompute()
+    except TypeError:
+        return False
+
+    # make x-oriented sensor joint
+    x = None
+    y = 270
+    z = None
+    joint.Origin = rotate_placement(joint.Origin, x, y, z)
+    doc.recompute()
+
+    # correct mountedPlacement of sensor link
+    set_placement_fast(joint_origin=False)
+    # after correction link can have x-positive or x-negative direction dependent of object form
+    # user should corrects MountedPlacement if wrong direction is set
 
     return joint, child_link, parent_link
 
