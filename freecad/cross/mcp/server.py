@@ -73,6 +73,15 @@ class _FreeCADConsoleHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
+            # The FreeCAD console may run in a non-UTF-8 locale (e.g. C/POSIX),
+            # where printing a non-ASCII character (an em dash in a tool
+            # description, a non-Latin object label, ...) raises
+            # UnicodeEncodeError and the whole log line is lost. Degrade the
+            # text to ASCII instead of dropping the record.
+            try:
+                msg.encode('ascii')
+            except UnicodeEncodeError:
+                msg = msg.encode('ascii', 'replace').decode('ascii')
             if record.levelno >= logging.ERROR:
                 fc.Console.PrintError(msg + '\n')
             elif record.levelno >= logging.WARNING:

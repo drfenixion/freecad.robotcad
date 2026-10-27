@@ -207,7 +207,7 @@ tried variants.
 | Tool | Description |
 |---|---|
 | `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method** (analog of `Set Placement - fast`). Joins the two references by their CENTERS; only `ref1`/`ref2` go into the selection (not `target`); one on the parent, one on the child. `move` defaults to `leaf` (final chain element only). NEVER on a camera-like sensor link — EXCEPTION: a link hosting only a **horizontal lidar** IS positioned with this tool, then its parent joint is rotated about **Z**. |
-| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor (camera, vertical lidar). **The only tool that may connect such a sensor link to its parent link**: joins them by the CENTERS of the references, then turns the parent joint so the sensor's front follows its local X (red arrow) = the look direction. The roll about X must still be corrected. |
+| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor (camera, vertical lidar). **The only tool that may connect such a sensor link to its parent link**: joins them by the CENTERS of the references, then turns the parent joint so the sensor's front follows its local X (red arrow) = the look direction. The roll about X must still be corrected. `sensor` may be the sensor object **or the sensor link that hosts it** (e.g. `l_camera001`) — both are accepted. |
 | `set_placement_vision_mode(robot)` | Show only Real elements, hide Visual and Collision. Call before positioning. |
 | `rotate_object(object_name, axis, angle_deg)` | Rotate the joint Origin / link MountedPlacement / LCS — corrects orientation after a control snapshot. |
 | `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Only if the user explicitly asks** — plain subelement references are enough. |
@@ -363,7 +363,7 @@ just POSITION it:
 |---|---|
 | `list_sensor_types()` | Available sensors grouped by attachment directory (`link`, `joint`), each with `name`, `type`, `description`. |
 | `create_sensor(element, type, name)` | Add a sensor to a link, joint or robot. On a **joint** it needs no position. On a **link** it becomes a child "sensor link" that must already be connected to the parent link by a joint, then positioned (see above). If the sensor link ALREADY exists, do NOT create it again. |
-| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor — the ONLY way to connect such a sensor link to its parent link (see above). Joint sensors are rejected; a horizontal lidar uses `set_placement_between` + a Z rotation. |
+| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor — the ONLY way to connect such a sensor link to its parent link (see above). `sensor` may be the sensor object **or the sensor link that hosts it** (e.g. `l_camera001`). Joint sensors are rejected; a horizontal lidar uses `set_placement_between` + a Z rotation. |
 
 ### Workflow for a link sensor (e.g. a camera, lidar)
 

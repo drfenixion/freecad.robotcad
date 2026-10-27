@@ -55,12 +55,15 @@ from ..wb_utils import (
     is_link,
     is_robot,
     is_sensor,
+    is_sensor_joint,
+    is_sensor_link,
     make_lcs_at_link_body,
     ros_name,
     rotate_origin,
     set_placement_fast,
     set_placement_sensor,
 )
+from .errors import as_anticipated_error
 from .main_thread import run_on_main_thread
 
 # ---------------------------------------------------------------------------
@@ -873,8 +876,8 @@ def set_placement_between(
         # set_placement_between_sensor_link_and_parent. A link that
         # hosts only lidar(s) IS positioned with this tool (see the docstring).
         non_lidar_sensors = [
-            child for child in target_obj.OutList
-            if is_sensor(child) and not _is_lidar_sensor(child)
+            child for child in _link_sensors(target_obj)
+            if not _is_lidar_sensor(child)
         ]
         if is_link(target_obj) and non_lidar_sensors:
             raise RuntimeError(
@@ -1492,11 +1495,50 @@ def get_robot_controllers(robot: str) -> dict[str, Any]:
 _SENSOR_PARAM_GLUE = wb_constants.ROS2_CONTROLLERS_PARAM_FULL_NAME_GLUE
 
 
+def _link_sensors(link_obj: fc.DocumentObject) -> list[fc.DocumentObject]:
+    """Return the sensors hosted by a link (a "sensor link").
+
+    A link-attached sensor is added to the link's ``Group`` by
+    ``create_sensor``; ``OutList`` is checked as a fallback for documents
+    written by older versions.
+    """
+    sensors = [
+        child for child in list(getattr(link_obj, 'Group', []) or [])
+        if is_sensor(child)
+    ]
+    if sensors:
+        return sensors
+    return [
+        child for child in list(getattr(link_obj, 'OutList', []) or [])
+        if is_sensor(child)
+    ]
+
+
 def _resolve_sensor(name: str) -> fc.DocumentObject:
+    """Resolve a sensor by Name/Label, or by the link that hosts it.
+
+    Agents naturally pass the **sensor link** (e.g. ``l_camera001``) rather
+    than the sensor object itself, so a ``Cross::Link`` is accepted and its
+    hosted sensor is returned. A forward-looking (non-lidar) sensor is
+    preferred when the link hosts several.
+    """
     obj = _resolve_object(name)
-    if not is_sensor(obj):
-        raise RuntimeError(f'Object "{name}" is not a Cross::Sensor.')
-    return obj
+    if is_sensor(obj):
+        return obj
+    if is_link(obj):
+        sensors = _link_sensors(obj)
+        if sensors:
+            forward_looking = [s for s in sensors if not _is_lidar_sensor(s)]
+            return (forward_looking or sensors)[0]
+        raise RuntimeError(
+            f'Link "{name}" hosts no sensor. Create one first with '
+            f'create_sensor("{name}", "<sensor type>"); see '
+            'list_sensor_types() for the available types.',
+        )
+    raise RuntimeError(
+        f'Object "{name}" is not a Cross::Sensor (nor a Cross::Link hosting '
+        'one). Pass the sensor object or its sensor link.',
+    )
 
 
 def _find_sensor_entry(
@@ -1534,8 +1576,10 @@ def _sensor_info(obj: fc.DocumentObject) -> dict[str, Any]:
     info = _obj_basic_info(obj)
     info['SensorName'] = ros_name(obj)
     info['SensorType'] = getattr(obj, 'attr_type', '')
-    info['IsLinkSensor'] = getattr(obj, '_Type', '') == 'Cross::SensorLink'
-    info['IsJointSensor'] = getattr(obj, '_Type', '') == 'Cross::SensorJoint'
+    # ``is_sensor_link``/``is_sensor_joint`` also recognise objects created
+    # with ``fpo`` (``Proxy.Type``), not only the old ``_Type`` property.
+    info['IsLinkSensor'] = is_sensor_link(obj)
+    info['IsJointSensor'] = is_sensor_joint(obj)
     parts = []
     for parent in getattr(obj, 'InList', []):
         if is_link(parent) or is_joint(parent) or is_robot(parent):
@@ -1635,6 +1679,9 @@ def set_placement_between_sensor_link_and_parent(
 ) -> dict[str, Any]:
     """Position a **link**-attached forward-looking sensor by connecting it to its parent link.
 
+    ``sensor`` is the sensor object **or the sensor link that hosts it** (e.g.
+    ``l_camera001``) — both are accepted.
+
     The ONLY tool that may join a **camera (or similar forward-looking)**
     sensor link to its parent link — never ``set_placement_between`` for that.
     Mirrors the "Set placement - sensor" tool. ``ref_parent`` is a
@@ -1660,10 +1707,15 @@ def set_placement_between_sensor_link_and_parent(
 
     def _impl() -> dict[str, Any]:
         sensor_obj = _resolve_sensor(sensor)
-        if getattr(sensor_obj, '_Type', '') == 'Cross::SensorJoint':
+        if is_sensor_joint(sensor_obj):
             raise RuntimeError(
-                f'Sensor "{sensor}" is attached to a joint and needs no '
-                'position; this tool only applies to link sensors.',
+                f'Sensor "{sensor_obj.Name}" is attached to a joint and needs '
+                'no position; this tool only applies to link sensors.',
+            )
+        if not is_sensor_link(sensor_obj):
+            raise RuntimeError(
+                f'Object "{sensor_obj.Name}" is not a link sensor '
+                '(Cross::SensorLink); this tool only applies to link sensors.',
             )
         fcgui.Selection.clearSelection()
         ref1_info = _select_reference(doc, ref_parent)
@@ -1679,9 +1731,14 @@ def set_placement_between_sensor_link_and_parent(
                 )
             joint = result[0] if isinstance(result, tuple) else None
         fcgui.Selection.clearSelection()
+        sensor_link = next(
+            (o for o in getattr(sensor_obj, 'InList', []) if is_link(o)),
+            None,
+        )
         return {
             'status': 'ok',
             'sensor': sensor_obj.Name,
+            'sensor_link': sensor_link.Name if sensor_link is not None else '',
             'joint': joint.Name if joint is not None else '',
             'ref_parent': ref1_info,
             'ref_sensor': ref2_info,
@@ -2543,7 +2600,8 @@ specified in the **General algorithm** (source of truth).
   — positions a **link**-attached forward-looking sensor (see the sensors
   topic): joins the two links by the centers of the references and turns the
   parent joint so the sensor's front follows its local X (look direction). The
-  roll about X must still be corrected afterwards.
+  roll about X must still be corrected afterwards. `sensor` may be the sensor
+  object OR the sensor link that hosts it (e.g. `l_camera001`).
 - `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`,
   link `MountedPlacement` or LCS; correct orientation after a snapshot.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
@@ -2753,6 +2811,8 @@ THREE axes again before finishing.
   again.
 - `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
   — position a **link**-attached **forward-looking** sensor (details above).
+  `sensor` may be the sensor object OR the sensor link that hosts it (e.g.
+  `l_camera001`).
   Joint sensors are rejected; a horizontal lidar uses `set_placement_between` +
   a Z rotation.
 
@@ -2923,5 +2983,13 @@ TOOLS: list[tuple[str, Any]] = [
 
 
 def get_tools() -> list[tuple[str, Any]]:
-    """Return the list of (name, callable) tool pairs."""
-    return list(TOOLS)
+    """Return the list of (name, callable) tool pairs.
+
+    Every tool is wrapped so that an expected failure (``RuntimeError`` /
+    ``ValueError``: wrong object type, invalid reference, missing joint, ...)
+    reaches the agent as the MCP SDK's ``ToolError``. The SDK then logs it at
+    INFO without a traceback and forwards the message to the model, instead of
+    reporting a crash ("Error executing tool ...") with a full ERROR traceback
+    in the FreeCAD console.
+    """
+    return [(name, as_anticipated_error(fn)) for name, fn in TOOLS]

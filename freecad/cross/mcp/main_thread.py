@@ -85,6 +85,7 @@ def _guard_messages(fn: Callable[..., Any]) -> Callable[..., Any]:
             consume_recorded_messages,
             set_gui_messages_suppressed,
         )
+        from .errors import enrich_error
 
         def _texts() -> list[str]:
             return [
@@ -97,7 +98,9 @@ def _guard_messages(fn: Callable[..., Any]) -> Callable[..., Any]:
         except Exception as exc:  # noqa: BLE001 - re-raised, enriched below.
             messages = _texts()
             if messages:
-                raise RuntimeError(f'{exc}\n' + '\n'.join(messages)) from exc
+                # Keep the exception class: an anticipated ``ToolError`` must
+                # stay one, otherwise the SDK logs a full traceback at ERROR.
+                raise enrich_error(exc, messages) from exc
             raise
         finally:
             # Always restore the user-facing GUI behaviour, even when a dialog

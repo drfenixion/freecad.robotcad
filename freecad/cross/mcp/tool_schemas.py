@@ -363,9 +363,10 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'type': 'string',
                 'description': (
                     'Link-attached forward-looking sensor (camera or vertical '
-                    'lidar) name or Label. A HORIZONTAL lidar does NOT use this '
-                    'tool — use set_placement_between + a Z rotation of its '
-                    'parent joint.'
+                    'lidar): the sensor object OR the sensor link that hosts '
+                    'it (e.g. "l_camera001") — both are accepted. A HORIZONTAL '
+                    'lidar does NOT use this tool — use set_placement_between '
+                    '+ a Z rotation of its parent joint.'
                 ),
             },
             'ref_parent': {
