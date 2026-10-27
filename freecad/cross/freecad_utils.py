@@ -233,33 +233,77 @@ def warn(text: str, gui: bool = False) -> None:
         _message_box(QtGui.QMessageBox.Warning, text)
 
 
+# Observers that render console output. ``Console`` is the terminal/stdout
+# logger, ``ReportOutput`` feeds the GUI "Report view" panel, ``StatusBar``
+# and ``NotificationAreaObserver`` show short notifications. FreeCAD's
+# ``AttachEngine3D`` writes its warnings through *all* of them, so silencing
+# only ``Console`` (as an earlier version did) still left the message in the
+# Report view, which is what the user sees as console spam.
+_CONSOLE_OBSERVERS = (
+    'Console',
+    'ReportOutput',
+    'StatusBar',
+    'NotificationAreaObserver',
+)
+
+
+def _console_observers() -> tuple[str, ...]:
+    """Return the names of the console observers to silence.
+
+    The list is queried from FreeCAD so that observers added by other
+    workbenches are covered too. Falls back to the known names when
+    ``GetObservers`` is unavailable (e.g. ``freecadcmd``).
+    """
+    console = getattr(fc, 'Console', None)
+    get_observers = getattr(console, 'GetObservers', None)
+    if get_observers is None:
+        return _CONSOLE_OBSERVERS
+    try:
+        available = tuple(get_observers())
+    except Exception:
+        return _CONSOLE_OBSERVERS
+    # Keep the known order, then append any observer we did not list.
+    known = tuple(o for o in _CONSOLE_OBSERVERS if o in available)
+    extra = tuple(o for o in available if o not in _CONSOLE_OBSERVERS)
+    return known + extra
+
+
 @contextmanager
 def suppress_console_warnings() -> Iterator[None]:
-    """Silence the FreeCAD console ``Wrn`` stream for the enclosed block.
+    """Silence the FreeCAD console warning streams for the enclosed block.
 
     Some FreeCAD C++ algorithms emit console warnings from a place the
     workbench can not intercept from Python (e.g. ``AttachEngine3D`` in the
     ``InertialCS`` map mode prints "inertia tensor has axis of symmetry. Second
     and third axes of inertia are undefined."). This context manager
-    temporarily disables the ``Wrn`` stream of the ``Console`` observer so such
-    messages do not reach the report view / terminal, and restores the previous
-    state on exit.
+    temporarily disables the ``Wrn`` stream of *every* console observer
+    (``Console`` for the terminal, ``ReportOutput`` for the GUI "Report view",
+    ``StatusBar``, ...) so such messages do not reach any of them, and restores
+    the previous state on exit.
     """
     console = getattr(fc, 'Console', None)
-    previous_status: Optional[bool] = None
+    previous: dict[str, bool] = {}
     if console is not None:
-        try:
-            previous_status = console.GetStatus('Console', 'Wrn')
-            console.SetStatus('Console', 'Wrn', False)
-        except Exception:
-            # ``SetStatus`` is unavailable (e.g. ``freecadcmd``): just run.
-            previous_status = None
+        for observer in _console_observers():
+            try:
+                status = console.GetStatus(observer, 'Wrn')
+            except Exception:
+                # ``GetStatus`` is unavailable (e.g. ``freecadcmd``) or the
+                # observer does not support the ``Wrn`` type.
+                continue
+            if status is None:
+                continue
+            try:
+                console.SetStatus(observer, 'Wrn', False)
+            except Exception:
+                continue
+            previous[observer] = bool(status)
     try:
         yield
     finally:
-        if console is not None and previous_status is not None:
+        for observer, status in previous.items():
             try:
-                console.SetStatus('Console', 'Wrn', bool(previous_status))
+                console.SetStatus(observer, 'Wrn', status)
             except Exception:
                 pass
 

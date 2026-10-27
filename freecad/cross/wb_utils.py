@@ -1085,20 +1085,22 @@ def make_lcs_at_link_body(
 
     original_obj_wrapper.addObject(body_lcs_wrapper)
 
-    lcs = doc.addObject( 'PartDesign::CoordinateSystem', 'LCS')
-    body_lcs_wrapper.addObject(lcs)
-
-    setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
-
     # The ``InertialCS`` map mode makes FreeCAD's ``AttachEngine3D`` print a
     # console warning ("inertia tensor has axis of symmetry. Second and third
     # axes of inertia are undefined.") every time the attachment is evaluated:
     # already when ``MapMode`` is assigned (the attachment is recomputed
-    # immediately) and again on ``doc.recompute()``. This method is shared by
-    # the dedicated LCS tool and by the automatic LCS creation of the
-    # ``set_placement`` tools, so the whole block that may trigger the
-    # evaluation is silenced here for all callers.
+    # immediately) and again on ``doc.recompute()``. The message is written to
+    # *every* console observer, in particular ``ReportOutput`` (the GUI
+    # "Report view" panel), not only to ``Console`` (the terminal), so
+    # ``suppress_console_warnings`` disables the ``Wrn`` stream of all of them.
+    # This method is shared by the dedicated LCS tool and by the automatic LCS
+    # creation of the ``set_placement`` tools, so the whole block that may
+    # trigger the evaluation is silenced here for all callers.
     with suppress_console_warnings():
+        lcs = doc.addObject( 'PartDesign::CoordinateSystem', 'LCS')
+        body_lcs_wrapper.addObject(lcs)
+
+        setattr(lcs, lcs_attachmentsupport_name(), [(original_obj, sub_element_name)])   # The X axis.
 
         if sub_element_type == 'Vertex':
             lcs.MapMode = 'Translate'
