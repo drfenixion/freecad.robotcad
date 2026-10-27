@@ -529,3 +529,94 @@ def text_2d(
     # FRONT should suffice but doesn't work alone.
     text_node.parts = coin.SoText3.FRONT | coin.SoText3.SIDES | coin.SoText3.BACK
     return root, text_node, matrix_transform, material
+
+
+def text_3d(
+        text: str,
+        position: Sequence[float] = (0.0, 0.0, 0.0),
+        color: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        size: float = 10.0,
+        justification: str = 'center',
+        rotation: object | None = None,
+) -> coin.SoSeparator:
+    """Return the separator of a 3D text placed at `position`.
+
+    Unlike `text_2d`, which is drawn in screen space, the text is real 3D
+    geometry whose height is `size` in the current (world) units, i.e.
+    millimetres in FreeCAD. It can therefore be scaled proportionally to the
+    object it annotates.
+
+    Arguments
+    ---------
+    - text: string to show.
+    - position: (x, y, z) in world coordinates, the center of the text.
+    - color: a tuple with 3 values ∈ [0, 1].
+    - size: font height in world units (mm), strictly positive.
+    - justification: 'left', 'center' or 'right'.
+    - rotation: optional orientation of the text plane, as an `SbRotation` or
+          a `FreeCAD.Rotation`. Pass the camera's orientation to make the text
+          face the viewer and stay upright (an `SoBillboard` would instead
+          rotate the letters in their own plane and tilt them).
+
+    """
+    # Accept any 3-value sequence (e.g. a FreeCAD.Vector).
+    position = tuple(float(v) for v in position)
+    if len(position) != 3:
+        raise RuntimeError('Argument `position` must be a tuple with 3 values')
+    if len(color) != 3:
+        raise RuntimeError('Argument `color` must be a tuple with 3 values ∈ [0, 1]')
+    if size <= 0.0:
+        raise RuntimeError('Argument `size` must be strictly positive')
+
+    justifications = {
+        'left': coin.SoText3.LEFT,
+        'center': coin.SoText3.CENTER,
+        'right': coin.SoText3.RIGHT,
+    }
+    if justification not in justifications:
+        raise RuntimeError(
+            f'Argument `justification` must be one of {sorted(justifications)}',
+        )
+
+    separator = coin.SoSeparator()
+
+    translation = coin.SoTranslation()
+    translation.translation = tuple(position)
+    separator.addChild(translation)
+
+    # Orient the text plane. `SoText3` lies in the local XY plane with its
+    # normal along +Z, so applying the camera's own rotation makes the text
+    # face the viewer with its local +Y pointing up: the letters stay upright.
+    # An `SoBillboard` would instead rotate the letters in their own plane and
+    # tilt them, so it is only used as a fallback when no rotation is given.
+    if rotation is not None:
+        # Accept both an `SbRotation` and a `FreeCAD.Rotation` (its `.Q`).
+        sb_rotation = getattr(rotation, 'Q', rotation)
+        text_group = coin.SoSeparator()
+        rotation_node = coin.SoRotation()
+        rotation_node.rotation = sb_rotation
+        text_group.addChild(rotation_node)
+    elif hasattr(coin, 'SoBillboard'):
+        text_group = coin.SoBillboard()
+    else:
+        text_group = coin.SoSeparator()
+    separator.addChild(text_group)
+
+    # Same color node as `arrow_group` so that the label matches the arrow it
+    # annotates, including the selection highlight applied to the parent.
+    coin_color = coin.SoBaseColor()
+    coin_color.rgb = color
+    text_group.addChild(coin_color)
+
+    font = coin.SoFont()
+    font.size = size
+    text_group.addChild(font)
+
+    text_node = coin.SoText3()
+    text_node.string = text
+    text_node.justification = justifications[justification]
+    # FRONT alone is not enough for the text to be visible from both sides.
+    text_node.parts = coin.SoText3.FRONT | coin.SoText3.SIDES | coin.SoText3.BACK
+    text_group.addChild(text_node)
+
+    return separator

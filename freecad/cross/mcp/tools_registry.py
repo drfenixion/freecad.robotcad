@@ -2266,6 +2266,140 @@ def check_overlap(
 # ---------------------------------------------------------------------------
 
 
+def _add_joint_axis_labels(
+        obj: fc.DocumentObject,
+        rotation: Any = None,
+        view_direction: Optional[fc.Vector] = None,
+) -> list[tuple[Any, Any]]:
+    """Annotate the joint's axes with ``X``/``Y``/``Z`` labels.
+
+    The labels are added to the joint's markers node (the same node the axis
+    arrows are drawn into), so they inherit the joint's visibility and the
+    selection highlight: a label therefore gets exactly the color of the arrow
+    it annotates, including the selection palette used by ``get_snapshot``.
+
+    The label height is proportional to the joint's size, taken as its
+    ``AxisLength`` (the length of the Z arrow). Each label sits near the tip of
+    its arrow, pushed sideways off the axis so the letter does not overlap the
+    arrow itself.
+
+    ``rotation`` is the orientation of the text plane (a ``FreeCAD.Rotation``
+    or an ``SbRotation``). Pass the camera's orientation so the letters face
+    the viewer and stay upright instead of being tilted.
+
+    ``view_direction`` is the camera's view direction. It is used for the
+    sideways offset: the label is moved along the direction perpendicular to
+    both the axis and the view direction, which lies in the image plane, so the
+    letter appears beside the arrow on screen.
+
+    Return the list of ``(parent_node, label_node)`` pairs so the caller can
+    remove the labels again (see ``_remove_joint_axis_labels``).
+    """
+    from ..coin_utils import text_3d
+
+    vobj = getattr(obj, 'ViewObject', None)
+    if vobj is None:
+        return []
+    # No arrows are drawn (and no labels are needed) when the axes are hidden.
+    if not (getattr(vobj, 'Visibility', False) and getattr(vobj, 'ShowAxis', False)):
+        return []
+    axis_length = getattr(vobj, 'AxisLength', None)
+    length = axis_length.Value if axis_length is not None else 0.0
+    if not length:
+        return []
+    placement = getattr(obj, 'Placement', None)
+    if placement is None:
+        return []
+    # Same colors as the arrows in ``joint_proxy._ViewProviderJoint.draw``.
+    if getattr(obj, 'Type', '') == 'fixed':
+        z_color = (0.0, 0.0, 0.7)
+    else:
+        z_color = (0.0, 0.0, 1.0)
+    # The label height is proportional to the joint's size (its axis length).
+    size = length * 0.12
+    # The text is centered on its position, so pull it back by half its height
+    # (plus a small margin) to keep the whole letter INSIDE the axis extent.
+    inset = size * 0.6
+    # Push the label sideways off the arrow: the letter is placed on a line
+    # parallel to the axis, offset by just over its own half-size, so it clears
+    # the shaft and the cone while staying close to the axis.
+    side_offset = size * 0.85
+    # (label, local axis direction, local position, color)
+    axes = (
+        ('Z', fc.Vector(0.0, 0.0, 1.0),
+         fc.Vector(0.0, 0.0, length - inset), z_color),
+        ('X', fc.Vector(1.0, 0.0, 0.0),
+         fc.Vector(length / 2.0 - inset, 0.0, 0.0), (1.0, 0.0, 0.0)),
+        ('Y', fc.Vector(0.0, 1.0, 0.0),
+         fc.Vector(0.0, length / 2.0 - inset, 0.0), (0.0, 1.0, 0.0)),
+    )
+    # Draw into the markers node (the arrows' node) when available, so the
+    # labels follow the standard visibility toggle; fall back to the root node.
+    proxy = getattr(vobj, 'Proxy', None)
+    parent = getattr(proxy, '_markers', None)
+    if parent is None:
+        parent = getattr(vobj, 'RootNode', None)
+    if parent is None:
+        return []
+    added: list[tuple[Any, Any]] = []
+    for label, local_direction, local_position, color in axes:
+        position = placement * local_position
+        if view_direction is not None and view_direction.Length > 0.0:
+            # Offset the label in the image plane, perpendicular to the arrow as
+            # seen on screen: the cross product of the axis and the view
+            # direction is perpendicular to both, so the letter ends up beside
+            # the arrow instead of on top of it.
+            axis_world = placement.Rotation.multVec(local_direction)
+            side = axis_world.cross(view_direction)
+            if side.Length > 0.0:
+                side.normalize()
+                position = position + side * side_offset
+        node = text_3d(
+            label,
+            position=position,
+            color=color,
+            size=size,
+            rotation=rotation,
+        )
+        parent.addChild(node)
+        added.append((parent, node))
+    return added
+
+
+def _remove_joint_axis_labels(added: list[tuple[Any, Any]]) -> None:
+    """Remove the label nodes added by ``_add_joint_axis_labels``."""
+    for parent, node in added:
+        try:
+            parent.removeChild(node)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _is_blank_image(path: str) -> bool:
+    """Return ``True`` when the saved image is a single flat color.
+
+    Right after FreeCAD starts (or after the 3D view was just modified) the
+    first ``saveImage()`` can return an all-white frame because the view has
+    not been rendered yet. Such a frame carries no information, so the caller
+    retries instead of returning a useless white picture.
+    """
+    image = QtGui.QImage(path)
+    if image.isNull():
+        return True
+    width = image.width()
+    height = image.height()
+    if not (width and height):
+        return True
+    # Sample a coarse grid instead of every pixel: a rendered view always has
+    # some variation, a blank one is uniform.
+    first = image.pixelColor(0, 0)
+    for x in range(0, width, max(1, width // 16)):
+        for y in range(0, height, max(1, height // 16)):
+            if image.pixelColor(x, y) != first:
+                return False
+    return True
+
+
 def _snapshot_content_blocks(
     width: int,
     height: int,
@@ -2328,6 +2462,14 @@ def get_snapshot(
     **Z (longest) = light-blue/cyan, X = pink, Y = turquoise**; with NO
     ``object_name`` **Z (longest) = blue, X = red, Y = green**. Z (up) is always
     the longest arrow.
+
+    When ``object_name`` is a **joint**, its three axes are additionally
+    annotated with the letters ``Z``, ``X`` and ``Y``, drawn just past the tip
+    of the matching arrow and in the SAME color as that arrow (the labels live
+    in the joint's markers node, so they follow the selection highlight too).
+    The letter height is proportional to the joint's size (its ``AxisLength``).
+    The labels exist only for the capture: they are removed right after it, so
+    the joint's axes are back to their normal state.
     """
 
     def _impl() -> list[Any]:
@@ -2350,17 +2492,22 @@ def get_snapshot(
             raise RuntimeError('No active 3D view available.')
         # Visibility of the joints, saved to restore it after the snapshot.
         saved_joint_visibility: dict[str, bool] = {}
+        # Axis labels added for the capture, removed right after it.
+        added_axis_labels: list[tuple[Any, Any]] = []
         try:
             # Always switch to an isometric orientation so the snapshot is taken
             # from a stable, readable angle. It is applied AFTER the fit/selection
             # so it keeps the framing just computed and only changes the viewpoint.
             view.viewIsometric()
+            # The joint whose axes get labelled, if any.
+            joint_obj: Optional[fc.DocumentObject] = None
             if object_name:
                 # Frame a single object: select it and fit the camera to the
                 # SELECTION. ``ViewSelection`` is what Std_ViewFitSelection
                 # sends; ``ViewFit`` would instead fit the whole scene.
                 obj = _resolve_object(object_name)
                 if is_joint(obj):
+                    joint_obj = obj
                     # Show ONLY the requested joint: hide every other joint in
                     # the document so the requested joint's axes are not
                     # obscured. The previous visibility is saved and restored
@@ -2389,6 +2536,62 @@ def get_snapshot(
                 while time.monotonic() < deadline:
                     QtGui.QApplication.processEvents()
                     time.sleep(0.05)
+            if joint_obj is not None:
+                # Annotate the joint's axes with the letters Z, X and Y, in the
+                # same color as the arrow each one belongs to. The labels are
+                # added to the joint's markers node, so they are highlighted
+                # together with the arrows (selection palette) and removed in
+                # the ``finally`` block below, restoring the normal state.
+                # The camera's own orientation is passed so the letters face the
+                # viewer and stay upright (a billboard would tilt them). The view
+                # direction is passed too, so each label is pushed sideways off
+                # its arrow in the image plane instead of sitting on top of it.
+                added_axis_labels = _add_joint_axis_labels(
+                    joint_obj,
+                    rotation=view.getCameraOrientation(),
+                    view_direction=view.getViewDirection(),
+                )
+                if added_axis_labels:
+                    # A ``Cross::Joint`` has no ``Shape``: its axes live only in
+                    # the coin markers node, so ``Std_ViewFitSelection`` above
+                    # had an empty bounding box and left the camera where it was
+                    # (the snapshot then came out blank or zoomed into the
+                    # ground). Fit the camera to the joint's coin scene graph
+                    # instead, which holds the arrows and the labels just added.
+                    camera = view.getCameraNode()
+                    if camera is not None and hasattr(camera, 'viewAll'):
+                        # ``SoCamera.viewAll`` needs an ``SbViewportRegion``
+                        # (the aspect ratio is taken from it). Prefer the real
+                        # viewer's region so the framing matches the on-screen
+                        # view; fall back to the capture size.
+                        viewport_region = None
+                        try:
+                            viewer = view.getViewer()
+                            render_manager = viewer.getSoRenderManager()
+                            viewport_region = render_manager.getViewportRegion()
+                        except Exception:  # noqa: BLE001 - API may differ.
+                            viewport_region = None
+                        if viewport_region is None:
+                            from pivy import coin
+
+                            viewport_region = coin.SbViewportRegion(width, height)
+                        # Fit the ROOT node, not the markers node: the root node
+                        # carries the joint's placement transform, so its
+                        # bounding box is in world coordinates - the space the
+                        # camera works in. The markers node alone would be in
+                        # local coordinates and the camera would be misplaced.
+                        vobj = getattr(joint_obj, 'ViewObject', None)
+                        root = getattr(vobj, 'RootNode', None)
+                        target = root if root is not None else added_axis_labels[0][0]
+                        camera.viewAll(target, viewport_region)
+                    # The scene graph was just modified: pump the Qt event loop
+                    # for a moment so the 3D view finishes the redraw before the
+                    # capture. A single processEvents() is not enough and the
+                    # image may come out blank or without the labels.
+                    deadline = time.monotonic() + 1.0
+                    while time.monotonic() < deadline:
+                        QtGui.QApplication.processEvents()
+                        time.sleep(0.05)
             # saveImage() writes to a file, so use a temporary one and read it
             # back.
             fd, save_path = tempfile.mkstemp(suffix=f'.{format}')
@@ -2396,30 +2599,60 @@ def get_snapshot(
             try:
                 # saveImage() may return None even on success (it saves the
                 # file directly), so verify the file on disk instead of the
-                # return value.
-                view.saveImage(save_path, width, height, 'White')
-                if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
-                    raise RuntimeError('Failed to capture the 3D view.')
-                with open(save_path, 'rb') as f:
-                    data = f.read()
+                # return value. The first capture after FreeCAD starts (or
+                # right after the scene graph was modified) can come out as a
+                # flat white frame because the view has not been rendered yet,
+                # so retry a few times, pumping the event loop in between.
+                data = b''
+                for attempt in range(4):
+                    view.saveImage(save_path, width, height, 'White')
+                    if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
+                        raise RuntimeError('Failed to capture the 3D view.')
+                    with open(save_path, 'rb') as f:
+                        data = f.read()
+                    if not _is_blank_image(save_path):
+                        break
+                    # Blank frame: let the 3D view render and try again.
+                    deadline = time.monotonic() + 1.0
+                    while time.monotonic() < deadline:
+                        QtGui.QApplication.processEvents()
+                        time.sleep(0.05)
             finally:
                 try:
-                    os.remove(save_path)
+                    # os.remove(save_path)
+                    pass
                 except OSError:
                     pass
         finally:
+            # Remove the axis labels so the joint's axes are back to their
+            # normal state (no letters) after the snapshot.
+            _remove_joint_axis_labels(added_axis_labels)
             # Restore the joints' visibility to its state before the snapshot.
             for name, visible in saved_joint_visibility.items():
                 other = doc.getObject(name)
                 other_vo = getattr(other, 'ViewObject', None) if other is not None else None
                 if other_vo is not None:
                     other_vo.Visibility = visible
-            if saved_joint_visibility:
+            if saved_joint_visibility or added_axis_labels:
                 # Refresh the view so the restored state is shown immediately.
                 QtGui.QApplication.processEvents()
         return _snapshot_content_blocks(width, height, format, data)
 
-    return run_on_main_thread(_impl)
+    try:
+        return run_on_main_thread(_impl)
+    except Exception as exc:  # noqa: BLE001 - re-raised with the reason below.
+        if isinstance(exc, (RuntimeError, ValueError)):
+            raise
+        # An unexpected failure (for example a ``Base.FreeCADError`` raised by
+        # the coin layer) would otherwise reach the agent as a bare
+        # "Error executing tool get_snapshot" with no reason at all. Re-raise
+        # it as a ``RuntimeError`` so the message is forwarded to the caller
+        # (``as_anticipated_error`` turns it into a ``ToolError``).
+        import traceback
+
+        raise RuntimeError(
+            f'{type(exc).__name__}: {exc}\n{traceback.format_exc()}'
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
