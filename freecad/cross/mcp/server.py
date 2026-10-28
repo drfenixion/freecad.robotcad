@@ -119,10 +119,11 @@ def _build_mcp_server():
     mcp = MCPServer(
         'robotcad-mcp',
         instructions=(
-            'Tools to control the RobotCAD (FreeCAD OVERCROSS) workbench: '
+            'Tools to control the RobotCAD workbench: '
             'create robots, links, joints, collisions, set placements, '
             'rotate objects, set materials, calculate mass/inertia, '
-            'select objects and capture 3D view snapshots.'
+            'measure distances and radii, select objects and capture 3D view '
+            'snapshots.'
         ),
     )
     for name, fn in get_tools():

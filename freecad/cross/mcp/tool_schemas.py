@@ -259,6 +259,39 @@ TOOL_SCHEMAS: dict[str, dict] = {
         },
         'required': ['parent', 'child'],
     },
+    'measure_geometry': {
+        'properties': {
+            'ref1': {
+                'type': 'string',
+                'description': (
+                    'REQUIRED full subelement path: face/edge/vertex/circle of '
+                    "a link Real element as '<real_link>.<inner_link_name>."
+                    "<feature>.<subelement>' (e.g. 'real_l_wheel001_.wheel001."
+                    "Cylinder.Face2'), or an LCS name. A bare object name "
+                    "(robot link 'l_...', Real element 'real_l_...' or any "
+                    'whole object) is rejected — it has no geometry of its own.'
+                ),
+            },
+            'ref2': {
+                'type': 'string',
+                'description': (
+                    'Second reference, same full subelement path format. Omit '
+                    'it to measure the RADIUS of a circular edge or a '
+                    'cylindrical/spherical face.'
+                ),
+            },
+            'mode': {
+                'type': 'string',
+                'enum': ['auto', 'distance', 'radius'],
+                'description': (
+                    "'auto' (default): distance when ref2 is given, radius "
+                    "otherwise. 'distance' = min gap + center distance + per-axis "
+                    "delta; 'radius' = radius/diameter/center/axis of ref1."
+                ),
+            },
+        },
+        'required': ['ref1'],
+    },
     'get_snapshot': {
         'properties': {
             'width': {'type': 'integer', 'description': 'Width (default 1024)'},

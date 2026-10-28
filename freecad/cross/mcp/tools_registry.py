@@ -2262,6 +2262,383 @@ def check_overlap(
 
 
 # ---------------------------------------------------------------------------
+# Measurement tool
+# ---------------------------------------------------------------------------
+
+
+def _subelement_kind(name: str) -> str:
+    """Return ``'Face'``, ``'Edge'`` or ``'Vertex'`` for a subelement name."""
+    for kind in ('Face', 'Edge', 'Vertex'):
+        if name.startswith(kind):
+            return kind
+    return ''
+
+
+def _placed_subelement_shape(shape_obj: fc.DocumentObject, shape: Any) -> Any:
+    """Return ``shape`` transformed to GLOBAL coordinates.
+
+    A subelement read from the selection is in the object's own coordinate
+    system (already placed by the object's ``Placement``); the ancestor
+    transform maps it to global coordinates — the same convention as
+    ``_placed_shape_and_ranges``. It is the identity for the ``Real`` element
+    of a robot link, whose shape is already global.
+    """
+    ancestor = _ancestor_placement(shape_obj)
+    if ancestor.isIdentity():
+        return shape
+    try:
+        placed = shape.copy()
+        placed.transformShape(ancestor.Matrix)
+        return placed
+    except Exception:  # noqa: BLE001
+        return shape
+
+
+def _subelement_hint(doc: fc.Document, ref: str) -> str:
+    """Return a hint naming the valid subelement paths for a bare ``ref``.
+
+    ``ref`` is an object name without a subelement (a robot link ``l_...``,
+    its Real element ``real_l_...`` or any other object). The hint is built
+    from the object tree so the agent gets the exact
+    ``<real_link>.<inner_link_name>.<feature>.<subelement>`` prefix instead of
+    guessing it.
+    """
+    try:
+        obj = _resolve_object(ref)
+    except RuntimeError:
+        return ''
+    link_obj: Optional[fc.DocumentObject] = None
+    if is_link(obj):
+        link_obj = obj
+    else:
+        link_obj, _real_link = _find_link_by_real_tree(doc, obj.Name)
+    if link_obj is None:
+        return ''
+    paths = _reference_paths(link_obj)
+    if not paths:
+        return ''
+    return (
+        f'Use a subelement of the Real element of link "{link_obj.Name}", '
+        f'e.g. "{paths["example"]}" (prefix "{paths["prefix"]}").'
+    )
+
+
+def _measure_reference(doc: fc.Document, ref: str) -> dict[str, Any]:
+    """Resolve a measurement reference to geometry in GLOBAL coordinates.
+
+    A reference MUST be a full subelement path
+    ``<real_link>.<inner_link_name>.<feature>.<subelement>`` — the same format
+    as ``set_placement_between`` (tolerant to Name/Label mixups and missing
+    levels) — or an LCS (its origin is the measured point).
+
+    A bare object name (a robot link ``l_...``, its Real element
+    ``real_l_...`` or any other whole object) is REJECTED: such an object has
+    no geometry of its own (an ``App::Link`` has an empty ``Shape``), so a
+    measurement on it would be meaningless. The error names the exact
+    subelement prefix to use instead.
+    """
+    obj: Optional[fc.DocumentObject] = None
+    try:
+        obj = _resolve_object(ref)
+    except RuntimeError:
+        obj = None
+    if obj is not None:
+        if is_lcs(obj):
+            # The LCS origin in GLOBAL coordinates (an LCS may live inside a
+            # body, so its own Placement is not enough).
+            point = obj.Placement.Base
+            if hasattr(obj, 'getGlobalPlacement'):
+                try:
+                    point = obj.getGlobalPlacement().Base
+                except Exception:  # noqa: BLE001
+                    pass
+            return {
+                'object': obj.Name,
+                'subelement': '',
+                'kind': 'LCS',
+                'shape': None,
+                'point': point,
+            }
+        hint = _subelement_hint(doc, ref)
+        raise RuntimeError(
+            f'"{ref}" is a whole object, not a subelement. measure_geometry '
+            'accepts ONLY a full subelement path '
+            '"<real_link>.<inner_link_name>.<feature>.<subelement>" (e.g. '
+            '"real_l_wheel001_.wheel001.Cylinder.Face2") or an LCS. '
+            + (hint or 'Call get_objects_info(...) to get the exact path.')
+        )
+    # A subelement path: reuse the tolerant resolver of the placement tools.
+    info = _select_link_subelement(doc, ref)
+    shape = None
+    shape_obj = None
+    try:
+        for entry in fcgui.Selection.getSelectionEx(doc.Name, 0):
+            if entry.ObjectName != info['object']:
+                continue
+            subs = list(getattr(entry, 'SubObjects', []) or [])
+            names = list(getattr(entry, 'SubElementNames', []) or [])
+            for name, sub in zip(names, subs):
+                if name == info['subelement']:
+                    shape = sub
+                    shape_obj = entry.Object
+                    break
+            if shape is None and subs:
+                # The subelement name may be reported with a different prefix
+                # (e.g. through the App::Link); the single selected sub-shape
+                # is still the one that was resolved.
+                shape = subs[0]
+                shape_obj = entry.Object
+            if shape is not None:
+                break
+    finally:
+        fcgui.Selection.clearSelection()
+    if shape is None or shape_obj is None:
+        raise RuntimeError(
+            f'Cannot read the geometry of "{ref}" (resolved to '
+            f'"{info["object"]}.{info["subelement"]}").',
+        )
+    return {
+        'object': info['object'],
+        'subelement': info['subelement'],
+        'kind': _subelement_kind(info['subelement']),
+        'shape': _placed_subelement_shape(shape_obj, shape),
+        'point': None,
+    }
+
+
+def _measure_point(geom: dict[str, Any]) -> Optional[fc.Vector]:
+    """Return the representative point of a measurement reference."""
+    if geom['kind'] == 'LCS':
+        return geom['point']
+    shape = geom['shape']
+    if shape is None:
+        return None
+    if geom['kind'] == 'Vertex':
+        return shape.Point
+    try:
+        return shape.CenterOfMass
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _circular_parameters(shape: Any, kind: str) -> dict[str, Any]:
+    """Return radius/diameter/center/axis when the geometry is circular.
+
+    ``kind`` is ``'Face'``, ``'Edge'`` or ``'Vertex'`` — a whole object is
+    never measured (``measure_geometry`` requires a subelement path).
+    """
+    result: dict[str, Any] = {}
+    if kind == 'Edge':
+        curve = getattr(shape, 'Curve', None)
+        if curve is not None and curve.__class__.__name__ == 'Circle':
+            result['radius'] = curve.Radius
+            result['diameter'] = 2.0 * curve.Radius
+            result['center'] = _vector_to_list(curve.Center)
+            result['axis'] = _vector_to_list(curve.Axis)
+            result['circular'] = True
+        return result
+    if kind != 'Face':
+        return result
+    surface = getattr(shape, 'Surface', None)
+    surface_type = surface.__class__.__name__ if surface is not None else ''
+    if surface_type == 'Cylinder':
+        result['radius'] = surface.Radius
+        result['diameter'] = 2.0 * surface.Radius
+        result['center'] = _vector_to_list(surface.Center)
+        result['axis'] = _vector_to_list(surface.Axis)
+        result['circular'] = True
+    elif surface_type == 'Sphere':
+        result['radius'] = surface.Radius
+        result['diameter'] = 2.0 * surface.Radius
+        result['center'] = _vector_to_list(surface.Center)
+        result['circular'] = True
+    elif surface_type == 'Torus':
+        result['major_radius'] = surface.MajorRadius
+        result['minor_radius'] = surface.MinorRadius
+        result['center'] = _vector_to_list(surface.Center)
+        result['axis'] = _vector_to_list(surface.Axis)
+        result['circular'] = True
+    elif surface_type == 'Cone':
+        result['radius'] = surface.Radius
+        result['diameter'] = 2.0 * surface.Radius
+        result['semi_angle'] = surface.SemiAngle
+        result['axis'] = _vector_to_list(surface.Axis)
+        result['circular'] = True
+    elif surface_type == 'Plane':
+        # A planar DISC (e.g. the end of a cylinder): its outer wire is a
+        # single circular edge, which gives the radius.
+        outer = getattr(shape, 'OuterWire', None)
+        edges = list(getattr(outer, 'Edges', []) or [])
+        if len(edges) == 1:
+            curve = getattr(edges[0], 'Curve', None)
+            if curve is not None and curve.__class__.__name__ == 'Circle':
+                result['radius'] = curve.Radius
+                result['diameter'] = 2.0 * curve.Radius
+                result['center'] = _vector_to_list(curve.Center)
+                result['axis'] = _vector_to_list(curve.Axis)
+                result['circular'] = True
+    return result
+
+
+def _measure_summary(geom: dict[str, Any]) -> dict[str, Any]:
+    """Return a compact description of a measurement reference."""
+    summary: dict[str, Any] = {
+        'object': geom['object'],
+        'subelement': geom['subelement'],
+        'kind': geom['kind'],
+    }
+    if geom['kind'] == 'LCS':
+        summary['point'] = _vector_to_list(geom['point'])
+        return summary
+    shape = geom['shape']
+    if shape is None:
+        return summary
+    if geom['kind'] == 'Vertex':
+        summary['point'] = _vector_to_list(shape.Point)
+        return summary
+    point = _measure_point(geom)
+    if point is not None:
+        summary['center'] = _vector_to_list(point)
+    if geom['kind'] == 'Edge':
+        try:
+            summary['length'] = shape.Length
+        except Exception:  # noqa: BLE001
+            pass
+    elif geom['kind'] == 'Face':
+        try:
+            summary['area'] = shape.Area
+        except Exception:  # noqa: BLE001
+            pass
+    summary.update(_circular_parameters(shape, geom['kind']))
+    return summary
+
+
+def measure_geometry(
+    ref1: str,
+    ref2: str = '',
+    mode: str = 'auto',
+) -> dict[str, Any]:
+    """Measure a distance between two faces/edges/vertices or a circle radius.
+
+    ``ref1``/``ref2`` MUST be a FULL subelement path in the SAME format as
+    ``set_placement_between``: a face/edge/vertex/circle of a link Real
+    element written ``<real_link>.<inner_link_name>.<feature>.<subelement>``
+    (e.g. ``real_l_chassis001_.chassis001.Box.Face3``), or an LCS. A bare
+    object name (a robot link ``l_...``, its Real element ``real_l_...`` or
+    any other whole object) is REJECTED with a hint naming the exact
+    subelement prefix to use — such objects have no geometry of their own.
+    All values are in **millimetres** (model units).
+
+    - ``ref2`` given (``mode='auto'``/``'distance'``) — the DISTANCE between
+      the two geometries: ``distance`` is the minimum distance between the
+      surfaces/curves/points (the real gap, e.g. between the facing inner
+      faces of two wheels), ``center_distance`` the distance between their
+      centers and ``delta`` the per-axis center offset.
+    - ``ref2`` omitted (``mode='auto'``/``'radius'``) — the RADIUS of a
+      circular edge (rim/hole) or of a cylindrical/spherical/toroidal face,
+      plus its center and axis.
+
+    Use it for EVERY geometric value a controller needs (wheel separation,
+    wheel radius, offsets) instead of estimating from bounding boxes.
+    """
+    if mode not in ('auto', 'distance', 'radius'):
+        raise RuntimeError(
+            f'Unknown mode "{mode}". Use "auto" (default), "distance" or '
+            '"radius".',
+        )
+    if mode == 'distance' and not ref2:
+        raise RuntimeError('mode="distance" requires ref2.')
+    if mode == 'radius' and ref2:
+        raise RuntimeError(
+            'mode="radius" measures ref1 only; omit ref2 (or use '
+            'mode="distance").',
+        )
+
+    def _impl() -> dict[str, Any]:
+        doc = _active_doc()
+        geom1 = _measure_reference(doc, ref1)
+        summary1 = _measure_summary(geom1)
+        if not ref2:
+            result: dict[str, Any] = {
+                'status': 'ok',
+                'mode': 'radius',
+                'ref1': summary1,
+                'units': 'mm',
+            }
+            for key in (
+                'radius', 'diameter', 'major_radius', 'minor_radius',
+                'center', 'axis', 'circular',
+            ):
+                if key in summary1:
+                    result[key] = summary1[key]
+            if 'circular' not in result:
+                result['circular'] = False
+                result['note'] = (
+                    'The reference is not circular. Pass a circular edge (a '
+                    'rim or a hole) or a cylindrical/spherical/toroidal face, '
+                    'or give ref2 to measure a distance.'
+                )
+            return _round_floats(result)
+        geom2 = _measure_reference(doc, ref2)
+        summary2 = _measure_summary(geom2)
+        shape1 = geom1['shape']
+        shape2 = geom2['shape']
+        distance: Optional[float] = None
+        closest: dict[str, Any] = {}
+        if shape1 is not None and shape2 is not None:
+            try:
+                dist, points, _info = shape1.distToShape(shape2)
+                distance = dist
+                if len(points) >= 2:
+                    closest = {
+                        'ref1': _vector_to_list(points[0]),
+                        'ref2': _vector_to_list(points[1]),
+                    }
+            except Exception:  # noqa: BLE001
+                distance = None
+        point1 = _measure_point(geom1)
+        point2 = _measure_point(geom2)
+        center_distance: Optional[float] = None
+        delta: Optional[dict[str, float]] = None
+        if point1 is not None and point2 is not None:
+            center_distance = (point2 - point1).Length
+            delta = {
+                'x': point2.x - point1.x,
+                'y': point2.y - point1.y,
+                'z': point2.z - point1.z,
+            }
+        if distance is None:
+            # Fall back to the distance between the reference points.
+            if point1 is None or point2 is None:
+                raise RuntimeError(
+                    f'Cannot measure the distance between "{ref1}" and '
+                    f'"{ref2}": at least one reference has no geometry. '
+                    'Pass a full subelement path '
+                    '"<real_link>.<inner_link_name>.<feature>.<subelement>" '
+                    '(e.g. "real_l_wheel001_.wheel001.Cylinder.Face2") or an '
+                    'LCS.',
+                )
+            distance = center_distance
+            closest = {
+                'ref1': _vector_to_list(point1),
+                'ref2': _vector_to_list(point2),
+            }
+        return _round_floats({
+            'status': 'ok',
+            'mode': 'distance',
+            'ref1': summary1,
+            'ref2': summary2,
+            'distance': distance,
+            'center_distance': center_distance,
+            'delta': delta,
+            'closest_points': closest,
+            'units': 'mm',
+        })
+
+    return run_on_main_thread(_impl)
+
+
+# ---------------------------------------------------------------------------
 # Snapshot tool
 # ---------------------------------------------------------------------------
 
@@ -2689,6 +3066,14 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    and need `rotate_object(child_link, 'x', 180)`, see e-bis) — symmetric parts
    on opposite sides of a parent (e.g. left/right wheels) are the usual
    candidates.
+   SIDES — the LEFT/RIGHT side of EVERY part (wheels, arms, sensors, ...) is
+   defined as seen from BEHIND the object: stand behind it and look along its
+   FORWARD direction; what lies on your left is LEFT, on your right is RIGHT.
+   The forward direction comes from the robot's direction-defining parts
+   (forward-looking sensors, end effector); with no such feature use the base
+   convention (local +X forward, so +Y is left). NEVER derive a side from an
+   arbitrary axis, from the current snapshot's viewpoint or from the order the
+   links were created.
 1. No active document? `create_document(name)`.
 2. `create_robot(name)`.
 3. `create_links_filled(robot, object_names)` — links from existing bodies; the
@@ -2725,9 +3110,10 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
       local Z and with it the child chain. Do NOT rotate the link to fix the
       final pose.
    e-ter. For a chassis with several symmetric wheels, ALL wheels' joint local
-      Z axes (the axles) MUST be parallel and point the SAME way — to the LEFT.
-      Never mirror the joints into opposite directions; flip a wrong one by
-      rotating its JOINT.
+      Z axes (the axles) MUST be parallel and point the SAME way — to the LEFT
+      **as seen from behind the chassis** (see SIDES in step 0). Never mirror
+      the joints into opposite directions; flip a wrong one by rotating its
+      JOINT.
    e-bis. Mirroring: if the joint and the link are both oriented correctly but
       the link's body penetrates the parent through its full height (it belongs
       on the opposite side), rotate the LINK 180° about X:
@@ -2769,9 +3155,12 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 10. `set_material(...)`; if not specified, use `ABS-Generic`.
 11. `calculate_mass_and_inertia(robot)`.
 12. Inspect and verify with `list_scene_objects()`, `get_objects_info(...)`,
-    `get_snapshot(...)`. Prefer ONE `get_objects_info([...])` call with many
-    names; pass an element (e.g. a sensor's joint) to
-    `get_snapshot(object_name=...)` to frame it up close.
+    `measure_geometry(...)`, `get_snapshot(...)`. Prefer ONE
+    `get_objects_info([...])` call with many names; pass an element (e.g. a
+    sensor's joint) to `get_snapshot(object_name=...)` to frame it up close.
+    Every geometric value that must be EXACT (a gap, a wheel separation, a
+    radius) is measured with `measure_geometry(...)`, never estimated from
+    bounding boxes.
 """,
     'create_robot': """\
 ## Creating a robot
@@ -2800,8 +3189,8 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 4. `set_placement_between` for the parent/child pair.
 5. Orient the child's JOINT so its local Z lies along the child's functional
    axis; for a parent with several symmetric wheels make ALL wheels' joint
-   local Z axes point the SAME way (left) — see steps d–e-ter of the General
-   algorithm.
+   local Z axes point the SAME way (left **as seen from behind the parent**) —
+   see steps d–e-ter of the General algorithm.
 6. ONLY AFTER step 5, run the MANDATORY OVERLAP CHECK for this child on ALL
    THREE axes X/Y/Z and PRINT the numeric evidence; mirror the child if it is
    contained on any axis. Do not start collisions/materials until every child
@@ -2839,6 +3228,17 @@ specified in the **General algorithm** (source of truth).
   link `MountedPlacement` or LCS; correct orientation after a snapshot.
 - `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
   Real element. ONLY on explicit user request.
+- `measure_geometry(ref1, ref2, mode)` — measures the DISTANCE between two
+  faces/edges/vertices (`ref2` given: `distance` = real minimum gap,
+  `center_distance`, per-axis `delta`) or the RADIUS of a circular edge /
+  cylindrical face (`ref2` omitted: `radius`, `diameter`, `center`, `axis`).
+  `ref1`/`ref2` MUST be a FULL subelement path
+  (`<real_link>.<inner_link_name>.<feature>.<subelement>`, e.g.
+  `real_l_wheel001_.wheel001.Cylinder.Face2`) or an LCS — a bare object name
+  (robot link `l_...`, Real element `real_l_...`, whole object) is REJECTED
+  with a hint naming the exact prefix. Use it whenever a gap, an offset or a
+  radius must be exact (e.g. the gap between the facing inner faces of two
+  wheels) — never estimate from bounding boxes.
 """,
     'joints': """\
 ## Joints
@@ -2899,12 +3299,20 @@ configure each controller for exactly its functional joint group:
   (or steering + traction) for a car-like base; the matching omni controller for
   mecanum/swerve. Set `wheel_*_names` / `left/right_wheel_names` /
   `steering_*_names` and `base_frame_id` / `odom_frame_id` to the real names.
-  - **LEFT/RIGHT wheels**: derive each side from the robot's direction-defining
-    parts (forward-looking sensors, end effector), not from an arbitrary axis;
+  - **LEFT/RIGHT wheels**: a side is defined **as seen from BEHIND the robot**:
+    stand behind it, look along its FORWARD direction — what lies on your left
+    is LEFT, on your right is RIGHT. Take the forward direction from the
+    robot's direction-defining parts (forward-looking sensors, end effector);
     with no such feature use the base convention (local +X forward, +Y left).
+    Never derive a side from an arbitrary axis or from the snapshot viewpoint.
   - **Wheel separation**: the distance between the **nearest (facing inner)
     faces** of the right and left wheel on one axis — not between centers and
-    not between outer faces.
+    not between outer faces. MEASURE it with
+    `measure_geometry(<right wheel inner face>, <left wheel inner face>)` and
+    use the returned `distance`; never estimate it from bounding boxes.
+  - **Wheel radius**: MEASURE it with
+    `measure_geometry(<wheel rim edge or cylindrical face>)` (no `ref2`) and
+    use the returned `radius`/`diameter`.
 - **Manipulator arm**: a `joint_trajectory_controller` over the arm's
   revolute/prismatic joints (`joints`, `base_frame_id`).
 - **Gripper / end effector**: `gripper_action_controller` /
@@ -2915,6 +3323,12 @@ configure each controller for exactly its functional joint group:
 - **Parameter units**: distance parameters are in **metres** unless the
   parameter's `description` says otherwise — convert model measurements
   (wheel separation, radius, offsets, limits) before setting them.
+- **Measure, do not guess**: whenever a controller parameter needs a geometric
+  value (wheel separation, wheel radius, track/offset, a mounting distance),
+  obtain it with `measure_geometry(...)` — `distance` for a gap between two
+  faces/edges/vertices, `radius` for a circular edge or cylindrical face — and
+  convert the millimetre result to the parameter's unit. Never derive such a
+  value from a bounding box, from `center_of_mass` differences or by eye.
 
 ### Tools
 
@@ -3100,6 +3514,18 @@ For a joint sensor (e.g. a force-torque sensor) just
   parallel, which vertex is a corner) from `center_of_mass`, `surface_type`,
   `vertices` and `point` — NOT from the index alone, which only identifies the
   subelement. Call `get_objects_info(...)` before choosing references.
+- `measure_geometry(ref1, ref2, mode)` — exact measurement in **millimetres**.
+  With `ref2`: the DISTANCE between two faces/edges/vertices — `distance` (the
+  real minimum gap between the surfaces/curves/points), `center_distance` and
+  the per-axis `delta` of the centers, plus the `closest_points`. Without
+  `ref2`: the RADIUS of a circular edge (rim, hole) or of a
+  cylindrical/spherical/toroidal face — `radius`, `diameter`, `center`, `axis`.
+  `ref1`/`ref2` MUST be a FULL subelement path
+  (`<real_link>.<inner_link_name>.<feature>.<subelement>`) or an LCS. A bare
+  object name (robot link `l_...`, Real element `real_l_...`, whole object) is
+  REJECTED with a hint naming the exact prefix — never pass a whole object.
+  Use it for every value that must be exact (gaps, wheel separation, radii,
+  offsets) instead of estimating from bounding boxes.
 - `get_snapshot(width, height, format, object_name)` — 3D view capture as an MCP
   image block (not base64). `object_name` (e.g. a **joint**) selects it and fits
   the camera onto it so its axes fill the frame; empty = fit the WHOLE scene.
@@ -3118,6 +3544,12 @@ For a joint sensor (e.g. a force-torque sensor) just
   call `set_placement_vision_mode()` before positioning.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()`.
+- Sides (left/right) of every part are defined **as seen from behind the
+  object**, looking along its forward direction — never from an arbitrary axis
+  or from the snapshot viewpoint.
+- Measure exact geometry with `measure_geometry()` (distance between two
+  faces/edges/vertices, radius of a circular edge/face) instead of estimating
+  from bounding boxes or `center_of_mass` differences.
 - Never guess the inner link name: read `Reference.prefix` from
   `get_objects_info([link])` and append the subelement (links from the same
   source body share one inner link name, e.g. all four wheels → `wheel001`).
@@ -3210,6 +3642,7 @@ TOOLS: list[tuple[str, Any]] = [
     ('list_scene_objects', list_scene_objects),
     ('get_objects_info', get_objects_info),
     ('check_overlap', check_overlap),
+    ('measure_geometry', measure_geometry),
     ('get_snapshot', get_snapshot),
     ('instructions_to_work_with_tools', instructions_to_work_with_tools),
 ]

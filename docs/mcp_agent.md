@@ -4,7 +4,7 @@ RobotCAD provides an **MCP server** that lets an external LLM agent
 (for example, an agent in VS Code — Roo, Cline, Continue — or Claude Desktop)
 control the RobotCAD document: create robots, links, joints and collisions,
 position and rotate objects, set materials, compute mass and inertia,
-select objects and take 3D view snapshots.
+measure distances and radii, select objects and take 3D view snapshots.
 
 ## Quick start
 
@@ -134,10 +134,19 @@ axis (e.g. a wheel's axle) must lie along the joint's local Z, otherwise the
 joint turns the link about the wrong axis and the wheel will not roll. There is
 no `axis` parameter on `create_joint` — use `rotate_object(joint, axis, angle)`.
 
+> **Sides are defined as seen from BEHIND the object.** The LEFT/RIGHT side of
+> every part (wheels, arms, sensors, ...) is the side you see when you stand
+> **behind** the object and look along its **forward** direction: what lies on
+> your left is LEFT, on your right is RIGHT. Take the forward direction from the
+> robot's direction-defining parts (forward-looking sensors, end effector); with
+> no such feature use the base convention (local +X forward, so +Y is left).
+> Never derive a side from an arbitrary axis, from the current snapshot's
+> viewpoint or from the order the links were created.
+
 > **Chassis: all wheel Z axes must point the same way (to the LEFT).** All
 > wheels' joint local Z axes (the axles) MUST be parallel and point the SAME
-> way. Never mirror the joints into opposite directions; flip a wrong one by
-> rotating its JOINT.
+> way — to the LEFT **as seen from behind the chassis**. Never mirror the joints
+> into opposite directions; flip a wrong one by rotating its JOINT.
 
 **Mirroring a link to the other side of the parent** — the one case where
 rotating the link is correct (the joint and link are oriented correctly but the
@@ -207,6 +216,7 @@ tried variants.
 | Tool | Description |
 |---|---|
 | `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method** (analog of `Set Placement - fast`). Joins the two references by their CENTERS; only `ref1`/`ref2` go into the selection (not `target`); one on the parent, one on the child. `move` defaults to `leaf` (final chain element only). NEVER on a camera-like sensor link — EXCEPTION: a link hosting only a **horizontal lidar** IS positioned with this tool, then its parent joint is rotated about **Z**. |
+| `measure_geometry(ref1, ref2, mode)` | **Exact measurement** in millimetres. With `ref2`: the **distance** between two faces/edges/vertices — `distance` (real minimum gap between the surfaces/curves/points), `center_distance`, per-axis `delta` and the `closest_points`. Without `ref2`: the **radius** of a circular edge (rim, hole) or of a cylindrical/spherical/toroidal face — `radius`, `diameter`, `center`, `axis`. `ref1`/`ref2` MUST be a **full subelement path** in the same format as `set_placement_between` (`<real_link>.<inner_link_name>.<feature>.<subelement>`, e.g. `real_l_wheel001_.wheel001.Cylinder.Face2`) or an LCS. A bare object name (robot link `l_...`, Real element `real_l_...`, whole object) is **rejected** with a hint naming the exact prefix — such objects have no geometry of their own. Use it for every value that must be exact (gaps, wheel separation, radii, offsets) instead of estimating from bounding boxes. |
 | `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor (camera, vertical lidar). **The only tool that may connect such a sensor link to its parent link**: joins them by the CENTERS of the references, then turns the parent joint so the sensor's front follows its local X (red arrow) = the look direction. The roll about X must still be corrected. `sensor` may be the sensor object **or the sensor link that hosts it** (e.g. `l_camera001`) — both are accepted. |
 | `set_placement_vision_mode(robot)` | Show only Real elements, hide Visual and Collision. Call before positioning. |
 | `rotate_object(object_name, axis, angle_deg)` | Rotate the joint Origin / link MountedPlacement / LCS — corrects orientation after a control snapshot. |
@@ -235,18 +245,29 @@ the general flow, give the robot the controllers its **purpose** and its
   `diff_drive_controller` (differential), `ackermann_steering_controller`
   (car-like) or an omni/swerve controller — set its `*_wheel_names` /
   `steering_*_names` and frame parameters.
-- **Left/right wheels**: determine each wheel's side from the robot's
-  direction-defining parts, NOT from an arbitrary axis. Take the FORWARD
-  direction from meaningful features (forward-looking sensors, the end
-  effector); the side to the LEFT of it is LEFT. With no such feature, fall back
-  to the chassis convention (local +X forward, so +Y is left).
+- **Left/right wheels**: a side is defined **as seen from BEHIND the robot** —
+  stand behind it and look along its FORWARD direction; what lies on your left
+  is LEFT, on your right is RIGHT. Take the FORWARD direction from meaningful
+  features (forward-looking sensors, the end effector); with no such feature,
+  fall back to the chassis convention (local +X forward, so +Y is left). Never
+  derive a side from an arbitrary axis or from the snapshot viewpoint.
 - **Wheel separation**: measure it as the distance between the **nearest facing
   inner faces** of the right and left wheel — not between their centers and not
-  between their outer faces.
+  between their outer faces. Obtain it with
+  `measure_geometry(<right wheel inner face>, <left wheel inner face>)` and use
+  the returned `distance`.
+- **Wheel radius**: obtain it with `measure_geometry(<wheel rim edge or
+  cylindrical face>)` (no `ref2`) and use the returned `radius`/`diameter`.
 - **Parameter units**: distance parameters are in **metres** unless the
   parameter's description says otherwise. Convert the model measurement to the
   parameter's unit before setting it; check the `description` from
   `list_controller_parameters(...)`.
+- **Measure, do not guess**: whenever a controller parameter needs a geometric
+  value (wheel separation, wheel radius, track/offset, a mounting distance),
+  obtain it with `measure_geometry(...)` — `distance` for a gap between two
+  faces/edges/vertices, `radius` for a circular edge or cylindrical face — and
+  convert the millimetre result to the parameter's unit. Never derive such a
+  value from a bounding box, from `center_of_mass` differences or by eye.
 - A manipulator arm gets a `joint_trajectory_controller` over its joints (set
   `joints` and `base_frame_id`); a gripper gets `gripper_action_controller` (or
   a position/trajectory controller) over the gripper joints; any other
@@ -400,6 +421,7 @@ For a joint sensor (e.g. a force-torque sensor) just
 |---|---|
 | `list_scene_objects()` | JSON description of the scene (robots, links, joints, objects). |
 | `get_objects_info(object_names)` | Detailed info about SEVERAL objects in one call (list of names/Labels), merged into `{objects: {...}, errors: {...}}`. |
+| `measure_geometry(ref1, ref2, mode)` | Exact measurement in millimetres: distance between two faces/edges/vertices (`ref2` given) or radius of a circular edge / cylindrical face (`ref2` omitted). See "Positioning and rotation". |
 | `get_snapshot(width, height, format, object_name)` | 3D view snapshot as an MCP image content block. `object_name` (e.g. a joint) selects it and fits the view onto it so its axes fill the frame; empty = fit the whole scene. Always ISOMETRIC; a **joint** target hides every other joint for the capture (restored right after) and waits one second so the render is up to date. Axis colors depend on the framing — see "Sensors". |
 
 ### Agent instructions

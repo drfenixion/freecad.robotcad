@@ -31,6 +31,7 @@
 				"rotate_object",
 				"get_objects_info",
 				"set_placement_between",
+				"measure_geometry",
 				"get_snapshot"
 			]
 		}
