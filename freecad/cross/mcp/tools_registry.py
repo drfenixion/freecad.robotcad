@@ -12,6 +12,7 @@ content blocks (a text line plus an image).
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import math
 import os
@@ -1275,6 +1276,68 @@ def _iter_controller_parameters(controller_data: dict) -> Iterator[dict[str, Any
         }
 
 
+def _fc_type(name: str) -> tuple[type, ...]:
+    """Return ``FreeCAD.<name>`` as an isinstance-compatible tuple.
+
+    The attribute is a class, but resolving it defensively keeps
+    ``_json_safe`` from raising on a FreeCAD build that exposes it as
+    something else. An unresolvable name yields an empty tuple, i.e. the
+    ``isinstance`` check never matches.
+    """
+    cls = getattr(fc, name, None)
+    return (cls,) if isinstance(cls, type) else ()
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert a FreeCAD value to a JSON-serializable one.
+
+    Link/joint parameters hold ``DocumentObject`` (``FeaturePython``)
+    instances, and properties may hold vectors, placements or quantities.
+    None of those can be encoded by the MCP SDK's pydantic serializer, so
+    returning one as-is makes the tool crash with
+    ``PydanticSerializationError: Unable to serialize unknown type:
+    <class 'FeaturePython'>``.
+
+    Document objects are reduced to their ``Name`` — exactly what the caller
+    passes back to ``set_controller_parameter`` and the other tools.
+    Containers are converted recursively; numbers (including numpy scalars)
+    stay numbers; any remaining FreeCAD type falls back to its string
+    representation.
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_json_safe(item) for item in value]
+    # ``Placement`` must be checked before the vector branch: it has no flat
+    # coordinates, only ``Base`` and ``Rotation``.
+    if isinstance(value, _fc_type('Placement')):
+        return _placement_to_dict(value)
+    if isinstance(value, _fc_type('Vector')):
+        return [value.x, value.y, value.z]
+    # Link/joint parameters (FeaturePython, Part::Feature, ...).
+    if hasattr(value, 'Name') and hasattr(value, 'TypeId'):
+        return value.Name
+    # ``Base.Quantity`` (a length, an angle, ...): report the plain number in
+    # model units (millimetres / degrees) instead of the formatted string.
+    magnitude = getattr(value, 'Value', None)
+    if isinstance(magnitude, (int, float)) and not isinstance(magnitude, bool):
+        return float(magnitude)
+    # numpy scalars (``numpy.float64``, ...) from the geometry helpers.
+    item = getattr(value, 'item', None)
+    if callable(item):
+        try:
+            scalar = item()
+        except Exception:  # noqa: BLE001 - not a numpy scalar.
+            pass
+        else:
+            if isinstance(scalar, (bool, int, float, str)):
+                return scalar
+    # Enumerations and any other FreeCAD type.
+    return str(value)
+
+
 def _coerce_parameter_value(prop_type: str, value: Any) -> Any:
     """Coerce a JSON value to the Python type expected by a FreeCAD property."""
     if prop_type in ('App::PropertyLinkGlobal',):
@@ -1392,7 +1455,13 @@ def list_controller_parameters(controller: str) -> dict[str, Any]:
                 entry = dict(param)
                 if hasattr(controller_obj, full_name):
                     try:
-                        entry['current_value'] = getattr(controller_obj, full_name)
+                        # Link/joint parameters hold DocumentObject
+                        # (FeaturePython) instances, which the MCP SDK's
+                        # pydantic serializer cannot encode. Reduce them (and
+                        # any other FreeCAD type) to a JSON-safe value.
+                        entry['current_value'] = _json_safe(
+                            getattr(controller_obj, full_name),
+                        )
                     except Exception:  # noqa: BLE001
                         entry['current_value'] = None
                 parameters.append(entry)
@@ -3648,6 +3717,30 @@ TOOLS: list[tuple[str, Any]] = [
 ]
 
 
+#: Tools that return MCP content blocks instead of a JSON-able dict. Their
+#: result must not be passed through ``_json_safe``.
+_RAW_RESULT_TOOLS = frozenset({'get_snapshot'})
+
+
+def _wrap_result(name: str, fn: Any) -> Any:
+    """Wrap ``fn`` so its result is JSON-serializable.
+
+    FreeCAD values (``DocumentObject``/``FeaturePython``, ``Vector``,
+    ``Placement``, ``Base.Quantity``) can leak into a tool result and then
+    crash the MCP SDK's pydantic serializer *after* the tool succeeded, with
+    an opaque ``PydanticSerializationError``. Converting the result here keeps
+    every tool JSON-safe regardless of what its internals return.
+    """
+    if name in _RAW_RESULT_TOOLS:
+        return fn
+
+    @functools.wraps(fn)
+    def _wrapper(*args: Any, **kwargs: Any) -> Any:
+        return _json_safe(fn(*args, **kwargs))
+
+    return _wrapper
+
+
 def get_tools() -> list[tuple[str, Any]]:
     """Return the list of (name, callable) tool pairs.
 
@@ -3657,5 +3750,11 @@ def get_tools() -> list[tuple[str, Any]]:
     INFO without a traceback and forwards the message to the model, instead of
     reporting a crash ("Error executing tool ...") with a full ERROR traceback
     in the FreeCAD console.
+
+    Results are also made JSON-safe (see ``_wrap_result``) so a FreeCAD object
+    cannot trigger a ``PydanticSerializationError`` in the SDK.
     """
-    return [(name, as_anticipated_error(fn)) for name, fn in TOOLS]
+    return [
+        (name, as_anticipated_error(_wrap_result(name, fn)))
+        for name, fn in TOOLS
+    ]

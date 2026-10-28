@@ -280,7 +280,7 @@ the general flow, give the robot the controllers its **purpose** and its
 | `list_controller_types()` | Available controllers and broadcasters (`name`, `description`, `plugin_class_name`, `parameter_count`). |
 | `create_controller(robot, type, name, kind)` | Add a controller (or broadcaster). `type` is the ROS controller name (e.g. `diff_drive_controller`) or the plugin class full name; `kind` is `'controller'` (default) or `'broadcaster'`; `name` overrides the Label. |
 | `get_robot_controllers(robot)` | List the controllers and broadcasters present on a robot. |
-| `list_controller_parameters(controller)` | List a controller's parameters: `full_name`, `type_fc`, `type`, `default_value`, `description`, `current_value`. |
+| `list_controller_parameters(controller)` | List a controller's parameters: `full_name`, `type_fc`, `type`, `default_value`, `description`, `current_value`. `current_value` is always JSON: a link/joint parameter reports the object **name** (pass it back to `set_controller_parameter`), a vector reports `[x, y, z]`, a placement reports `{x, y, z, q0, q1, q2, q3}` and a quantity reports its plain number. |
 | `set_controller_parameter(controller, parameter, value)` | Set one parameter by full name. Nested names are joined with `'___'`. Joint/link parameters (e.g. `joints`, `base_frame_id`) accept an object name or a list of names. |
 | `set_controller_parameters(controller, values)` | Set several parameters at once (`full_name` -> value). |
 
