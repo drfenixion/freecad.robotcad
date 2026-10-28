@@ -1,3 +1,44 @@
+# RobotCAD — Release v12.10.5
+
+**Date:** 2026-10-28
+
+## New features
+
+- Added **sensor support to the MCP tools**: `list_sensor_types`, `create_sensor` and `set_placement_between_sensor_link_and_parent`, so an agent can add a sensor to a link, joint or robot and position a forward-looking sensor (camera, vertical lidar) correctly ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Added **controllers / `ros2_control` support to the MCP tools**: `list_controller_types`, `create_controller`, `get_robot_controllers`, `list_controller_parameters`, `set_controller_parameter` and `set_controller_parameters` ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Added the **`measure_geometry` MCP tool** — exact measurements in millimetres: the distance between two faces/edges/vertices (real minimum gap, center distance, per-axis delta) or the radius/diameter/axis of a circular edge or cylindrical/spherical/toroidal face. References use the same full subelement path as `set_placement_between`; a bare object name is rejected with a hint naming the correct prefix ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+
+## Improvements
+
+- **`create_collision` → `create_collisions`**: collisions are now created for several links/robots in one call, with either one type for every element or a list parallel to `link_or_robot`. A robot covers all its links; its links passed explicitly are skipped, so nothing is collision-ised twice ([`freecad/cross/mcp/tool_schemas.py`](freecad/cross/mcp/tool_schemas.py)).
+- **`get_object_info` → `get_objects_info`**: detailed information about several objects is now returned in one call, with unresolvable names collected under `errors` instead of aborting the request ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- **`get_snapshot`**: added the `object_name` parameter — it selects an object/joint and fits the view onto it, so a joint's axes fill the frame; `get_snapshot` is registered with `structured_output=False` so the image block reaches the agent as an image instead of being re-serialized into truncated text ([`freecad/cross/mcp/server.py`](freecad/cross/mcp/server.py)).
+- **Joint snapshots are annotated with `Z` / `X` / `Y` axis letters**, drawn just past the tip of the matching arrow and in the same color, so the labels follow the selection highlight. The letter height is proportional to the joint's `AxisLength` and each label is offset beside its arrow in the image plane (new `text_3d()` helper in [`freecad/cross/coin_utils.py`](freecad/cross/coin_utils.py)).
+- The **stdio MCP proxy forwards the remote content blocks unchanged** (instead of flattening them to text), so an image result stays an image ([`freecad/cross/mcp/stdio_server.py`](freecad/cross/mcp/stdio_server.py)).
+- Rewritten **MCP agent instructions** ([`docs/mcp_agent.md`](docs/mcp_agent.md)): the sides of a part are defined **as seen from behind** the object, a controller-selection and parameter workflow was added, and geometric values must be obtained with `measure_geometry` instead of estimated from bounding boxes.
+- The **"Set placement - sensor"** workflow was extracted into [`set_placement_sensor()`](freecad/cross/wb_utils.py), so the GUI command and the MCP tool share one implementation ([`freecad/cross/ui/command_set_placement_fast_sensor.py`](freecad/cross/ui/command_set_placement_fast_sensor.py)).
+
+## Fixes
+
+- Fixed **MCP tool calls blocking on modal dialogs**: many workbench helpers report problems with a modal `QMessageBox`, which froze the GUI thread (and therefore the tool call waiting for it) until a human clicked "OK". GUI message boxes are now suppressed while a tool runs, `ask_confirmation`/`show_notification` do not block, and the emitted messages are recorded and returned to the agent ([`freecad/cross/mcp/main_thread.py`](freecad/cross/mcp/main_thread.py), [`freecad/cross/freecad_utils.py`](freecad/cross/freecad_utils.py), [`freecad/cross/freecadgui_utils.py`](freecad/cross/freecadgui_utils.py)).
+- Fixed the **full traceback printed to the FreeCAD console** when an MCP tool got a wrong object (e.g. `set_placement_between_sensor_link_and_parent`). Anticipated `RuntimeError`/`ValueError` failures are converted to the SDK's `ToolError`, which is logged at INFO without a traceback and hands the real reason to the agent (new [`freecad/cross/mcp/errors.py`](freecad/cross/mcp/errors.py)).
+- Fixed the **white / blank snapshot of a joint**: a `Cross::Joint` has no `Shape`, so `Std_ViewFitSelection` had an empty bounding box and left the camera where it was. The camera is now fitted to the joint's coin root node and the Qt event loop is pumped before the capture, so the arrows and labels are rendered ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Fixed the **console warning spam `AttachEngine3D::calculateAttachedPlacement: InertialCS ...`**: [`suppress_console_warnings()`](freecad/cross/freecad_utils.py) silenced only the `Console` observer, while FreeCAD also writes to `ReportOutput` (the GUI "Report view"), `StatusBar` and `NotificationAreaObserver`. The `Wrn` stream of every console observer is now disabled for the block and restored afterwards ([`freecad/cross/freecad_utils.py`](freecad/cross/freecad_utils.py), [`freecad/cross/wb_utils.py`](freecad/cross/wb_utils.py)).
+- Fixed the **ROS 2 `none` parameter type** (filter chains such as `sensor_filter_chain` / `filter_chain`), which raised a spurious "Unknown parameter type" warning: it is now mapped to `App::PropertyString`. The misspelled map name `ROS2_CONTROLLERS_PARAMS_TO_FRECAD_PROP_MAP` was renamed to `ROS2_CONTROLLERS_PARAMS_TO_FREECAD_PROP_MAP` ([`freecad/cross/wb_constants.py`](freecad/cross/wb_constants.py), [`freecad/cross/controller_proxy.py`](freecad/cross/controller_proxy.py), [`freecad/cross/sensors/sensor_proxy.py`](freecad/cross/sensors/sensor_proxy.py)).
+
+---
+
+### Commits
+
+- `0ae8d64` — bump version
+- `1b42e9b` — add measure_geometry mcp tool
+- `3159d1e` — add axis labels when snapshop of joint. Fix white screen when snapshot
+- `f1f687d` — fix error stacktrace to console when set_placement_between_sensor_link_and_parent get wrong object
+- `449f486` — fix console warn spam - "AttachEngine3D::calculateAttachedPlacement:InertialCS"
+- `6ad5990` — add sensors and controllers manipulation to mcp tool. Fix get_snapshot mcp tool.
+
+---
+
 # RobotCAD — Release v12.10.4
 
 **Date:** 2026-10-23
