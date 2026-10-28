@@ -17,6 +17,7 @@
 - The **stdio MCP proxy forwards the remote content blocks unchanged** (instead of flattening them to text), so an image result stays an image ([`freecad/cross/mcp/stdio_server.py`](freecad/cross/mcp/stdio_server.py)).
 - Rewritten **MCP agent instructions** ([`docs/mcp_agent.md`](docs/mcp_agent.md)): the sides of a part are defined **as seen from behind** the object, a controller-selection and parameter workflow was added, and geometric values must be obtained with `measure_geometry` instead of estimated from bounding boxes.
 - The **"Set placement - sensor"** workflow was extracted into [`set_placement_sensor()`](freecad/cross/wb_utils.py), so the GUI command and the MCP tool share one implementation ([`freecad/cross/ui/command_set_placement_fast_sensor.py`](freecad/cross/ui/command_set_placement_fast_sensor.py)).
+- Documented the **JSON shape of `list_controller_parameters` results** in the MCP agent instructions: `current_value` is always JSON — a link/joint parameter reports the object **name** (pass it straight back to `set_controller_parameter`), a vector reports `[x, y, z]`, a placement reports `{x, y, z, q0, q1, q2, q3}` and a quantity reports its plain number ([`docs/mcp_agent.md`](docs/mcp_agent.md)).
 
 ## Fixes
 
@@ -32,6 +33,7 @@
 
 ### Commits
 
+- `859255f` — fix `list_controller_parameters` raising an unexpected exception (make tool results JSON-safe, document `current_value` shape)
 - `0ae8d64` — bump version
 - `1b42e9b` — add measure_geometry mcp tool
 - `3159d1e` — add axis labels when snapshop of joint. Fix white screen when snapshot
