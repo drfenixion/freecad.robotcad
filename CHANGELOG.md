@@ -1,3 +1,39 @@
+# RobotCAD — Release v12.10.6
+
+**Date:** 2026-10-29
+
+## New features
+
+- Added the **`view` parameter to the `get_snapshot` MCP tool**: the camera can now be turned to `isometric` (default), `axonometric`, `top`, `bottom`, `front`, `rear`, `left` or `right` (aliases `iso`, `axo`, `back`, `side`, `default`), so a part can be inspected from several directions with one call per side. The orientation is applied **before** the fit, so every view keeps the same framing and only the viewpoint changes; an unknown name raises a `ValueError` listing the accepted values instead of silently producing an isometric image, and the text block of the result now names the view used ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py), [`freecad/cross/mcp/tool_schemas.py`](freecad/cross/mcp/tool_schemas.py)).
+
+## Improvements
+
+- **Objects are now addressed by `Label` instead of `Name`** in the MCP tools: the arguments were renamed accordingly — `create_links_filled(object_labels)`, `create_joints_filled(link_labels_in_order)`, `get_objects_info(object_labels)` and `calculate_mass_and_inertia(robot_or_link_labels)`; a `Name` is still accepted as a fallback. The agent instructions now require passing the human-readable `Label` and reporting objects by it ([`freecad/cross/mcp/tool_schemas.py`](freecad/cross/mcp/tool_schemas.py), [`docs/mcp_agent.md`](docs/mcp_agent.md)).
+- **`create_joint` `name` semantics documented**: `name` applies ONLY to a joint created without links (both `parent_link` and `child_link` empty); when both links are given the joint is created between them and named automatically, so the passed `name` is ignored ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- **Compressed the MCP agent instructions and tool descriptions** (about 1000 lines removed from [`docs/mcp_agent.md`](docs/mcp_agent.md), [`freecad/cross/mcp/tool_schemas.py`](freecad/cross/mcp/tool_schemas.py) and [`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)) to cut the context an agent has to read, without dropping the workflow rules.
+- **Joint axes must be identified by their `X` / `Y` / `Z` labels only**: the axis-colour hints were removed from the instructions and descriptions, since the labels are drawn on the snapshot itself ([`docs/mcp_agent.md`](docs/mcp_agent.md)).
+- **`measure_geometry` reports the exact geometry type** of the measured subelement (`curve_type` for an edge, `surface_type` for a face), so a non-circular result (`circular == false`) is self-explanatory ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Added a **demo link for agentic assembling with the MCP server** to the README ([`README.md`](README.md)).
+
+## Fixes
+
+- Fixed **`measure_geometry` failing to find the radius of a circular edge/face** given as a FULL subelement path (e.g. `wheel001.Cylinder.Face2`): the subelement kind was read from the beginning of the path instead of its last segment, so `Face`/`Edge` was never recognised. The kind is now taken from the last segment, with the shape's own `ShapeType` as a fallback when the path carries no token ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Fixed the **circular geometry type detection**: a trimmed circle (`Part.ArcOfCircle`) or a torus (`Toroid` vs. `Part::GeomToroid`) was not recognised by the exact class-name comparison, so a rim or a hole reported `circular == false`. The type is now normalised (and verified with `isDerivedFrom`) in a single helper ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Fixed the **wrong radius/center/axis of a circle on a placed or rotated link**: the radius was read from the **globally placed** shape, where a general transform (`transformShape`) may convert a `Cylinder`/`Circle` into a B-spline and hide its radius. The parameters are now read from the shape in the object's own coordinate system and only the returned `center`/`axis` are moved to global coordinates ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+- Fixed the **radius of a planar disc** (the flat end of a cylinder): it was measured only when the outer wire consisted of exactly one circular edge, so a disc whose boundary was split into arcs (or that had a coaxial hole) reported no radius. Every circular edge of the outer wire is now considered and the largest one wins ([`freecad/cross/mcp/tools_registry.py`](freecad/cross/mcp/tools_registry.py)).
+
+---
+
+### Commits
+
+- `3785b0a` — bump version
+- `d3c8d99` — add various view options to get_snapshot tool
+- `96dab3a` — compression of instructions and tool descriptions
+- `aef1df1` — fix measure_geometry for circles. Set prefer labels usage instead of names. Remove colors info about axis, force to use only axis labels. Add info about autonaming filled joints.
+- `4de930a` — Update README with demo link for MCP server
+
+---
+
 # RobotCAD — Release v12.10.5
 
 **Date:** 2026-10-28
