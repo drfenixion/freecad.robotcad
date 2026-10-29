@@ -3020,6 +3020,7 @@ def _snapshot_content_blocks(
     height: int,
     format: str,
     data: bytes,
+    view_name: str = 'isometric',
 ) -> list[Any]:
     """Build the MCP content blocks for a captured 3D view.
 
@@ -3039,7 +3040,10 @@ def _snapshot_content_blocks(
     return [
         TextContent(
             type='text',
-            text=f'3D view snapshot: {width}x{height} {format} ({mime}).',
+            text=(
+                f'3D view snapshot ({view_name}): '
+                f'{width}x{height} {format} ({mime}).'
+            ),
         ),
         ImageContent(
             type='image',
@@ -3049,40 +3053,124 @@ def _snapshot_content_blocks(
     ]
 
 
+#: Camera orientations accepted by ``get_snapshot``'s ``view`` argument, in the
+#: order they are reported in error messages. Each one is applied by calling the
+#: matching ``View3DInventorPy`` method (``view.viewIsometric()``, ...), see
+#: ``_apply_view_orientation``.
+_VIEW_ORIENTATIONS: tuple[str, ...] = (
+    'isometric',
+    'axonometric',
+    'top',
+    'bottom',
+    'front',
+    'rear',
+    'left',
+    'right',
+)
+
+#: Aliases accepted for the ``view`` argument (``iso`` is what agents type).
+_VIEW_ALIASES: dict[str, str] = {
+    'iso': 'isometric',
+    'axo': 'axonometric',
+    'back': 'rear',
+    'side': 'right',
+    'default': 'isometric',
+}
+
+
+def _normalize_view_name(view: str) -> str:
+    """Return the canonical orientation name for ``view``.
+
+    An unknown name raises a ``ValueError`` listing the accepted ones, so a typo
+    reaches the agent as an actionable message instead of silently producing an
+    isometric snapshot.
+    """
+    key = (view or 'isometric').strip().lower()
+    key = _VIEW_ALIASES.get(key, key)
+    if key not in _VIEW_ORIENTATIONS:
+        raise ValueError(
+            f'Unknown snapshot view "{view}". Accepted: '
+            + ', '.join(_VIEW_ORIENTATIONS)
+            + ' (aliases: ' + ', '.join(_VIEW_ALIASES) + ').',
+        )
+    return key
+
+
+def _apply_view_orientation(view: Any, name: str) -> None:
+    """Turn the 3D view camera to the orientation ``name``.
+
+    ``view`` is the ``View3DInventorPy`` of the document's active 3D view; each
+    orientation calls the corresponding ``view.viewXxx()`` method directly.
+
+    Only the camera orientation changes: the tool runs BEFORE the fit, so the
+    distance and the target computed by the fit are kept - a top/front/... view
+    shows the same region as the isometric one, just seen from that side.
+    """
+    if name == 'isometric':
+        view.viewIsometric()
+    elif name == 'axonometric':
+        view.viewAxonometric()
+    elif name == 'top':
+        view.viewTop()
+    elif name == 'bottom':
+        view.viewBottom()
+    elif name == 'front':
+        view.viewFront()
+    elif name == 'rear':
+        view.viewRear()
+    elif name == 'left':
+        view.viewLeft()
+    elif name == 'right':
+        view.viewRight()
+    else:  # pragma: no cover - ``view`` is validated beforehand.
+        raise ValueError(f'Unknown snapshot view "{name}".')
+
+
 def get_snapshot(
     width: int = 1024,
     height: int = 768,
     format: str = 'png',
     object_name: str = '',
+    view: str = 'isometric',
 ) -> list[Any]:
     """Capture the active 3D view as an MCP image block (plus a text line).
 
     ``object_name`` (typically a **joint**) selects that object and fits the view
-    onto it so its axes fill the frame; empty fits the WHOLE scene. Always
-    ISOMETRIC. Sensor field-of-view zones are hidden for the capture, and a
-    joint target also hides every other joint (both restored right after), the
-    tool waiting one second so the render is current. A joint's axes are
-    annotated with the letters ``X``/``Y``/``Z`` — identify every axis by its
-    label; the labels exist only for the capture.
+    onto it so its axes fill the frame; empty fits the WHOLE scene.
+
+    ``view`` picks the side the camera looks from: ``isometric`` (default),
+    ``axonometric``, ``top``, ``bottom``, ``front``, ``rear`` (``back``),
+    ``left``, ``right``. Call the tool once per side to inspect a part from
+    several directions; the orientation only rotates the camera, so all the
+    views keep the same framing and line up with each other.
+
+    Sensor field-of-view zones are hidden for the capture, and a joint target
+    also hides every other joint (both restored right after), the tool waiting
+    one second so the render is current. A joint's axes are annotated with the
+    letters ``X``/``Y``/``Z`` — identify every axis by its label; the labels
+    exist only for the capture.
     """
 
     def _impl() -> list[Any]:
         if not fc.GuiUp:
             raise RuntimeError('FreeCAD GUI is not available.')
+        # Validate the requested side before touching the view: a typo must
+        # reach the agent as a clear message and not change the camera at all.
+        view_name = _normalize_view_name(view)
         doc = _active_doc()
         # Make sure the document is active in the GUI and has a 3D view.
         gui_doc = fcgui.getDocument(doc.Name)
         if gui_doc is None:
             raise RuntimeError(f'Document "{doc.Name}" is not open in the GUI.')
         fcgui.ActiveDocument = gui_doc
-        view = gui_doc.ActiveView
-        if view is None:
+        view3d = gui_doc.ActiveView
+        if view3d is None:
             # Try to open a 3D view for the document.
             mw = fcgui.getMainWindow()
             if mw is not None:
                 mw.newWindow(doc)
-                view = gui_doc.ActiveView
-        if view is None:
+                view3d = gui_doc.ActiveView
+        if view3d is None:
             raise RuntimeError('No active 3D view available.')
         # Visibility of the joints, saved to restore it after the snapshot.
         saved_joint_visibility: dict[str, bool] = {}
@@ -3091,10 +3179,11 @@ def get_snapshot(
         # Axis labels added for the capture, removed right after it.
         added_axis_labels: list[tuple[Any, Any]] = []
         try:
-            # Always switch to an isometric orientation so the snapshot is taken
-            # from a stable, readable angle. It is applied AFTER the fit/selection
-            # so it keeps the framing just computed and only changes the viewpoint.
-            view.viewIsometric()
+            # Turn the camera to the requested side (isometric by default) so the
+            # snapshot is taken from a stable, readable angle. It runs BEFORE the
+            # fit/selection: the orientation survives the fit, which keeps it and
+            # only recomputes the distance and the target.
+            _apply_view_orientation(view3d, view_name)
             # Hide the sensors' field-of-view zones BEFORE the fit: they are
             # large translucent volumes that cover the parts and the joint axes
             # and that would inflate the bounding box the camera is fitted to.
@@ -3149,8 +3238,8 @@ def get_snapshot(
                 # its arrow in the image plane instead of sitting on top of it.
                 added_axis_labels = _add_joint_axis_labels(
                     joint_obj,
-                    rotation=view.getCameraOrientation(),
-                    view_direction=view.getViewDirection(),
+                    rotation=view3d.getCameraOrientation(),
+                    view_direction=view3d.getViewDirection(),
                 )
                 if added_axis_labels:
                     # A ``Cross::Joint`` has no ``Shape``: its axes live only in
@@ -3159,7 +3248,7 @@ def get_snapshot(
                     # (the snapshot then came out blank or zoomed into the
                     # ground). Fit the camera to the joint's coin scene graph
                     # instead, which holds the arrows and the labels just added.
-                    camera = view.getCameraNode()
+                    camera = view3d.getCameraNode()
                     if camera is not None and hasattr(camera, 'viewAll'):
                         # ``SoCamera.viewAll`` needs an ``SbViewportRegion``
                         # (the aspect ratio is taken from it). Prefer the real
@@ -3167,7 +3256,7 @@ def get_snapshot(
                         # view; fall back to the capture size.
                         viewport_region = None
                         try:
-                            viewer = view.getViewer()
+                            viewer = view3d.getViewer()
                             render_manager = viewer.getSoRenderManager()
                             viewport_region = render_manager.getViewportRegion()
                         except Exception:  # noqa: BLE001 - API may differ.
@@ -3206,7 +3295,7 @@ def get_snapshot(
                 # so retry a few times, pumping the event loop in between.
                 data = b''
                 for attempt in range(4):
-                    view.saveImage(save_path, width, height, 'White')
+                    view3d.saveImage(save_path, width, height, 'White')
                     if not os.path.isfile(save_path) or os.path.getsize(save_path) == 0:
                         raise RuntimeError('Failed to capture the 3D view.')
                     with open(save_path, 'rb') as f:
@@ -3236,7 +3325,7 @@ def get_snapshot(
             if saved_joint_visibility or saved_fov_visibility or added_axis_labels:
                 # Refresh the view so the restored state is shown immediately.
                 QtGui.QApplication.processEvents()
-        return _snapshot_content_blocks(width, height, format, data)
+        return _snapshot_content_blocks(width, height, format, data, view_name)
 
     try:
         return run_on_main_thread(_impl)
@@ -3616,12 +3705,16 @@ A joint sensor (e.g. `force_torque`) just needs
   never from the index alone.
 - `measure_geometry(ref1, ref2, mode)` — exact measurement in **millimetres**
   (see Positioning). `closest_points` is returned with a distance.
-- `get_snapshot(width, height, format, object_name)` — 3D view as an MCP image
-  block. `object_name` (e.g. a **joint**) selects it and fits the camera onto it
-  so its axes fill the frame; empty = whole scene. Always ISOMETRIC; the sensor
-  field-of-view zones are hidden and a **joint** target also hides every other
-  joint (both restored after), waiting one second so the render is up to date.
-  A joint's axes are labelled `X`/`Y`/`Z` (see Sensors).
+- `get_snapshot(width, height, format, object_name, view)` — 3D view as an MCP
+  image block. `object_name` (e.g. a **joint**) selects it and fits the camera
+  onto it so its axes fill the frame; empty = whole scene. `view` picks the
+  side the camera looks from: `isometric` (default), `axonometric`, `top`,
+  `bottom`, `front`, `rear`, `left`, `right` — call the tool once per side to
+  inspect a part from several directions (the framing is kept, only the
+  viewpoint turns). The sensor field-of-view zones are hidden and a **joint**
+  target also hides every other joint (both restored after), waiting one second
+  so the render is up to date. A joint's axes are labelled `X`/`Y`/`Z` (see
+  Sensors).
 - `check_overlap(parent, child)` — deterministic boolean `overlap` (shared face
   is not an overlap), plus per-axis AABB intervals and `min_distance`.
 """,

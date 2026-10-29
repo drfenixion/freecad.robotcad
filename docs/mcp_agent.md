@@ -201,7 +201,7 @@ objects.
 | `list_scene_objects()` | JSON description of the scene (robots, links, joints, objects). |
 | `get_objects_info(object_labels)` | Details for SEVERAL objects in one call (list of Labels), merged into `{objects: {...}, errors: {...}}`. Each entry has basic info plus `Geometry` (global faces/vertices, `center_of_mass`, `surface_type`) and a `Reference` block with the exact `prefix` for subelement paths. |
 | `measure_geometry(ref1, ref2, mode)` | See "Positioning and measurement". |
-| `get_snapshot(width, height, format, object_name)` | 3D view as an MCP image block. `object_name` (e.g. a joint) selects it and fits the view onto it so its axes fill the frame; empty = whole scene. Always ISOMETRIC; sensor field-of-view zones are hidden and a joint target also hides every other joint (both restored after), waiting one second. A joint's axes are labelled `X`/`Y`/`Z`. |
+| `get_snapshot(width, height, format, object_name, view)` | 3D view as an MCP image block. `object_name` (e.g. a joint) selects it and fits the view onto it so its axes fill the frame; empty = whole scene. `view` = camera side: `isometric` (default), `axonometric`, `top`, `bottom`, `front`, `rear`, `left`, `right` (aliases `iso`, `axo`, `back`, `side`, `default`) — call it once per side; the framing is kept and only the viewpoint turns. Sensor field-of-view zones are hidden and a joint target also hides every other joint (both restored after), waiting one second. A joint's axes are labelled `X`/`Y`/`Z`. |
 | `check_overlap(parent, child)` | See "Positioning and measurement". |
 
 ### Agent instructions

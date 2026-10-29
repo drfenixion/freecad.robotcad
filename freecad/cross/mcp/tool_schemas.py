@@ -310,6 +310,25 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     'check its frame). Empty = fit the whole scene.'
                 ),
             },
+            'view': {
+                'type': 'string',
+                'enum': [
+                    'isometric',
+                    'axonometric',
+                    'top',
+                    'bottom',
+                    'front',
+                    'rear',
+                    'left',
+                    'right',
+                ],
+                'description': (
+                    "Side the camera looks from (default 'isometric'). Call the "
+                    'tool once per side to inspect a part from several '
+                    'directions: top/bottom, front/rear (back), left/right. '
+                    "Aliases: 'iso', 'axo', 'back', 'side', 'default'."
+                ),
+            },
         },
         'required': [],
     },
