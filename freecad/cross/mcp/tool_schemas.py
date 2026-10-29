@@ -127,32 +127,25 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'target': {
                 'type': 'string',
                 'description': (
-                    'Link or joint to position. NEVER on a sensor link hosting a '
-                    'camera or similar forward-looking sensor (use '
-                    'set_placement_between_sensor_link_and_parent). EXCEPTION: a '
-                    'link hosting only a horizontal lidar IS positioned with this '
-                    'tool, then its parent joint is rotated about Z.'
+                    'Link or joint to position. NOT on a camera-like sensor link '
+                    '(use set_placement_between_sensor_link_and_parent). A link '
+                    'with only a HORIZONTAL lidar IS positioned here, then its '
+                    'parent joint is rotated about Z.'
                 ),
             },
             'ref1': {
                 'type': 'string',
                 'description': (
-                    'Reference on the PARENT link: face/edge/vertex/circle of its '
-                    "Real element as '<real_link>.<inner_link_name>.<feature>."
-                    "<subelement>' (e.g. 'real_l_chassis001_.chassis001.Box."
-                    "Face3'), or an existing LCS. <inner_link_name> is the Name "
-                    'of the App::Link inside the Real element (e.g. '
-                    "'chassis001'), NOT the source body name. A robot link "
-                    '(l_...) cannot be a ref. Do NOT create LCS objects.'
+                    "Reference on the PARENT link: a Real-element subelement "
+                    "('real_l_chassis001_.chassis001.Box.Face3') or an LCS. A "
+                    'robot link (l_...) cannot be a ref.'
                 ),
             },
             'ref2': {
                 'type': 'string',
                 'description': (
-                    'Reference on the CHILD link, same format. If the call '
-                    "succeeds but the target did NOT move, both references "
-                    'resolved to the same point — verify with '
-                    'get_objects_info([target]) and pick different ones.'
+                    'Reference on the CHILD link, same format. Joined to ref1 by '
+                    'their centers.'
                 ),
             },
             'move': {
@@ -170,10 +163,9 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'type': 'string',
                 'enum': ['x', 'y', 'z'],
                 'description': (
-                    'Rotation axis. Orient a jointed link by rotating the JOINT '
-                    '(its local Z is the functional axis). MIRROR a link to the '
-                    'other side of the parent by rotating the LINK 180° about X '
-                    '(NOT Z: that only spins it around its own functional axis).'
+                    'Orienting a link: rotate its JOINT (local Z = functional '
+                    'axis). Mirroring a link to the parent\'s other side: rotate '
+                    'the LINK 180 about X (not Z).'
                 ),
             },
             'angle_deg': {'type': 'number', 'description': 'Angle in degrees'},
@@ -186,12 +178,9 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'subelement': {
                 'type': 'string',
                 'description': (
-                    "Subelement of the link Real element: '<real_link>."
-                    "<inner_link_name>.<feature>.<subelement>' (e.g. "
-                    "'real_l_chassis001_.chassis001.Box.Face3'); short forms "
-                    "'chassis001.Box.Face3' / 'Box.Face3' accepted; empty = Real "
-                    'origin. ONLY on explicit user request — the default '
-                    'workflow uses plain references in set_placement_between.'
+                    "Real-element subelement ('real_l_chassis001_.chassis001.Box."
+                    "Face3'); short forms 'chassis001.Box.Face3' / 'Box.Face3' "
+                    'accepted; empty = Real origin. ONLY on explicit request.'
                 ),
             },
         },
@@ -283,21 +272,17 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'ref1': {
                 'type': 'string',
                 'description': (
-                    'REQUIRED full subelement path: face/edge/vertex/circle of '
-                    "a link Real element as '<real_link>.<inner_link_name>."
-                    "<feature>.<subelement>' (e.g. 'real_l_wheel001_.wheel001."
-                    "Cylinder.Face2'), or an LCS name. A bare object name "
-                    "(robot link 'l_...', Real element 'real_l_...' or any "
-                    'whole object) is rejected — it has no geometry of its own.'
+                    "REQUIRED full subelement path "
+                    "('real_l_wheel001_.wheel001.Cylinder.Face2') or an LCS "
+                    'name. A bare object name is rejected.'
                 ),
             },
             'ref2': {
                 'type': 'string',
                 'description': (
-                    'Second reference, same full subelement path format. Omit '
-                    'it to measure the RADIUS of a circular edge or a '
-                    'cylindrical/spherical/toroidal/conical face (or a planar '
-                    'disc, the flat end of a cylinder).'
+                    'Second reference, same format. Omit it to measure the RADIUS '
+                    'of a circular edge or a cylindrical/spherical/toroidal/'
+                    'conical face (or a flat cylinder end).'
                 ),
             },
             'mode': {
@@ -306,8 +291,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': (
                     "'auto' (default): distance when ref2 is given, radius "
                     "otherwise. 'distance' = min gap + center distance + per-axis "
-                    "delta; 'radius' = radius/diameter/center/axis of ref1, with "
-                    "'circular' telling whether a radius was found."
+                    "delta; 'radius' = radius/diameter/center/axis + 'circular'."
                 ),
             },
         },
@@ -416,25 +400,18 @@ TOOL_SCHEMAS: dict[str, dict] = {
             'sensor': {
                 'type': 'string',
                 'description': (
-                    'Link-attached forward-looking sensor (camera or vertical '
-                    'lidar): the sensor object OR the sensor link that hosts '
-                    'it (e.g. "l_camera001") — both are accepted. A HORIZONTAL '
-                    'lidar does NOT use this tool — use set_placement_between '
-                    '+ a Z rotation of its parent joint.'
+                    'Forward-looking link sensor (camera or vertical lidar): the '
+                    'sensor object OR its sensor link. A HORIZONTAL lidar does not '
+                    'use this tool.'
                 ),
             },
             'ref_parent': {
                 'type': 'string',
-                'description': (
-                    'Reference on the parent link: '
-                    '"<real_link>.<inner_link_name>.<feature>.<Face|Edge|VertexN>" or an LCS name'
-                ),
+                'description': 'Reference on the parent link (Real-element subelement) or an LCS name',
             },
             'ref_sensor': {
                 'type': 'string',
-                'description': (
-                    'Matching reference on the sensor link, same format'
-                ),
+                'description': 'Matching reference on the sensor link, same format',
             },
         },
         'required': ['sensor', 'ref_parent', 'ref_sensor'],
@@ -458,8 +435,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 ],
                 'description': (
                     'Section to return (default "all"); "general_algorithm" is '
-                    'the source of truth. The header states that objects must be '
-                    'identified by Label (preferred) rather than Name. '
+                    'the source of truth.'
                 ),
             },
         },

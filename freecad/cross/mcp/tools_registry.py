@@ -332,12 +332,9 @@ def _validate_collision_type(type: str) -> tuple[Any, str]:
 
 
 def create_collision(link_or_robot: str, type: str = 'copy') -> dict[str, Any]:
-    """Create a collision for a single link or robot. Default `type='copy'`
-    (exact geometry copy — the default). Primitives (`box`, `sphere`,
-    `cylinder_z/x/y` from the bounding box) ONLY on explicit user request.
+    """Create a collision for a single link or robot (default ``copy``).
 
-    NOTE: this single-object function is NOT exposed to the agent as an MCP
-    tool; it is called internally by ``create_collisions`` (once per element).
+    Not exposed as an MCP tool: called internally by ``create_collisions``.
     """
     bound_func, label = _validate_collision_type(type)
 
@@ -361,19 +358,13 @@ def create_collisions(
 ) -> dict[str, Any]:
     """Create collisions for several links/robots in ONE call.
 
-    ``link_or_robot`` is a list of link/robot Names or Labels. ``type`` is either
-    a single collision type applied to every element, or a list parallel to
-    ``link_or_robot`` (one type per element). Default ``type='copy'`` (exact
-    geometry copy — the default). Primitives (``box``, ``sphere``,
-    ``cylinder_z/x/y`` from the bounding box) ONLY on explicit user request.
+    ``link_or_robot`` is a list of names/Labels; ``type`` is one type for all or
+    a list parallel to it. Default ``copy`` (exact geometry). Primitives
+    (``box``, ``sphere``, ``cylinder_z/x/y``) ONLY on explicit user request.
 
-    A robot name covers the robot AS A WHOLE (all its links). When a robot and
-    some of its own links are passed together, the robot's links are removed
-    from the list FIRST (so they are not collision-ised twice): the pass runs
-    over all the robot's links, then over the remaining explicitly-listed
-    elements.
-
-    Internally this calls ``create_collision`` for each element.
+    A robot covers all its links; its own links passed in the same call are
+    dropped first, so nothing is collision-ised twice. Calls ``create_collision``
+    per element.
     """
     # Normalise `type` into a per-element list.
     if isinstance(type, str):
@@ -874,14 +865,13 @@ def set_placement_between(
     ref2: str,
     move: str = 'leaf',
 ) -> dict[str, Any]:
-    """Position a link/joint by snapping the contact zones of two neighbouring links via two subelement references (one on the parent, one on the child). The two references are joined BY THEIR CENTERS: the child is moved so that the center of ``ref2`` coincides with the center of ``ref1``.
+    """Snap two neighbouring links together by joining ``ref2`` (child) onto
+    ``ref1`` (parent) **by their centers**.
 
-    A link hosting a **camera or similar forward-looking** sensor (a "sensor
-    link") must NOT be joined with this tool — it needs the sensor-specific
-    orientation applied by
-    ``set_placement_between_sensor_link_and_parent``. A link hosting
-    **only a lidar mounted horizontally** to scan all around IS positioned with
-    this tool (its parent joint is then turned about Z to aim the sector)."""
+    NEVER on a link hosting a camera or similar forward-looking sensor — use
+    ``set_placement_between_sensor_link_and_parent``. A link hosting only a
+    HORIZONTAL lidar IS positioned here, then its parent joint is turned about Z.
+    """
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -964,11 +954,12 @@ def rotate_object(object_name: str, axis: str = 'z', angle_deg: float = 45.0) ->
 def create_lcs(link: str, subelement: str = '') -> dict[str, Any]:
     """Create an LCS on a face/edge/circle/vertex of a link Real element.
 
-    ONLY on explicit user request. ``subelement``: ``<real_link>.<body>.
-    <subelement>`` (e.g. ``real_l_chassis001_.chassis001.Box.Face3``); short
-    forms ``chassis001.Box.Face3`` / ``Box.Face3`` accepted; empty = Real
-    origin. Tolerant to Name/Label mixups and missing levels; a robot link
-    (``l_...``) cannot be used."""
+    ONLY on explicit user request. ``subelement`` uses the reference path
+    (``real_l_chassis001_.chassis001.Box.Face3``); short forms
+    (``chassis001.Box.Face3``, ``Box.Face3``) are accepted and empty means the
+    Real origin. Tolerates Name/Label mixups; a robot link (``l_...``) is
+    rejected.
+    """
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -1705,17 +1696,13 @@ def create_sensor(
     type: str,
     name: str = '',
 ) -> dict[str, Any]:
-    """Add a sensor to a link, joint or robot.
+    """Add a sensor to a ``Cross::Link``, ``Cross::Joint`` or ``Cross::Robot``.
 
-    ``element`` is the Name or Label of the parent ``Cross::Link``,
-    ``Cross::Joint`` or ``Cross::Robot``. On a **joint** the sensor needs no
-    position (it is oriented by the joint). On a **link** it becomes a child
-    "sensor link" that must ALREADY be connected to the parent link by a joint
-    (build the chain first with ``create_links_filled``/``create_link`` +
-    ``create_joint``), then positioned with
-    ``set_placement_between_sensor_link_and_parent`` (camera / vertical lidar)
-    or ``set_placement_between`` + a Z rotation of its parent joint (horizontal
-    lidar). If the sensor link already exists, do NOT create it again.
+    On a **joint** it needs no position. On a **link** it becomes a child sensor
+    link that must ALREADY be connected to the parent by a joint; position it
+    with ``set_placement_between_sensor_link_and_parent`` (camera / vertical
+    lidar) or ``set_placement_between`` + a Z rotation of its parent joint
+    (horizontal lidar). Never create an existing sensor link again.
     """
     doc = _active_doc()
 
@@ -1762,32 +1749,16 @@ def set_placement_between_sensor_link_and_parent(
     ref_parent: str,
     ref_sensor: str,
 ) -> dict[str, Any]:
-    """Position a **link**-attached forward-looking sensor by connecting it to its parent link.
+    """Connect a link-attached forward-looking sensor to its parent link.
 
-    ``sensor`` is the sensor object **or the sensor link that hosts it** (e.g.
-    ``l_camera001``) — both are accepted.
-
-    The ONLY tool that may join a **camera (or similar forward-looking)**
-    sensor link to its parent link — never ``set_placement_between`` for that.
-    Mirrors the "Set placement - sensor" tool. ``ref_parent`` is a
-    face/edge/vertex/circle reference on the parent link, ``ref_sensor`` the
-    matching reference on the sensor link; the two are joined BY THEIR CENTERS.
-
-    ORIENTATION: the sensor link's **parent joint** is turned so that the
-    sensor's front follows the joint's local X = the look direction. The ROLL
-    about X is NOT set: you MUST still rotate the joint about X until Z points
-    perpendicularly UP relative to the parent part (skip it and the image lies
-    on its side). Verify with ``get_snapshot('<joint>')``, where the joint's
-    axes are labelled ``X``, ``Y`` and ``Z`` — identify every axis BY ITS
-    LABEL — and check **ALL THREE axes — X, Y and Z — one by one**:
-    X = look direction, Z = UP relative to the parent part, Y = the frame's
-    LEFT seen from behind (a wrong Y means the frame is rolled about the look
-    axis). If the sensor looks the OPPOSITE way, verify with ``check_overlap``
-    and rotate the joint 180 deg about Y.
-
-    Joint sensors need no position and are rejected here. EXCEPTION: a
-    **horizontal lidar** is NOT positioned with this tool — use
-    ``set_placement_between`` + a Z rotation of its parent joint.
+    ``sensor`` is the sensor object OR its sensor link. The ONLY tool for a
+    camera-like sensor link (never ``set_placement_between``). Joins the two
+    references by their centers and turns the sensor link's parent joint so the
+    sensor's front follows its local X (look direction). The ROLL about X is not
+    set: rotate the joint about X until Z points up relative to the parent part,
+    verifying X/Y/Z by the labels of ``get_snapshot('<joint>')``; if it looks the
+    OPPOSITE way, rotate 180 deg about Y. Joint sensors are rejected; a
+    HORIZONTAL lidar uses ``set_placement_between`` + a Z rotation instead.
     """
     doc = _active_doc()
 
@@ -2326,18 +2297,14 @@ def check_overlap(
     child: str,
     tolerance: float = _OVERLAP_LINEAR_TOL,
 ) -> dict[str, Any]:
-    """Deterministically test whether two objects/links overlap in space.
+    """Test whether two objects/links overlap in space (the mandatory check).
 
-    PRIMARY verification tool for the mandatory overlap check. The decision is
-    the boolean intersection volume of the two solids, computed inside FreeCAD
-    from the document's own geometry — the agent must read the returned
-    ``overlap`` boolean, never supply or assume the values. A shared face (the
-    parts merely touching, ``common_volume`` ~ 0) is reported as no overlap.
-
-    ``parent`` and ``child`` are object/link names or Labels; each may be a
-    robot ``Cross::Link`` (its ``Real`` geometry is used) or any object with a
-    ``Shape``. The result also contains the per-axis AABB intervals
-    (``axes.x/y/z``) and ``min_distance`` for diagnostics.
+    The decision is the boolean intersection volume of the two solids, computed
+    by FreeCAD from the document geometry: read the returned ``overlap`` boolean,
+    never assume the values. A shared face (parts merely touching) is NOT an
+    overlap. ``parent``/``child`` are object/link names or Labels (a
+    ``Cross::Link`` contributes its ``Real`` geometry). Also returns the
+    per-axis AABB intervals (``axes.x/y/z``) and ``min_distance``.
     """
 
     def _impl() -> dict[str, Any]:
@@ -2712,30 +2679,21 @@ def measure_geometry(
     ref2: str = '',
     mode: str = 'auto',
 ) -> dict[str, Any]:
-    """Measure a distance between two faces/edges/vertices or a circle radius.
+    """Measure a distance between two subelements or the radius of one.
 
-    ``ref1``/``ref2`` MUST be a FULL subelement path in the SAME format as
-    ``set_placement_between``: a face/edge/vertex/circle of a link Real
-    element written ``<real_link>.<inner_link_name>.<feature>.<subelement>``
-    (e.g. ``real_l_chassis001_.chassis001.Box.Face3``), or an LCS. A bare
-    object name (a robot link ``l_...``, its Real element ``real_l_...`` or
-    any other whole object) is REJECTED with a hint naming the exact
-    subelement prefix to use — such objects have no geometry of their own.
-    All values are in **millimetres** (model units).
+    ``ref1``/``ref2`` must be FULL subelement paths in the ``set_placement_between``
+    format (``<real_link>.<inner_link_name>.<feature>.<subelement>``) or an LCS;
+    a bare object name is REJECTED with a hint naming the exact prefix. All
+    values are in **millimetres**.
 
-    - ``ref2`` given (``mode='auto'``/``'distance'``) — the DISTANCE between
-      the two geometries: ``distance`` is the minimum distance between the
-      surfaces/curves/points (the real gap, e.g. between the facing inner
-      faces of two wheels), ``center_distance`` the distance between their
-      centers and ``delta`` the per-axis center offset.
-    - ``ref2`` omitted (``mode='auto'``/``'radius'``) — the RADIUS of a
-      circular edge (rim, hole) or of a cylindrical/spherical/toroidal/conical
-      face, or of a planar DISC (the flat end of a cylinder), plus its center
-      and axis. ``circular`` is ``True`` exactly when such a radius was found,
-      so a wheel radius and a wheel rim edge both report it.
+    - ``ref2`` given (``distance``): ``distance`` = the real minimum gap,
+      ``center_distance`` and the per-axis ``delta`` of the centers.
+    - ``ref2`` omitted (``radius``): ``radius``/``diameter``/``center``/``axis``
+      of a circular edge, a cylindrical/spherical/toroidal/conical face or a
+      planar disc (flat cylinder end); ``circular`` tells whether one was found.
 
-    Use it for EVERY geometric value a controller needs (wheel separation,
-    wheel radius, offsets) instead of estimating from bounding boxes.
+    Use it for EVERY value that must be exact (gaps, wheel separation, radii,
+    offsets) instead of estimating from bounding boxes.
     """
     if mode not in ('auto', 'distance', 'radius'):
         raise RuntimeError(
@@ -3097,35 +3055,15 @@ def get_snapshot(
     format: str = 'png',
     object_name: str = '',
 ) -> list[Any]:
-    """Capture the active 3D view and return it as MCP content blocks.
+    """Capture the active 3D view as an MCP image block (plus a text line).
 
-    Returns a ``TextContent`` (image dimensions) and an ``ImageContent`` (the
-    pixels), so vision agents get an actual image instead of base64. Registered
-    *unstructured* (see ``server.py``), so the blocks are forwarded as-is.
-
-    ``object_name`` selects the framing: empty (default) fits the WHOLE scene
-    (``ViewFit``); an object's ``Name``/``Label`` (typically a **joint**)
-    selects it and fits the view onto the SELECTION (``Std_ViewFitSelection``)
-    so its axes are shown up close — use this before correcting a sensor's
-    orientation. The view is then always switched to an ISOMETRIC orientation
-    before the capture.
-
-    The field-of-view zones of all sensors (camera frustums, lidar sectors)
-    are hidden for the capture and restored right after it,
-    success or not: they are large translucent volumes that would cover the
-    parts and the joint axes.
-
-    When ``object_name`` is a **joint**, every OTHER joint is hidden for the
-    capture (restored right after, success or not) and, because the visibility
-    was just changed, the tool waits ONE SECOND (pumping the Qt event loop) so
-    the render is up to date.
-
-    When ``object_name`` is a **joint**, its three axes are annotated with the
-    letters ``Z``, ``X`` and ``Y``, drawn just past the tip of the matching
-    arrow: identify EVERY axis by ITS LABEL. The letter height is proportional
-    to the joint's size (its ``AxisLength``). The labels exist only for the
-    capture: they are removed right after it, so the joint's axes are back to
-    their normal state.
+    ``object_name`` (typically a **joint**) selects that object and fits the view
+    onto it so its axes fill the frame; empty fits the WHOLE scene. Always
+    ISOMETRIC. Sensor field-of-view zones are hidden for the capture, and a
+    joint target also hides every other joint (both restored right after), the
+    tool waiting one second so the render is current. A joint's axes are
+    annotated with the letters ``X``/``Y``/``Z`` — identify every axis by its
+    label; the labels exist only for the capture.
     """
 
     def _impl() -> list[Any]:
@@ -3326,19 +3264,14 @@ def get_snapshot(
 _INSTRUCTIONS_HEADER = """\
 # RobotCAD MCP — Agent Instructions
 
-You are controlling the RobotCAD (FreeCAD OVERCROSS) workbench through MCP
-tools. All tools operate on the **active FreeCAD document** and accept objects
-by `Name` or `Label`. The sections below are the recommended workflow; the
-**General algorithm** is the source of truth — follow it and resolve any
-contradictions in its favor.
-
-**USE `Label`, NOT `Name`, WHENEVER POSSIBLE.** Pass the `Label` (the
-human-readable one, e.g. `left wheel`; NOT the internal `l_wheel001_`) to every
-tool argument that takes an object, and name objects by their `Label` when
-reporting to the user. Pass the `Name` only if the Label is missing or
-ambiguous (`Ambiguous label "..."`). Subelement references
-(`real_l_...<inner>.<feature>.FaceN`) are path-based — take them from
+Tools operate on the **active FreeCAD document** and accept objects by `Name` or
+`Label`. **Prefer `Label`** — in tool arguments and in everything reported to the
+user; use `Name` only when the Label is missing or ambiguous
+(`Ambiguous label "..."`). Subelement paths are Name-based — build them from
 `Reference.prefix` of `get_objects_info([link])`.
+
+The **General algorithm** is the source of truth; every other section only adds
+detail and never overrides it.
 """
 
 #: Per-topic instruction snippets, in the order they are concatenated into the
@@ -3349,112 +3282,90 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
     'general_algorithm': """\
 ## General algorithm (source of truth)
 
+CONVENTIONS — defined here once, referenced by every section:
+
+- **Sides**: LEFT/RIGHT of a part (wheel, arm, sensor, ...) is as seen from
+  BEHIND it, looking along its FORWARD direction. Forward comes from the
+  direction-defining parts (forward-looking sensors, end tool); with none, local
+  +X is forward and +Y is left. Never use an arbitrary axis, the snapshot
+  viewpoint or the creation order.
+- **References**: `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
+  `real_l_chassis001_.chassis001.Box.Face3`), always on a link's Real element —
+  a robot link (`l_...`) is not a reference. `<inner_link_name>` is the App::Link
+  Name INSIDE the Real element: never guess it, read `Reference.prefix` from
+  `get_objects_info([link])` and append `.FaceN`/`.VertexN`/`.EdgeN`. Links from
+  one source body share one inner name (all four wheels → `wheel001`). Plain
+  references are enough — do not create LCS.
+- **Exact values**: every gap, separation, offset and radius comes from
+  `measure_geometry(...)` (mm) — never from bounding boxes, `center_of_mass`
+  differences or by eye.
+
 0. PLAN FIRST. Write the plan AS A TODO LIST before touching the document and
-   keep it updated: every step below is a separate checklist item (break step 6
-   into per-link items), marked DONE right after it is completed. Following this
-   algorithm MEANS working through that list in order — never skip, reorder or
-   batch items. The plan MUST list every link, the parent/child topology, the
-   reference chosen for each placement, and an explicit **mirroring check** per
-   child (decide up front whether it may land on the wrong side of its parent
-   and need `rotate_object(child_link, 'x', 180)`, see e-bis) — symmetric parts
-   on opposite sides of a parent (e.g. left/right wheels) are the usual
-   candidates.
-   SIDES — the LEFT/RIGHT side of EVERY part (wheels, arms, sensors, ...) is
-   defined as seen from BEHIND the object: stand behind it and look along its
-   FORWARD direction; what lies on your left is LEFT, on your right is RIGHT.
-   The forward direction comes from the robot's direction-defining parts
-   (forward-looking sensors, end effector); with no such feature use the base
-   convention (local +X forward, so +Y is left). NEVER derive a side from an
-   arbitrary axis, from the current snapshot's viewpoint or from the order the
-   links were created.
-1. No active document? `create_document(name)`.
+   keep it updated: one item per step below (per-link items for step 6), marked
+   DONE right after completion. Following this algorithm MEANS working through
+   that list in order — never skip, reorder or batch items. The plan lists every
+   link, the parent/child topology, the reference chosen for each placement and
+   an explicit **mirroring check** per child (can it land on the wrong side and
+   need `rotate_object(child_link, 'x', 180)`? — symmetric parts on opposite
+   sides of a parent usually can).
+1. No active document → `create_document(name)`.
 2. `create_robot(name)`.
 3. `create_links_filled(robot, object_labels)` — links from existing bodies
-   (pass their Labels); the same body may be reused for several links.
-4. Create joints: 2 neighbouring links at a time, root link first.
+   (Labels); the same body may feed several links.
+4. Joints: two neighbouring links at a time, root link first.
 5. `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision.
 6. Position links pairwise along the chain with
-   `set_placement_between(target, ref1, ref2)`. Per pair:
-   a. Pick one reference on the parent and one on the child: a
-      face/edge/vertex/circle of the link Real element, written
-      `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
-      `real_l_chassis001_.chassis001.Box.Face3`). `<inner_link_name>` is the
-      Name of the App::Link inside the Real element (e.g. `chassis001`), NOT the
-      source body name and NOT the robot link name. **NEVER guess this path**:
-      read `Reference.prefix` from `get_objects_info([link])` and append
-      `.FaceN`/`.VertexN`/`.EdgeN`. Links filled from the SAME source body share
-      one inner link name (four wheels from one `wheel` body all have
-      `wheel001`; `wheel002` is NOT valid). Do NOT create LCS objects — plain
-      subelement references are enough. Choose the face/vertex from the
-      `Geometry` data (`center_of_mass`, `surface_type`, `vertices`, `point`),
-      never from the index alone.
-   b. `set_placement_between(target, ref1, ref2)` — only the two references go
-      into the selection. If it returns no error but the target did NOT move,
-      the two references most likely resolved to the same point: verify with
-      `get_objects_info([target])` and pick different references.
-   c. Control snapshot: `get_snapshot(...)`.
-   d. Orient the JOINT so its local Z lies along the child's functional axis
-      (revolute/continuous rotate around local Z, prismatic moves along local
-      Z) — ONLY with `rotate_object(joint_name, axis, angle_deg)`. NEVER rotate
-      the LINK for this: the link follows the joint, so rotating it breaks the
-      alignment (a wheel whose axle is not along the joint's local Z will not
-      roll).
-   e. Aim the assembly by rotating the JOINT (`rotate_object`): that turns its
-      local Z and with it the child chain. Do NOT rotate the link to fix the
-      final pose.
-   e-ter. For a chassis with several symmetric wheels, ALL wheels' joint local
-      Z axes (the axles) MUST be parallel and point the SAME way — to the LEFT
-      **as seen from behind the chassis** (see SIDES in step 0). Never mirror
-      the joints into opposite directions; flip a wrong one by rotating its
-      JOINT.
-   e-bis. Mirroring: if the joint and the link are both oriented correctly but
-      the link's body penetrates the parent through its full height (it belongs
-      on the opposite side), rotate the LINK 180° about X:
-      `rotate_object(link_name, 'x', 180)`. The link is aligned along its local
-      Z, so an X rotation mirrors it about Z — it flips to the other side while
-      its Z alignment and the joint orientation stay intact. Use X, NOT Z
-      (a Z rotation would only spin it around its own functional axis).
-   e-quater. MANDATORY OVERLAP CHECK — HARD GATE. Run it for EACH child
-      individually, ONLY AFTER its joint is oriented (d, e, e-ter) and after
-      every later `rotate_object` on that joint (orientation changes the child's
-      global ranges), and BEFORE collisions/materials. Never batch or assume
-      symmetry. Compare the GLOBAL min/max of child and parent on ALL THREE axes
-      X/Y/Z from `get_objects_info(...)` `Geometry` (never one axis, never by
-      eye). If the child's range on ANY axis is CONTAINED in the parent's on
-      that axis → OVERLAP FAILURE: mirror the child (e-bis) and re-check. PRINT
-      per child: `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..]
-      Z[..] -> OUTSIDE` (or `OVERLAP -> mirrored`). Never proceed until every
-      child passes and the numbers are printed.
-   f. Verify with another snapshot.
-7. Sensors: MANDATORY — never skip. Choose the set by priority: (a) the user
-   asked something specific → do exactly that; (b) else the source objects
-   already contain specific sensors (a `Cross::Sensor` or a sensor link) → add
-   THOSE; (c) else add the DEFAULT set (forward RGB-D camera + 360° lidar on
-   the chassis, RGB-D camera on the manipulator aimed at the end tool). Attach
-   each sensor to the link/joint it BELONGS to by meaning (never the root link
-   by default). If a sensor link ALREADY exists, do NOT recreate it — position
-   it. Then verify the sensor FRAME (MANDATORY): X = look direction,
-   Z = perpendicularly UP relative to the parent part, Y = the frame's LEFT —
-   identify the axes by the ``X``/``Y``/``Z`` labels of
-   `get_snapshot('<joint>')`. See the **Sensors** section.
-8. Controllers and broadcasters: choose them from the robot's PURPOSE and its
-   ACTUATED joints (see **Controllers and broadcasters**). Actuated joints
-   require a `joint_state_broadcaster`; a chassis gets a drive controller suited
-   to its wheels; a manipulator/gripper gets the matching trajectory/gripper
-   controllers.
-9. Collisions: ONE `create_collisions([link1, link2, ...])` call, default
-   WITHOUT `type` (type `copy`). A robot name covers the whole robot; its links
-   passed in the same call are skipped. Primitive types (`box`, `sphere`,
-   `cylinder_x/y/z`) ONLY on explicit user request. Never call it once per link.
-10. `set_material(...)`; if not specified, use `ABS-Generic`.
+   `set_placement_between(target, ref1, ref2)`:
+   a. Pick one reference on the parent and one on the child (CONVENTIONS).
+      Choose the face/edge/vertex from the `Geometry` data of
+      `get_objects_info` (`center_of_mass`, `surface_type`, `vertices`, `point`)
+      — never from the index alone.
+   b. Call it with only the two references selected. A call that succeeds but
+      does not move the target means both references resolved to the same point:
+      re-check with `get_objects_info([target])` and pick other references.
+   c. Control snapshot: `get_snapshot()`.
+   d. Orient the JOINT (`rotate_object(joint_name, axis, angle_deg)`) so its
+      local Z lies along the child's functional axis (revolute/continuous spin
+      around it, prismatic slides along it). Never rotate the link for this —
+      the link follows the joint.
+   e. Aim the child chain by rotating the JOINT as well.
+   f. On a chassis with several symmetric wheels, ALL wheel axles (joint local
+      Z) must be parallel and point the SAME way — to the LEFT (CONVENTIONS).
+      Never mirror joints; flip a wrong one by rotating its joint.
+   g. Mirroring — the only case where the LINK is rotated: joint and link
+      oriented correctly but the body penetrates the parent through its full
+      height → `rotate_object(link_name, 'x', 180)`. Along its local Z the link
+      flips to the other side while Z alignment and joint orientation survive.
+      Use X, never Z (Z only spins it around its own axis).
+   h. MANDATORY OVERLAP CHECK — HARD GATE, per child, AFTER its joint is oriented
+      (d–g) and after every later `rotate_object` on that joint, BEFORE
+      collisions/materials. Never batch it, never assume symmetry.
+      `check_overlap(parent, child)` returns the decision in `overlap` — use it.
+      On failure mirror the child (g) and re-check. Print per child
+      `overlap check <child>: X[..] Y[..] Z[..] vs parent X[..] Y[..] Z[..] ->
+      OUTSIDE` (or `OVERLAP -> mirrored`), taking the ranges from `Geometry`.
+      Never proceed until every child passes.
+   i. Verify with another snapshot.
+7. Sensors — MANDATORY (details in **Sensors**). Choose the set by priority:
+   (a) what the user asked; else (b) sensors already present in the source
+   objects; else (c) the DEFAULT set (forward RGB-D camera + 360° lidar on the
+   chassis, RGB-D camera on the manipulator aimed at the end tool). Attach each
+   sensor where it BELONGS by meaning — never the root link by default. If a
+   sensor link already exists, position it, do not recreate it. Then verify its
+   frame: X = look, Z = up relative to the parent part, Y = left, reading the
+   `X`/`Y`/`Z` labels of `get_snapshot('<joint>')`.
+8. Controllers/broadcasters from the robot's PURPOSE and ACTUATED joints (see
+   **Controllers**): actuated joints need a `joint_state_broadcaster`, a chassis
+   a drive controller for its wheels, a manipulator/gripper the matching
+   trajectory/gripper controllers.
+9. Collisions: ONE `create_collisions([...])` call without `type` (default
+   `copy`). A robot name covers its whole robot and its links passed in the same
+   call are skipped. Primitive types only on explicit user request.
+10. `set_material(...)`; default `ABS-Generic`.
 11. `calculate_mass_and_inertia(robot)`.
-12. Inspect and verify with `list_scene_objects()`, `get_objects_info(...)`,
-    `measure_geometry(...)`, `get_snapshot(...)`. Prefer ONE
-    `get_objects_info([...])` call with many Labels; pass an element (e.g. a
-    sensor's joint) to `get_snapshot(object_name=...)` to frame it up close.
-    Every geometric value that must be EXACT (a gap, a wheel separation, a
-    radius) is measured with `measure_geometry(...)`, never estimated from
-    bounding boxes.
+12. Inspect and verify with `list_scene_objects()`, ONE batched
+    `get_objects_info([...])`, `measure_geometry(...)` and `get_snapshot(...)`
+    (pass an element, e.g. a sensor's joint, as `object_name` to frame it close).
 """,
     'create_robot': """\
 ## Creating a robot
@@ -3468,164 +3379,105 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
     'positioning': """\
 ## Positioning
 
-### Positioning algorithm (step by step)
+Steps a–i of the **General algorithm** (source of truth) cover the per-pair loop:
+one batched `get_objects_info`, reference choice, `set_placement_between`, joint
+orientation, mirroring and the mandatory overlap check.
 
-1. Get the parent and its child links with ONE
-   `get_objects_info([parent, child1, child2, ...])` call (Real geometry:
-   faces, vertices, `center_of_mass`, `surface_type`).
-2. Choose the faces/vertices to place each child on by their geometry, taking
-   the link topology into account (e.g. a 4-wheeled chassis: parent = chassis,
-   children = the four wheels). A face anchors the attachment at its center of
-   mass.
-3. Print `parent_robot_link_name face1/vertex1 - child_robot_link_name
-   face1/vertex1` naming the parent reference and the child reference that will
-   be joined.
-4. `set_placement_between` for the parent/child pair.
-5. Orient the child's JOINT so its local Z lies along the child's functional
-   axis; for a parent with several symmetric wheels make ALL wheels' joint
-   local Z axes point the SAME way (left **as seen from behind the parent**) —
-   see steps d–e-ter of the General algorithm.
-6. ONLY AFTER step 5, run the MANDATORY OVERLAP CHECK for this child on ALL
-   THREE axes X/Y/Z and PRINT the numeric evidence; mirror the child if it is
-   contained on any axis. Do not start collisions/materials until every child
-   passes.
-
-Reference building, joint orientation, mirroring and the overlap procedure are
-specified in the **General algorithm** (source of truth).
-
-- `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps
-  two neighbouring links by two references (one on the parent, one on the
-  child): a face/edge/vertex/circle of the link Real element as
-  `<real_link>.<inner_link_name>.<feature>.<subelement>` (e.g.
-  `real_l_chassis001_.chassis001.Box.Face3`) or an existing LCS; a robot link
-  (`l_...`) cannot be a reference. `move='leaf'` (default) — only for the final
-  chain element; `child_branch`/`parent_tree` are advanced. Only the two
-  references go into the selection (the target is not selected).
-  CONNECTION MODEL: the references are joined **by their CENTERS** — the child
-  moves so that the center of `ref2` coincides with the center of `ref1` (e.g.
-  a hole/boss center lands on the mating hole/boss center). Pick ref1/ref2 so
-  that the points which must touch are exactly those centers.
-  NEVER use it on a **sensor link** hosting a camera or similar forward-looking
-  sensor — use `set_placement_between_sensor_link_and_parent` (see the sensors
-  topic). EXCEPTION: a link hosting only a **horizontal lidar** IS positioned
-  with `set_placement_between` (then rotate its parent joint about Z to aim the
-  sector).
+- `set_placement_between(target, ref1, ref2, move)` — PRIMARY method: snaps two
+  neighbouring links by one reference on the parent and one on the child
+  (CONVENTIONS). References are joined **by their CENTERS** (face/circle = its
+  center, edge = midpoint, vertex = itself), so pick the pair whose centers must
+  touch (e.g. a hole center onto the mating boss center). Only the two
+  references go into the selection. `move='leaf'` (default) = final chain
+  element only; `child_branch`/`parent_tree` are advanced.
+  NEVER on a camera-like **sensor link** — use
+  `set_placement_between_sensor_link_and_parent`. EXCEPTION: a link hosting only
+  a **horizontal lidar** IS positioned here, then its parent joint is rotated
+  about Z to aim the sector.
+- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
+  — the only way to connect a **link**-attached forward-looking sensor: joins
+  the two links by the centers of the references and turns the parent joint so
+  the sensor's front follows its local X (look direction). The roll about X must
+  still be corrected. `sensor` may be the sensor object OR its sensor link.
 - `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision; call
   before positioning.
-- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
-  — positions a **link**-attached forward-looking sensor (see the sensors
-  topic): joins the two links by the centers of the references and turns the
-  parent joint so the sensor's front follows its local X (look direction). The
-  roll about X must still be corrected afterwards. `sensor` may be the sensor
-  object OR the sensor link that hosts it (e.g. `l_camera001`).
-- `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`,
-  link `MountedPlacement` or LCS; correct orientation after a snapshot.
-- `create_lcs(link, subelement)` — LCS on a face/edge/circle/vertex of the
-  Real element. ONLY on explicit user request.
-- `measure_geometry(ref1, ref2, mode)` — measures the DISTANCE between two
-  faces/edges/vertices (`ref2` given: `distance` = real minimum gap,
-  `center_distance`, per-axis `delta`) or the RADIUS of a circular edge /
-  cylindrical face (`ref2` omitted: `radius`, `diameter`, `center`, `axis`).
-  `ref1`/`ref2` MUST be a FULL subelement path
-  (`<real_link>.<inner_link_name>.<feature>.<subelement>`, e.g.
-  `real_l_wheel001_.wheel001.Cylinder.Face2`) or an LCS — a bare object name
-  (robot link `l_...`, Real element `real_l_...`, whole object) is REJECTED
-  with a hint naming the exact prefix. Use it whenever a gap, an offset or a
-  radius must be exact (e.g. the gap between the facing inner faces of two
-  wheels) — never estimate from bounding boxes.
+- `rotate_object(object_name, axis, angle_deg)` — rotates a joint `Origin`, link
+  `MountedPlacement` or LCS; corrects orientation after a snapshot.
+- `create_lcs(link, subelement)` — LCS on a Real-element subelement. ONLY on
+  explicit user request.
+- `measure_geometry(ref1, ref2, mode)` — DISTANCE between two subelements
+  (`ref2` given: `distance` = real minimum gap, `center_distance`, per-axis
+  `delta`) or the RADIUS of a circular edge / cylindrical face (`ref2` omitted:
+  `radius`, `diameter`, `center`, `axis`). Full subelement paths or LCS only; a
+  bare object name is REJECTED with a hint naming the exact prefix.
 """,
     'joints': """\
 ## Joints
 
-IMPORTANT: a joint always rotates around its **local Z axis** (revolute,
-continuous) or translates along its **local Z axis** (prismatic). The joint's
-local Z is oriented by rotating the JOINT itself with `rotate_object` — there
-is NO `axis` parameter on `create_joint`. See the **General algorithm**
-(source of truth) for the orientation and mirroring rules.
+A joint rotates around its **local Z** (revolute, continuous) or translates
+along it (prismatic); orient that Z by rotating the JOINT with `rotate_object` —
+`create_joint` has no `axis` parameter.
 
-- `create_joint(robot, name, parent_link, child_link, type, lower,
-  upper, effort, velocity)` — joint between two links; `type`: `fixed`,
-  `revolute`, `prismatic`, `continuous`, ...; limits in degrees (revolute) or
-  mm (prismatic). `name` is used ONLY when creating a joint WITHOUT links
-  (both `parent_link` and `child_link` empty); when both links are given the
-  joint is named automatically and `name` is ignored.
-- `create_joints_filled(robot, link_labels_in_order, connect_type)` — auto
-  joints over the given link Labels: `chain` = consecutive links, `spider` =
-  all to the first link.
+- `create_joint(robot, name, parent_link, child_link, type, lower, upper,
+  effort, velocity)` — `type`: `fixed`, `revolute`, `prismatic`, `continuous`,
+  ...; limits in degrees (revolute) or mm (prismatic). `name` is used ONLY for a
+  joint WITHOUT links (both links empty); with both links the joint is named
+  automatically and `name` is ignored.
+- `create_joints_filled(robot, link_labels_in_order, connect_type)` — `chain` =
+  consecutive links, `spider` = all to the first link.
 - `set_joint_values(robot, values)` — joint ROS names (or Labels) -> degrees
   (revolute) or mm (prismatic).
 """,
     'collisions': """\
 ## Collisions
 
-- `create_collisions(link_or_robot, type)` — create collisions for SEVERAL
-  links/robots in ONE call. `link_or_robot` is a LIST of link/robot names or
-  Labels. `type` is either a single collision type applied to every element or
-  a LIST parallel to `link_or_robot` (one type per element). Default WITHOUT
-  `type` (type `copy` = exact geometry copy; the only allowed default).
-  Primitive types ONLY on explicit user request: `box`, `sphere`,
-  `cylinder_x/y/z` (from the bounding box).
-  Passing a **robot** covers the robot AS A WHOLE (all its links). When a robot
-  and some of its OWN links are passed together, those links are removed from
-  the list first and the pass runs over all the robot's links, then over the
-  remaining explicitly-listed elements — so no link gets a duplicate collision.
-  ALWAYS use this batch tool; never call it once per link.
+- `create_collisions(link_or_robot, type)` — several links/robots in ONE call
+  (never once per link). `link_or_robot` is a LIST; `type` is one type for all
+  or a LIST parallel to it. Default WITHOUT `type` (`copy` = exact geometry).
+  Primitive types (`box`, `sphere`, `cylinder_x/y/z`, from the bounding box)
+  ONLY on explicit user request. A **robot** covers all its links; its own links
+  passed in the same call are removed first, so no element is collision-ised
+  twice.
 """,
     'materials': """\
 ## Materials and inertia
 
 - `set_material(object_name, material_card_path, density, card_name)` —
-  `.FCMat` path or material name; `density` in kg/m^3 (optional, from the
-  card if omitted).
-- `calculate_mass_and_inertia(robot_or_link_labels)` — mass, inertia, center
-  of mass; robot Label or a list of link Labels.
+  `.FCMat` path or material name; `density` in kg/m^3 (from the card if
+  omitted).
+- `calculate_mass_and_inertia(robot_or_link_labels)` — mass, inertia, center of
+  mass; a robot Label or a list of link Labels.
 """,
     'controllers': """\
 ## Controllers and broadcasters (ros2_control)
 
 Give the robot the controllers its PURPOSE and its ACTUATED joints require
-(`Cross::Controller` / `Cross::Broadcaster` from `ros2_controllers`). Decide
-from the robot's topology and actuated joints — not from a fixed list — and
-configure each controller for exactly its functional joint group:
+(`Cross::Controller` / `Cross::Broadcaster`), one per functional joint group.
 
 - **Any robot with actuated joints**: a `joint_state_broadcaster`
   (`kind='broadcaster'`), otherwise joint states are not published.
-- **Chassis / mobile base**: a drive controller chosen by the wheel layout —
-  `diff_drive_controller` for two driven wheels/sides (`left_wheel_names`,
-  `right_wheel_names`, wheel separation, radius); `ackermann_steering_controller`
-  (or steering + traction) for a car-like base; the matching omni controller for
-  mecanum/swerve. Set `wheel_*_names` / `left/right_wheel_names` /
-  `steering_*_names` and `base_frame_id` / `odom_frame_id` to the real names.
-  - **LEFT/RIGHT wheels**: a side is defined **as seen from BEHIND the robot**:
-    stand behind it, look along its FORWARD direction — what lies on your left
-    is LEFT, on your right is RIGHT. Take the forward direction from the
-    robot's direction-defining parts (forward-looking sensors, end effector);
-    with no such feature use the base convention (local +X forward, +Y left).
-    Never derive a side from an arbitrary axis or from the snapshot viewpoint.
-  - **Wheel separation**: the distance between the **nearest (facing inner)
-    faces** of the right and left wheel on one axis — not between centers and
-    not between outer faces. MEASURE it with
-    `measure_geometry(<right wheel inner face>, <left wheel inner face>)` and
-    use the returned `distance`; never estimate it from bounding boxes.
-  - **Wheel radius**: MEASURE it with
-    `measure_geometry(<wheel rim edge or cylindrical face>)` (no `ref2`) and
-    use the returned `radius`/`diameter`.
-- **Manipulator arm**: a `joint_trajectory_controller` over the arm's
-  revolute/prismatic joints (`joints`, `base_frame_id`).
+- **Chassis / mobile base**: a drive controller matching the wheel layout —
+  `diff_drive_controller` (`left/right_wheel_names`, wheel separation, radius),
+  `ackermann_steering_controller` for a car-like base, the matching omni
+  controller for mecanum/swerve. Set `*_wheel_names`, `steering_*_names`,
+  `base_frame_id`, `odom_frame_id` to the real names.
+  - **LEFT/RIGHT wheels** follow the side convention of the General algorithm.
+  - **Wheel separation**: the distance between the **nearest facing inner
+    faces** of the right and left wheel — not between centers, not between
+    outer faces. MEASURE with
+    `measure_geometry(<right wheel inner face>, <left wheel inner face>)`.
+  - **Wheel radius**: MEASURE with `measure_geometry(<wheel rim edge or
+    cylindrical face>)` (no `ref2`).
+- **Manipulator arm**: `joint_trajectory_controller` over its revolute/prismatic
+  joints (`joints`, `base_frame_id`).
 - **Gripper / end effector**: `gripper_action_controller` /
-  `position_controllers` (or `joint_trajectory_controller`) over the gripper
-  joints.
+  `position_controllers` (or `joint_trajectory_controller`) over its joints.
 - **Other groups** (pan-tilt, lift, conveyor, ...): a
-  `joint_trajectory_controller` (or a suitable velocity/position controller).
-- **Parameter units**: distance parameters are in **metres** unless the
-  parameter's `description` says otherwise — convert model measurements
-  (wheel separation, radius, offsets, limits) before setting them.
-- **Measure, do not guess**: whenever a controller parameter needs a geometric
-  value (wheel separation, wheel radius, track/offset, a mounting distance),
-  obtain it with `measure_geometry(...)` — `distance` for a gap between two
-  faces/edges/vertices, `radius` for a circular edge or cylindrical face — and
-  convert the millimetre result to the parameter's unit. Never derive such a
-  value from a bounding box, from `center_of_mass` differences or by eye.
+  `joint_trajectory_controller` or a suitable velocity/position controller.
+- **Units**: controller distance parameters are in **metres** unless their
+  `description` says otherwise — convert the millimetre measurement first.
+  Any geometric parameter (separation, radius, track, offset) comes from
+  `measure_geometry(...)`, never from a bounding box or by eye.
 
 ### Tools
 
@@ -3657,135 +3509,93 @@ configure each controller for exactly its functional joint group:
     'sensors': """\
 ## Sensors
 
-Adding sensors is a MANDATORY part of the general algorithm — never skip it.
-Decide WHICH set to add FIRST; the three cases are mutually exclusive and are
-checked in this order:
+Adding sensors is MANDATORY (step 7 of the General algorithm). Pick the set
+first — the cases are mutually exclusive, checked in this order:
 
-1. **The user asked something specific** (type, count, placement) → add exactly
-   that, INSTEAD of the default set.
-2. **The source objects already contain specific sensors** (a `Cross::Sensor`,
-   a sensor link, or a plain camera/lidar part) → add THOSE INSTEAD of the
-   default set.
-3. **The user said nothing about sensors** and you follow the general algorithm
-   → add the DEFAULT SENSOR SET below.
+1. The user asked something specific (type, count, placement) → exactly that.
+2. The source objects already contain sensors (`Cross::Sensor`, a sensor link, a
+   plain camera/lidar part) → those.
+3. Otherwise → the DEFAULT SET: RGB-D camera (`rgbd_camera`) looking FORWARD and
+   a 360° lidar (`gpu_lidar`) on the chassis, plus an RGB-D camera on the
+   manipulator's end link aimed at the END TOOL. No manipulator → skip that
+   camera; no chassis → put the chassis sensors on the base link.
 
-A robot hosts `Cross::Sensor` objects (Gazebo sensors from `resources/sensors`),
-attached to a `Cross::Link`, `Cross::Joint` or `Cross::Robot`. **A sensor has no
-position of its own**: it is oriented by the parent joint of the element it is
-attached to (X = look, Z = up, Y = left). **Attach each sensor where it BELONGS
-BY MEANING** — a camera on the head/end-tool link, a lidar on the chassis, a
-wheel encoder on the wheel's joint, an IMU on the base; never the root link by
-default.
+A `Cross::Sensor` attaches to a `Cross::Link`, `Cross::Joint` or `Cross::Robot`
+and has **no position of its own**: it is oriented by the parent joint of its
+element. Attach it where it BELONGS BY MEANING — camera on the head/end tool, a
+lidar on the chassis, a wheel encoder on the wheel's joint, an IMU on the base;
+never the root link by default.
 
-### Default sensor set (case 3)
+### Frame check (X = look, Y = left, Z = up)
 
-- **RGB-D camera** (`rgbd_camera`) on the chassis, looking FORWARD.
-- **360-degree lidar** (`gpu_lidar`, circular scan) on the chassis.
-- **RGB-D camera** (`rgbd_camera`) on the manipulator's end (tool-flange) link,
-  aimed at the END TOOL.
+After positioning, verify the sensor's **parent joint** frame — MANDATORY and the
+most often skipped step, whose symptom is an image LYING ON ITS SIDE. Check ALL
+THREE axes by the letters printed next to the arrows of
+`get_snapshot('<joint>')` (a snapshot without argument is too far away to read
+them):
 
-No manipulator → skip that camera; no chassis → put the chassis sensors on the
-base link. Adapt the set to what the robot actually has.
+- **X = look direction**;
+- **Z = the top of the frame**, perpendicularly UP **relative to the parent
+  part** — not the world, not along the look direction;
+- **Y = the frame's LEFT** seen from behind the sensor; a wrong Y means the frame
+  is rolled about the look axis even when X and Z look plausible.
 
-### Positioning an existing sensor link
-
-A **sensor link** is a normal link that also hosts a `Cross::Sensor`. **Before
-adding one, CHECK whether it already exists** (its whole chain from the robot
-down to it — see the workflow below); if it does, do NOT recreate it, just
-POSITION it:
-
-- **Camera / vertical (forward-looking) lidar** →
-  `set_placement_between_sensor_link_and_parent(...)` — the ONLY way to connect
-  such a sensor link to its parent link; never `set_placement_between`. It turns
-  the parent joint so the sensor's front follows its local X (look direction);
-  the roll about X must still be corrected (see below).
-- **Horizontal lidar** (scans all around) → the EXCEPTION: position it with
-  `set_placement_between(...)`, then aim its sector by rotating its **parent
-  joint** about **Z** until the sector front (the joint's positive X) points
-  where it must.
-
-### Check the sensor frame orientation (X = look, Y = left, Z = up)
-
-After positioning, ALWAYS verify the frame of the sensor's **parent joint** —
-MANDATORY and the step most often skipped, leaving the image LYING ON ITS SIDE.
-Check **ALL THREE axes — X, Y AND Z — one by one**; do NOT stop after X and Z:
-
-- **X = the look direction**;
-- **Z = the top of the frame** — **perpendicularly UP relative to the parent
-  part**, NOT relative to the world and NOT along the look direction;
-- **Y = the frame's LEFT** seen when looking at the sensor **from behind**. A
-  wrong Y means the frame is rolled about the look axis even when X and Z look
-  plausible.
-
-To judge the triad, zoom in on the sensor's **parent joint**:
-`get_snapshot('<joint>')` selects it, fits the view onto it, switches to
-ISOMETRIC, hides the sensors' field-of-view zones and every OTHER joint for the
-capture (both restored right after) and waits ONE SECOND (Qt events pumped) so
-the render is up to date. The joint's axes are annotated with the letters ``X``,
-``Y`` and ``Z`` just past the arrow tips — **identify EVERY axis BY ITS LABEL**.
-A snapshot with no argument fits the whole scene and is too far away to see the
-arrows.
-
-Corrections — rotate the sensor's **parent joint** (never its link) with
+Fix by rotating the sensor's **parent joint** (never its link) with
 `rotate_object(joint_name, axis, angle_deg)`:
 
-- about **X** — tilts the frame forward/back; fixes Z (up). After
-  `set_placement_between_sensor_link_and_parent` this is the roll you almost
-  always still need: rotate until Z points perpendicularly up (a sideways Z
-  arrow means the image is on its side).
-- about **Z** — spins the frame left/right; aims a forward-looking sensor or the
-  front of a horizontal lidar's sector.
-- about **Y** — rolls the frame; fixes Y (left). If the sensor looks the
-  OPPOSITE way, verify with `check_overlap` and rotate **180 deg about Y**.
+- **X** — tilts the frame; sets Z (up). After
+  `set_placement_between_sensor_link_and_parent` this is the roll almost always
+  still needed.
+- **Z** — spins the frame left/right; aims a forward-looking sensor or a
+  horizontal lidar's sector.
+- **Y** — rolls the frame; sets Y (left). If the sensor looks the OPPOSITE way,
+  rotate **180° about Y**.
 
-Rotations combine: aim X with a Z rotation, then bring Z up with an X rotation.
-Re-check with `get_snapshot('<joint>')` after each rotation and confirm ALL
-THREE axes again before finishing.
+Rotations combine (aim X with Z, then bring Z up with X). Re-check with
+`get_snapshot('<joint>')` after each rotation.
 
-### Tools
+### Positioning
 
-- `list_sensor_types()` — available sensors grouped by attachment directory
-  (`link`, `joint`), each with `name`, `type`, `description`.
-- `create_sensor(element, type, name)` — add a sensor to a link, joint or robot.
-  On a **joint** it needs no position. On a **link** it becomes a child "sensor
-  link" that must already be connected to the parent link by a joint, then
-  positioned (see above). If the sensor link ALREADY exists, do NOT create it
-  again.
-- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
-  — position a **link**-attached **forward-looking** sensor (details above).
-  `sensor` may be the sensor object OR the sensor link that hosts it (e.g.
-  `l_camera001`).
-  Joint sensors are rejected; a horizontal lidar uses `set_placement_between` +
-  a Z rotation.
+A **sensor link** is a link hosting a `Cross::Sensor`. Check first whether it —
+and its whole chain from the robot down to it — already exists; if so, POSITION
+it instead of recreating it:
 
-### Workflow for a link sensor (e.g. a camera, lidar)
+- **Camera / vertical (forward-looking) lidar** →
+  `set_placement_between_sensor_link_and_parent(...)`, the ONLY way to connect
+  such a link; never `set_placement_between`.
+- **Horizontal lidar** (scans all around) → the EXCEPTION:
+  `set_placement_between(...)`, then rotate its parent joint about **Z** to aim
+  the sector.
 
-Creating the sensor does NOT build its kinematic structure. BEFORE creating it,
-CHECK whether the sensor's chain already exists (the sensor link plus every link
-and joint from the robot down to it) with `list_scene_objects()` /
-`get_objects_info(...)`. If the source objects (bodies / `App::Link`s) are
-present, BUILD the chain from them and only THEN attach the sensor; if they are
+### Tools / workflow for a link sensor
+
+Creating the sensor does NOT build its kinematic structure; build the chain
+first from the existing source objects (bodies / `App::Link`s). If they are
 absent, say so instead of attaching a sensor that has nothing to connect to.
 
-1) (if missing) build the chain: `create_links_filled(robot, [<object>])` (or
-   `create_link(robot, ...)` with no geometry to reuse) for the sensor link and
-   any intermediate links, connected with
-   `create_joint(robot, name, parent_link=..., child_link=...)`. The sensor link
-   must be a proper child of the parent link before you continue.
-2) `create_sensor('<sensor link>', '<sensor type>')` — skip if it already exists.
-3) Position it by its mounting (see "Positioning an existing sensor link"):
-   camera / vertical lidar → `set_placement_between_sensor_link_and_parent(...)`;
-   horizontal lidar → `set_placement_between(...)` + a Z rotation of the parent
-   joint.
-4) Verify the frame with `get_snapshot('<joint>')` and correct it until ALL
-   THREE axes (X, Y and Z) are right. Aim until the sensor looks where it must:
-   chassis camera forward / lidar all-round, manipulator camera toward the end
-   tool.
+1. If missing: `create_links_filled(robot, [<object>])` (or `create_link`) for
+   the sensor link and intermediate links, joined with
+   `create_joint(robot, name, parent_link=..., child_link=...)` — the sensor link
+   must be a proper child of its parent.
+2. `create_sensor('<sensor link>', '<sensor type>')` — skip if it exists.
+3. Position it as described above.
+4. Verify the frame and aim until the sensor looks where it must (chassis camera
+   forward / lidar all-round, manipulator camera toward the end tool).
+
+- `list_sensor_types()` — available sensors grouped by attachment directory
+  (`link`, `joint`).
+- `create_sensor(element, type, name)` — sensor on a link, joint or robot. On a
+  **joint** it needs no position; on a **link** it becomes a child "sensor link"
+  that must already be connected by a joint. Never create an existing one again.
+- `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)`
+  — see Positioning. `sensor` may be the sensor object OR its sensor link. Joint
+  sensors are rejected; a horizontal lidar uses `set_placement_between` + a Z
+  rotation.
 
 ### Joint sensor
 
-For a joint sensor (e.g. a force-torque sensor) just
-`create_sensor('<joint>', 'force_torque')` — no positioning needed.
+A joint sensor (e.g. `force_torque`) just needs
+`create_sensor('<joint>', 'force_torque')` — no positioning.
 """,
     'inspection': """\
 ## Inspection
@@ -3793,72 +3603,41 @@ For a joint sensor (e.g. a force-torque sensor) just
 - `list_scene_objects()` — scene description (robots, links, joints, other
   objects) with placements.
 - `get_objects_info(object_labels, max_internal_geometry_items)` — details for
-  SEVERAL objects in ONE call (a LIST of Labels; a Name is accepted as a
-  fallback), merged into
-  `{'status': 'ok', 'objects': {<name>: <info>, ...}}`; unresolvable names go
-  under `errors`. ALWAYS prefer this batch call over repeated single lookups.
-  Each entry has the basic info (Real, Visual, Collision, Mass, joint limits,
-  ...) plus `Geometry`: every face and vertex in **global** coordinates — a face
-  with a 1-based `index` (`Face1`, ...), `center_of_mass`, `surface_type`
-  (`Plane`, `Cylinder`, ...), `area` and its `vertices`; a vertex with a 1-based
-  `index` and its `point`. For a `Cross::Link` the `Real` element's geometry is
-  reported, so the indices are usable directly in positioning references, and a
-  `Reference` block gives the exact path (`real_link`, `inner_link`, `feature`,
-  `prefix`, `example`): use `Reference.prefix` + `.FaceN`/`.VertexN` and never
-  guess the inner link name.
-  IMPORTANT: judge the spatial arrangement (which face is on top, which are
-  parallel, which vertex is a corner) from `center_of_mass`, `surface_type`,
-  `vertices` and `point` — NOT from the index alone, which only identifies the
-  subelement. Call `get_objects_info(...)` before choosing references.
-- `measure_geometry(ref1, ref2, mode)` — exact measurement in **millimetres**.
-  With `ref2`: the DISTANCE between two faces/edges/vertices — `distance` (the
-  real minimum gap between the surfaces/curves/points), `center_distance` and
-  the per-axis `delta` of the centers, plus the `closest_points`. Without
-  `ref2`: the RADIUS of a circular edge (rim, hole) or of a
-  cylindrical/spherical/toroidal face — `radius`, `diameter`, `center`, `axis`.
-  `ref1`/`ref2` MUST be a FULL subelement path
-  (`<real_link>.<inner_link_name>.<feature>.<subelement>`) or an LCS. A bare
-  object name (robot link `l_...`, Real element `real_l_...`, whole object) is
-  REJECTED with a hint naming the exact prefix — never pass a whole object.
-  Use it for every value that must be exact (gaps, wheel separation, radii,
-  offsets) instead of estimating from bounding boxes.
-- `get_snapshot(width, height, format, object_name)` — 3D view capture as an MCP
-  image block (not base64). `object_name` (e.g. a **joint**) selects it and fits
-  the camera onto it so its axes fill the frame; empty = fit the WHOLE scene.
-  Always ISOMETRIC; the **sensor field-of-view zones** are hidden for the capture
-  and a **joint** target also hides every other joint (both restored right after)
-  and waits one second so the render is up to date. A joint's axes are labelled
-  with the letters ``X``, ``Y`` and ``Z`` — identify them by the labels (see the
-  sensors topic).
+  SEVERAL objects in ONE call (LIST of Labels), merged into
+  `{'status': 'ok', 'objects': {...}}`; unresolvable names go under `errors`.
+  Prefer it over repeated single lookups. Each entry has the basic info (Real,
+  Visual, Collision, Mass, joint limits, ...) plus `Geometry`: every face and
+  vertex in **global** coordinates — faces with a 1-based `index` (`Face1`, ...),
+  `center_of_mass`, `surface_type` (`Plane`, `Cylinder`, ...), `area` and
+  `vertices`; vertices with an `index` and `point`. For a `Cross::Link` the Real
+  element's geometry is reported, so indices are usable in references, and a
+  `Reference` block gives the exact path (`prefix`, `example`). Judge the spatial
+  arrangement from `center_of_mass`, `surface_type`, `vertices` and `point` —
+  never from the index alone.
+- `measure_geometry(ref1, ref2, mode)` — exact measurement in **millimetres**
+  (see Positioning). `closest_points` is returned with a distance.
+- `get_snapshot(width, height, format, object_name)` — 3D view as an MCP image
+  block. `object_name` (e.g. a **joint**) selects it and fits the camera onto it
+  so its axes fill the frame; empty = whole scene. Always ISOMETRIC; the sensor
+  field-of-view zones are hidden and a **joint** target also hides every other
+  joint (both restored after), waiting one second so the render is up to date.
+  A joint's axes are labelled `X`/`Y`/`Z` (see Sensors).
+- `check_overlap(parent, child)` — deterministic boolean `overlap` (shared face
+  is not an overlap), plus per-axis AABB intervals and `min_distance`.
 """,
     'best_practices': """\
 ## Best practices
 
-- Work through the **General algorithm** (source of truth) as a TODO list,
-  marking items done one by one; include the per-child **mirroring check**.
+- Work through the **General algorithm** (source of truth) as a TODO list, one
+  item at a time, including the per-child mirroring check.
 - Order: robot and links -> joints -> positioning -> sensors -> controllers ->
   collisions/materials.
-- Resolve exact names with `list_scene_objects()` / `get_objects_info()` and
-  call `set_placement_vision_mode()` before positioning.
-- **Prefer `Label` over `Name`**: pass the human-readable `Label` to every tool
-  argument that takes an object and name objects by `Label` in everything you
-  report to the user; fall back to the internal `Name` only when the Label is
-  missing or ambiguous. Subelement paths (`Reference.prefix` + `.FaceN`) stay
-  Name-based.
-- Position with `set_placement_between()`; verify each step with
-  `get_snapshot()`; fix orientation with `rotate_object()`.
-- Sides (left/right) of every part are defined **as seen from behind the
-  object**, looking along its forward direction — never from an arbitrary axis
-  or from the snapshot viewpoint.
-- Measure exact geometry with `measure_geometry()` (distance between two
-  faces/edges/vertices, radius of a circular edge/face) instead of estimating
-  from bounding boxes or `center_of_mass` differences.
-- Never guess the inner link name: read `Reference.prefix` from
-  `get_objects_info([link])` and append the subelement (links from the same
-  source body share one inner link name, e.g. all four wheels → `wheel001`).
-- Error reporting: tools never block on a GUI dialog. A failure raises and the
-  error text (with the workbench reason) is returned — read it and fix the call,
-  do not retry blindly. A successful tool may return a `messages` field with
+- Follow the General-algorithm CONVENTIONS (Sides, References, Exact values) —
+  they are stated once there and hold everywhere.
+- Verify each step with `get_snapshot()`; fix orientation with `rotate_object()`.
+- Error reporting: tools never block on a GUI dialog. A failure raises and its
+  text (with the workbench reason) is returned — read it and fix the call, do
+  not retry blindly. A successful tool may return a `messages` field with
   non-fatal warnings; inspect it too.
 """,
 }
