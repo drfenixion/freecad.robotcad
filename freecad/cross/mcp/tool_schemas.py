@@ -35,18 +35,28 @@ TOOL_SCHEMAS: dict[str, dict] = {
     'create_links_filled': {
         'properties': {
             'robot': {'type': 'string', 'description': 'Cross::Robot name or Label'},
-            'object_names': {
+            'object_labels': {
                 'type': 'array',
                 'items': {'type': 'string'},
-                'description': 'Objects (Part/Body/App::Link) to fill links from, in link order',
+                'description': (
+                    'Labels of the objects (Part/Body/App::Link) to fill links '
+                    'from, in link order (a Name is accepted as a fallback)'
+                ),
             },
         },
-        'required': ['robot', 'object_names'],
+        'required': ['robot', 'object_labels'],
     },
     'create_joint': {
         'properties': {
             'robot': {'type': 'string', 'description': 'Cross::Robot name or Label'},
-            'name': {'type': 'string', 'description': 'Joint name (default "Joint")'},
+            'name': {
+                'type': 'string',
+                'description': (
+                    'Joint name (default "Joint"). Used ONLY when no links are '
+                    'given (a joint without links). When parent_link and '
+                    'child_link are given, the joint is named automatically.'
+                ),
+            },
             'parent_link': {'type': 'string', 'description': 'Parent link name'},
             'child_link': {'type': 'string', 'description': 'Child link name'},
             'type': {'type': 'string', 'description': 'fixed, revolute, prismatic, continuous, ...'},
@@ -60,10 +70,13 @@ TOOL_SCHEMAS: dict[str, dict] = {
     'create_joints_filled': {
         'properties': {
             'robot': {'type': 'string', 'description': 'Cross::Robot name or Label'},
-            'link_names_in_order': {
+            'link_labels_in_order': {
                 'type': 'array',
                 'items': {'type': 'string'},
-                'description': 'Links in connection order; first is the spider hub',
+                'description': (
+                    'Link Labels in connection order (a Name is accepted as a '
+                    'fallback); first is the spider hub'
+                ),
             },
             'connect_type': {
                 'type': 'string',
@@ -71,7 +84,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': 'chain = consecutive, spider = all to first',
             },
         },
-        'required': ['robot', 'link_names_in_order'],
+        'required': ['robot', 'link_labels_in_order'],
     },
     'create_collisions': {
         'properties': {
@@ -210,13 +223,16 @@ TOOL_SCHEMAS: dict[str, dict] = {
     },
     'calculate_mass_and_inertia': {
         'properties': {
-            'robot_or_link_names': {
+            'robot_or_link_labels': {
                 'type': 'array',
                 'items': {'type': 'string'},
-                'description': 'Robot name or list of link names',
+                'description': (
+                    'Robot Label, or a list of link Labels (a Name is accepted '
+                    'as a fallback)'
+                ),
             },
         },
-        'required': ['robot_or_link_names'],
+        'required': ['robot_or_link_labels'],
     },
     'set_joint_values': {
         'properties': {
@@ -235,10 +251,13 @@ TOOL_SCHEMAS: dict[str, dict] = {
     },
     'get_objects_info': {
         'properties': {
-            'object_names': {
+            'object_labels': {
                 'type': 'array',
                 'items': {'type': 'string'},
-                'description': 'List of object names or labels to describe in one call',
+                'description': (
+                    'List of object Labels to describe in one call (a Name is '
+                    'accepted as a fallback when the Label is ambiguous)'
+                ),
             },
             'max_internal_geometry_items': {
                 'type': 'integer',
@@ -246,7 +265,7 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': 'Max faces/vertices returned per object (default 1000, minimum 100)',
             },
         },
-        'required': ['object_names'],
+        'required': ['object_labels'],
     },
     'check_overlap': {
         'properties': {
@@ -277,7 +296,8 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': (
                     'Second reference, same full subelement path format. Omit '
                     'it to measure the RADIUS of a circular edge or a '
-                    'cylindrical/spherical face.'
+                    'cylindrical/spherical/toroidal/conical face (or a planar '
+                    'disc, the flat end of a cylinder).'
                 ),
             },
             'mode': {
@@ -286,7 +306,8 @@ TOOL_SCHEMAS: dict[str, dict] = {
                 'description': (
                     "'auto' (default): distance when ref2 is given, radius "
                     "otherwise. 'distance' = min gap + center distance + per-axis "
-                    "delta; 'radius' = radius/diameter/center/axis of ref1."
+                    "delta; 'radius' = radius/diameter/center/axis of ref1, with "
+                    "'circular' telling whether a radius was found."
                 ),
             },
         },
@@ -435,7 +456,11 @@ TOOL_SCHEMAS: dict[str, dict] = {
                     'inspection',
                     'best_practices',
                 ],
-                'description': 'Section to return (default "all"); "general_algorithm" is the source of truth',
+                'description': (
+                    'Section to return (default "all"); "general_algorithm" is '
+                    'the source of truth. The header states that objects must be '
+                    'identified by Label (preferred) rather than Name. '
+                ),
             },
         },
         'required': [],

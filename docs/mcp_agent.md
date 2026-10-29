@@ -70,6 +70,17 @@ measure distances and radii, select objects and take 3D view snapshots.
 All tools operate on the **active document** and accept objects by name
 (`Name` or `Label`).
 
+> **Prefer `Label` over `Name` whenever possible.** Every object has an internal
+> `Name` (e.g. `l_wheel001_`) and a human-readable `Label` (e.g. `left wheel`).
+> Pass the `Label` to every tool argument that takes an object (`robot`,
+> `object_name`, `link_or_robot`, `parent_link`, `child_link`, `element`,
+> `controller`, `parent`, `child`, `sensor`, ...) and name objects by their
+> `Label` in everything reported to the user. Fall back to the `Name` only when
+> the Label is missing or ambiguous (`Ambiguous label "..."` error lists the
+> candidates). Subelement references
+> (`<real_link>.<inner_link_name>.<feature>.<subelement>`) are path-based — build
+> them from `Reference.prefix` of `get_objects_info([link])`.
+
 ### Creation
 
 | Tool | Description |
@@ -77,9 +88,9 @@ All tools operate on the **active document** and accept objects by name
 | `create_document(name)` | Create a new FreeCAD document and make it active (useful when there is no active document yet). |
 | `create_robot(name)` | Create an empty `Cross::Robot`. |
 | `create_link(robot, name)` | Create a `Cross::Link` and add it to the robot. |
-| `create_links_filled(robot, object_names)` | Create links filled with Real/Visual from existing objects. |
-| `create_joint(robot, name, parent_link, child_link, type, lower, upper, effort, velocity)` | Create a joint between two links and set type/limits. The joint's local Z is oriented later with `rotate_object` (there is no `axis` parameter). |
-| `create_joints_filled(robot, link_names_in_order, connect_type)` | Create joints in a chain (`chain`) or "spider" (`spider` — all links to the first one). |
+| `create_links_filled(robot, object_labels)` | Create links filled with Real/Visual from existing objects (given by `Label`). |
+| `create_joint(robot, name, parent_link, child_link, type, lower, upper, effort, velocity)` | Create a joint between two links and set type/limits. `name` is used ONLY for a joint WITHOUT links (both `parent_link` and `child_link` empty); with both links given the joint is named automatically and `name` is ignored. The joint's local Z is oriented later with `rotate_object` (there is no `axis` parameter). |
+| `create_joints_filled(robot, link_labels_in_order, connect_type)` | Create joints over the given link `Label`s in a chain (`chain`) or "spider" (`spider` — all links to the first one). |
 
 ### Collisions
 
@@ -119,7 +130,7 @@ on the child).
 > `set_placement_between`.** Use **only**
 > `set_placement_between_sensor_link_and_parent`: it joins the two links by the
 > centers of `ref_parent`/`ref_sensor` **and** turns the parent joint so the
-> sensor's front follows its local X (red arrow) = the look direction.
+> sensor's front follows its local X = the look direction.
 > `set_placement_between` leaves such a sensor mis-oriented. EXCEPTION: a link
 > hosting only a **lidar mounted HORIZONTALLY** (scanning all around) **is**
 > positioned with `set_placement_between`, then its **parent joint** is rotated
@@ -127,7 +138,7 @@ on the child).
 > must.
 
 **Joint axis orientation.** A `revolute`/`continuous` joint **rotates around its
-local Z** (blue arrow); a `prismatic` joint **moves along its local Z**.
+local Z**; a `prismatic` joint **moves along its local Z**.
 Rotating a joint also rotates its **child chain and end link**, so orient a
 wheel/arm by rotating the JOINT, never the link. The child link's functional
 axis (e.g. a wheel's axle) must lie along the joint's local Z, otherwise the
@@ -217,7 +228,7 @@ tried variants.
 |---|---|
 | `set_placement_between(target, ref1, ref2, move)` | **Primary positioning method** (analog of `Set Placement - fast`). Joins the two references by their CENTERS; only `ref1`/`ref2` go into the selection (not `target`); one on the parent, one on the child. `move` defaults to `leaf` (final chain element only). NEVER on a camera-like sensor link — EXCEPTION: a link hosting only a **horizontal lidar** IS positioned with this tool, then its parent joint is rotated about **Z**. |
 | `measure_geometry(ref1, ref2, mode)` | **Exact measurement** in millimetres. With `ref2`: the **distance** between two faces/edges/vertices — `distance` (real minimum gap between the surfaces/curves/points), `center_distance`, per-axis `delta` and the `closest_points`. Without `ref2`: the **radius** of a circular edge (rim, hole) or of a cylindrical/spherical/toroidal face — `radius`, `diameter`, `center`, `axis`. `ref1`/`ref2` MUST be a **full subelement path** in the same format as `set_placement_between` (`<real_link>.<inner_link_name>.<feature>.<subelement>`, e.g. `real_l_wheel001_.wheel001.Cylinder.Face2`) or an LCS. A bare object name (robot link `l_...`, Real element `real_l_...`, whole object) is **rejected** with a hint naming the exact prefix — such objects have no geometry of their own. Use it for every value that must be exact (gaps, wheel separation, radii, offsets) instead of estimating from bounding boxes. |
-| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor (camera, vertical lidar). **The only tool that may connect such a sensor link to its parent link**: joins them by the CENTERS of the references, then turns the parent joint so the sensor's front follows its local X (red arrow) = the look direction. The roll about X must still be corrected. `sensor` may be the sensor object **or the sensor link that hosts it** (e.g. `l_camera001`) — both are accepted. |
+| `set_placement_between_sensor_link_and_parent(sensor, ref_parent, ref_sensor)` | Position a **link**-attached **forward-looking** sensor (camera, vertical lidar). **The only tool that may connect such a sensor link to its parent link**: joins them by the CENTERS of the references, then turns the parent joint so the sensor's front follows its local X = the look direction. The roll about X must still be corrected. `sensor` may be the sensor object **or the sensor link that hosts it** (e.g. `l_camera001`) — both are accepted. |
 | `set_placement_vision_mode(robot)` | Show only Real elements, hide Visual and Collision. Call before positioning. |
 | `rotate_object(object_name, axis, angle_deg)` | Rotate the joint Origin / link MountedPlacement / LCS — corrects orientation after a control snapshot. |
 | `create_lcs(link, subelement)` | Create an LCS on a face/edge/circle/vertex of the link Real element. **Only if the user explicitly asks** — plain subelement references are enough. |
@@ -227,7 +238,7 @@ tried variants.
 | Tool | Description |
 |---|---|
 | `set_material(object_name, material_card_path, density, card_name)` | Set a material on a link/robot (`.FCMat` or density). |
-| `calculate_mass_and_inertia(robot_or_link_names)` | Compute mass, inertia and center of mass. |
+| `calculate_mass_and_inertia(robot_or_link_labels)` | Compute mass, inertia and center of mass (robot or link `Label`s). |
 | `set_joint_values(robot, values)` | Set joint values (degrees/mm). |
 
 ### Controllers and broadcasters (ros2_control)
@@ -326,30 +337,28 @@ positioning, ALWAYS verify the frame of the sensor's **parent joint** — MANDAT
 and the step most often skipped, leaving the image LYING ON ITS SIDE. Check **ALL
 THREE axes — X, Y AND Z — one by one**; do NOT stop after X and Z:
 
-- **X (red) = the look direction**;
-- **Z (blue) = the top of the frame** — **perpendicularly UP relative to the
-  parent part**, NOT relative to the world and NOT along the look direction;
-- **Y (green) = the frame's LEFT** seen when looking at the sensor **from
-  behind**. A wrong Y means the frame is rolled about the look axis even when X
-  and Z look plausible.
-
-**Axis colors depend on the framing** — identify axes by LENGTH when in doubt
-(Z, up, is ALWAYS the longest arrow): **WITH `object_name`** (selection palette)
-Z = light-blue/cyan, X = pink, Y = turquoise; **NO `object_name`** (whole scene)
-Z = blue, X = red, Y = green.
+- **X = the look direction**;
+- **Z = the top of the frame** — **perpendicularly UP relative to the parent
+  part**, NOT relative to the world and NOT along the look direction;
+- **Y = the frame's LEFT** seen when looking at the sensor **from behind**. A
+  wrong Y means the frame is rolled about the look axis even when X and Z look
+  plausible.
 
 To judge the triad, zoom in on the sensor's **parent joint**:
 `get_snapshot(object_name=<joint>)` selects it, fits the view onto it, switches
-to ISOMETRIC, hides every OTHER joint for the capture (restored right after) and
-waits ONE SECOND (Qt events pumped) so the render is up to date. A snapshot with
-no argument fits the whole scene and is too far away to see the arrows.
+to ISOMETRIC, hides the sensors' field-of-view zones and every OTHER joint for
+the capture (both restored right after) and waits ONE SECOND (Qt events pumped)
+so the render is up to date. The joint's axes are annotated with the letters
+`X`, `Y` and `Z` just past the arrow tips — **identify every axis BY ITS
+LABEL**. A snapshot with no argument fits the whole scene and is too far away to
+see the arrows.
 
 Corrections — rotate the sensor's **parent joint** (never its link) with
 `rotate_object(joint_name, axis, angle_deg)`:
 
 - about **X** — tilts the frame forward/back; fixes Z (up). After
   `set_placement_between_sensor_link_and_parent` this is the roll you almost
-  always still need: rotate until Z points perpendicularly up (a sideways blue
+  always still need: rotate until Z points perpendicularly up (a sideways Z
   arrow means the image is on its side).
 - about **Z** — spins the frame left/right; aims a forward-looking sensor or the
   front of a horizontal lidar's sector.
@@ -363,8 +372,8 @@ ALL THREE axes again before finishing.
 **What `set_placement_between_sensor_link_and_parent` does to the frame.** It
 snaps the sensor link to the parent link by the CENTERS of the two references and
 turns the sensor link's **parent joint** so the sensor's front follows the joint's
-local X (red arrow) = the look direction. The ROLL about X is NOT set — that is
-the correction you still MUST make (see above).
+local X = the look direction. The ROLL about X is NOT set — that is the
+correction you still MUST make (see above).
 
 **Rules for positioning an existing sensor link.** A sensor link is a normal link
 that also carries a sensor. Before adding one, CHECK whether it (and its whole
@@ -420,9 +429,9 @@ For a joint sensor (e.g. a force-torque sensor) just
 | Tool | Description |
 |---|---|
 | `list_scene_objects()` | JSON description of the scene (robots, links, joints, objects). |
-| `get_objects_info(object_names)` | Detailed info about SEVERAL objects in one call (list of names/Labels), merged into `{objects: {...}, errors: {...}}`. |
+| `get_objects_info(object_labels)` | Detailed info about SEVERAL objects in one call (list of Labels; a Name is accepted as a fallback), merged into `{objects: {...}, errors: {...}}`. |
 | `measure_geometry(ref1, ref2, mode)` | Exact measurement in millimetres: distance between two faces/edges/vertices (`ref2` given) or radius of a circular edge / cylindrical face (`ref2` omitted). See "Positioning and rotation". |
-| `get_snapshot(width, height, format, object_name)` | 3D view snapshot as an MCP image content block. `object_name` (e.g. a joint) selects it and fits the view onto it so its axes fill the frame; empty = fit the whole scene. Always ISOMETRIC; a **joint** target hides every other joint for the capture (restored right after) and waits one second so the render is up to date. Axis colors depend on the framing — see "Sensors". |
+| `get_snapshot(width, height, format, object_name)` | 3D view snapshot as an MCP image content block. `object_name` (e.g. a joint) selects it and fits the view onto it so its axes fill the frame; empty = fit the whole scene. Always ISOMETRIC; the **sensor field-of-view zones** (camera frustums, lidar sectors) are hidden for the capture and a **joint** target also hides every other joint — both restored right after — and the tool waits one second so the render is up to date. A joint's axes are labelled with the letters `X`, `Y` and `Z` — identify them by the labels. |
 
 ### Agent instructions
 

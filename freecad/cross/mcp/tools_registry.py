@@ -50,6 +50,7 @@ from ..wb_gui_utils import createBoundObjects
 from .. import wb_constants
 from ..wb_utils import (
     get_parent_link_of_obj,
+    has_cross_type,
     is_broadcaster,
     is_controller,
     is_joint,
@@ -214,13 +215,17 @@ def create_link(robot: str, name: str = 'Link', add_to_robot: bool = True) -> di
     return run_on_main_thread(_impl)
 
 
-def create_links_filled(robot: str, object_names: list[str]) -> dict[str, Any]:
-    """Create Cross::Link objects filled with Real/Visual from existing objects."""
+def create_links_filled(robot: str, object_labels: list[str]) -> dict[str, Any]:
+    """Create Cross::Link objects filled with Real/Visual from existing objects.
+
+    ``object_labels`` is a list of Labels of the source objects (a Name is
+    accepted as a fallback).
+    """
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
         robot_obj = _resolve_robot(robot)
-        objs = [_resolve_object(n) for n in object_names]
+        objs = [_resolve_object(n) for n in object_labels]
         with _transaction(doc, 'MCP: create filled links'):
             links = make_robot_links_filled(objs, robot=robot_obj)
         if not links:
@@ -241,7 +246,13 @@ def create_joint(
     effort: float = 0.0,
     velocity: float = 0.0,
 ) -> dict[str, Any]:
-    """Create a Cross::Joint between two links and set its properties."""
+    """Create a Cross::Joint between two links and set its properties.
+
+    ``name`` is used ONLY when creating a joint WITHOUT links (both
+    ``parent_link`` and ``child_link`` empty). When both links are given, the
+    joint is created automatically between them and its name is generated
+    automatically — the passed ``name`` is ignored.
+    """
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
@@ -268,16 +279,20 @@ def create_joint(
 
 def create_joints_filled(
     robot: str,
-    link_names_in_order: list[str],
+    link_labels_in_order: list[str],
     connect_type: str = 'chain',
 ) -> dict[str, Any]:
     """Create joints between links: ``chain`` = consecutive links,
-    ``spider`` = all to the first (hub) link."""
+    ``spider`` = all to the first (hub) link.
+
+    ``link_labels_in_order`` is a list of link Labels in connection order (a
+    Name is accepted as a fallback).
+    """
 
     def _impl() -> dict[str, Any]:
         doc = _active_doc()
         robot_obj = _resolve_robot(robot)
-        links = [_resolve_link(n) for n in link_names_in_order]
+        links = [_resolve_link(n) for n in link_labels_in_order]
         if len(links) < 2:
             raise RuntimeError('At least 2 links are required.')
         with _transaction(doc, 'MCP: create filled joints'):
@@ -1151,18 +1166,19 @@ def set_material(
     return run_on_main_thread(_impl)
 
 
-def calculate_mass_and_inertia(robot_or_link_names: list[str]) -> dict[str, Any]:
+def calculate_mass_and_inertia(robot_or_link_labels: list[str]) -> dict[str, Any]:
     """Calculate mass, inertia and center of mass for links of a robot.
 
-    Accepts a robot name or a list of link names. Uses the same logic as the
-    panel command ``CalculateMassAndInertia``.
+    Accepts a robot Label or a list of link Labels (a Name is accepted as a
+    fallback). Uses the same logic as the panel command
+    ``CalculateMassAndInertia``.
     """
 
     def _impl() -> dict[str, Any]:
         from ..ui.command_calculate_mass_and_inertia import _CalculateMassAndInertiaCommand
 
         doc = _active_doc()
-        objs = [_resolve_object(n) for n in robot_or_link_names]
+        objs = [_resolve_object(n) for n in robot_or_link_labels]
         # Reuse the command's Activated logic by temporarily setting the
         # selection to the resolved objects.
         fcgui.Selection.clearSelection()
@@ -1758,15 +1774,16 @@ def set_placement_between_sensor_link_and_parent(
     matching reference on the sensor link; the two are joined BY THEIR CENTERS.
 
     ORIENTATION: the sensor link's **parent joint** is turned so that the
-    sensor's front follows the joint's local X (red arrow) = the look
-    direction. The ROLL about X is NOT set: you MUST still rotate the joint
-    about X until Z (blue) points perpendicularly UP relative to the parent
-    part (skip it and the image lies on its side). Verify with
-    ``get_snapshot('<joint>')`` and check **ALL THREE axes — X, Y and Z — one
-    by one**: X = look direction, Z = UP relative to the parent part, Y = the
-    frame's LEFT seen from behind (a wrong Y means the frame is rolled about
-    the look axis). If the sensor looks the OPPOSITE way, verify with
-    ``check_overlap`` and rotate the joint 180 deg about Y.
+    sensor's front follows the joint's local X = the look direction. The ROLL
+    about X is NOT set: you MUST still rotate the joint about X until Z points
+    perpendicularly UP relative to the parent part (skip it and the image lies
+    on its side). Verify with ``get_snapshot('<joint>')``, where the joint's
+    axes are labelled ``X``, ``Y`` and ``Z`` — identify every axis BY ITS
+    LABEL — and check **ALL THREE axes — X, Y and Z — one by one**:
+    X = look direction, Z = UP relative to the parent part, Y = the frame's
+    LEFT seen from behind (a wrong Y means the frame is rolled about the look
+    axis). If the sensor looks the OPPOSITE way, verify with ``check_overlap``
+    and rotate the joint 180 deg about Y.
 
     Joint sensors need no position and are rejected here. EXCEPTION: a
     **horizontal lidar** is NOT positioned with this tool — use
@@ -2102,7 +2119,9 @@ def _face_info(
         ],
     }
     surface = getattr(face, 'Surface', None)
-    surface_type = surface.__class__.__name__ if surface is not None else 'Unknown'
+    # ``_geometry_type`` normalises the OCC class name (e.g. ``Toroid`` for a
+    # torus), so the branches below match every circular surface.
+    surface_type = _geometry_type(surface) if surface is not None else 'Unknown'
     info['surface_type'] = surface_type
     # Surface-specific parameters, transformed to global coordinates.
     try:
@@ -2263,12 +2282,13 @@ def _object_info_impl(
 
 
 def get_objects_info(
-    object_names: list[str],
+    object_labels: list[str],
     max_internal_geometry_items: int = 1000,
 ) -> dict[str, Any]:
     """Return detailed information for several objects in ONE call.
 
-    ``object_names`` is a list of Names or Labels. Each entry is resolved and
+    ``object_labels`` is a list of object Labels (a Name is accepted as a
+    fallback when the Label is ambiguous or missing). Each entry is resolved and
     described (basic info, ``Group``, and — for links/joints — Real/Visual/
     Collision/Mass/Reference or Parent/Child/limits, plus a ``Geometry`` entry
     with the global-coordinate description of every face and vertex) and the
@@ -2283,7 +2303,7 @@ def get_objects_info(
     def _impl() -> dict[str, Any]:
         objects: dict[str, Any] = {}
         errors: dict[str, str] = {}
-        for name in object_names:
+        for name in object_labels:
             try:
                 objects[name] = _object_info_impl(name, max_internal_geometry_items)
             except Exception as exc:  # noqa: BLE001
@@ -2336,11 +2356,28 @@ def check_overlap(
 
 
 def _subelement_kind(name: str) -> str:
-    """Return ``'Face'``, ``'Edge'`` or ``'Vertex'`` for a subelement name."""
+    """Return ``'Face'``, ``'Edge'`` or ``'Vertex'`` for a subelement name.
+
+    ``name`` may be a BARE token (``Face2``) or a FULL subelement path
+    (``wheel001.Cylinder.Face2``) — only the last segment carries the
+    ``Face``/``Edge``/``Vertex`` token, the leading segments are the inner
+    link/feature levels.
+    """
+    last = name.rsplit('.', 1)[-1] if name else ''
     for kind in ('Face', 'Edge', 'Vertex'):
-        if name.startswith(kind):
+        if last.startswith(kind) and last[len(kind):].isdigit():
             return kind
     return ''
+
+
+def _shape_kind(shape: Any) -> str:
+    """Return ``'Face'``, ``'Edge'`` or ``'Vertex'`` from the shape itself.
+
+    Used as a fallback when the subelement name carries no kind token, so a
+    circular face/edge is still recognised as such.
+    """
+    shape_type = getattr(shape, 'ShapeType', '')
+    return shape_type if shape_type in ('Face', 'Edge', 'Vertex') else ''
 
 
 def _placed_subelement_shape(shape_obj: fc.DocumentObject, shape: Any) -> Any:
@@ -2466,11 +2503,26 @@ def _measure_reference(doc: fc.Document, ref: str) -> dict[str, Any]:
             f'Cannot read the geometry of "{ref}" (resolved to '
             f'"{info["object"]}.{info["subelement"]}").',
         )
+    placed = _placed_subelement_shape(shape_obj, shape)
+    # ``info['subelement']`` is a FULL path (``wheel001.Cylinder.Face2``), so
+    # the kind must be read from its last segment; the shape itself is the
+    # fallback when the path carries no ``Face``/``Edge``/``Vertex`` token
+    # (e.g. a geometric element selected through an App::Link).
+    kind = (
+        _subelement_kind(info['subelement'])
+        or _shape_kind(shape)
+        or _shape_kind(placed)
+    )
     return {
         'object': info['object'],
         'subelement': info['subelement'],
-        'kind': _subelement_kind(info['subelement']),
-        'shape': _placed_subelement_shape(shape_obj, shape),
+        'kind': kind,
+        # ``shape`` is GLOBAL (used for distances); ``raw_shape`` stays in the
+        # object's own system so a cylinder/circle keeps its true type (a
+        # general transform may turn it into a B-spline and lose the radius).
+        'shape': placed,
+        'raw_shape': shape,
+        'placement': _ancestor_placement(shape_obj),
         'point': None,
     }
 
@@ -2490,62 +2542,118 @@ def _measure_point(geom: dict[str, Any]) -> Optional[fc.Vector]:
         return None
 
 
-def _circular_parameters(shape: Any, kind: str) -> dict[str, Any]:
+def _geometry_type(geometry: Any) -> str:
+    """Return the OCC type name of a curve/surface (``Circle``, ``Cylinder``...).
+
+    The class name is used first; ``Part.ArcOfCircle`` (a trimmed circle) and
+    friends are reported as their base type. ``isDerivedFrom`` is the fallback
+    for subclasses, so a circular edge is recognised whatever the concrete
+    Python class is.
+    """
+    if geometry is None:
+        return ''
+    name = geometry.__class__.__name__
+    if name.startswith('ArcOf'):
+        name = name[len('ArcOf'):]
+    for candidate, fc_type in (
+        ('Circle', 'Part::GeomCircle'),
+        ('Cylinder', 'Part::GeomCylinder'),
+        ('Sphere', 'Part::GeomSphere'),
+        ('Torus', 'Part::GeomToroid'),
+        ('Cone', 'Part::GeomCone'),
+        ('Plane', 'Part::GeomPlane'),
+    ):
+        if name == candidate:
+            return candidate
+        try:
+            if geometry.isDerivedFrom(fc_type):
+                return candidate
+        except Exception:  # noqa: BLE001
+            pass
+    return name
+
+
+def _circular_parameters(
+    shape: Any, kind: str, placement: Optional[fc.Placement] = None,
+) -> dict[str, Any]:
     """Return radius/diameter/center/axis when the geometry is circular.
 
     ``kind`` is ``'Face'``, ``'Edge'`` or ``'Vertex'`` — a whole object is
-    never measured (``measure_geometry`` requires a subelement path).
+    never measured (``measure_geometry`` requires a subelement path). The kind
+    may be empty (the subelement path carries no ``Face``/``Edge`` token), in
+    which case the shape itself decides.
+
+    ``shape`` MUST be the shape in the OBJECT's own coordinate system (not the
+    globally placed copy), because a general transform (``transformShape``)
+    may convert a ``Cylinder``/``Circle`` into a B-spline and hide its radius.
+    ``placement`` (the ancestor transform) is applied to the returned
+    ``center``/``axis`` only.
     """
     result: dict[str, Any] = {}
+    if kind not in ('Face', 'Edge'):
+        kind = _shape_kind(shape)
+    placement = placement or fc.Placement()
+
+    def _center(vector: Any) -> list[float]:
+        return _vector_to_list(placement.multVec(vector))
+
+    def _axis(vector: Any) -> list[float]:
+        return _vector_to_list(placement.Rotation.multVec(vector))
+
     if kind == 'Edge':
         curve = getattr(shape, 'Curve', None)
-        if curve is not None and curve.__class__.__name__ == 'Circle':
+        if _geometry_type(curve) == 'Circle':
             result['radius'] = curve.Radius
             result['diameter'] = 2.0 * curve.Radius
-            result['center'] = _vector_to_list(curve.Center)
-            result['axis'] = _vector_to_list(curve.Axis)
+            result['center'] = _center(curve.Center)
+            result['axis'] = _axis(curve.Axis)
             result['circular'] = True
         return result
     if kind != 'Face':
         return result
     surface = getattr(shape, 'Surface', None)
-    surface_type = surface.__class__.__name__ if surface is not None else ''
+    surface_type = _geometry_type(surface)
     if surface_type == 'Cylinder':
         result['radius'] = surface.Radius
         result['diameter'] = 2.0 * surface.Radius
-        result['center'] = _vector_to_list(surface.Center)
-        result['axis'] = _vector_to_list(surface.Axis)
+        result['center'] = _center(surface.Center)
+        result['axis'] = _axis(surface.Axis)
         result['circular'] = True
     elif surface_type == 'Sphere':
         result['radius'] = surface.Radius
         result['diameter'] = 2.0 * surface.Radius
-        result['center'] = _vector_to_list(surface.Center)
+        result['center'] = _center(surface.Center)
         result['circular'] = True
     elif surface_type == 'Torus':
         result['major_radius'] = surface.MajorRadius
         result['minor_radius'] = surface.MinorRadius
-        result['center'] = _vector_to_list(surface.Center)
-        result['axis'] = _vector_to_list(surface.Axis)
+        result['center'] = _center(surface.Center)
+        result['axis'] = _axis(surface.Axis)
         result['circular'] = True
     elif surface_type == 'Cone':
         result['radius'] = surface.Radius
         result['diameter'] = 2.0 * surface.Radius
         result['semi_angle'] = surface.SemiAngle
-        result['axis'] = _vector_to_list(surface.Axis)
+        result['axis'] = _axis(surface.Axis)
         result['circular'] = True
     elif surface_type == 'Plane':
-        # A planar DISC (e.g. the end of a cylinder): its outer wire is a
-        # single circular edge, which gives the radius.
+        # A planar DISC (e.g. the flat end of a cylinder): its OUTER wire is
+        # circular. The wire may be split into several circular arcs, so every
+        # circular edge is considered and the one with the LARGEST radius wins
+        # (the outer boundary, not a coaxial hole).
         outer = getattr(shape, 'OuterWire', None)
-        edges = list(getattr(outer, 'Edges', []) or [])
-        if len(edges) == 1:
-            curve = getattr(edges[0], 'Curve', None)
-            if curve is not None and curve.__class__.__name__ == 'Circle':
-                result['radius'] = curve.Radius
-                result['diameter'] = 2.0 * curve.Radius
-                result['center'] = _vector_to_list(curve.Center)
-                result['axis'] = _vector_to_list(curve.Axis)
-                result['circular'] = True
+        best = None
+        for edge in list(getattr(outer, 'Edges', []) or []):
+            curve = getattr(edge, 'Curve', None)
+            if _geometry_type(curve) == 'Circle' and getattr(curve, 'Radius', 0) > 0:
+                if best is None or curve.Radius > best.Radius:
+                    best = curve
+        if best is not None:
+            result['radius'] = best.Radius
+            result['diameter'] = 2.0 * best.Radius
+            result['center'] = _center(best.Center)
+            result['axis'] = _axis(best.Axis)
+            result['circular'] = True
     return result
 
 
@@ -2578,7 +2686,24 @@ def _measure_summary(geom: dict[str, Any]) -> dict[str, Any]:
             summary['area'] = shape.Area
         except Exception:  # noqa: BLE001
             pass
-    summary.update(_circular_parameters(shape, geom['kind']))
+    raw_shape = geom.get('raw_shape', shape)
+    # The exact geometric type (``Circle``, ``Cylinder``, ``Plane``...), so a
+    # non-circular result is self-explanatory.
+    if geom['kind'] == 'Edge':
+        curve_type = _geometry_type(getattr(raw_shape, 'Curve', None))
+        if curve_type:
+            summary['curve_type'] = curve_type
+    elif geom['kind'] == 'Face':
+        surface_type = _geometry_type(getattr(raw_shape, 'Surface', None))
+        if surface_type:
+            summary['surface_type'] = surface_type
+    summary.update(
+        _circular_parameters(
+            raw_shape,
+            geom['kind'],
+            geom.get('placement'),
+        ),
+    )
     return summary
 
 
@@ -2604,8 +2729,10 @@ def measure_geometry(
       faces of two wheels), ``center_distance`` the distance between their
       centers and ``delta`` the per-axis center offset.
     - ``ref2`` omitted (``mode='auto'``/``'radius'``) — the RADIUS of a
-      circular edge (rim/hole) or of a cylindrical/spherical/toroidal face,
-      plus its center and axis.
+      circular edge (rim, hole) or of a cylindrical/spherical/toroidal/conical
+      face, or of a planar DISC (the flat end of a cylinder), plus its center
+      and axis. ``circular`` is ``True`` exactly when such a radius was found,
+      so a wheel radius and a wheel rim edge both report it.
 
     Use it for EVERY geometric value a controller needs (wheel separation,
     wheel radius, offsets) instead of estimating from bounding boxes.
@@ -2640,12 +2767,16 @@ def measure_geometry(
             ):
                 if key in summary1:
                     result[key] = summary1[key]
-            if 'circular' not in result:
+            if not result.get('circular'):
                 result['circular'] = False
                 result['note'] = (
-                    'The reference is not circular. Pass a circular edge (a '
-                    'rim or a hole) or a cylindrical/spherical/toroidal face, '
-                    'or give ref2 to measure a distance.'
+                    'The reference is not circular: its geometry is a '
+                    f'{summary1.get("kind") or "subelement"} of type '
+                    f'"{summary1.get("surface_type") or summary1.get("curve_type") or "unknown"}" '
+                    'carrying no radius. Pass a circular edge (a rim or a '
+                    'hole) or a cylindrical/spherical/toroidal/conical face '
+                    '(or a planar disc, the flat end of a cylinder), or give '
+                    'ref2 to measure a distance.'
                 )
             return _round_floats(result)
         geom2 = _measure_reference(doc, ref2)
@@ -2721,8 +2852,7 @@ def _add_joint_axis_labels(
 
     The labels are added to the joint's markers node (the same node the axis
     arrows are drawn into), so they inherit the joint's visibility and the
-    selection highlight: a label therefore gets exactly the color of the arrow
-    it annotates, including the selection palette used by ``get_snapshot``.
+    selection highlight, matching the arrow they annotate.
 
     The label height is proportional to the joint's size, taken as its
     ``AxisLength`` (the length of the Z arrow). Each label sits near the tip of
@@ -2756,7 +2886,7 @@ def _add_joint_axis_labels(
     placement = getattr(obj, 'Placement', None)
     if placement is None:
         return []
-    # Same colors as the arrows in ``joint_proxy._ViewProviderJoint.draw``.
+    # Matches the arrow style used in ``joint_proxy._ViewProviderJoint.draw``.
     if getattr(obj, 'Type', '') == 'fixed':
         z_color = (0.0, 0.0, 0.7)
     else:
@@ -2819,6 +2949,87 @@ def _remove_joint_axis_labels(added: list[tuple[Any, Any]]) -> None:
             parent.removeChild(node)
         except Exception:  # noqa: BLE001
             pass
+
+
+#: Cross types whose only 3D representation is the sensor field-of-view
+#: visualization (a camera frustum, a lidar sector, a set of ultrasound rays).
+_SENSOR_FOV_TYPES = (
+    'Cross::Sensor',
+    'Cross::SensorLink',
+    'Cross::SensorJoint',
+)
+
+
+def _is_sensor_object(obj: fc.DocumentObject) -> bool:
+    """Return True for objects that only draw a sensor field of view."""
+    return any(has_cross_type(obj, type_name) for type_name in _SENSOR_FOV_TYPES)
+
+
+def _iter_document_objects(doc: fc.Document) -> Iterator[fc.DocumentObject]:
+    """Yield every object of ``doc``, including the nested ones.
+
+    ``doc.Objects`` lists only the top-level objects, while a sensor is added
+    to the ``Group`` of its parent link, joint or robot. The groups are walked
+    recursively so the nested objects are seen too.
+    """
+    seen: set[int] = set()
+    stack = list(doc.Objects)
+    while stack:
+        obj = stack.pop()
+        if id(obj) in seen:
+            continue
+        seen.add(id(obj))
+        yield obj
+        stack.extend(list(getattr(obj, 'Group', []) or []))
+
+
+def _hide_sensor_fovs(doc: fc.Document) -> dict[str, bool]:
+    """Hide the field-of-view visualization of the sensors in ``doc``.
+
+    The field of view (a camera frustum or a lidar sector of a
+    ``Cross::Sensor``) is the ONLY 3D content of a sensor object and it
+    follows the object's standard ``Visibility`` property: the sensor draws
+    it into a registered display-mode node (see ``_ViewProviderSensor``).
+    Hiding the object therefore hides exactly the zone (the view provider
+    clears or redraws the content on the visibility change).
+
+    A snapshot needs that because the zones are large translucent volumes:
+    they cover the parts being positioned and the joint axes being inspected.
+
+    Return the ``{name: True}`` of the objects that were visible and have just
+    been hidden, so the caller can restore them (see
+    ``_restore_view_visibilities``). Sensors that were already hidden are not
+    touched and therefore not returned.
+    """
+    saved: dict[str, bool] = {}
+    for obj in _iter_document_objects(doc):
+        if not _is_sensor_object(obj):
+            continue
+        vobj = getattr(obj, 'ViewObject', None)
+        if vobj is None or not getattr(vobj, 'Visibility', False):
+            continue
+        saved[obj.Name] = True
+        vobj.Visibility = False
+    return saved
+
+
+def _restore_view_visibilities(
+    doc: fc.Document,
+    saved: dict[str, bool],
+) -> None:
+    """Restore view-object visibilities saved before modifying them.
+
+    ``saved`` maps an object name to its visibility before the snapshot (see
+    ``_hide_sensor_fovs`` and the joint hiding in ``get_snapshot``). Objects
+    that no longer exist or already have the wanted state are skipped, so a
+    redundant visibility change (and the redraw it triggers) is avoided.
+    """
+    for name, visible in saved.items():
+        obj = doc.getObject(name)
+        vobj = getattr(obj, 'ViewObject', None) if obj is not None else None
+        if vobj is None or bool(getattr(vobj, 'Visibility', False)) == visible:
+            continue
+        vobj.Visibility = visible
 
 
 def _is_blank_image(path: str) -> bool:
@@ -2899,23 +3110,22 @@ def get_snapshot(
     orientation. The view is then always switched to an ISOMETRIC orientation
     before the capture.
 
+    The field-of-view zones of all sensors (camera frustums, lidar sectors)
+    are hidden for the capture and restored right after it,
+    success or not: they are large translucent volumes that would cover the
+    parts and the joint axes.
+
     When ``object_name`` is a **joint**, every OTHER joint is hidden for the
     capture (restored right after, success or not) and, because the visibility
     was just changed, the tool waits ONE SECOND (pumping the Qt event loop) so
     the render is up to date.
 
-    AXIS COLORS follow the framing: WITH ``object_name`` (selection palette)
-    **Z (longest) = light-blue/cyan, X = pink, Y = turquoise**; with NO
-    ``object_name`` **Z (longest) = blue, X = red, Y = green**. Z (up) is always
-    the longest arrow.
-
-    When ``object_name`` is a **joint**, its three axes are additionally
-    annotated with the letters ``Z``, ``X`` and ``Y``, drawn just past the tip
-    of the matching arrow and in the SAME color as that arrow (the labels live
-    in the joint's markers node, so they follow the selection highlight too).
-    The letter height is proportional to the joint's size (its ``AxisLength``).
-    The labels exist only for the capture: they are removed right after it, so
-    the joint's axes are back to their normal state.
+    When ``object_name`` is a **joint**, its three axes are annotated with the
+    letters ``Z``, ``X`` and ``Y``, drawn just past the tip of the matching
+    arrow: identify EVERY axis by ITS LABEL. The letter height is proportional
+    to the joint's size (its ``AxisLength``). The labels exist only for the
+    capture: they are removed right after it, so the joint's axes are back to
+    their normal state.
     """
 
     def _impl() -> list[Any]:
@@ -2938,6 +3148,8 @@ def get_snapshot(
             raise RuntimeError('No active 3D view available.')
         # Visibility of the joints, saved to restore it after the snapshot.
         saved_joint_visibility: dict[str, bool] = {}
+        # Visibility of the sensor field-of-view zones, saved to restore it.
+        saved_fov_visibility: dict[str, bool] = {}
         # Axis labels added for the capture, removed right after it.
         added_axis_labels: list[tuple[Any, Any]] = []
         try:
@@ -2945,6 +3157,11 @@ def get_snapshot(
             # from a stable, readable angle. It is applied AFTER the fit/selection
             # so it keeps the framing just computed and only changes the viewpoint.
             view.viewIsometric()
+            # Hide the sensors' field-of-view zones BEFORE the fit: they are
+            # large translucent volumes that cover the parts and the joint axes
+            # and that would inflate the bounding box the camera is fitted to.
+            # Their visibility is saved and restored in the ``finally`` block.
+            saved_fov_visibility = _hide_sensor_fovs(doc)
             # The joint whose axes get labelled, if any.
             joint_obj: Optional[fc.DocumentObject] = None
             if object_name:
@@ -2973,9 +3190,9 @@ def get_snapshot(
 
             # Let the GUI process the view changes / redraw before capturing.
             QtGui.QApplication.processEvents()
-            if saved_joint_visibility:
-                # The joints' visibility was just changed: wait one second, all
-                # the while pumping the Qt event loop, so the 3D view has time to
+            if saved_joint_visibility or saved_fov_visibility:
+                # The visibility was just changed: wait one second, all the
+                # while pumping the Qt event loop, so the 3D view has time to
                 # finish rendering before the snapshot. Without this the captured
                 # image may still show the previous visibility state.
                 deadline = time.monotonic() + 1.0
@@ -2983,11 +3200,11 @@ def get_snapshot(
                     QtGui.QApplication.processEvents()
                     time.sleep(0.05)
             if joint_obj is not None:
-                # Annotate the joint's axes with the letters Z, X and Y, in the
-                # same color as the arrow each one belongs to. The labels are
-                # added to the joint's markers node, so they are highlighted
-                # together with the arrows (selection palette) and removed in
-                # the ``finally`` block below, restoring the normal state.
+                # Annotate the joint's axes with the letters Z, X and Y so each
+                # axis is identified by its label. The labels are added to the
+                # joint's markers node, so they are highlighted together with
+                # the arrows and removed in the ``finally`` block below,
+                # restoring the normal state.
                 # The camera's own orientation is passed so the letters face the
                 # viewer and stay upright (a billboard would tilt them). The view
                 # direction is passed too, so each label is pushed sideways off
@@ -3073,13 +3290,12 @@ def get_snapshot(
             # Remove the axis labels so the joint's axes are back to their
             # normal state (no letters) after the snapshot.
             _remove_joint_axis_labels(added_axis_labels)
-            # Restore the joints' visibility to its state before the snapshot.
-            for name, visible in saved_joint_visibility.items():
-                other = doc.getObject(name)
-                other_vo = getattr(other, 'ViewObject', None) if other is not None else None
-                if other_vo is not None:
-                    other_vo.Visibility = visible
-            if saved_joint_visibility or added_axis_labels:
+            # Restore the joints' and the sensor zones' visibility to the state
+            # before the snapshot (whether the capture succeeded or not).
+            _restore_view_visibilities(
+                doc, {**saved_joint_visibility, **saved_fov_visibility},
+            )
+            if saved_joint_visibility or saved_fov_visibility or added_axis_labels:
                 # Refresh the view so the restored state is shown immediately.
                 QtGui.QApplication.processEvents()
         return _snapshot_content_blocks(width, height, format, data)
@@ -3115,6 +3331,14 @@ tools. All tools operate on the **active FreeCAD document** and accept objects
 by `Name` or `Label`. The sections below are the recommended workflow; the
 **General algorithm** is the source of truth — follow it and resolve any
 contradictions in its favor.
+
+**USE `Label`, NOT `Name`, WHENEVER POSSIBLE.** Pass the `Label` (the
+human-readable one, e.g. `left wheel`; NOT the internal `l_wheel001_`) to every
+tool argument that takes an object, and name objects by their `Label` when
+reporting to the user. Pass the `Name` only if the Label is missing or
+ambiguous (`Ambiguous label "..."`). Subelement references
+(`real_l_...<inner>.<feature>.FaceN`) are path-based — take them from
+`Reference.prefix` of `get_objects_info([link])`.
 """
 
 #: Per-topic instruction snippets, in the order they are concatenated into the
@@ -3145,8 +3369,8 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    links were created.
 1. No active document? `create_document(name)`.
 2. `create_robot(name)`.
-3. `create_links_filled(robot, object_names)` — links from existing bodies; the
-   same body may be reused for several links.
+3. `create_links_filled(robot, object_labels)` — links from existing bodies
+   (pass their Labels); the same body may be reused for several links.
 4. Create joints: 2 neighbouring links at a time, root link first.
 5. `set_placement_vision_mode(robot)` — show Real, hide Visual/Collision.
 6. Position links pairwise along the chain with
@@ -3209,9 +3433,10 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
    the chassis, RGB-D camera on the manipulator aimed at the end tool). Attach
    each sensor to the link/joint it BELONGS to by meaning (never the root link
    by default). If a sensor link ALREADY exists, do NOT recreate it — position
-   it. Then verify the sensor FRAME (MANDATORY): X (red) = look direction,
-   Z (blue) = perpendicularly UP relative to the parent part, Y (green) = the
-   frame's LEFT. See the **Sensors** section.
+   it. Then verify the sensor FRAME (MANDATORY): X = look direction,
+   Z = perpendicularly UP relative to the parent part, Y = the frame's LEFT —
+   identify the axes by the ``X``/``Y``/``Z`` labels of
+   `get_snapshot('<joint>')`. See the **Sensors** section.
 8. Controllers and broadcasters: choose them from the robot's PURPOSE and its
    ACTUATED joints (see **Controllers and broadcasters**). Actuated joints
    require a `joint_state_broadcaster`; a chassis gets a drive controller suited
@@ -3225,7 +3450,7 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 11. `calculate_mass_and_inertia(robot)`.
 12. Inspect and verify with `list_scene_objects()`, `get_objects_info(...)`,
     `measure_geometry(...)`, `get_snapshot(...)`. Prefer ONE
-    `get_objects_info([...])` call with many names; pass an element (e.g. a
+    `get_objects_info([...])` call with many Labels; pass an element (e.g. a
     sensor's joint) to `get_snapshot(object_name=...)` to frame it up close.
     Every geometric value that must be EXACT (a gap, a wheel separation, a
     radius) is measured with `measure_geometry(...)`, never estimated from
@@ -3237,8 +3462,8 @@ _INSTRUCTIONS_BY_TOPIC: dict[str, str] = {
 - `create_document(name)` — new document (required if none is active).
 - `create_robot(name)` — empty `Cross::Robot`.
 - `create_link(robot, name, add_to_robot=True)` — empty `Cross::Link`.
-- `create_links_filled(robot, object_names)` — links filled with
-  Real/Visual from existing objects, in the given order.
+- `create_links_filled(robot, object_labels)` — links filled with
+  Real/Visual from existing objects (given by Label), in the given order.
 """,
     'positioning': """\
 ## Positioning
@@ -3321,9 +3546,12 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
 - `create_joint(robot, name, parent_link, child_link, type, lower,
   upper, effort, velocity)` — joint between two links; `type`: `fixed`,
   `revolute`, `prismatic`, `continuous`, ...; limits in degrees (revolute) or
-  mm (prismatic).
-- `create_joints_filled(robot, link_names_in_order, connect_type)` — auto
-  joints: `chain` = consecutive links, `spider` = all to the first link.
+  mm (prismatic). `name` is used ONLY when creating a joint WITHOUT links
+  (both `parent_link` and `child_link` empty); when both links are given the
+  joint is named automatically and `name` is ignored.
+- `create_joints_filled(robot, link_labels_in_order, connect_type)` — auto
+  joints over the given link Labels: `chain` = consecutive links, `spider` =
+  all to the first link.
 - `set_joint_values(robot, values)` — joint ROS names (or Labels) -> degrees
   (revolute) or mm (prismatic).
 """,
@@ -3349,8 +3577,8 @@ is NO `axis` parameter on `create_joint`. See the **General algorithm**
 - `set_material(object_name, material_card_path, density, card_name)` —
   `.FCMat` path or material name; `density` in kg/m^3 (optional, from the
   card if omitted).
-- `calculate_mass_and_inertia(robot_or_link_names)` — mass, inertia, center
-  of mass; robot name or list of link names.
+- `calculate_mass_and_inertia(robot_or_link_labels)` — mass, inertia, center
+  of mass; robot Label or a list of link Labels.
 """,
     'controllers': """\
 ## Controllers and broadcasters (ros2_control)
@@ -3482,30 +3710,28 @@ After positioning, ALWAYS verify the frame of the sensor's **parent joint** —
 MANDATORY and the step most often skipped, leaving the image LYING ON ITS SIDE.
 Check **ALL THREE axes — X, Y AND Z — one by one**; do NOT stop after X and Z:
 
-- **X (red) = the look direction**;
-- **Z (blue) = the top of the frame** — **perpendicularly UP relative to the
-  parent part**, NOT relative to the world and NOT along the look direction;
-- **Y (green) = the frame's LEFT** seen when looking at the sensor **from
-  behind**. A wrong Y means the frame is rolled about the look axis even when X
-  and Z look plausible.
-
-**Axis colors depend on the framing** — identify axes by LENGTH when in doubt
-(Z, up, is ALWAYS the longest arrow): **WITH `object_name`** (selection palette)
-Z = light-blue/cyan, X = pink, Y = turquoise; **NO `object_name`** (whole scene)
-Z = blue, X = red, Y = green.
+- **X = the look direction**;
+- **Z = the top of the frame** — **perpendicularly UP relative to the parent
+  part**, NOT relative to the world and NOT along the look direction;
+- **Y = the frame's LEFT** seen when looking at the sensor **from behind**. A
+  wrong Y means the frame is rolled about the look axis even when X and Z look
+  plausible.
 
 To judge the triad, zoom in on the sensor's **parent joint**:
 `get_snapshot('<joint>')` selects it, fits the view onto it, switches to
-ISOMETRIC, hides every OTHER joint for the capture (restored right after) and
-waits ONE SECOND (Qt events pumped) so the render is up to date. A snapshot with
-no argument fits the whole scene and is too far away to see the arrows.
+ISOMETRIC, hides the sensors' field-of-view zones and every OTHER joint for the
+capture (both restored right after) and waits ONE SECOND (Qt events pumped) so
+the render is up to date. The joint's axes are annotated with the letters ``X``,
+``Y`` and ``Z`` just past the arrow tips — **identify EVERY axis BY ITS LABEL**.
+A snapshot with no argument fits the whole scene and is too far away to see the
+arrows.
 
 Corrections — rotate the sensor's **parent joint** (never its link) with
 `rotate_object(joint_name, axis, angle_deg)`:
 
 - about **X** — tilts the frame forward/back; fixes Z (up). After
   `set_placement_between_sensor_link_and_parent` this is the roll you almost
-  always still need: rotate until Z points perpendicularly up (a sideways blue
+  always still need: rotate until Z points perpendicularly up (a sideways Z
   arrow means the image is on its side).
 - about **Z** — spins the frame left/right; aims a forward-looking sensor or the
   front of a horizontal lidar's sector.
@@ -3566,8 +3792,9 @@ For a joint sensor (e.g. a force-torque sensor) just
 
 - `list_scene_objects()` — scene description (robots, links, joints, other
   objects) with placements.
-- `get_objects_info(object_names, max_internal_geometry_items)` — details for
-  SEVERAL objects in ONE call (a LIST of names/Labels), merged into
+- `get_objects_info(object_labels, max_internal_geometry_items)` — details for
+  SEVERAL objects in ONE call (a LIST of Labels; a Name is accepted as a
+  fallback), merged into
   `{'status': 'ok', 'objects': {<name>: <info>, ...}}`; unresolvable names go
   under `errors`. ALWAYS prefer this batch call over repeated single lookups.
   Each entry has the basic info (Real, Visual, Collision, Mass, joint limits,
@@ -3598,9 +3825,11 @@ For a joint sensor (e.g. a force-torque sensor) just
 - `get_snapshot(width, height, format, object_name)` — 3D view capture as an MCP
   image block (not base64). `object_name` (e.g. a **joint**) selects it and fits
   the camera onto it so its axes fill the frame; empty = fit the WHOLE scene.
-  Always ISOMETRIC; a **joint** target hides every other joint for the capture
-  (restored right after) and waits one second so the render is up to date. Axis
-  colors depend on the framing — see the sensors topic.
+  Always ISOMETRIC; the **sensor field-of-view zones** are hidden for the capture
+  and a **joint** target also hides every other joint (both restored right after)
+  and waits one second so the render is up to date. A joint's axes are labelled
+  with the letters ``X``, ``Y`` and ``Z`` — identify them by the labels (see the
+  sensors topic).
 """,
     'best_practices': """\
 ## Best practices
@@ -3611,6 +3840,11 @@ For a joint sensor (e.g. a force-torque sensor) just
   collisions/materials.
 - Resolve exact names with `list_scene_objects()` / `get_objects_info()` and
   call `set_placement_vision_mode()` before positioning.
+- **Prefer `Label` over `Name`**: pass the human-readable `Label` to every tool
+  argument that takes an object and name objects by `Label` in everything you
+  report to the user; fall back to the internal `Name` only when the Label is
+  missing or ambiguous. Subelement paths (`Reference.prefix` + `.FaceN`) stay
+  Name-based.
 - Position with `set_placement_between()`; verify each step with
   `get_snapshot()`; fix orientation with `rotate_object()`.
 - Sides (left/right) of every part are defined **as seen from behind the
