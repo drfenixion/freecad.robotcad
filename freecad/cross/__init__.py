@@ -111,6 +111,26 @@ check_install_package('xmltodict')
 check_install_package('collada', 'pycollada')
 check_install_package('PyQt5')
 check_install_package('lxml')
+# install pinocchio for inverse kinematics
+check_install_package('pinocchio', 'pin')
+# cmeel uses .pth files that are not processed at runtime. Force them manually.
+try:
+    from pathlib import Path
+    package_path = add_packages_path()
+    pth_file = package_path / 'cmeel.pth'
+    print(f"[DEBUG] cmeel.pth file path: {pth_file.exists()}")
+    if pth_file.exists():
+        exec(pth_file.read_text(), {'__file__': str(pth_file), '__name__': '__main__'})
+        print(f"[DEBUG - cmeel.pth content]: {pth_file.read_text()}")    
+except Exception as e:
+    print(f"[DEBUG - cmeel] Error: {e}")
+
+# Check whether Pinocchio is importable later
+try:
+    import pinocchio as pin
+    print("[DEBUG - Pinocchio] Import OK after cmeel paths.")
+except Exception as e:
+    print(f"[DEBUG - Pinocchio] it keeps failing to import Pinocchio after cmeel paths. Error: {e}")
 
 # Must be imported after the call to `add_ros_library_path`.
 from freecad.cross.freecad_utils import warn

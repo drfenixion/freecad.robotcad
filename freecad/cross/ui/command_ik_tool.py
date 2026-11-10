@@ -35,6 +35,8 @@ dialog
 ┌─ IK Tool ──────────────────────────────────────────────┐
 │  End Effector: [tip_link ▼]                            │
 │                                                        │
+│  Select IK: [RoboTool/Pinocchio]                       │
+│                                                        │
 │  Target position (mm) [world frame]                    │
 │  X: [______]  Y: [______]  Z: [______]                 │
 │                                                        │
@@ -98,11 +100,22 @@ except ImportError:
 
 from ..gui_utils import tr
 from ..wb_utils import is_robot
+# Imports RoboTool
 from ..kinematics.models import Robot, Joint, Link
 from ..kinematics.kinematics import forward_kinematics
 from ..kinematics.inverse_kinematics import inverse_kinematics
 from ..kinematics.jacobians import compute_jacobian
-
+# Pinocchio - opcional
+try:
+    import pinocchio as pin
+    from ..pinocchio_backend.adapter_pinocchio import build_pin_model_from_robot
+    from ..pinocchio_backend.inverse_kinematics_pinocchio import inverse_kinematics as pin_ik
+    from ..pinocchio_backend.kinematics_pinocchio import get_ee_transform as pin_fk
+    _PINOCCHIO_AVAILABLE = True
+    print("[DEBUG - Pinocchio] Pinocchio is available and imported successfully.")
+except ImportError as e:
+    _PINOCCHIO_AVAILABLE = False
+    print(f'[DEBUG - Pinocchio] Import failed: {type(e).__name__}: {e}')
 # Default SLERP steps — overridable from the dialog spinbox.
 _N_STEPS_DEFAULT = 50
 
@@ -397,6 +410,8 @@ class _EFPoseObserver:
     def __init__(self, dialog: 'IKToolDialog') -> None:
         self._dialog = dialog
         self._solving = False   # guard: skip updates while Solve IK is running
+        self._pin_model = None
+        self._pin_data = None
 
     def slotRecomputedDocument(self, doc: fc.App.Document) -> None:
         """Called by FreeCAD after every document recompute."""
@@ -544,6 +559,24 @@ class IKToolDialog(QtWidgets.QDialog):
         lay_ee.addWidget(self._combo_ee)
         lay_ee.addStretch()
         root_layout.addWidget(grp_ee)
+
+        # Select to backend 
+        grp_backend = QtWidgets.QGroupBox(tr('IK Backend'))
+        lay_backend = QtWidgets.QHBoxLayout(grp_backend)
+        self._radio_robotool = QtWidgets.QRadioButton('RoboTool')
+        self._radio_pinocchio = QtWidgets.QRadioButton('Pinocchio')
+        self._radio_robotool.setChecked(True)
+
+        self._backend_group = QtWidgets.QButtonGroup(self)
+        self._backend_group.addButton(self._radio_robotool)
+        self._backend_group.addButton(self._radio_pinocchio)
+        
+        if not _PINOCCHIO_AVAILABLE:
+            self._radio_pinocchio.setEnabled(False)
+            self._radio_pinocchio.setToolTip(tr('Pinocchio not installed - run: pip instal pin'))
+        lay_backend.addWidget(self._radio_robotool)
+        lay_backend.addWidget(self._radio_pinocchio)
+        root_layout.addWidget(grp_backend)
 
         # Target position
         grp_target = QtWidgets.QGroupBox(tr('Target position (mm) — world frame'))
@@ -1021,6 +1054,18 @@ class IKToolDialog(QtWidgets.QDialog):
             self._btn_solve.setEnabled(False)
             return
 
+        # Construction the model to Pinocchio
+        if _PINOCCHIO_AVAILABLE:
+            try:
+                self._pin_model, self._pin_data = build_pin_model_from_robot(self._robot)
+                print(f"[DEBUG - Pinocchio] Model built successfully OK - Joints: {self._pin_model.njoints}, frame: {self._pin_model.nframes}")
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                print(f"[DEBUG - Pinocchio] build_pin_model_from_robot FAILED: {exc}")
+                self._radio_pinocchio.setEnabled(False)
+                self._radio_pinocchio.setToolTip(f'Pinocchio model error: {exc}')
+
         self._joint_objs = chain_joints
         n_joints = len(chain_joints)
 
@@ -1082,11 +1127,24 @@ class IKToolDialog(QtWidgets.QDialog):
         if not self._joint_objs or self._robot is None:
             return
 
+        # Evaluate backend 
+        use_pinocchio =(
+            self._radio_pinocchio.isChecked()
+            and _PINOCCHIO_AVAILABLE
+            and self._pin_model is not None
+        )
+        used_backend = "Pinocchio" if use_pinocchio else "RoboTool"
+
+        # Debug: print current joint positions to console
+        print(f"[DEBUG] radio_pinocchio checked: {self._radio_pinocchio.isChecked()}")
+        print(f"[DEBUG] _PINOCCHIO_AVAILABLE: {_PINOCCHIO_AVAILABLE}")
+        print(f"[DEBUG] pin_model: {getattr(self, '_pin_model', 'It does not exist')}")
+
         try:
             # Build R_target_world from RPY spinboxes
             roll  = np.deg2rad(self._spins['Roll'].value())
-            pitch = np.deg2rad(self._spins['Pitch'].value())
             yaw   = np.deg2rad(self._spins['Yaw'].value())
+            pitch = np.deg2rad(self._spins['Pitch'].value())
 
             Rx = np.array([
                 [1, 0,             0            ],
@@ -1161,75 +1219,114 @@ class IKToolDialog(QtWidgets.QDialog):
             # a tiny displacement (1% of total travel) to get a non-singular q
             # before the main SLERP loop. This prevents _escape_singularity from
             # landing on a random pose that becomes step 1 of the animation.
-            J_check = compute_jacobian(self._robot, q_current)
-            w_check = float(np.sqrt(max(0.0, np.linalg.det(
-                J_check[:3, :] @ J_check[:3, :].T
-            ))))
-            if w_check < 1e-4:
-                pos_prewarm = pos_start + 0.01 * (target_local - pos_start)
-                try:
-                    q_warm = inverse_kinematics(
-                        self._robot,
-                        target_position    = pos_prewarm,
-                        initial_guess      = q_current,
-                        target_rotation    = R_start,
-                        weight_position    = pos_weight,
-                        weight_orientation = 0.0,
-                        max_iterations     = max_iter,
-                        tolerance          = np.linalg.norm(target_local - pos_start) * 0.005,
-                        max_restarts       = restarts,
-                        verbose            = verbose,
-                        wrap_joints        = False,
-                    )
-                    if q_warm is not None:
-                        q_current = q_warm
-                except Exception:
-                    pass
+            # Pre-warm only RoboTool
+            if not use_pinocchio:
+                J_check = compute_jacobian(self._robot, q_current)
+                w_check = float(np.sqrt(max(0.0, np.linalg.det(
+                    J_check[:3, :] @ J_check[:3, :].T
+                ))))
+                if w_check < 1e-4:
+                    pos_prewarm = pos_start + 0.01 * (target_local - pos_start)
+                    try:
+                        q_warm = inverse_kinematics(
+                            self._robot,
+                            target_position    = pos_prewarm,
+                            initial_guess      = q_current,
+                            target_rotation    = R_start,
+                            weight_position    = pos_weight,
+                            weight_orientation = 0.0,
+                            max_iterations     = max_iter,
+                            tolerance          = np.linalg.norm(target_local - pos_start) * 0.005,
+                            max_restarts       = restarts,
+                            verbose            = verbose,
+                            wrap_joints        = False,
+                        )
+                        if q_warm is not None:
+                            q_current = q_warm
+                    except Exception:
+                        pass
 
             # Single transaction for the whole Solve — one undo entry, no
             # partial revert between steps that was causing the robot to
             # reset to home when starting a second Solve.
             self._observer._solving = True
             self._doc.openTransaction(tr('IK Tool – solve'))
+            transaction_success = False
 
-            for step in range(n_steps):
-                alpha      = (step + 1) / n_steps
-                pos_interp = pos_start + alpha * (target_local - pos_start)
-                R_interp   = _slerp_rotation(R_start, R_target_local, alpha)
-
-                try:
-                    q_new = inverse_kinematics(
-                        self._robot,
-                        target_position    = pos_interp,
-                        initial_guess      = q_current,
-                        target_rotation    = R_interp,
-                        weight_position    = pos_weight,
-                        weight_orientation = ori_weight,
-                        max_iterations     = max_iter,
-                        tolerance          = tolerance,
-                        max_restarts       = restarts,
-                        verbose            = verbose,
-                        wrap_joints        = False,
+            try:
+                if use_pinocchio:
+                # Pinocchio - a single direct solve to the final target in local frame 
+                    target_se3 = pin.SE3(R_target_local, target_local / 1000.0)
+                    ee_frame_name = self._joint_objs[-1].Child
+                    q_new, converged = pin_ik(
+                        self._pin_model, self._pin_data,
+                        q_init = q_current,
+                        ee_frame_name = ee_frame_name,
+                        target_pose = target_se3,
+                        max_iterations = max_iter,
+                        tolerance = tolerance / 1000, # Pinocchio works in the meters
+                        damping = 1e-6,
+                        verbose = verbose,
                     )
-                except Exception as solver_exc:
-                    self._lbl_status.setText(f'Solver exception at step {step+1}: {solver_exc}')
-                    break
+                    if converged:
+                        q_final = q_new
+                        steps_done = n_steps
+                        _write_joint_values(self._robot_obj, self._joint_objs, q_final)
+                        self._doc.recompute()
+                        fcgui.updateGui()
 
-                if q_new is None:
-                    break
+                    else:
+                        self._lbl_status.setText(
+                            tr('[Pinocchio] IK did not converge.' \
+                            ' Target may be outside the workspace.')
+                        )
+                else:
+                    for step in range(n_steps):
+                        alpha      = (step + 1) / n_steps
+                        pos_interp = pos_start + alpha * (target_local - pos_start)
+                        R_interp   = _slerp_rotation(R_start, R_target_local, alpha)
+
+                        try:
+                            q_new = inverse_kinematics(
+                                self._robot,
+                                target_position    = pos_interp,
+                                initial_guess      = q_current,
+                                target_rotation    = R_interp,
+                                weight_position    = pos_weight,
+                                weight_orientation = ori_weight,
+                                max_iterations     = max_iter,
+                                tolerance          = tolerance,
+                                max_restarts       = restarts,
+                                verbose            = verbose,
+                                wrap_joints        = False,
+                            )
+                        except Exception as solver_exc:
+                            self._lbl_status.setText(
+                                f'Solver exception at step {step+1}: {solver_exc}'
+                            )
+                            break
+
+                        if q_new is None:
+                            break
 
                 # Write values without recompute for smooth animation.
                 # The viewport refreshes via updateGui() after each step.
-                _write_joint_values(self._robot_obj, self._joint_objs, q_new)
-                self._doc.recompute()
-                fcgui.updateGui()
+                    _write_joint_values(self._robot_obj, self._joint_objs, q_new)
+                    self._doc.recompute()
+                    fcgui.updateGui()
 
-                q_current  = q_new
-                q_final    = q_new
-                steps_done += 1
+                    q_current  = q_new
+                    q_final    = q_new
+                    steps_done += 1
 
-            self._doc.commitTransaction()
-            self._observer._solving = False
+                transaction_success = True
+
+            finally:
+                if transaction_success:
+                    self._doc.commitTransaction()
+                else:
+                    self._doc.abortTransaction()
+                self._observer._solving = False
 
             if q_final is None:
                 self._lbl_status.setText(
@@ -1263,33 +1360,52 @@ class IKToolDialog(QtWidgets.QDialog):
                 T_world_solved  = T_world @ T_solved
                 achieved_world  = T_world_solved[:3, 3]
                 R_achieved      = T_world_solved[:3, :3]
-
+            except Exception as exc:
+                self._lbl_status.setText(f'FK verification failed: {exc}')
+                self._btn_apply.setEnabled(False)
+                return
+            # Marker + points - best effort 
+            try:
                 if self._ee_marker is None:
                     self._create_ee_marker()
-
                 self._update_ee_marker(T_world_solved)
                 self._update_ef_pose_display(T_world_solved)
                 self._ensure_measurement_points()
+            except Exception:
+                pass
 
-                pos_error = float(np.linalg.norm(target_world - achieved_world))
-                cos_angle = np.clip(
-                    (np.trace(R_achieved.T @ R_target_world) - 1) / 2,
-                    -1.0, 1.0
-                )
-                step_info = (
-                    f'partial: {steps_done}/{n_steps} steps'
-                    if steps_done < n_steps
-                    else f'{steps_done}/{n_steps} steps'
-                )
-                status_details = (
-                    f'Converged ({step_info})\n'
+            pos_error = float(np.linalg.norm(target_world - achieved_world))
+            cos_angle = float(np.clip(
+                (np.trace(R_achieved.T @ R_target_world) - 1) / 2, -1.0, 1.0
+            ))
+            ori_error_deg = float(np.rad2deg(np.arccos(cos_angle)))
+            step_info = (
+                f'partial: {steps_done}/{n_steps} steps'
+                if steps_done < n_steps
+                else f'{steps_done}/{n_steps} steps'
+            )
+            status_details = (
+                    f'[{used_backend}] Converged ({step_info})\n'
                     f'Target:   [{target_world[0]:.3f}, {target_world[1]:.3f}, {target_world[2]:.3f}] mm\n'
                     f'Achieved: [{achieved_world[0]:.3f}, {achieved_world[1]:.3f}, {achieved_world[2]:.3f}] mm\n'
                     f'Error:    {pos_error:.6f} mm\n'
-                    f'Error orientation: {np.rad2deg(np.arccos(cos_angle)):.2f} deg'
+                    f'Error orientation: {ori_error_deg:.2f} deg'
                 )
+            # Verbose Pinocchio - best effort
+            if use_pinocchio == 'Pinocchio' and verbose:
+                try:
+                    self._log.appendPlainText(
+                    f'[Pinocchio] frames: {[f.name for f in self._pin_model.frames]}\n'
+                    f'[Pinocchio] ee_frame_name: {ee_frame_name}\n'
+                    f'[Pinocchio] q_init: {q_current}\n'
+                    f'[Pinocchio] converged: {converged}\n'
+                    f'[Pinocchio] q_new: {q_new}'
+                    )
+                except Exception:
+                    pass 
 
                 # Log full result to the solve log panel.
+            try:
                 self._solve_count += 1
                 self._log_solve_result(
                     solve_n        = self._solve_count,
@@ -1304,7 +1420,7 @@ class IKToolDialog(QtWidgets.QDialog):
                     n_steps        = n_steps,
                 )
             except Exception as exc:
-                status_details = f'(FK verification failed: {exc})'
+                pass
 
             self._lbl_status.setText(status_details)
             self._btn_apply.setEnabled(True)
