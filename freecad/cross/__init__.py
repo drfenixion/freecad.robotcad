@@ -6,12 +6,17 @@ import subprocess
 import os
 import sys
 
+# Keep this import order: try `freecad.utils` first. This module is imported
+# before the GUI is up (FreeCAD.GuiUp == 0). Importing `addonmanager_utilities`
+# at that point caches `addonmanager_freecad_interface` without GUI support
+# (`loadUi` and `FreeCADGui` set to None), and the Addon Manager then fails
+# to open.
 try:
+    # For v0.22/v1.0+/v26+:
+    from freecad.utils import get_python_exe
+except (ModuleNotFoundError, ImportError, AttributeError):
     # For v0.21:
     from addonmanager_utilities import get_python_exe
-except (ModuleNotFoundError, ImportError, AttributeError):
-    # For v0.22/v1.0:
-    from freecad.utils import get_python_exe
 
 def add_packages_path():
     # dynamically add module to sys.path
