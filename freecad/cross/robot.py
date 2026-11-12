@@ -30,6 +30,8 @@ class Robot(DO):
     GenerateCodeForRosVersion: dict
     _Type: str
     Mass: float
+    InertiaCalculationMethod: str
+    InertiaCalculatorLogLevel: str
 
     def addObject(self, object_to_add: fc.DocumentObject) -> None: ...
     def removeObject(self, object_to_remove: fc.DocumentObject) -> DOList: ...
